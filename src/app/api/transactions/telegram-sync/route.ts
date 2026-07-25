@@ -4,7 +4,7 @@ import logger from "@/lib/logger";
 import { sendTelegramMessage, answerCallbackQuery } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
-import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile } from "@/lib/gemini";
+import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent } from "@/lib/gemini";
 
 const MAIN_MENU_KEYBOARD = {
   inline_keyboard: [
@@ -587,28 +587,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // ─── 0B. Conversational Financial Questions via Gemini AI ───
-    const isQuestionOrInquiry = /\b(what|how|why|who|can|show|tell|give|my|spending|spent|worth|balance|tips|advise|recommend|explain|predict)\b/i.test(cleanRaw) && !/\d{3,}/.test(cleanRaw);
+    // ─── 0B. Autonomous Gemini AI Decision Engine ───
+    const geminiApiKey = getGeminiApiKeyForProfile(profile);
+    if (geminiApiKey && !rawText.startsWith("cat_") && !rawText.startsWith("/")) {
+      try {
+        let totalNetWorth = 0;
+        if (accounts) {
+          totalNetWorth = accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0);
+        }
 
-    if (isQuestionOrInquiry && cleanRaw.length > 3 && !cleanRaw.startsWith("add") && !cleanRaw.startsWith("create") && !cleanRaw.startsWith("buy")) {
-      const geminiApiKey = getGeminiApiKeyForProfile(profile);
-      if (geminiApiKey) {
-        try {
-          let totalNetWorth = 0;
-          if (accounts) {
-            totalNetWorth = accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0);
+        const userContext = `User: ${profile.full_name || profile.username || 'User'}. Total Net Worth: ₹${totalNetWorth}. Accounts: ${JSON.stringify(accounts.map((a: any) => ({ id: a.id, name: a.name, bank_name: a.bank_name, balance: a.balance, type: a.type })))}. Family: ${JSON.stringify(familyMembers.map((f: any) => ({ id: f.id, name: f.name, relationship: f.relationship })))}. Base Currency: ${profile.base_currency || 'INR'}.`;
+
+        const decision = await parseAutonomousTelegramIntent(rawText, userContext, geminiApiKey);
+
+        if (decision && decision.action !== "UNKNOWN") {
+          // 1. Autonomous CREATE_ACCOUNT
+          if (decision.action === "CREATE_ACCOUNT") {
+            let accName = (decision.accountName || rawText.replace(/^(create|add)\s*(account|bank)\s*/i, "")).trim();
+            if (accName.length <= 5) accName = accName.toUpperCase();
+            else accName = accName.charAt(0).toUpperCase() + accName.slice(1);
+            const initialBalance = decision.initialBalance || 0;
+            const accType = decision.accountType || "checking";
+
+            const { data: rpcRes, error: rpcErr } = await supabase.rpc("create_account_atomic", {
+              p_user_id: profile.id,
+              p_name: accName,
+              p_type: accType,
+              p_balance: initialBalance,
+              p_currency: profile.base_currency || "INR",
+              p_bank_name: accName,
+            });
+
+            if (!rpcErr && rpcRes && typeof rpcRes === "object" && (rpcRes as any).success !== false) {
+              await sendTelegramMessage(
+                chatId,
+                `🤖 *Gemini AI Decision*: Created Bank Account!\n\n` +
+                `• *Account Name*: ${accName}\n` +
+                `• *Type*: ${accType.toUpperCase()}\n` +
+                `• *Initial Balance*: ₹${initialBalance.toLocaleString("en-IN")}\n` +
+                `• *Reasoning*: ${decision.reasoning || "Autonomously initialized bank account."}\n\n` +
+                `⚡ *Status*: Synced live with website dashboard.`,
+                MAIN_MENU_KEYBOARD
+              );
+              return NextResponse.json({ success: true });
+            }
           }
 
-          const contextSummary = `User Name: ${profile.full_name || profile.username || 'User'}. Total Net Worth: ₹${totalNetWorth}. Accounts: ${JSON.stringify(accounts || [])}. Goals: ${JSON.stringify(goals || [])}. Base Currency: ${profile.base_currency || 'INR'}.`;
-
-          const aiAnswer = await askGeminiFinanceAssistant(rawText, contextSummary, geminiApiKey);
-          if (aiAnswer) {
-            await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${aiAnswer}`, MAIN_MENU_KEYBOARD);
+          // 2. Autonomous FINANCIAL_QUERY
+          if (decision.action === "FINANCIAL_QUERY" && decision.replyMessage) {
+            await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`, MAIN_MENU_KEYBOARD);
             return NextResponse.json({ success: true });
           }
-        } catch (aiErr) {
-          console.warn("Gemini AI conversational query failed:", aiErr);
         }
+      } catch (geminiErr) {
+        console.warn("Autonomous Gemini decision failed, falling back to pattern matchers:", geminiErr);
       }
     }
 

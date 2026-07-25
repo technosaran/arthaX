@@ -241,9 +241,9 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { key: "all", label: "All", value: goals.length },
-              { key: "active", label: "Active", value: summary.active },
-              { key: "completed", label: "Completed", value: summary.completed },
+              { key: "all", label: "All" },
+              { key: "active", label: "Active" },
+              { key: "completed", label: "Completed" },
             ].map((filter) => (
               <button
                 key={filter.key}
@@ -255,7 +255,7 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
                     : "bg-white/5 border-white/10 text-[--text-muted]"
                 }`}
               >
-                {filter.label} ({filter.value})
+                {filter.label}
               </button>
             ))}
           </div>

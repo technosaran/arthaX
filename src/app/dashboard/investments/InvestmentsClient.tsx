@@ -27,6 +27,7 @@ export default function InvestmentsClient() {
 
   const { data: { investments, mutualFunds, bonds, forexAccounts, alternativeAssets, profile }, isLoading } = useFinanceData();
   const mounted = useHasMounted();
+  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
 
   // Dynamic modules check
   const enabledModules = useMemo(() => {
@@ -53,15 +54,20 @@ export default function InvestmentsClient() {
 
   const availableTabs = useMemo(() => {
     const list = [{ key: "overview", label: "Overview" }];
-    if (hasStocks) list.push({ key: "stocks", label: "Stocks" });
-    if (hasMF) list.push({ key: "mutual-funds", label: "Mutual Funds" });
-    list.push({ key: "crypto", label: "Crypto" });
-    if (hasBonds) list.push({ key: "bonds", label: "Bonds" });
-    if (hasFnO) list.push({ key: "fno", label: "FnO Trading" });
-    if (hasForex) list.push({ key: "forex", label: "Forex" });
-    if (hasAltAssets) list.push({ key: "alt-assets", label: "Alternative Assets" });
+    if (currencyMode === "USD") {
+      // USD mode: Overview + Forex + Crypto
+      if (hasForex) list.push({ key: "forex", label: "Forex" });
+      list.push({ key: "crypto", label: "Crypto" });
+    } else {
+      // INR mode: everything except Forex & Crypto
+      if (hasStocks) list.push({ key: "stocks", label: "Stocks" });
+      if (hasMF) list.push({ key: "mutual-funds", label: "Mutual Funds" });
+      if (hasBonds) list.push({ key: "bonds", label: "Bonds" });
+      if (hasFnO) list.push({ key: "fno", label: "FnO Trading" });
+      if (hasAltAssets) list.push({ key: "alt-assets", label: "Alternative Assets" });
+    }
     return list;
-  }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets]);
+  }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets, currencyMode]);
 
   const tabParam = searchParams.get("tab");
   const validTabParam = useMemo(() => {
@@ -120,7 +126,7 @@ export default function InvestmentsClient() {
     const rawPnLPercentINR = totalInvestedINR > 0 ? (totalPnLINR / totalInvestedINR) * 100 : 0;
     const totalPnLPercentINR = Number.isFinite(rawPnLPercentINR) ? rawPnLPercentINR : 0;
 
-    // 6. Forex & USD Stocks (Separate USD)
+    // 6. Forex & USD Stocks & Crypto (Unified USD Portfolio)
     const activeForex = forexAccounts.filter(f => Number(f.balance) > 0);
     const forexInvestedUSD = activeForex.reduce((sum, f) => {
       const amount = Number(f.total_deposited || 0) - Number(f.total_withdrawn || 0);
@@ -129,20 +135,17 @@ export default function InvestmentsClient() {
     const forexCurrentUSD = activeForex.reduce((sum, f) => sum + Number(f.balance || 0), 0);
     const forexRealizedUSD = forexAccounts.reduce((sum, f) => sum + Number(f.total_pnl || 0), 0);
 
-    const totalInvestedUSD = forexInvestedUSD + usdStocksInvested;
-    const totalCurrentUSD = forexCurrentUSD + usdStocksCurrent;
-    const totalRealizedUSD = forexRealizedUSD + usdStocksRealized;
-    const totalPnLUSD = (totalCurrentUSD - totalInvestedUSD) + totalRealizedUSD;
-    const rawPnLPercentUSD = totalInvestedUSD > 0 ? (totalPnLUSD / totalInvestedUSD) * 100 : 0;
-    const totalPnLPercentUSD = Number.isFinite(rawPnLPercentUSD) ? rawPnLPercentUSD : 0;
-
-    // 7. Crypto (Binance USDT / USD)
+    // Crypto (Binance USDT / USD)
     const activeCrypto = investments.filter(i => i.type === "crypto" && Number(i.quantity) > 0);
     const cryptoInvestedUSD = activeCrypto.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.buy_price)), 0);
     const cryptoCurrentUSD = activeCrypto.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.current_price)), 0);
-    const cryptoPnLUSD = cryptoCurrentUSD - cryptoInvestedUSD;
-    const rawCryptoPnLPercentUSD = cryptoInvestedUSD > 0 ? (cryptoPnLUSD / cryptoInvestedUSD) * 100 : 0;
-    const cryptoPnLPercentUSD = Number.isFinite(rawCryptoPnLPercentUSD) ? rawCryptoPnLPercentUSD : 0;
+
+    const totalInvestedUSDCombined = forexInvestedUSD + usdStocksInvested + cryptoInvestedUSD;
+    const totalCurrentUSDCombined = forexCurrentUSD + usdStocksCurrent + cryptoCurrentUSD;
+    const totalRealizedUSDCombined = forexRealizedUSD + usdStocksRealized;
+    const totalPnLUSDCombined = (totalCurrentUSDCombined - totalInvestedUSDCombined) + totalRealizedUSDCombined;
+    const rawPnLPercentUSDCombined = totalInvestedUSDCombined > 0 ? (totalPnLUSDCombined / totalInvestedUSDCombined) * 100 : 0;
+    const totalPnLPercentUSDCombined = Number.isFinite(rawPnLPercentUSDCombined) ? rawPnLPercentUSDCombined : 0;
 
     return {
       inr: {
@@ -157,24 +160,20 @@ export default function InvestmentsClient() {
         hasData: totalCurrentINR > 0 || totalInvestedINR > 0
       },
       usd: {
-        totalInvested: totalInvestedUSD,
-        totalCurrent: totalCurrentUSD,
-        totalPnL: totalPnLUSD,
-        totalPnLPercent: totalPnLPercentUSD,
-        hasData: totalCurrentUSD > 0 || totalInvestedUSD > 0
-      },
-      crypto: {
-        totalInvested: cryptoInvestedUSD,
-        totalCurrent: cryptoCurrentUSD,
-        totalPnL: cryptoPnLUSD,
-        totalPnLPercent: cryptoPnLPercentUSD,
-        hasData: cryptoCurrentUSD > 0 || cryptoInvestedUSD > 0
+        forexValue: forexCurrentUSD,
+        usdStocksValue: usdStocksCurrent,
+        cryptoValue: cryptoCurrentUSD,
+        totalInvested: totalInvestedUSDCombined,
+        totalCurrent: totalCurrentUSDCombined,
+        totalPnL: totalPnLUSDCombined,
+        totalPnLPercent: totalPnLPercentUSDCombined,
+        hasData: totalCurrentUSDCombined > 0 || totalInvestedUSDCombined > 0
       }
     };
   }, [investments, mutualFunds, bonds, forexAccounts, alternativeAssets]);
 
   // Donut chart data for INR portfolio allocation
-  const allocationData = useMemo(() => {
+  const allocationDataINR = useMemo(() => {
     const data = [];
     if (portfolioStats.inr.stocksValue > 0) {
       data.push({ name: "Stocks", value: portfolioStats.inr.stocksValue, fill: getColorByLabel("Stocks") });
@@ -187,6 +186,21 @@ export default function InvestmentsClient() {
     }
     if (portfolioStats.inr.altValue > 0) {
       data.push({ name: "Alternative Assets", value: portfolioStats.inr.altValue, fill: getColorByLabel("Alt Assets") });
+    }
+    return data;
+  }, [portfolioStats]);
+
+  // Donut chart data for USD portfolio allocation
+  const allocationDataUSD = useMemo(() => {
+    const data = [];
+    if (portfolioStats.usd.forexValue > 0) {
+      data.push({ name: "Forex Trading", value: portfolioStats.usd.forexValue, fill: "#06B6D4" });
+    }
+    if (portfolioStats.usd.usdStocksValue > 0) {
+      data.push({ name: "US Equities", value: portfolioStats.usd.usdStocksValue, fill: "#38BDF8" });
+    }
+    if (portfolioStats.usd.cryptoValue > 0) {
+      data.push({ name: "Crypto (USDT)", value: portfolioStats.usd.cryptoValue, fill: "#8B5CF6" });
     }
     return data;
   }, [portfolioStats]);
@@ -211,6 +225,32 @@ export default function InvestmentsClient() {
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white uppercase italic">Investments Hub</h1>
           <p className="text-sm text-[--text-secondary] mt-1">Multi-asset portfolio management, equity, mutual funds &amp; alternative assets.</p>
         </div>
+
+        {/* Currency Switcher Toggle in Top Right */}
+        <div className="flex items-center gap-1 p-1.5 bg-white/[0.03] border border-white/10 rounded-2xl shadow-xl self-start sm:self-auto backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => { setCurrencyMode("INR"); setCustomTab("overview"); }}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+              currencyMode === "INR"
+                ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-100"
+                : "text-[--text-muted] hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span className="text-sm">🇮🇳</span> INR Portfolio (₹)
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCurrencyMode("USD"); setCustomTab("overview"); }}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+              currencyMode === "USD"
+                ? "bg-sky-500 text-white shadow-[0_0_20px_rgba(14,165,233,0.4)] scale-100"
+                : "text-[--text-muted] hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span className="text-sm">💵</span> USD Investments ($)
+          </button>
+        </div>
       </div>
 
       {/* Premium Segmented Toggle Bar */}
@@ -218,7 +258,6 @@ export default function InvestmentsClient() {
         {availableTabs.map((tab) => {
           const isActive = activeTab === tab.key;
           
-          // Get specific color styling based on the active tab key
           let activeStyles = "bg-[--accent-primary] text-white shadow-[0_0_20px_rgba(99,102,241,0.3)]";
           if (tab.key === "stocks") activeStyles = "bg-sky-500 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)]";
           else if (tab.key === "mutual-funds") activeStyles = "bg-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)]";
@@ -248,98 +287,65 @@ export default function InvestmentsClient() {
       {/* Content Rendering */}
       {activeTab === "overview" && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* INR Portfolio Summary stats */}
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">INR Portfolio (Stocks, Mutual Funds, Bonds, Alt Assets)</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="glass-card-static p-6 border-white/5">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
-                <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalInvested)}</p>
-                <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">INR Principal</p>
-              </div>
-              <div className="glass-card-static p-6 border-white/5">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Value</p>
-                <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalCurrent)}</p>
-                <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value</p>
-              </div>
-              <div className="glass-card-static p-6 border-white/5">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Portfolio P&amp;L</p>
-                <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
-                  {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{formatINR(portfolioStats.inr.totalPnL)}
-                </p>
-                <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Return</p>
-              </div>
-              <div className="glass-card-static p-6 border-white/5">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Percentage ROI</p>
-                <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
-                  {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{portfolioStats.inr.totalPnLPercent.toFixed(2)}%
-                </p>
-                <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Gain/Loss %</p>
+          {currencyMode === "INR" ? (
+            /* INR Portfolio Summary stats */
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">INR Portfolio (Stocks, Mutual Funds, Bonds, Alt Assets)</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-card-static p-6 border-white/5">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
+                  <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalInvested)}</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">INR Principal</p>
+                </div>
+                <div className="glass-card-static p-6 border-white/5">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Value</p>
+                  <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalCurrent)}</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value</p>
+                </div>
+                <div className="glass-card-static p-6 border-white/5">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Portfolio P&amp;L</p>
+                  <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
+                    {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{formatINR(portfolioStats.inr.totalPnL)}
+                  </p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Return</p>
+                </div>
+                <div className="glass-card-static p-6 border-white/5">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Percentage ROI</p>
+                  <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
+                    {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{portfolioStats.inr.totalPnLPercent.toFixed(2)}%
+                  </p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Gain/Loss %</p>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* USD Forex Summary stats */}
-          {portfolioStats.usd.hasData && (
+          ) : (
+            /* USD Portfolio Summary stats */
             <div>
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">USD Portfolio (Forex Trading)</h2>
+              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">USD Dollars Portfolio (Forex Trading, US Equities, Crypto USDT)</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card-static p-6 border-white/5">
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.usd.totalInvested)}</p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Forex Capital</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">USD Principal ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Balance</p>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Equity</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.usd.totalCurrent)}</p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Forex Equity</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Forex P&amp;L</p>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">USD P&amp;L</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.usd.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.usd.totalPnL >= 0 ? "+" : ""}{formatUSD(portfolioStats.usd.totalPnL)}
                   </p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Profit/Loss</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Gain/Loss ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Percentage ROI</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.usd.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.usd.totalPnL >= 0 ? "+" : ""}{portfolioStats.usd.totalPnLPercent.toFixed(2)}%
                   </p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Forex ROI %</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Crypto Portfolio Summary stats ($ USDT) */}
-          {portfolioStats.crypto.hasData && (
-            <div>
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Crypto Portfolio ($ USDT)</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
-                  <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.crypto.totalInvested)}</p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Crypto Capital</p>
-                </div>
-                <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Value</p>
-                  <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.crypto.totalCurrent)}</p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value</p>
-                </div>
-                <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Crypto P&amp;L</p>
-                  <p className={`text-2xl md:text-3xl font-black ${portfolioStats.crypto.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
-                    {portfolioStats.crypto.totalPnL >= 0 ? "+" : ""}{formatUSD(portfolioStats.crypto.totalPnL)}
-                  </p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Profit/Loss</p>
-                </div>
-                <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Portfolio ROI</p>
-                  <p className={`text-2xl md:text-3xl font-black ${portfolioStats.crypto.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
-                    {portfolioStats.crypto.totalPnL >= 0 ? "+" : ""}{portfolioStats.crypto.totalPnLPercent.toFixed(2)}%
-                  </p>
-                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Crypto ROI %</p>
+                  <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">USD ROI %</p>
                 </div>
               </div>
             </div>
@@ -349,110 +355,180 @@ export default function InvestmentsClient() {
             {/* Value Allocation Breakdown */}
             <div className="glass-card-static p-6 lg:col-span-2 flex flex-col justify-between min-h-[350px]">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[--text-muted] mb-6">Asset Value Distribution</h3>
-                <div className="space-y-6">
-                  {hasStocks && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-white">Equity Holdings (Stocks)</span>
-                        <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.stocksValue)}</span>
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[--text-muted] mb-6">
+                  {currencyMode === "INR" ? "INR Asset Value Distribution" : "USD Asset Value Distribution"}
+                </h3>
+                {currencyMode === "INR" ? (
+                  <div className="space-y-6">
+                    {hasStocks && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-white">Equity Holdings (Stocks)</span>
+                          <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.stocksValue)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full" 
+                            style={{ 
+                              width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.stocksValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
+                              backgroundColor: getColorByLabel("Stocks")
+                            }} 
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full" 
-                          style={{ 
-                            width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.stocksValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
-                            backgroundColor: getColorByLabel("Stocks")
-                          }} 
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {hasMF && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-white">Mutual Funds Portfolio</span>
-                        <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.mfValue)}</span>
+                    {hasMF && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-white">Mutual Funds Portfolio</span>
+                          <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.mfValue)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full" 
+                            style={{ 
+                              width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.mfValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
+                              backgroundColor: getColorByLabel("Mutual Funds")
+                            }} 
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full" 
-                          style={{ 
-                            width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.mfValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
-                            backgroundColor: getColorByLabel("Mutual Funds")
-                          }} 
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {hasBonds && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-white">Fixed Income (Bonds)</span>
-                        <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.bondsValue)}</span>
+                    {hasBonds && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-white">Fixed Income (Bonds)</span>
+                          <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.bondsValue)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full" 
+                            style={{ 
+                              width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.bondsValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
+                              backgroundColor: getColorByLabel("Bonds")
+                            }} 
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full" 
-                          style={{ 
-                            width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.bondsValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
-                            backgroundColor: getColorByLabel("Bonds")
-                          }} 
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {hasAltAssets && (
+                    {hasAltAssets && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-white">Alternative Assets</span>
+                          <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.altValue)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full" 
+                            style={{ 
+                              width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.altValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
+                              backgroundColor: getColorByLabel("Alt Assets")
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold">
-                        <span className="text-white">Alternative Assets</span>
-                        <span className="text-[--text-secondary]">{formatINR(portfolioStats.inr.altValue)}</span>
+                        <span className="text-white">Forex Trading Accounts</span>
+                        <span className="text-[--text-secondary]">{formatUSD(portfolioStats.usd.forexValue)}</span>
                       </div>
                       <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
                         <div 
-                          className="h-full rounded-full" 
+                          className="h-full bg-cyan-400 rounded-full" 
                           style={{ 
-                            width: `${portfolioStats.inr.totalCurrent > 0 ? (portfolioStats.inr.altValue / portfolioStats.inr.totalCurrent) * 100 : 0}%`,
-                            backgroundColor: getColorByLabel("Alt Assets")
+                            width: `${portfolioStats.usd.totalCurrent > 0 ? (portfolioStats.usd.forexValue / portfolioStats.usd.totalCurrent) * 100 : 0}%` 
                           }} 
                         />
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-white">US Equities / Stocks</span>
+                        <span className="text-[--text-secondary]">{formatUSD(portfolioStats.usd.usdStocksValue)}</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-sky-400 rounded-full" 
+                          style={{ 
+                            width: `${portfolioStats.usd.totalCurrent > 0 ? (portfolioStats.usd.usdStocksValue / portfolioStats.usd.totalCurrent) * 100 : 0}%` 
+                          }} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-white">Crypto Assets ($ USDT)</span>
+                        <span className="text-[--text-secondary]">{formatUSD(portfolioStats.usd.cryptoValue)}</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-violet-400 rounded-full" 
+                          style={{ 
+                            width: `${portfolioStats.usd.totalCurrent > 0 ? (portfolioStats.usd.cryptoValue / portfolioStats.usd.totalCurrent) * 100 : 0}%` 
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Allocation Donut Chart */}
             <div className="glass-card-static p-6 flex flex-col items-center justify-center relative min-h-[350px]">
-              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-6 left-6">INR Asset Allocation</h3>
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-6 left-6">
+                {currencyMode === "INR" ? "INR Allocation" : "USD Allocation"}
+              </h3>
               <div className="w-full h-[220px] mt-4">
-                {mounted && portfolioStats.inr.hasData ? (
+                {mounted && (currencyMode === "INR" ? portfolioStats.inr.hasData : portfolioStats.usd.hasData) ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={allocationData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={4} dataKey="value">
-                        {allocationData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
+                      <Pie 
+                        data={currencyMode === "INR" ? allocationDataINR : allocationDataUSD} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius={55} 
+                        outerRadius={75} 
+                        paddingAngle={4} 
+                        dataKey="value"
+                      >
+                        {(currencyMode === "INR" ? allocationDataINR : allocationDataUSD).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />
+                        ))}
                       </Pie>
                       <RechartsTooltip 
                         contentStyle={{ backgroundColor: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
                         itemStyle={{ color: "#fff", fontWeight: "bold" }}
-                        formatter={(value: any) => [`₹${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Value"]}
+                        formatter={(value: any) => [
+                          currencyMode === "INR" 
+                            ? `₹${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                          "Value"
+                        ]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
                      <span className="text-3xl mb-2">📊</span>
-                     <span className="text-xs uppercase tracking-widest font-black">No INR Assets Loaded</span>
+                     <span className="text-xs uppercase tracking-widest font-black">
+                       {currencyMode === "INR" ? "No INR Assets Loaded" : "No USD Assets Loaded"}
+                     </span>
                   </div>
                 )}
               </div>
-              {portfolioStats.inr.hasData && (
+              {(currencyMode === "INR" ? portfolioStats.inr.hasData : portfolioStats.usd.hasData) && (
                 <div className="flex flex-wrap justify-center gap-4 mt-2 w-full">
-                  {allocationData.map((entry, index) => (
+                  {(currencyMode === "INR" ? allocationDataINR : allocationDataUSD).map((entry, index) => (
                     <div key={index} className="flex items-center gap-1.5 text-xs">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
                       <span className="text-[--text-secondary] font-semibold">{entry.name}</span>
@@ -465,13 +541,15 @@ export default function InvestmentsClient() {
         </div>
       )}
 
-      {activeTab === "stocks" && hasStocks && <StocksClient />}
-      {activeTab === "mutual-funds" && hasMF && <MutualFundsClient />}
-      {activeTab === "crypto" && <CryptoClient />}
-      {activeTab === "bonds" && hasBonds && <BondsClient />}
-      {activeTab === "fno" && hasFnO && <FnoClient />}
-      {activeTab === "forex" && hasForex && <ForexClient />}
-      {activeTab === "alt-assets" && hasAltAssets && <AlternativeAssetsClient isSubComponent />}
+      {/* INR sub-clients */}
+      {currencyMode === "INR" && activeTab === "stocks" && hasStocks && <StocksClient />}
+      {currencyMode === "INR" && activeTab === "mutual-funds" && hasMF && <MutualFundsClient />}
+      {currencyMode === "INR" && activeTab === "bonds" && hasBonds && <BondsClient />}
+      {currencyMode === "INR" && activeTab === "fno" && hasFnO && <FnoClient />}
+      {currencyMode === "INR" && activeTab === "alt-assets" && hasAltAssets && <AlternativeAssetsClient isSubComponent />}
+      {/* USD sub-clients: Forex + Crypto */}
+      {currencyMode === "USD" && activeTab === "forex" && hasForex && <ForexClient />}
+      {currencyMode === "USD" && activeTab === "crypto" && <CryptoClient />}
     </div>
   );
 }

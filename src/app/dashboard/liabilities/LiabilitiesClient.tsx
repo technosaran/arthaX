@@ -20,8 +20,8 @@ const Legend = dynamic(() => import("recharts").then((mod) => mod.Legend), { ssr
 const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
 const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
 const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
-const AreaChart = dynamic(() => import("recharts").then((mod) => mod.AreaChart), { ssr: false });
-const Area = dynamic(() => import("recharts").then((mod) => mod.Area), { ssr: false });
+const BarChart = dynamic(() => import("recharts").then((mod) => mod.BarChart), { ssr: false });
+const Bar = dynamic(() => import("recharts").then((mod) => mod.Bar), { ssr: false });
 const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
 
 import LiabilitiesDataTable from "./components/LiabilitiesDataTable";
@@ -336,8 +336,8 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
         <div className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
           {[
             { key: "overview", label: "Overview" },
-            { key: "records", label: "Debt Records", badge: liabilities.length },
-            { key: "history", label: "Loan History", badge: loanHistoryLogs.length }
+            { key: "records", label: "Debt Records" },
+            { key: "history", label: "Loan History" }
           ].map((tab) => {
             const isActive = activeView === tab.key;
             
@@ -356,13 +356,6 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
                 }`}
               >
                 {tab.label}
-                {tab.badge !== undefined && (
-                  <span className={`flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1.5 text-[0.5rem] font-black ${
-                    isActive ? "bg-white/20 text-white" : "bg-white/10 text-white"
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -380,32 +373,22 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
                     <p className="text-2xl font-black mt-2 text-white">Paydown Analysis</p>
                   </div>
                 </div>
-                <div className="flex-1 min-h-[250px] w-full mt-4 -ml-4">
+                <div className="flex-1 min-h-[260px] w-full mt-4 -ml-4">
                   {mounted && (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={barChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="paidGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                          </linearGradient>
-                          <linearGradient id="remainingGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <BarChart data={barChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} barGap={6}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
-                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }} />
+                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }} />
                         <RechartsTooltip 
-                          contentStyle={{ backgroundColor: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}
+                          contentStyle={{ backgroundColor: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", boxShadow: "0 10px 25px rgba(0,0,0,0.6)" }}
                           itemStyle={{ color: "#fff", fontWeight: "bold" }}
                           formatter={(value: any, name: any) => [`₹${Number(value).toLocaleString()}`, name]}
                         />
                         <Legend wrapperStyle={{ paddingTop: "15px" }} />
-                        <Area type="monotone" dataKey="Paid" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#paidGrad)" />
-                        <Area type="monotone" dataKey="Remaining" stroke="#F43F5E" strokeWidth={3} fillOpacity={1} fill="url(#remainingGrad)" />
-                      </AreaChart>
+                        <Bar dataKey="Paid" name="Cleared / Paid" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                        <Bar dataKey="Remaining" name="Remaining Debt" fill="#F43F5E" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                      </BarChart>
                     </ResponsiveContainer>
                   )}
                 </div>
@@ -414,20 +397,26 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               {/* Allocation Pie Chart */}
               <div className="glass-card-static p-6 flex flex-col items-center justify-center relative min-h-[400px]">
                 <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-6 left-6">Debt Exposure</h3>
-                <div className="w-full h-[250px] mt-8">
+                <div className="w-full h-[250px] mt-6 relative flex items-center justify-center">
                   {mounted && pieChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value">
-                          {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
-                        </Pie>
-                        <RechartsTooltip 
-                          contentStyle={{ backgroundColor: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
-                          itemStyle={{ color: "#fff", fontWeight: "bold" }}
-                          formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, "Debt"]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={65} outerRadius={88} paddingAngle={4} dataKey="value">
+                            {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
+                          </Pie>
+                          <RechartsTooltip 
+                            contentStyle={{ backgroundColor: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px" }}
+                            itemStyle={{ color: "#fff", fontWeight: "bold" }}
+                            formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, "Debt"]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                        <span className="text-[0.5625rem] font-black uppercase tracking-widest text-[--text-muted]">Total Exposure</span>
+                        <span className="text-sm font-black text-rose-400 mt-0.5">₹{stats.totalDebt.toLocaleString()}</span>
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
                        <span className="text-3xl mb-2">📊</span>
@@ -440,7 +429,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
                     {pieChartData.slice(0, 5).map((entry, index) => (
                       <div key={index} className="flex items-center gap-1.5 text-xs">
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
-                        <span className="text-[--text-secondary] font-medium">{entry.name}</span>
+                        <span className="text-[--text-secondary] font-semibold">{entry.name}</span>
                       </div>
                     ))}
                   </div>

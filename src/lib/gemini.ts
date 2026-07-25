@@ -147,6 +147,102 @@ Only output raw JSON without markdown code blocks.`;
   }
 }
 
+export interface GeminiAutonomousDecision {
+  action: "CREATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "UNKNOWN";
+  accountName?: string | null;
+  accountType?: "checking" | "savings" | "credit" | "investment" | "cash" | null;
+  initialBalance?: number | null;
+  amount?: number | null;
+  category?: string | null;
+  description?: string | null;
+  targetAccountName?: string | null;
+  fromAccountName?: string | null;
+  toAccountName?: string | null;
+  familyMemberName?: string | null;
+  symbol?: string | null;
+  quantity?: number | null;
+  price?: number | null;
+  fundName?: string | null;
+  replyMessage?: string | null;
+  reasoning?: string | null;
+}
+
+export async function parseAutonomousTelegramIntent(
+  text: string,
+  userContext: string,
+  apiKey: string
+): Promise<GeminiAutonomousDecision> {
+  try {
+    const systemPrompt = `You are the Autonomous Financial AI Engine for FinanceOS & Telegram.
+Analyze user natural language messages and autonomously decide what financial action to execute.
+
+User's Live Financial Context (Existing Accounts, Balances, Family):
+${userContext}
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "action": "CREATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "UNKNOWN",
+  "accountName": string or null (e.g. "SBI", "HDFC", "ICICI"),
+  "accountType": "checking" | "savings" | "credit" | "investment" | "cash" or null (default "checking" for banks),
+  "initialBalance": number or null,
+  "amount": number or null,
+  "category": "Food" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Health" | "Housing" | "Salary" | "Gift" | "Work" | "Investments" | "Other" or null,
+  "description": string or null,
+  "targetAccountName": string or null,
+  "fromAccountName": string or null,
+  "toAccountName": string or null,
+  "familyMemberName": string or null,
+  "symbol": string or null,
+  "quantity": number or null,
+  "price": number or null,
+  "fundName": string or null,
+  "replyMessage": string or null,
+  "reasoning": string or null
+}
+
+Action Selection Rules:
+1. "CREATE_ACCOUNT": If user asks to create, add, or open a bank/account (e.g. "create account SBI", "add account HDFC 5000", "create account sbi 200"). Extract accountName ("SBI"), accountType ("checking"), initialBalance (e.g. 200 or 0).
+2. "LOG_EXPENSE": If user spent money (e.g. "500 Swiggy", "paid 1200 rent").
+3. "LOG_INCOME": If user received money (e.g. "50000 salary credited", "got 2000 refund").
+4. "FAMILY_TRANSFER": If user transferred money to family (e.g. "sent 1000 to Mom").
+5. "BUY_STOCK": If user bought stocks (e.g. "bought 10 shares of SBI at 800").
+6. "BUY_MUTUAL_FUND": If user invested in mutual fund (e.g. "invested 5000 in Parag Parikh Flexi Cap").
+7. "TRANSFER_BETWEEN_ACCOUNTS": If user transferred between own accounts (e.g. "moved 5000 from HDFC to SBI").
+8. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, or summary. Provide friendly concise markdown in "replyMessage".
+
+Output raw JSON with no markdown tags.`;
+
+    const resultText = await callGeminiApi(apiKey, `User message: "${text}"`, systemPrompt);
+    const cleanedJson = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleanedJson);
+
+    return {
+      action: parsed.action || "UNKNOWN",
+      accountName: parsed.accountName || null,
+      accountType: parsed.accountType || "checking",
+      initialBalance: typeof parsed.initialBalance === "number" ? parsed.initialBalance : null,
+      amount: typeof parsed.amount === "number" ? parsed.amount : null,
+      category: parsed.category || null,
+      description: parsed.description || null,
+      targetAccountName: parsed.targetAccountName || null,
+      fromAccountName: parsed.fromAccountName || null,
+      toAccountName: parsed.toAccountName || null,
+      familyMemberName: parsed.familyMemberName || null,
+      symbol: parsed.symbol || null,
+      quantity: typeof parsed.quantity === "number" ? parsed.quantity : null,
+      price: typeof parsed.price === "number" ? parsed.price : null,
+      fundName: parsed.fundName || null,
+      replyMessage: parsed.replyMessage || null,
+      reasoning: parsed.reasoning || null,
+    };
+  } catch (error: any) {
+    return {
+      action: "UNKNOWN",
+      reasoning: error.message || "Failed to process autonomous intent",
+    };
+  }
+}
+
 /**
  * Conversational AI Assistant for financial questions & advice
  */

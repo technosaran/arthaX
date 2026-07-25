@@ -541,7 +541,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           </div>
         </div>
 
-        <div className="hidden table-responsive-wrapper md:block">
+        <div className="hidden table-responsive-wrapper md:block max-h-[500px] overflow-y-auto custom-scrollbar relative">
           {incomes.length === 0 ? (
             <EmptyState
               title="Track Your Wealth Inflow"
@@ -559,8 +559,8 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             />
           ) : (
             <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="bg-white/[0.02] border-b border-white/5">
+              <thead className="sticky top-0 z-10 bg-[#12151c] shadow-sm">
+                <tr className="border-b border-white/5">
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Date</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Source</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Segment</th>
@@ -623,7 +623,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         </div>
 
         {/* Mobile card list feed for incomes */}
-        <div className="divide-y divide-white/10 md:hidden">
+        <div className="divide-y divide-white/10 md:hidden max-h-[500px] overflow-y-auto custom-scrollbar">
           {filteredIncomes.length === 0 ? (
             <div className="p-8 text-center text-[--text-muted] text-xs italic">
               No transactions found matching your criteria.

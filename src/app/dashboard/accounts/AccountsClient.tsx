@@ -10,6 +10,8 @@ import BankLogo from "@/components/ui/bank-logo";
 import { searchBanks, type Bank } from "@/lib/banks";
 import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance } from "./actions";
 import { Drawer } from "@/components/ui/drawer";
+import { X } from "lucide-react";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { getChartColour } from "@/lib/chart-colours";
@@ -981,44 +983,44 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
       )}
     </div>
 
-      {/* DRAWERS */}
-      <Drawer
+      {/* CENTERED DATA ENTRY MODALS */}
+      <CenteredModal
         isOpen={showForm}
         onClose={resetForm}
         title={editingId ? "Update Account" : "Open New Account"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-3">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Account Label</label>
-            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium" placeholder="e.g. Primary Savings" autoComplete="new-password" />
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Account Label</label>
+            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium py-2 text-xs" placeholder="e.g. Primary Savings" autoComplete="new-password" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Asset Category</label>
-              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Asset Category</label>
+              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium py-2 text-xs">
                 {Object.keys(TYPE_STYLES).map(t => <option key={t} value={t} className="bg-[#181A20] text-white font-medium">{t.toUpperCase()}</option>)}
               </select>
             </div>
-            <div className="space-y-3">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Currency</label>
-              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Currency</label>
+              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium py-2 text-xs">
                 <option value="INR" className="bg-[#181A20] text-white font-medium">INR (₹)</option>
                 <option value="USD" className="bg-[#181A20] text-white font-medium">USD ($)</option>
               </select>
             </div>
           </div>
           {!editingId && (
-            <div className="space-y-3">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Opening Balance</label>
-              <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Opening Balance</label>
+              <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium py-2 text-xs" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
             </div>
           )}
-          <div ref={searchContainerRef} className="relative space-y-3">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Bank Institution</label>
+          <div ref={searchContainerRef} className="relative space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Bank Institution</label>
             <div className="relative flex items-center">
               {bankSearch.trim().length > 0 && (
-                <div className="absolute left-3 flex items-center pointer-events-none z-10">
-                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={26} />
+                <div className="absolute left-2.5 flex items-center pointer-events-none z-10">
+                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={22} />
                 </div>
               )}
               <input 
@@ -1030,42 +1032,42 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     setBankResults(results);
                   }
                 }}
-                className={`input-premium w-full ${bankSearch.trim().length > 0 ? "!pl-12" : ""}`} 
+                className={`input-premium py-2 text-xs w-full ${bankSearch.trim().length > 0 ? "!pl-10" : ""}`} 
                 placeholder="Search Banks (e.g. SBI, HDFC, ICICI, Chase)..." 
                 autoComplete="off" 
               />
             </div>
             {bankResults.length > 0 && (
               <div 
-                className="absolute top-full left-0 right-0 mt-2 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-48 custom-scrollbar"
+                className="absolute top-full left-0 right-0 mt-1.5 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-40 custom-scrollbar"
                 style={{ backgroundColor: "rgba(21, 27, 38, 0.98)", backdropFilter: "blur(12px)" }}
               >
-                {bankResults.slice(0, 10).map(b => (
+                {bankResults.slice(0, 8).map(b => (
                   <button
                     key={b.name}
                     type="button"
                     onClick={() => selectBank(b)}
-                    className="w-full p-3.5 flex items-center gap-3 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
+                    className="w-full p-2.5 flex items-center gap-2.5 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
                   >
-                    <BankLogo bankName={b.name} accountName={b.name} size={32} />
+                    <BankLogo bankName={b.name} accountName={b.name} size={26} />
                     <div>
-                      <p className="font-bold text-sm text-white">{b.name}</p>
-                      <p className="text-xs text-[--text-muted]">{b.domain}</p>
+                      <p className="font-bold text-xs text-white">{b.name}</p>
+                      <p className="text-[10px] text-[--text-muted]">{b.domain}</p>
                     </div>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <div className="pt-2 mt-4">
-            <button type="submit" disabled={submitting} className="btn-primary w-full h-11 shadow-xl shadow-[--accent-primary]/20 transition-all text-xs font-black uppercase tracking-widest">
+          <div className="pt-1 mt-3">
+            <button type="submit" disabled={submitting} className="btn-primary w-full h-10 shadow-lg shadow-[--accent-primary]/20 transition-all text-xs font-black uppercase tracking-widest">
               {submitting ? "Saving..." : (editingId ? "Update Account" : "Add Account")}
             </button>
           </div>
         </form>
-      </Drawer>
+      </CenteredModal>
 
-      <Drawer
+      <CenteredModal
         isOpen={showAdjustModal}
         onClose={() => setShowAdjustModal(false)}
         title="Adjust Balance"
@@ -1101,9 +1103,9 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             </button>
           </div>
         </form>
-      </Drawer>
+      </CenteredModal>
 
-      <Drawer
+      <CenteredModal
         isOpen={showTransferModal}
         onClose={() => {
           setShowTransferModal(false);
@@ -1190,7 +1192,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             </button>
           </div>
         </form>
-      </Drawer>
+      </CenteredModal>
 
       {showDeleteConfirm && (
         <div className="mobile-dialog-shell fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[--bg-base]/80 backdrop-blur-md animate-fade-in">
@@ -1212,5 +1214,77 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
         </div>
       )}
     </>
+  );
+}
+
+/* ── Centered Modal Component for Accounts Data Entry ── */
+function CenteredModal({
+  isOpen,
+  onClose,
+  title,
+  subtitle = "Data Entry / Actions",
+  children,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  const mounted = useHasMounted();
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
+
+  if (!mounted || !isOpen) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 bg-black/65 backdrop-blur-md animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="glass-card-static relative w-full max-w-sm overflow-hidden border border-white/10 rounded-xl shadow-xl animate-scale-in"
+      >
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500" />
+        
+        {/* Header */}
+        <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <div>
+            <h2 className="text-sm font-black text-white tracking-tight">{title}</h2>
+            <p className="text-[0.45rem] font-bold uppercase tracking-widest text-[--text-muted] mt-0.5">{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[--text-muted] hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+
+        {/* Form Body */}
+        <div className="p-3.5 sm:p-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }

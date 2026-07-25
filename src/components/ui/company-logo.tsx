@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import Image from "next/image";
 import { getCompanyDomain } from "@/lib/companies";
 
@@ -55,6 +55,13 @@ export const CompanyLogo = memo(function CompanyLogo({
     return queryName ? getLogoSources(queryName) : [];
   }, [queryName]);
 
+  // Reset image state when queryName changes to prevent stale logos
+  useEffect(() => {
+    setImgLoaded(false);
+    setSrcIndex(0);
+    setAllFailed(false);
+  }, [queryName]);
+
   const fallbackIcon = useMemo(() => {
     const cat = (category || "").toLowerCase().trim();
     return CATEGORIES[cat] || "📦";
@@ -84,12 +91,18 @@ export const CompanyLogo = memo(function CompanyLogo({
       }}
       title={queryName || "Company Logo"}
     >
-      <div 
-        className="absolute inset-0 flex items-center justify-center select-none"
-        style={{ fontSize: `${size * 0.45}px` }}
-      >
-        {fallbackIcon}
-      </div>
+      {(!showImage || allFailed) && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center select-none"
+          style={{ fontSize: `${size * 0.45}px` }}
+        >
+          {fallbackIcon}
+        </div>
+      )}
+
+      {showImage && !imgLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-white/10" />
+      )}
 
       {showImage && (
         <Image
@@ -109,6 +122,7 @@ export const CompanyLogo = memo(function CompanyLogo({
             objectFit: "contain",
             padding: `${Math.max(size * 0.1, 4)}px`,
             borderRadius: "var(--radius-md, 14px)",
+            zIndex: 3,
           }}
           onError={handleImgError}
           onLoad={handleImgLoad}
