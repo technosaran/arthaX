@@ -16,6 +16,25 @@ export interface GeminiParsedIntent {
 }
 
 /**
+ * Check if Gemini AI is enabled and configured for a user profile
+ */
+export function isGeminiActiveForProfile(profile: any): boolean {
+  if (!profile) return false;
+  if (profile.gemini_enabled === false) return false;
+  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  return !!key && key.trim().length > 0;
+}
+
+/**
+ * Get active Gemini API key for a profile (or process.env fallback)
+ */
+export function getGeminiApiKeyForProfile(profile: any): string | null {
+  if (!profile || profile.gemini_enabled === false) return null;
+  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  return key?.trim() || null;
+}
+
+/**
  * Low-level caller for Google Gemini REST API (gemini-2.5-flash with fallback to gemini-1.5-flash)
  */
 export async function callGeminiApi(

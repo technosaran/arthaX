@@ -4,7 +4,7 @@ import logger from "@/lib/logger";
 import { sendTelegramMessage, answerCallbackQuery } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
-import { parseTransactionWithGemini } from "@/lib/gemini";
+import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile } from "@/lib/gemini";
 
 const MAIN_MENU_KEYBOARD = {
   inline_keyboard: [
@@ -905,6 +905,22 @@ export async function POST(req: NextRequest) {
       let advice = "Keep logging daily expenses to maintain accurate cash flow tracking.";
       if (savingsRate < 10) advice = "⚠️ Your savings rate is low. Try reviewing your top spending category to curb non-essential expenses.";
       else if (savingsRate >= 30) advice = "🚀 Stellar 30%+ savings rate! Allocate your surplus into Mutual Funds or Stocks for long-term growth.";
+
+      if (isGeminiActiveForProfile(profile)) {
+        const apiKey = getGeminiApiKeyForProfile(profile);
+        if (apiKey) {
+          try {
+            const aiAdvice = await askGeminiFinanceAssistant(
+              "Give me 2 quick actionable financial coaching tips based on my monthly stats.",
+              `Monthly Income: ₹${totalIncome}, Monthly Expenses: ₹${totalExpense}, Savings Rate: ${savingsRate}%, Top Category: ${topCatText}, Health Score: ${score}/100`,
+              apiKey
+            );
+            if (aiAdvice) advice = aiAdvice;
+          } catch {
+            // Silently fallback to rule-based advice
+          }
+        }
+      }
 
       const msg = `🤖 *AI Financial Health & Wealth Coach*\n\n` +
         `🌟 *Health Score*: *${score}/100* (${scoreBadge})\n` +
@@ -2177,10 +2193,9 @@ export async function POST(req: NextRequest) {
         }
       }
       // ─── Gemini AI Parser Attempt (If enabled and API key is present) ───
-      const geminiApiKey = (profile as any)?.gemini_api_key || process.env.GEMINI_API_KEY;
-      const isGeminiEnabled = (profile as any)?.gemini_enabled !== false;
-
-      if (isGeminiEnabled && geminiApiKey && text.length > 2) {
+      if (isGeminiActiveForProfile(profile) && text.length > 2) {
+        const geminiApiKey = getGeminiApiKeyForProfile(profile);
+        if (geminiApiKey) {
         try {
           const aiResult = await parseTransactionWithGemini(text, geminiApiKey);
           if (aiResult.success && aiResult.amount && (aiResult.intentType === "expense" || aiResult.intentType === "income")) {
@@ -2232,6 +2247,7 @@ export async function POST(req: NextRequest) {
         } catch (geminiErr) {
           console.warn("Gemini AI parse failed, using rule-based fallback:", geminiErr);
         }
+      }
       }
 
       // ─── F. Universal Auto-Categorized Income & Expense Engine ───

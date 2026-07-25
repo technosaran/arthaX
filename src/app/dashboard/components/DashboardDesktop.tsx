@@ -595,68 +595,8 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
           )}
         </div>
 
-        {/* RIGHT COLUMN: STATS & ACTIVE GOALS (Span 1) */}
+        {/* RIGHT COLUMN: STATS (Span 1) */}
         <div className="flex flex-col gap-6">
-
-          {/* ACTIVE FINANCIAL GOALS MILestones */}
-          {enabledModules.includes("Goals") && (
-            <div className="glass-card-static rich-border p-6 md:p-8 flex-1 animate-fade-in">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-sm font-bold text-[--text-secondary]">Goals</h3>
-                <Link href="/dashboard/goals" className="text-xs font-semibold text-[--accent-primary-light] hover:underline">View all</Link>
-              </div>
-
-              <div className="space-y-6">
-                {goals.slice(0, 3).map((goal) => {
-                  const saved = Number(goal.current_amount || 0);
-                  const target = Number(goal.target_amount || 1);
-                  const pct = Math.min((saved / target) * 100, 100);
-                  const notStarted = saved === 0;
-                  
-                  return (
-                    <div key={goal.id} className="p-4 rounded-2xl bg-white/[0.01] border border-white/5">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white">{goal.name}</span>
-                          <span className="text-xs text-[--text-muted] mt-0.5">Target: ₹{target.toLocaleString()}</span>
-                        </div>
-                        {notStarted ? (
-                          <span className="text-xs font-bold text-[--text-muted] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">Not started</span>
-                        ) : (
-                          <span className="text-xs font-black text-[--accent-primary-light] tabular-nums">{pct.toFixed(0)}%</span>
-                        )}
-                      </div>
-
-                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden mb-3">
-                        {notStarted ? (
-                          <div className="h-full w-full bg-white/5 rounded-full" />
-                        ) : (
-                          <div 
-                            className="h-full bg-gradient-to-r from-[--accent-primary] to-[--accent-secondary] rounded-full transition-all duration-1000"
-                            style={{ width: `${pct}%` }}
-                          />
-                        )}
-                      </div>
-                      
-                      <div className="flex justify-between items-center text-xs text-[--text-secondary]">
-                        <span>{notStarted ? "No contributions yet" : `Saved: ₹${saved.toLocaleString()}`}</span>
-                        <span className="text-xs text-[--text-muted]">
-                          {goal.deadline ? format(new Date(goal.deadline), "MMM yyyy") : "No deadline"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {goals.length === 0 && (
-                  <div className="py-12 text-center border border-dashed border-white/5 rounded-2xl">
-                    <p className="text-xs text-[--text-secondary] mb-4">No active milestones registered</p>
-                    <Link href="/dashboard/goals?action=new" className="btn-secondary !h-9 text-xs">Establish Goal</Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
         </div>
 
       </div>

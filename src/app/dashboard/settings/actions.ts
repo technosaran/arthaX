@@ -4,6 +4,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { getFriendlyErrorMessage } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
+import { Client } from "pg";
 
 export async function resetUserData() {
   try {
@@ -102,6 +103,24 @@ type ProfileSettings = {
 
 type SafeJson = string | number | boolean | null | { [key: string]: SafeJson | undefined } | SafeJson[];
 
+async function ensureGeminiColumnsExist() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return;
+  try {
+    const client = new Client({ connectionString });
+    await client.connect();
+    await client.query(`
+      ALTER TABLE public.profiles
+      ADD COLUMN IF NOT EXISTS gemini_api_key TEXT,
+      ADD COLUMN IF NOT EXISTS gemini_enabled BOOLEAN DEFAULT true;
+      NOTIFY pgrst, 'reload schema';
+    `);
+    await client.end();
+  } catch (e) {
+    console.warn("Auto-migration for gemini columns failed or skipped:", e);
+  }
+}
+
 export async function updateSettings(settings: ProfileSettings) {
   try {
     const supabase = await createClient();
@@ -124,10 +143,20 @@ export async function updateSettings(settings: ProfileSettings) {
 
     if (Object.keys(payload).length === 0) return { success: true, message: "Settings updated successfully" };
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("profiles")
       .update(payload as any)
       .eq("id", user.id);
+
+    if (error && (error.message?.includes("column") || (error as any).code === "PGRST204" || (error as any).code === "42703")) {
+      console.log("Gemini columns missing in database schema, running automatic migration...");
+      await ensureGeminiColumnsExist();
+      const retry = await supabase
+        .from("profiles")
+        .update(payload as any)
+        .eq("id", user.id);
+      error = retry.error;
+    }
 
     if (error) return { error: getFriendlyErrorMessage(error) };
     

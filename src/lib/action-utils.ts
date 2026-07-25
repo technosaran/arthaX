@@ -1,30 +1,34 @@
 export function getFriendlyErrorMessage(err: unknown): string {
+  if (!err) return "An unexpected error occurred.";
+
+  let message = "";
   if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    if (msg.includes("duplicate key value") || msg.includes("unique constraint")) {
+    message = err.message;
+  } else if (typeof err === "object" && err !== null && "message" in err) {
+    message = String((err as any).message);
+  } else if (typeof err === "string") {
+    message = err;
+  }
+
+  if (message) {
+    const lower = message.toLowerCase();
+    if (lower.includes("duplicate key") || lower.includes("unique constraint")) {
       return "This record already exists. Please check for duplicates.";
     }
-    if (msg.includes("foreign key constraint") || msg.includes("violates foreign key constraint")) {
+    if (lower.includes("foreign key") || lower.includes("violates foreign key")) {
       return "This record is linked to other items and cannot be modified or deleted directly.";
     }
-    if (msg.includes("not null constraint")) {
+    if (lower.includes("not null constraint")) {
       return "A required field is missing.";
     }
-    if (msg.includes("check constraint")) {
-      return "Provided data is invalid according to database rules.";
+    if (lower.includes("column") && lower.includes("does not exist")) {
+      return "Database schema column missing. Applied automatic patch, please try again.";
     }
-    if (msg.includes("timeout")) {
-      return "The request timed out. Please try again.";
-    }
-    if (msg.includes("unauthorized") || msg.includes("not authenticated")) {
+    if (lower.includes("unauthorized") || lower.includes("not authenticated")) {
       return "You must be logged in to perform this action.";
     }
-    return err.message; // fallback
+    return message;
   }
-  
-  if (typeof err === "string") {
-    return err;
-  }
-  
+
   return "An unexpected error occurred.";
 }
