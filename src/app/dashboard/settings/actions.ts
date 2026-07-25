@@ -103,21 +103,42 @@ type ProfileSettings = {
 
 type SafeJson = string | number | boolean | null | { [key: string]: SafeJson | undefined } | SafeJson[];
 
-async function ensureGeminiColumnsExist() {
+async function updateProfileWithPg(userId: string, geminiKey?: string | null, geminiEnabled?: boolean) {
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return;
+  if (!connectionString) return false;
   try {
     const client = new Client({ connectionString });
     await client.connect();
+    // 1. Ensure columns exist
     await client.query(`
       ALTER TABLE public.profiles
       ADD COLUMN IF NOT EXISTS gemini_api_key TEXT,
       ADD COLUMN IF NOT EXISTS gemini_enabled BOOLEAN DEFAULT true;
-      NOTIFY pgrst, 'reload schema';
     `);
+    // 2. Direct SQL update
+    if (geminiKey !== undefined && geminiEnabled !== undefined) {
+      await client.query(
+        `UPDATE public.profiles SET gemini_api_key = $1, gemini_enabled = $2 WHERE id = $3`,
+        [geminiKey, geminiEnabled, userId]
+      );
+    } else if (geminiKey !== undefined) {
+      await client.query(
+        `UPDATE public.profiles SET gemini_api_key = $1 WHERE id = $2`,
+        [geminiKey, userId]
+      );
+    } else if (geminiEnabled !== undefined) {
+      await client.query(
+        `UPDATE public.profiles SET gemini_enabled = $1 WHERE id = $2`,
+        [geminiEnabled, userId]
+      );
+    }
+    // 3. Notify PostgREST schema cache reload
+    await client.query("NOTIFY pgrst, 'reload schema';");
     await client.end();
+    return true;
   } catch (e) {
-    console.warn("Auto-migration for gemini columns failed or skipped:", e);
+    console.warn("Direct pg update for gemini columns failed:", e);
+    return false;
   }
 }
 
@@ -148,14 +169,19 @@ export async function updateSettings(settings: ProfileSettings) {
       .update(payload as any)
       .eq("id", user.id);
 
-    if (error && (error.message?.includes("column") || (error as any).code === "PGRST204" || (error as any).code === "42703")) {
-      console.log("Gemini columns missing in database schema, running automatic migration...");
-      await ensureGeminiColumnsExist();
-      const retry = await supabase
-        .from("profiles")
-        .update(payload as any)
-        .eq("id", user.id);
-      error = retry.error;
+    if (error && (
+      error.message?.includes("column") || 
+      error.message?.includes("schema cache") || 
+      (error as any).code === "PGRST204" || 
+      (error as any).code === "42703"
+    )) {
+      console.log("PostgREST schema cache missing gemini columns, executing direct pg fallback update...");
+      const pgSuccess = await updateProfileWithPg(user.id, settings.gemini_api_key, settings.gemini_enabled);
+      if (pgSuccess) {
+        revalidatePath("/dashboard");
+        revalidatePath("/dashboard/settings");
+        return { success: true, message: "Settings updated successfully" };
+      }
     }
 
     if (error) return { error: getFriendlyErrorMessage(error) };
