@@ -6,11 +6,15 @@
 
 export interface GeminiParsedIntent {
   success: boolean;
-  intentType: "expense" | "income" | "transfer" | "inquiry" | "unknown";
+  intentType: "expense" | "income" | "transfer" | "stock" | "mutual_fund" | "inquiry" | "unknown";
   amount: number | null;
   category: string;
   description: string;
   accountName: string | null;
+  symbol?: string | null;
+  quantity?: number | null;
+  price?: number | null;
+  fundName?: string | null;
   answer?: string;
   error?: string;
 }
@@ -69,9 +73,9 @@ export async function callGeminiApi(
     body: JSON.stringify(payload),
   });
 
-  // Fallback to gemini-1.5-flash if 2.5 is unavailable or error 404
+  // Fallback to gemini-2.0-flash if 2.5 is unavailable or error 404
   if (!response.ok && (response.status === 404 || response.status === 400)) {
-    endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
+    endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
     response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -102,27 +106,35 @@ export async function parseTransactionWithGemini(
   apiKey: string
 ): Promise<GeminiParsedIntent> {
   try {
-    const systemPrompt = `You are a financial AI parser. Analyze user text (which may contain typos, slang, hinglish, or messy phrasing) and extract structured JSON matching this EXACT TypeScript schema:
+    const systemPrompt = `You are an expert financial AI parser for FinanceOS. Analyze user text (which may contain typos, slang, hinglish, stock purchases, or mutual fund investments) and extract structured JSON matching this EXACT TypeScript schema:
 {
-  "intentType": "expense" | "income" | "transfer" | "inquiry" | "unknown",
+  "intentType": "expense" | "income" | "transfer" | "stock" | "mutual_fund" | "inquiry" | "unknown",
   "amount": number | null,
-  "category": "Food" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Health" | "Housing" | "Salary" | "Gift" | "Work" | "Other",
-  "description": "Short clean description of merchant or item",
-  "accountName": "bank/account name if explicitly mentioned or null"
+  "category": "Food" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Health" | "Housing" | "Salary" | "Gift" | "Work" | "Investments" | "Other",
+  "description": "Short clean description",
+  "accountName": "bank/account name if explicitly mentioned or null",
+  "symbol": "Stock ticker symbol (e.g. TATAMOTORS, RELIANCE, AAPL, TCS) if applicable or null",
+  "quantity": number or null,
+  "price": number or null,
+  "fundName": "Name of mutual fund if applicable or null"
 }
-Only output raw JSON. Do not include markdown code blocks or additional text.`;
+Only output raw JSON without markdown code blocks.`;
 
-    const resultText = await callGeminiApi(apiKey, `Parse this financial input: "${text}"`, systemPrompt);
+    const resultText = await callGeminiApi(apiKey, `Parse this financial text: "${text}"`, systemPrompt);
     const cleanedJson = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(cleanedJson);
 
     return {
       success: true,
       intentType: parsed.intentType || "unknown",
-      amount: typeof parsed.amount === "number" && parsed.amount > 0 ? parsed.amount : null,
-      category: parsed.category || "Other",
+      amount: typeof parsed.amount === "number" && parsed.amount > 0 ? parsed.amount : (parsed.quantity && parsed.price ? parsed.quantity * parsed.price : null),
+      category: parsed.category || (parsed.intentType === "stock" || parsed.intentType === "mutual_fund" ? "Investments" : "Other"),
       description: parsed.description || text,
       accountName: parsed.accountName || null,
+      symbol: parsed.symbol || null,
+      quantity: typeof parsed.quantity === "number" ? parsed.quantity : null,
+      price: typeof parsed.price === "number" ? parsed.price : null,
+      fundName: parsed.fundName || null,
     };
   } catch (error: any) {
     return {

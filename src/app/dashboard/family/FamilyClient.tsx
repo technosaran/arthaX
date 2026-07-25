@@ -10,8 +10,21 @@ import useSWR from "swr";
 import { createClient } from "@/lib/supabase-browser";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
-import { format } from "date-fns";
-import { Edit2, Trash2, Send, Plus, Users, History } from "lucide-react";
+import dynamic from "next/dynamic";
+import { format, subMonths, parseISO } from "date-fns";
+import { Edit2, Trash2, Send, Plus, Users, History, TrendingUp, PieChart as PieIcon } from "lucide-react";
+
+const XAxis = dynamic(() => import("recharts").then((mod) => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then((mod) => mod.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then((mod) => mod.CartesianGrid), { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
+const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
+const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
+const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
+const AreaChart = dynamic(() => import("recharts").then((mod) => mod.AreaChart), { ssr: false });
+const Area = dynamic(() => import("recharts").then((mod) => mod.Area), { ssr: false });
+const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
+const FAMILY_PALETTE = ["#ec4899", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#06b6d4", "#f43f5e"];
 import {
   addFamilyMember,
   updateFamilyMember,
@@ -127,6 +140,38 @@ export default function FamilyClient() {
     if (!transfers.length) return 0;
     const total = transfers.reduce((acc, t) => acc + Number(t.amount || 0), 0);
     return total / transfers.length;
+  }, [transfers]);
+
+  const pieChartData = useMemo(() => {
+    if (!members.length) return [];
+    return members
+      .map((m, idx) => ({
+        name: m.name,
+        value: Number(m.balance || 0),
+        fill: FAMILY_PALETTE[idx % FAMILY_PALETTE.length],
+      }))
+      .filter((d) => d.value > 0);
+  }, [members]);
+
+  const monthlyTrendData = useMemo(() => {
+    const monthsMap: Record<string, number> = {};
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(today, i);
+      monthsMap[format(d, "MMM yy")] = 0;
+    }
+    transfers.forEach((t) => {
+      if (!t.transfer_date) return;
+      try {
+        const key = format(parseISO(t.transfer_date), "MMM yy");
+        if (monthsMap[key] !== undefined) {
+          monthsMap[key] += Number(t.amount || 0);
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+    });
+    return Object.entries(monthsMap).map(([month, amount]) => ({ month, amount }));
   }, [transfers]);
 
 
@@ -356,6 +401,89 @@ export default function FamilyClient() {
             </p>
           </div>
         ))}
+      </section>
+
+      {/* ═══ CHARTS & ANALYTICS ═══ */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Monthly Transfer Activity Area Chart */}
+        <div className="glass-card-static p-6 lg:col-span-2 min-h-[360px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-pink-400" />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Support Flow</h3>
+              </div>
+              <p className="text-xl font-black text-white mt-1">Monthly Family Cashflow Trend</p>
+            </div>
+          </div>
+          <div className="w-full h-[240px]">
+            {mounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="familyFlowGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                  <YAxis tickFormatter={(v) => `₹${v}`} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}
+                    itemStyle={{ color: "#fff", fontWeight: "bold" }}
+                    formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, "Transferred"]}
+                  />
+                  <Area type="monotone" dataKey="amount" stroke="#ec4899" strokeWidth={3} fillOpacity={1} fill="url(#familyFlowGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Member Support Pie Breakdown */}
+        <div className="glass-card-static p-6 flex flex-col justify-between min-h-[360px]">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-rose-400" />
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Allocation Split</h3>
+            </div>
+          </div>
+          <p className="text-xl font-black text-white">Support by Member</p>
+          <div className="w-full h-[200px] my-auto">
+            {mounted && pieChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value">
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                    itemStyle={{ color: "#fff", fontWeight: "bold" }}
+                    formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, "Total Received"]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
+                <span className="text-2xl mb-1">👨‍👩‍👧‍👦</span>
+                <span className="text-[0.6875rem] uppercase tracking-wider font-bold">No Transfer Data Yet</span>
+              </div>
+            )}
+          </div>
+          {pieChartData.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
+              {pieChartData.slice(0, 4).map((entry, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill }} />
+                  <span className="text-white font-bold">{entry.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ═══ TABS SWITCHER ═══ */}

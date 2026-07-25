@@ -15,41 +15,12 @@ interface MutualFundsDataTableProps {
   onAdd: () => void;
 }
 
-import { getAMCLogoInfo } from "@/lib/amc-logos";
-
 export function AMCAvatar({ amcName, fundName }: { amcName: string; fundName: string }) {
-  const [imgStage, setImgStage] = useState<0 | 1 | 2>(0);
-  const info = getAMCLogoInfo(amcName, fundName);
-
-  // Priority order: 1. Local SVG / Groww Logo PNG -> 2. Google Favicon CDN (128px) -> 3. Gradient initials badge
-  const primaryUrl = info.logoUrl || info.fallbackLogoUrl;
-  const secondaryUrl = info.domain ? `https://www.google.com/s2/favicons?domain=${info.domain}&sz=128` : "";
-
-  if (primaryUrl && imgStage === 0) {
-    return (
-      <img 
-        src={primaryUrl} 
-        alt={info.badge} 
-        className="w-10 h-10 rounded-full bg-white object-contain p-1 flex-shrink-0 border border-white/10 shadow-md"
-        onError={() => setImgStage(1)}
-      />
-    );
-  }
-
-  if (secondaryUrl && imgStage === 1) {
-    return (
-      <img 
-        src={secondaryUrl} 
-        alt={info.badge} 
-        className="w-10 h-10 rounded-full bg-white object-contain p-1 flex-shrink-0 border border-white/10 shadow-md"
-        onError={() => setImgStage(2)}
-      />
-    );
-  }
-
+  const name = amcName || fundName || "MF";
+  const badge = name.substring(0, 3).toUpperCase();
   return (
-    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${info.gradientColor} border border-white/20 flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-md tracking-tighter`}>
-      {info.badge}
+    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 border border-white/20 flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-md tracking-tighter">
+      {badge}
     </div>
   );
 }

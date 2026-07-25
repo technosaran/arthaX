@@ -11,10 +11,19 @@ import { createGoal, updateGoalAmount, deleteGoal, updateGoal } from "./actions"
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { getColorByLabel } from "@/lib/chart-colours";
-
 import dynamic from "next/dynamic";
+
+const XAxis = dynamic(() => import("recharts").then((mod) => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then((mod) => mod.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then((mod) => mod.CartesianGrid), { ssr: false });
+const RechartsTooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
+const Legend = dynamic(() => import("recharts").then((mod) => mod.Legend), { ssr: false });
+const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
+const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
+const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
+const AreaChart = dynamic(() => import("recharts").then((mod) => mod.AreaChart), { ssr: false });
+const Area = dynamic(() => import("recharts").then((mod) => mod.Area), { ssr: false });
 const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 
 import { Drawer } from "@/components/ui/drawer";
 import GoalsDataTable from "./components/GoalsDataTable";
@@ -349,19 +358,29 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 <div className="flex-1 min-h-[250px] w-full mt-4 -ml-4">
                   {mounted && (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={barChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="rgba(255,255,255,0.05)" />
-                        <XAxis type="number" tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 12 }} />
-                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 12 }} width={100} />
+                      <AreaChart data={barChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="goalSavedGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="goalTargetGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
                         <RechartsTooltip 
                           contentStyle={{ backgroundColor: "rgba(10,10,10,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}
                           itemStyle={{ color: "#fff", fontWeight: "bold" }}
-                          formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, ""]}
+                          formatter={(value: any, name: any) => [`₹${Number(value).toLocaleString()}`, name]}
                         />
-                        <Legend wrapperStyle={{ paddingTop: "20px" }} />
-                        <Bar dataKey="Saved" stackId="a" fill="var(--accent-primary)" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="Remaining" stackId="a" fill="rgba(255,255,255,0.1)" radius={[0, 4, 4, 0]} />
-                      </BarChart>
+                        <Legend wrapperStyle={{ paddingTop: "15px" }} />
+                        <Area type="monotone" dataKey="Saved" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#goalSavedGrad)" />
+                        <Area type="monotone" dataKey="Target" stroke="#6366F1" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#goalTargetGrad)" />
+                      </AreaChart>
                     </ResponsiveContainer>
                   )}
                 </div>

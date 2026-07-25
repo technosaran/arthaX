@@ -182,6 +182,22 @@ export async function updateSettings(settings: ProfileSettings) {
         revalidatePath("/dashboard/settings");
         return { success: true, message: "Settings updated successfully" };
       }
+
+      // If pg fallback failed or DATABASE_URL not set, attempt update without gemini columns so remaining settings save
+      const cleanPayload = { ...payload };
+      delete cleanPayload.gemini_api_key;
+      delete cleanPayload.gemini_enabled;
+
+      if (Object.keys(cleanPayload).length > 0) {
+        await supabase.from("profiles").update(cleanPayload as any).eq("id", user.id);
+      }
+
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/settings");
+
+      return {
+        error: "The 'gemini_api_key' column does not exist on your Supabase 'profiles' table yet. Please run the SQL migration script in your Supabase SQL Editor:\n\nALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gemini_api_key TEXT, ADD COLUMN IF NOT EXISTS gemini_enabled BOOLEAN DEFAULT true;\nNOTIFY pgrst, 'reload schema';",
+      };
     }
 
     if (error) return { error: getFriendlyErrorMessage(error) };

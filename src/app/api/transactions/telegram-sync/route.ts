@@ -2192,62 +2192,148 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: true });
         }
       }
-      // ─── Gemini AI Parser Attempt (If enabled and API key is present) ───
+      // ─── Gemini AI Parser & Intelligence Engine (If enabled and API key is present) ───
       if (isGeminiActiveForProfile(profile) && text.length > 2) {
         const geminiApiKey = getGeminiApiKeyForProfile(profile);
         if (geminiApiKey) {
-        try {
-          const aiResult = await parseTransactionWithGemini(text, geminiApiKey);
-          if (aiResult.success && aiResult.amount && (aiResult.intentType === "expense" || aiResult.intentType === "income")) {
-            const txType = aiResult.intentType;
-            const category = aiResult.category;
-            const description = aiResult.description || text;
-            const targetAccount = resolveAccount(txType, text);
+          try {
+            const aiResult = await parseTransactionWithGemini(text, geminiApiKey);
 
-            if (targetAccount) {
-              const rpcName = txType === "expense" ? "record_expense" : "record_income";
-              const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName, {
-                p_user_id: profile.id,
-                p_description: `[Gemini AI] ${description}`,
-                p_amount: aiResult.amount,
-                p_category: category,
-                p_date: cleanDate,
-                p_account_id: targetAccount,
-              });
+            // 1. Stock Trade Intent via Gemini AI
+            if (aiResult.success && aiResult.intentType === "stock" && aiResult.symbol) {
+              const symbol = (aiResult.symbol || "EQUITY").toUpperCase();
+              const quantity = aiResult.quantity || 1;
+              const price = aiResult.price || (aiResult.amount ? aiResult.amount / quantity : 100);
+              const totalCost = quantity * price;
 
-              if (!rpcError && (!rpcData || (rpcData as any).success !== false)) {
-                if (txType === "expense") {
-                  await checkAndNotifyBudget(supabase, profile.id, chatId, category, aiResult.amount);
+              const targetAccount = resolveAccount("expense", text);
+              if (targetAccount) {
+                const { data: rpcData, error: rpcError } = await supabase.rpc("record_investment", {
+                  p_user_id: profile.id,
+                  p_name: symbol,
+                  p_type: "stock",
+                  p_symbol: symbol,
+                  p_quantity: quantity,
+                  p_buy_price: price,
+                  p_current_price: price,
+                  p_currency: "INR",
+                  p_notes: `[Gemini AI Telegram] ${text}`,
+                  p_date: cleanDate,
+                  p_account_id: targetAccount,
+                  p_total_cost: totalCost,
+                  p_trade_type: "buy",
+                  p_charges: 0
+                });
+
+                if (!rpcError && (!rpcData || (rpcData as any).success !== false)) {
+                  await sendTelegramMessage(
+                    chatId,
+                    `📈 *Gemini AI Stock Trade Recorded*:\n` +
+                    `• *Symbol*: ${symbol}\n` +
+                    `• *Qty*: ${quantity} @ ₹${price.toLocaleString("en-IN")}\n` +
+                    `• *Total Cost*: ₹${totalCost.toLocaleString("en-IN")}\n` +
+                    `• *Reflected on Web Dashboard*: ✅ Live`
+                  );
+                  return NextResponse.json({ success: true });
                 }
-                const accObj = accounts?.find((a: any) => a.id === targetAccount);
-                const { data: latestTx } = await supabase
-                  .from("transactions")
-                  .select("id")
-                  .eq("user_id", profile.id)
-                  .order("created_at", { ascending: false })
-                  .limit(1)
-                  .maybeSingle();
-
-                const txId = latestTx?.id;
-                const keyboard = txId && txType === "expense" ? CATEGORY_KEYBOARD(txId) : TX_CONFIRM_KEYBOARD;
-
-                await sendTelegramMessage(
-                  chatId,
-                  `🤖 *Gemini AI Logged ${txType === "expense" ? "Expense" : "Income"}*:\n` +
-                  `• *Amount*: ₹${aiResult.amount.toLocaleString("en-IN")}\n` +
-                  `• *Category*: ${category}\n` +
-                  `• *Account*: ${accObj?.name || "Default"}\n` +
-                  `• *Desc*: ${description}`,
-                  keyboard
-                );
-                return NextResponse.json({ success: true });
               }
             }
+
+            // 2. Mutual Fund Investment Intent via Gemini AI
+            if (aiResult.success && aiResult.intentType === "mutual_fund" && aiResult.amount) {
+              const fundName = aiResult.fundName || aiResult.description || "Mutual Fund Investment";
+              const amount = aiResult.amount;
+              const targetAccount = resolveAccount("expense", text);
+
+              if (targetAccount) {
+                const { data: rpcData, error: rpcError } = await supabase.rpc("record_mf_investment_v4", {
+                  p_user_id: profile.id,
+                  p_fund_name: fundName,
+                  p_scheme_code: "TELEGRAM_AI_MF",
+                  p_units: 1,
+                  p_nav: amount,
+                  p_investment_type: "buy",
+                  p_category: "Equity",
+                  p_amc_name: "Universal AMC",
+                  p_date: cleanDate,
+                  p_account_id: targetAccount,
+                  p_stamp_duty: 0,
+                  p_trade_type: "buy"
+                });
+
+                if (!rpcError && (!rpcData || (rpcData as any).success !== false)) {
+                  await sendTelegramMessage(
+                    chatId,
+                    `🏦 *Gemini AI Mutual Fund Investment Logged*:\n` +
+                    `• *Fund*: ${fundName}\n` +
+                    `• *Amount*: ₹${amount.toLocaleString("en-IN")}\n` +
+                    `• *Reflected on Web Dashboard*: ✅ Live`
+                  );
+                  return NextResponse.json({ success: true });
+                }
+              }
+            }
+
+            // 3. Expense or Income Intent via Gemini AI
+            if (aiResult.success && aiResult.amount && (aiResult.intentType === "expense" || aiResult.intentType === "income")) {
+              const txType = aiResult.intentType;
+              const category = aiResult.category;
+              const description = aiResult.description || text;
+              const targetAccount = resolveAccount(txType, text);
+
+              if (targetAccount) {
+                const rpcName = txType === "expense" ? "record_expense" : "record_income";
+                const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName, {
+                  p_user_id: profile.id,
+                  p_description: `[Gemini AI] ${description}`,
+                  p_amount: aiResult.amount,
+                  p_category: category,
+                  p_date: cleanDate,
+                  p_account_id: targetAccount,
+                });
+
+                if (!rpcError && (!rpcData || (rpcData as any).success !== false)) {
+                  if (txType === "expense") {
+                    await checkAndNotifyBudget(supabase, profile.id, chatId, category, aiResult.amount);
+                  }
+                  const accObj = accounts?.find((a: any) => a.id === targetAccount);
+                  const { data: latestTx } = await supabase
+                    .from("transactions")
+                    .select("id")
+                    .eq("user_id", profile.id)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                  const txId = latestTx?.id;
+                  const keyboard = txId && txType === "expense" ? CATEGORY_KEYBOARD(txId) : TX_CONFIRM_KEYBOARD;
+
+                  await sendTelegramMessage(
+                    chatId,
+                    `🤖 *Gemini AI Logged ${txType === "expense" ? "Expense" : "Income"}*:\n` +
+                    `• *Amount*: ₹${aiResult.amount.toLocaleString("en-IN")}\n` +
+                    `• *Category*: ${category}\n` +
+                    `• *Account*: ${accObj?.name || "Default"}\n` +
+                    `• *Desc*: ${description}\n` +
+                    `• *Reflected on Web Dashboard*: ✅ Live`,
+                    keyboard
+                  );
+                  return NextResponse.json({ success: true });
+                }
+              }
+            }
+
+            // 4. Live Data Inquiry Intent via Gemini AI
+            if (aiResult.success && aiResult.intentType === "inquiry") {
+              const contextSummary = `User accounts: ${JSON.stringify(accounts || [])}. User goals: ${JSON.stringify(goals || [])}.`;
+              const aiAnswer = await askGeminiFinanceAssistant(text, contextSummary, geminiApiKey);
+              await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${aiAnswer}`);
+              return NextResponse.json({ success: true });
+            }
+          } catch (geminiErr) {
+            console.warn("Gemini AI parse failed, using rule-based fallback:", geminiErr);
           }
-        } catch (geminiErr) {
-          console.warn("Gemini AI parse failed, using rule-based fallback:", geminiErr);
         }
-      }
       }
 
       // ─── F. Universal Auto-Categorized Income & Expense Engine ───
