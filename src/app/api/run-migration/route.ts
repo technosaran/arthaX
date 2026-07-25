@@ -23,18 +23,27 @@ export async function GET(req: NextRequest) {
   try {
     await client.connect();
     
-    const migrationPath = path.join(process.cwd(), "supabase", "migrations", "20260718210000_telegram_integration.sql");
-    const sql = fs.readFileSync(migrationPath, "utf8");
+    const telegramMigrationPath = path.join(process.cwd(), "supabase", "migrations", "20260718210000_telegram_integration.sql");
+    const geminiMigrationPath = path.join(process.cwd(), "supabase", "migrations", "20260725140000_gemini_integration.sql");
 
-    logger.info("Executing Telegram migration SQL...");
-    await client.query(sql);
+    if (fs.existsSync(telegramMigrationPath)) {
+      const sql1 = fs.readFileSync(telegramMigrationPath, "utf8");
+      logger.info("Executing Telegram migration SQL...");
+      await client.query(sql1);
+    }
+
+    if (fs.existsSync(geminiMigrationPath)) {
+      const sql2 = fs.readFileSync(geminiMigrationPath, "utf8");
+      logger.info("Executing Gemini migration SQL...");
+      await client.query(sql2);
+    }
     
     logger.info("Reloading PostgREST schema cache...");
     await client.query("NOTIFY pgrst, 'reload schema';");
     
     await client.end();
 
-    return NextResponse.json({ success: true, message: "Telegram columns migration completed and API schema cache refreshed successfully!" });
+    return NextResponse.json({ success: true, message: "Migrations completed and API schema cache refreshed successfully!" });
   } catch (error: any) {
     console.error("Migration endpoint error:", error);
     return NextResponse.json({ error: error.message || error }, { status: 500 });
