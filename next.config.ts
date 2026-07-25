@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "icons.duckduckgo.com" },
       { protocol: "https", hostname: "logo.clearbit.com" },
       { protocol: "https", hostname: "unavatar.io" },
+      { protocol: "https", hostname: "icon.horse" },
+      { protocol: "https", hostname: "assets.groww.in" },
+      { protocol: "https", hostname: "cdn.jsdelivr.net" },
+      { protocol: "https", hostname: "raw.githubusercontent.com" },
     ],
   },
   turbopack: {

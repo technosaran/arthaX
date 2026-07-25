@@ -8,7 +8,6 @@ import { format } from "date-fns";
 import type { Tables } from "@/lib/database.types";
 import { searchBanks, type Bank } from "@/lib/banks";
 import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance } from "./actions";
-import BankLogo from "@/components/bank-logo";
 import { Drawer } from "@/components/ui/drawer";
 
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
@@ -22,6 +21,11 @@ const Pie = dynamic(() => import("recharts").then(mod => mod.Pie), { ssr: false 
 const Cell = dynamic(() => import("recharts").then(mod => mod.Cell), { ssr: false });
 const ResponsiveContainer = dynamic(() => import("recharts").then(mod => mod.ResponsiveContainer), { ssr: false });
 const Tooltip = dynamic(() => import("recharts").then(mod => mod.Tooltip), { ssr: false });
+const AreaChart = dynamic(() => import("recharts").then(mod => mod.AreaChart), { ssr: false });
+const Area = dynamic(() => import("recharts").then(mod => mod.Area), { ssr: false });
+const XAxis = dynamic(() => import("recharts").then(mod => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then(mod => mod.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then(mod => mod.CartesianGrid), { ssr: false });
 
 type Account = Tables<"accounts">;
 type LedgerLog = Tables<"ledger_logs">;
@@ -126,6 +130,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [historyAccountId, setHistoryAccountId] = useState("all");
   const [historyDateRange, setHistoryDateRange] = useState<"30d" | "90d" | "all">("30d");
+  const [historySearch, setHistorySearch] = useState("");
 
   function handleBankSearch(query: string) {
     setBankSearch(query);
@@ -294,6 +299,58 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
       .sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
   }, [ledgerLogs, historyAccountId, historyDateRange]);
 
+  const historyStats = useMemo(() => {
+    let totalInflow = 0;
+    let totalOutflow = 0;
+    for (const log of accountHistory) {
+      if (log.amount !== null && log.amount !== undefined) {
+        const isDebit = log.new_balance !== null && log.previous_balance !== null
+          ? log.new_balance < log.previous_balance
+          : DEBIT_ACCOUNT_ACTIONS.has(log.action_type);
+        if (isDebit) {
+          totalOutflow += Math.abs(log.amount);
+        } else {
+          totalInflow += Math.abs(log.amount);
+        }
+      }
+    }
+    return { totalInflow, totalOutflow, count: accountHistory.length };
+  }, [accountHistory]);
+
+  const filteredAccountHistory = useMemo(() => {
+    if (!historySearch.trim()) return accountHistory;
+    const q = historySearch.toLowerCase();
+    return accountHistory.filter((log) => {
+      const acc = accounts.find((a) => a.id === log.account_id);
+      const accName = acc?.name.toLowerCase() || "";
+      const note = (log.details || "").toLowerCase();
+      const action = (log.action_type || "").toLowerCase();
+      const amountStr = String(log.amount || "");
+      return accName.includes(q) || note.includes(q) || action.includes(q) || amountStr.includes(q);
+    });
+  }, [accountHistory, historySearch, accounts]);
+
+  const historyTrendData = useMemo(() => {
+    const map: Record<string, { date: string; Inflow: number; Outflow: number }> = {};
+    [...accountHistory].reverse().forEach((log) => {
+      if (!log.created_at) return;
+      const dateStr = format(new Date(log.created_at), "MMM d");
+      if (!map[dateStr]) {
+        map[dateStr] = { date: dateStr, Inflow: 0, Outflow: 0 };
+      }
+      const isDebit = log.new_balance !== null && log.previous_balance !== null
+        ? log.new_balance < log.previous_balance
+        : DEBIT_ACCOUNT_ACTIONS.has(log.action_type);
+      const amt = Math.abs(Number(log.amount || 0));
+      if (isDebit) {
+        map[dateStr].Outflow += amt;
+      } else {
+        map[dateStr].Inflow += amt;
+      }
+    });
+    return Object.values(map).slice(-15);
+  }, [accountHistory]);
+
   function getActionLabel(type: string) {
     const labels: Record<string, string> = {
       CREATE: "Created",
@@ -308,7 +365,8 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
   }
 
   return (
-    <div className="flex flex-col gap-[var(--section-gap)]">
+    <>
+      <div className="flex flex-col gap-[var(--section-gap)]">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div>
@@ -438,7 +496,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
                         <div className="relative flex-shrink-0">
-                          {a.bank_name ? <BankLogo bankName={a.bank_name!} size={32} /> : <CategoryIcon type={a.type} className="w-8 h-8" />}
+                          <CategoryIcon type={a.type} className="w-8 h-8" />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -560,7 +618,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                     >
                       <div className="relative flex-shrink-0">
-                        {a.bank_name ? <BankLogo bankName={a.bank_name!} size={40} /> : <CategoryIcon type={a.type} className="w-10 h-10" />}
+                        <CategoryIcon type={a.type} className="w-10 h-10" />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1 text-left">
                         <p className="font-bold text-xs md:text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -631,7 +689,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 >
                   <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: style.gradient }} />
                   <div className="flex justify-between items-start mb-6">
-                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4">{a.bank_name ? <BankLogo bankName={a.bank_name} size={48} /> : <CategoryIcon type={a.type} className="w-12 h-12" />}<span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
+                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><CategoryIcon type={a.type} className="w-12 h-12" /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
                      {a.name !== "Cash" && <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>}
                   </div>
                   <div className="mt-auto">
@@ -650,132 +708,274 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             })}
           </div>
           ) : (
-          <div className="glass-card-static overflow-hidden animate-in fade-in duration-500">
-        <div className="p-6 border-b border-white/5 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-[--text-primary]">Account History</h2>
-            <p className="text-xs font-medium text-[--text-muted] mt-1">Past account activity</p>
-          </div>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[--text-muted]">{accountHistory.length} entries</span>
-        </div>
+          <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+            {/* Rich Top Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="glass-card rich-border p-5 rounded-2xl relative overflow-hidden bg-gradient-to-br from-emerald-900/20 via-emerald-950/10 to-slate-900/40 border border-emerald-500/20 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400">Total Credits / Inflow</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 text-sm font-bold">
+                    ↓
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-white mt-3">
+                  +₹{historyStats.totalInflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[0.6875rem] text-emerald-300/70 font-semibold mt-1">
+                  Filtered activity period
+                </p>
+              </div>
 
-        <div className="p-4 border-b border-white/5 flex flex-col gap-3">
-          {/* Date range quick filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[--text-muted] shrink-0">Period</span>
-            <div className="flex gap-1 rounded-xl bg-white/[0.03] border border-white/5 p-0.5">
-              {([
-                { key: "30d", label: "Last 30 days" },
-                { key: "90d", label: "Last 90 days" },
-                { key: "all", label: "All time" },
-              ] as const).map((opt) => (
+              <div className="glass-card rich-border p-5 rounded-2xl relative overflow-hidden bg-gradient-to-br from-rose-900/20 via-rose-950/10 to-slate-900/40 border border-rose-500/20 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-rose-400">Total Debits / Outflow</span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 text-sm font-bold">
+                    ↑
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-white mt-3">
+                  -₹{historyStats.totalOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[0.6875rem] text-rose-300/70 font-semibold mt-1">
+                  Filtered activity period
+                </p>
+              </div>
+
+              <div className="glass-card rich-border p-5 rounded-2xl relative overflow-hidden bg-gradient-to-br from-indigo-900/20 via-purple-950/10 to-slate-900/40 border border-indigo-500/20 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-300">Activity Log Volume</span>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-sm font-bold">
+                    📊
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-white mt-3">
+                  {historyStats.count} <span className="text-sm font-normal text-[--text-muted]">entries</span>
+                </p>
+                <p className="text-[0.6875rem] text-indigo-300/70 font-semibold mt-1">
+                  Verified audit ledger logs
+                </p>
+              </div>
+            </div>
+
+            {/* Rich Activity Trend Chart */}
+            {historyTrendData.length > 0 && (
+              <div className="glass-card rich-border p-6 rounded-2xl border border-white/10 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">Ledger Activity Trend</h3>
+                    <p className="text-xl font-black text-white mt-1">Inflow vs Outflow History Curve</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Inflow
+                    </span>
+                    <span className="flex items-center gap-1.5 text-rose-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Outflow
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full h-[220px] mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={historyTrendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="histInflowGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="histOutflowGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                      <YAxis tickFormatter={(v) => `₹${v}`} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}
+                        itemStyle={{ color: "#fff", fontWeight: "bold" }}
+                        formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, ""]}
+                      />
+                      <Area type="monotone" dataKey="Inflow" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#histInflowGrad)" />
+                      <Area type="monotone" dataKey="Outflow" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#histOutflowGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Controls Bar */}
+            <div className="glass-card rich-border p-5 rounded-2xl border border-white/10 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-white tracking-tight">Audit & Transfer Ledger</h3>
+                  <p className="text-xs text-[--text-muted]">Immutable log of account balance changes & transactions</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Live Search Box */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search history..."
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      className="bg-white/5 border border-white/10 focus:border-indigo-500/50 text-xs text-white rounded-xl px-3.5 py-1.5 w-44 placeholder:text-[--text-muted] outline-none transition-all"
+                    />
+                    {historySearch && (
+                      <button
+                        onClick={() => setHistorySearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[--text-muted] hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Period Selector */}
+                  <div className="flex items-center gap-1.5 rounded-xl bg-white/[0.03] border border-white/10 p-1">
+                    {([
+                      { key: "30d", label: "30 Days" },
+                      { key: "90d", label: "90 Days" },
+                      { key: "all", label: "All Time" },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setHistoryDateRange(opt.key)}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          historyDateRange === opt.key
+                            ? "bg-[--accent-primary] text-white shadow-md shadow-indigo-500/20"
+                            : "text-[--text-muted] hover:text-white"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Filter Chips */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                <span className="text-xs font-bold text-[--text-muted] mr-1">Account:</span>
                 <button
-                  key={opt.key}
                   type="button"
-                  onClick={() => setHistoryDateRange(opt.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    historyDateRange === opt.key
-                      ? "bg-[--accent-primary] text-white shadow-sm"
-                      : "text-[--text-muted] hover:text-white"
+                  onClick={() => setHistoryAccountId("all")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    historyAccountId === "all"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                      : "bg-white/5 text-[--text-muted] border border-white/10 hover:text-white"
                   }`}
                 >
-                  {opt.label}
+                  🌐 All Accounts
                 </button>
-              ))}
+                {accounts.map((account) => (
+                  <button
+                    type="button"
+                    key={account.id}
+                    onClick={() => setHistoryAccountId(account.id)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      historyAccountId === account.id
+                        ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                        : "bg-white/5 text-[--text-muted] border border-white/10 hover:text-white"
+                    }`}
+                  >
+                    💳 {account.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* History Table Container */}
+            <div className="glass-card rich-border rounded-2xl overflow-hidden border border-white/10">
+              {filteredAccountHistory.length === 0 ? (
+                <div className="py-20 text-center flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-3xl mb-4">
+                    📜
+                  </div>
+                  <p className="text-lg font-black text-white">No history logs match your filters</p>
+                  <p className="text-xs text-[--text-muted] mt-1">Try switching account filter, date range, or clear your search term</p>
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto max-h-[600px] overflow-y-auto relative custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
+                    <thead className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md border-b border-white/10 shadow-lg">
+                      <tr>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted]">Date & Time</th>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted]">Account</th>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted]">Action</th>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted] w-full">Activity Details</th>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted] text-right">Amount</th>
+                        <th className="p-4 text-xs font-black uppercase tracking-wider text-[--text-muted] text-right">Updated Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredAccountHistory.map((log) => {
+                        const account = accounts.find((a) => a.id === log.account_id);
+                        const isDebit = log.new_balance !== null && log.previous_balance !== null
+                          ? log.new_balance < log.previous_balance
+                          : DEBIT_ACCOUNT_ACTIONS.has(log.action_type);
+
+                        const ActionIcon = getActionIcon(log.action_type);
+                        const currency = account?.currency || "INR";
+
+                        return (
+                          <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                            <td className="p-4 whitespace-nowrap">
+                              <p className="text-xs font-bold text-white tracking-tight">
+                                {log.created_at ? format(new Date(log.created_at), "MMM d, yyyy") : "—"}
+                              </p>
+                              <p className="text-[0.6875rem] font-mono text-[--text-muted] mt-0.5 tracking-wider">
+                                {log.created_at ? format(new Date(log.created_at), "hh:mm a") : ""}
+                              </p>
+                            </td>
+                            <td className="p-4 whitespace-nowrap">
+                              <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                {account?.name || log.account_name || "System"}
+                              </span>
+                            </td>
+                            <td className="p-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold ${isDebit ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}`}>
+                                  {ActionIcon}
+                                </span>
+                                <span className="text-xs font-bold text-slate-200">
+                                  {getActionLabel(log.action_type)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <p className="text-xs text-[--text-secondary] truncate max-w-[280px] lg:max-w-[420px] font-medium" title={log.details || ""}>
+                                {log.details || "—"}
+                              </p>
+                            </td>
+                            <td className="p-4 text-right whitespace-nowrap">
+                              <p className={`text-sm font-black tracking-tight ${isDebit ? "text-rose-400" : "text-emerald-400"}`}>
+                                {log.amount === null ? "—" : `${isDebit ? "-" : "+"}${getCurrencySymbol(currency)}${Math.abs(log.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              </p>
+                            </td>
+                            <td className="p-4 text-right whitespace-nowrap">
+                              {log.new_balance !== null ? (
+                                <span className="text-xs font-mono font-bold text-white bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                                  {getCurrencySymbol(currency)}{log.new_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-[--text-muted]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
-          {/* Account chips */}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setHistoryAccountId("all")} className={`px-4 h-9 rounded-xl text-xs font-semibold transition-all ${historyAccountId === "all" ? "bg-[--accent-primary]/20 text-[--accent-primary-light] border border-[--accent-primary]/30" : "bg-white/5 text-[--text-muted] border border-white/10 hover:text-[--text-primary]"}`}>All accounts</button>
-            {accounts.map((account) => (
-              <button type="button" key={account.id} onClick={() => setHistoryAccountId(account.id)} className={`px-4 h-9 rounded-xl text-xs font-semibold transition-all ${historyAccountId === account.id ? "bg-[--accent-primary]/20 text-[--accent-primary-light] border border-[--accent-primary]/30" : "bg-white/5 text-[--text-muted] border border-white/10 hover:text-[--text-primary]"}`}>{account.name}</button>
-            ))}
-          </div>
-        </div>
-
-        {accountHistory.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-lg font-bold text-[--text-primary]">No history found</p>
-            <p className="text-sm text-[--text-muted] mt-1">Try another account filter or create activity.</p>
-          </div>
-        ) : (
-          <div className="w-full overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
-                <tr className="border-b border-white/10 bg-[#151515]">
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Timestamp</th>
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Account</th>
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Action</th>
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] w-full">Details</th>
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] text-right whitespace-nowrap">Amount</th>
-                  <th className="p-4 text-xs font-semibold text-[--text-muted] text-right whitespace-nowrap">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {accountHistory.map((log) => {
-                  const account = accounts.find((a) => a.id === log.account_id);
-                  const isDebit = log.new_balance !== null && log.previous_balance !== null
-                    ? log.new_balance < log.previous_balance
-                    : DEBIT_ACCOUNT_ACTIONS.has(log.action_type);
-
-                  const ActionIcon = getActionIcon(log.action_type);
-                  const currency = account?.currency || "INR";
-
-                  return (
-                    <tr key={log.id}>
-                      <td className="p-4 whitespace-nowrap">
-                        <p className="text-xs font-bold text-white tracking-tight">
-                          {log.created_at ? format(new Date(log.created_at), "MMM d, yyyy") : "—"}
-                        </p>
-                        <p className="text-xs font-mono text-[--text-muted] mt-0.5 tracking-widest uppercase">
-                          {log.created_at ? format(new Date(log.created_at), "hh:mm a") : ""}
-                        </p>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span className="text-xs font-bold text-white tracking-tight px-2 py-1 rounded bg-white/5 border border-white/10">
-                          {account?.name || log.account_name || "System"}
-                        </span>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-6 h-6 rounded-md flex items-center justify-center text-xs ${isDebit ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                            {ActionIcon}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-300">
-                            {getActionLabel(log.action_type)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <p className="text-xs text-[--text-secondary] truncate max-w-[250px] lg:max-w-[400px]" title={log.details || ""}>
-                          {log.details || "—"}
-                        </p>
-                      </td>
-                      <td className="p-4 text-right whitespace-nowrap">
-                        <p className={`text-sm font-black tracking-tight ${isDebit ? "text-rose-400" : "text-emerald-400"}`}>
-                          {log.amount === null ? "—" : `${isDebit ? "-" : "+"}${getCurrencySymbol(currency)}${Math.abs(log.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                        </p>
-                      </td>
-                      <td className="p-4 text-right whitespace-nowrap">
-                        {log.new_balance !== null ? (
-                          <span className="text-xs font-bold text-white bg-white/5 px-2 py-1 rounded-md border border-white/10 shadow-inner">
-                            {getCurrencySymbol(currency)}{log.new_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[--text-muted]">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
-      </div>
-      )}
       </>
       )}
+    </div>
 
       {/* DRAWERS */}
       <Drawer
@@ -836,7 +1036,9 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     onClick={() => selectBank(b)}
                     className="w-full p-3.5 flex items-center gap-3 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
                   >
-                    <BankLogo bankName={b.name} size={28} />
+                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-indigo-400">
+                      🏦
+                    </div>
                     <div>
                       <p className="font-bold text-sm text-white">{b.name}</p>
                       <p className="text-xs text-[--text-muted]">{b.domain}</p>
@@ -1000,6 +1202,6 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -84,10 +84,10 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
     return null;
   }
 
-  // Skip CSRF check for API routes that use other auth mechanisms
+  // Skip CSRF check for authenticated API routes that use session or token auth
   const pathname = request.nextUrl.pathname;
-  if (pathname.startsWith("/api/sync") || pathname.startsWith("/api/transactions/")) {
-    // Sync and transaction endpoints use Bearer tokens or secure sync tokens
+  if (pathname.startsWith("/api/sync") || pathname.startsWith("/api/transactions/") || pathname.startsWith("/api/ai/")) {
+    // Sync, transaction, and AI endpoints use session/auth tokens
     return null;
   }
 

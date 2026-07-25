@@ -84,9 +84,9 @@ async function fetchForex() {
 
 export function useFinanceData(initialData?: FinanceData) {
   const swrOptions = {
-    dedupingInterval: 2000, // 2 seconds to prevent double fetches on mount
-    focusThrottleInterval: 5000, // 5 seconds throttle
-    revalidateOnFocus: true, // Auto-refresh when tab focused
+    dedupingInterval: 5000, // 5 seconds to prevent double fetches on mount and tab switches
+    focusThrottleInterval: 10000, // 10 seconds throttle
+    revalidateOnFocus: false, // Prevent background refetch on tab focus causing rendering lag
     revalidateOnReconnect: true, // Auto-refresh when reconnected
     keepPreviousData: true, // Smoother UI transitions
   };

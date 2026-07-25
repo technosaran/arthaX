@@ -99,12 +99,44 @@ const BANKS: Bank[] = [
   { name: "SBI",                        domain: "sbi.co.in" },
 ];
 
+const SHORTHAND_DOMAINS: Record<string, string> = {
+  sbi: "sbi.co.in",
+  hdfc: "hdfcbank.com",
+  icici: "icicibank.com",
+  axis: "axisbank.com",
+  kotak: "kotak.com",
+  pnb: "pnbindia.in",
+  bob: "bankofbaroda.in",
+  canara: "canarabank.com",
+  union: "unionbankofindia.co.in",
+  boi: "bankofindia.co.in",
+  indianbank: "indianbank.in",
+  idfc: "idfcfirstbank.com",
+  indusind: "indusind.com",
+  yes: "yesbank.in",
+  federal: "federalbank.co.in",
+  rbl: "rblbank.com",
+  paytm: "paytm.com",
+  phonepe: "phonepe.com",
+  gpay: "pay.google.com",
+  cred: "cred.club",
+  zerodha: "zerodha.com",
+  groww: "groww.in",
+  upstox: "upstox.com",
+  angelone: "angelone.in",
+};
+
 /**
  * Get the domain registered for a bank name
  */
 export function getBankDomain(bankName: string): string | null {
   if (!bankName) return null;
   const normalizedSearch = bankName.toLowerCase().trim();
+
+  // 0. Shorthand override
+  if (SHORTHAND_DOMAINS[normalizedSearch]) {
+    return SHORTHAND_DOMAINS[normalizedSearch];
+  }
 
   // 1. Exact match
   let bank = BANKS.find((b) => b.name.toLowerCase() === normalizedSearch);
