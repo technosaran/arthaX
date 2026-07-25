@@ -13,6 +13,8 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { Drawer } from "@/components/ui/drawer";
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
+import CompanyLogo from "@/components/ui/company-logo";
+import BankLogo from "@/components/ui/bank-logo";
 
 import { CHART_COLOURS, CHART_SERIES_COLOURS } from "@/lib/chart-colours";
 function getColorByLabel(label: string | null | undefined) {
@@ -570,7 +572,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
               <tbody className="divide-y divide-white/10">
                 {filteredIncomes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">Infrastructure query returned no income data.</td>
+                    <td colSpan={6} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">No income transactions logged for this period.</td>
                   </tr>
                 ) : (
                   filteredIncomes.map((inc) => {
@@ -584,9 +586,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-sm font-bold">
-                              💰
-                            </div>
+                            <CompanyLogo name={inc.description} category={inc.category} size={54} />
                             <p className="text-sm font-medium group-hover:text-success transition-colors truncate max-w-[120px] md:max-w-none">{inc.description}</p>
                           </div>
                         </td>
@@ -595,7 +595,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-5 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(0,184,148,0.5)]" />
+                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={22} />
                             <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
@@ -636,9 +636,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                 <div key={inc.id} className="p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-sm font-bold">
-                        💰
-                      </div>
+                      <CompanyLogo name={inc.description} category={inc.category} size={54} />
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-[--text-primary] truncate">{inc.description}</span>
                         <span className="text-[0.5625rem] text-[--text-muted] uppercase font-bold">{inc.date ? format(parseISO(inc.date), "MMM d, yyyy") : "—"}</span>
@@ -651,7 +649,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(0,184,148,0.5)]" />
+                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={18} />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <button type="button" 
@@ -725,8 +723,8 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                 </svg>
               </div>
               <div>
-                <h3 className="text-xl font-black text-[--text-primary]">Revert Income</h3>
-                <p className="text-sm text-[--text-secondary] mt-2">Are you sure you want to revert this income entry? Your account balance will be debited.</p>
+                <h3 className="text-xl font-black text-[--text-primary]">Delete Income</h3>
+                <p className="text-sm text-[--text-secondary] mt-2">Are you sure you want to delete this income entry? Your account balance will be updated.</p>
               </div>
               <div className="flex gap-3 w-full mt-2">
                 <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeletingIncomeId(null); }} className="btn-secondary flex-1 h-11 font-bold rounded-xl">Cancel</button>
@@ -741,7 +739,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         <Drawer
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          title="Declare Revenue"
+          title="Add Income"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">

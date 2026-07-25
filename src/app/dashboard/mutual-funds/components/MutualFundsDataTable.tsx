@@ -15,14 +15,10 @@ interface MutualFundsDataTableProps {
   onAdd: () => void;
 }
 
-export function AMCAvatar({ amcName, fundName }: { amcName: string; fundName: string }) {
-  const name = amcName || fundName || "MF";
-  const badge = name.substring(0, 3).toUpperCase();
-  return (
-    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 border border-white/20 flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-md tracking-tighter">
-      {badge}
-    </div>
-  );
+import AMCLogo from "@/components/ui/amc-logo";
+
+export function AMCAvatar({ amcName, fundName, size = 40 }: { amcName: string; fundName: string; size?: number }) {
+  return <AMCLogo amcName={amcName} fundName={fundName} size={size} />;
 }
 
 export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onAdd }: MutualFundsDataTableProps) {

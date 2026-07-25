@@ -557,6 +557,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    // ─── 0. Greetings & Friendly Natural Language AI Assistant ───
+    const cleanRaw = rawText.trim().toLowerCase();
+    const isGreeting = /^(hi|hello|hey|hlo|hy|hola|yo|sup|\/start|start|good\s*morning|good\s*evening|good\s*afternoon|who\s*are\s*you|\/menu|\/help|menu|help)$/i.test(cleanRaw);
+
+    if (isGreeting) {
+      const userName = profile.username || profile.full_name || "there";
+      const greetingMsg = `👋 *Hello ${userName}!* Welcome to your *AI Wealth & Financial Terminal*.\n\n` +
+        `You can perform *all web dashboard actions* directly here in Telegram:\n\n` +
+        `💳 *Accounts & Net Worth*\n` +
+        `• Send \`/balance\` or \`/accounts\` to view bank balances & net worth\n` +
+        `• Send \`add account SBI 5000\` to create a new bank account\n` +
+        `• Send \`transfer 2000 from SBI to HDFC\` to move funds\n\n` +
+        `💸 *Log Income & Expenses*\n` +
+        `• Send \`450 Swiggy\` or \`1200 Petrol\`\n` +
+        `• Send \`salary 50000\` or \`credit 10000 freelance\`\n` +
+        `• Send \`/recent\` or \`/undo\`\n\n` +
+        `📈 *Investments (Stocks, MFs, Crypto, Bonds, FnO)*\n` +
+        `• Send \`buy 10 TATAMOTORS at 950\` (Stocks)\n` +
+        `• Send \`invest 5000 in Parag Parikh Flexi Cap\` (Mutual Funds)\n` +
+        `• Send \`buy 0.05 BTC at 65000\` (Crypto)\n` +
+        `• Send \`/stocks\`, \`/mf\`, \`/crypto\`, \`/bonds\` to view portfolio\n\n` +
+        `🎯 *Goals & Budget*\n` +
+        `• Send \`/goals\` or \`/budget\` or \`goal Car 5000\`\n\n` +
+        `🤖 *AI Chat & Financial Coach*\n` +
+        `• Ask me anything! e.g. *"What is my net worth?"*, *"How much did I spend this month?"*, or *"Give me tips to save money"*`;
+
+      await sendTelegramMessage(chatId, greetingMsg, MAIN_MENU_KEYBOARD);
+      return NextResponse.json({ success: true });
+    }
+
+    // ─── 0B. Conversational Financial Questions via Gemini AI ───
+    const isQuestionOrInquiry = /\b(what|how|why|who|can|show|tell|give|my|spending|spent|worth|balance|tips|advise|recommend|explain|predict)\b/i.test(cleanRaw) && !/\d{3,}/.test(cleanRaw);
+
+    if (isQuestionOrInquiry && cleanRaw.length > 3 && !cleanRaw.startsWith("add") && !cleanRaw.startsWith("create") && !cleanRaw.startsWith("buy")) {
+      const geminiApiKey = getGeminiApiKeyForProfile(profile);
+      if (geminiApiKey) {
+        try {
+          let totalNetWorth = 0;
+          if (accounts) {
+            totalNetWorth = accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0);
+          }
+
+          const contextSummary = `User Name: ${profile.full_name || profile.username || 'User'}. Total Net Worth: ₹${totalNetWorth}. Accounts: ${JSON.stringify(accounts || [])}. Goals: ${JSON.stringify(goals || [])}. Base Currency: ${profile.base_currency || 'INR'}.`;
+
+          const aiAnswer = await askGeminiFinanceAssistant(rawText, contextSummary, geminiApiKey);
+          if (aiAnswer) {
+            await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${aiAnswer}`, MAIN_MENU_KEYBOARD);
+            return NextResponse.json({ success: true });
+          }
+        } catch (aiErr) {
+          console.warn("Gemini AI conversational query failed:", aiErr);
+        }
+      }
+    }
+
     // Handle inline category re-assignment callback (e.g. "cat_txId_Category")
     if (rawText.startsWith("cat_")) {
       const parts = rawText.split("_");
@@ -2232,7 +2287,7 @@ export async function POST(req: NextRequest) {
                     `• *Symbol*: ${symbol}\n` +
                     `• *Qty*: ${quantity} @ ₹${price.toLocaleString("en-IN")}\n` +
                     `• *Total Cost*: ₹${totalCost.toLocaleString("en-IN")}\n` +
-                    `• *Reflected on Web Dashboard*: ✅ Live`
+                    `• *Dashboard*: ✅ Updated`
                   );
                   return NextResponse.json({ success: true });
                 }
@@ -2267,7 +2322,7 @@ export async function POST(req: NextRequest) {
                     `🏦 *Gemini AI Mutual Fund Investment Logged*:\n` +
                     `• *Fund*: ${fundName}\n` +
                     `• *Amount*: ₹${amount.toLocaleString("en-IN")}\n` +
-                    `• *Reflected on Web Dashboard*: ✅ Live`
+                    `• *Dashboard*: ✅ Updated`
                   );
                   return NextResponse.json({ success: true });
                 }
@@ -2315,7 +2370,7 @@ export async function POST(req: NextRequest) {
                     `• *Category*: ${category}\n` +
                     `• *Account*: ${accObj?.name || "Default"}\n` +
                     `• *Desc*: ${description}\n` +
-                    `• *Reflected on Web Dashboard*: ✅ Live`,
+                    `• *Dashboard*: ✅ Updated`,
                     keyboard
                   );
                   return NextResponse.json({ success: true });

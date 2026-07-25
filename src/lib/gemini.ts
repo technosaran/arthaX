@@ -65,37 +65,35 @@ export async function callGeminiApi(
     };
   }
 
-  // Primary model: gemini-2.5-flash
-  let endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
-  let response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  // Model fallback list for maximum reliability across API keys
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  let responseText = "";
+  let lastError = "";
 
-  // Fallback to gemini-2.0-flash if 2.5 is unavailable or error 404
-  if (!response.ok && (response.status === 404 || response.status === 400)) {
-    endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  for (const model of models) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidate) {
+          return candidate;
+        }
+      } else {
+        lastError = await res.text();
+      }
+    } catch (e: any) {
+      lastError = e.message || String(e);
+    }
   }
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errText}`);
-  }
-
-  const data = await response.json();
-  const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!candidate) {
-    throw new Error("Gemini returned empty candidate text");
-  }
-
-  return candidate;
+  throw new Error(`Gemini API call failed across models: ${lastError}`);
 }
 
 /**
