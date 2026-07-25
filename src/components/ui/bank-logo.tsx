@@ -322,14 +322,15 @@ export const BankLogo = memo(function BankLogo({
         height: size,
         minWidth: size,
         borderRadius: "var(--radius-md, 14px)",
-        background: imgLoaded ? "white" : fallbackStyle.background,
+        background: imgLoaded ? "#ffffff" : fallbackStyle.background,
         boxShadow: imgLoaded ? "0 2px 8px rgba(0,0,0,0.12)" : fallbackStyle.boxShadow,
-        border: imgLoaded ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.18)",
+        border: imgLoaded ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.15)",
         transition: "all 0.3s ease",
       }}
       title={queryName}
     >
       <span
+        aria-hidden={imgLoaded}
         style={{
           color: fallbackStyle.color,
           fontSize: fallbackStyle.fontSize,
@@ -337,10 +338,16 @@ export const BankLogo = memo(function BankLogo({
           transition: "opacity 0.3s ease",
           letterSpacing: "0.3px",
           fontWeight: 900,
+          zIndex: 1,
         }}
       >
         {fallbackStyle.abbr}
       </span>
+
+      {/* Shimmer pulse during image loading */}
+      {sources.length > 0 && !allFailed && !imgLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-white/10" style={{ zIndex: 2 }} />
+      )}
 
       {sources.length > 0 && !allFailed && (
         <Image
@@ -363,6 +370,7 @@ export const BankLogo = memo(function BankLogo({
             borderRadius: "var(--radius-md, 14px)",
             opacity: imgLoaded ? 1 : 0,
             transition: "opacity 0.3s ease",
+            zIndex: 3,
           }}
         />
       )}

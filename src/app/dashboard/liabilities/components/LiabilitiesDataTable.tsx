@@ -257,10 +257,10 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { key: "all", label: "All", value: liabilities.length },
-              { key: "open", label: "Open", value: summary.open },
-              { key: "dueSoon", label: "Due ≤7d", value: summary.dueSoon },
-              { key: "highApr", label: "APR ≥12%", value: summary.highApr },
+              { key: "all", label: "All" },
+              { key: "open", label: "Open" },
+              { key: "dueSoon", label: "Due ≤7d" },
+              { key: "highApr", label: "APR ≥12%" },
             ].map((filter) => (
               <button
                 key={filter.key}
@@ -272,7 +272,7 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
                     : "bg-white/5 border-white/10 text-[--text-muted] hover:text-white"
                 }`}
               >
-                {filter.label} ({filter.value})
+                {filter.label}
               </button>
             ))}
           </div>

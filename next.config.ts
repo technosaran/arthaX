@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "assets.groww.in" },
       { protocol: "https", hostname: "cdn.jsdelivr.net" },
       { protocol: "https", hostname: "raw.githubusercontent.com" },
+      { protocol: "https", hostname: "upload.wikimedia.org" },
+      { protocol: "https", hostname: "cdn.brandfetch.io" },
+      { protocol: "https", hostname: "logo.uplead.com" },
+      { protocol: "https", hostname: "api.statvoo.com" },
     ],
   },
   turbopack: {

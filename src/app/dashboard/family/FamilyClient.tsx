@@ -384,8 +384,8 @@ export default function FamilyClient() {
               ◀
             </button>
 
-            <div className="px-2.5 py-1.5 text-xs font-black uppercase tracking-wider text-pink-400 select-none min-w-[85px] text-center">
-              {showAllTime ? "All Time" : format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")}
+            <div className="px-3 py-1.5 text-xs font-black uppercase tracking-wider text-pink-400 select-none min-w-[90px] text-center">
+              {format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")}
             </div>
 
             <button
@@ -403,52 +403,6 @@ export default function FamilyClient() {
               aria-label="Next month"
             >
               ▶
-            </button>
-
-            <select
-              value={selectedMonth}
-              onChange={(e) => {
-                setShowAllTime(false);
-                setSelectedMonth(parseInt(e.target.value));
-              }}
-              disabled={showAllTime}
-              className="bg-black/40 text-white text-xs font-bold px-2 py-1.5 rounded-lg border border-white/10 outline-none cursor-pointer hover:border-pink-500/40 transition-colors"
-              aria-label="Select month"
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1} className="bg-[#121214]">
-                  {format(new Date(2020, i, 1), "MMM")}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedYear}
-              onChange={(e) => {
-                setShowAllTime(false);
-                setSelectedYear(parseInt(e.target.value));
-              }}
-              disabled={showAllTime}
-              className="bg-black/40 text-white text-xs font-bold px-2 py-1.5 rounded-lg border border-white/10 outline-none cursor-pointer hover:border-pink-500/40 transition-colors"
-              aria-label="Select year"
-            >
-              {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((yr) => (
-                <option key={yr} value={yr} className="bg-[#121214]">
-                  {yr}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => setShowAllTime((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 ${
-                showAllTime
-                  ? "bg-pink-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.4)]"
-                  : "bg-white/5 text-[--text-muted] hover:text-white border border-white/10"
-              }`}
-            >
-              {showAllTime ? "✓ All" : "All Time"}
             </button>
           </div>
 

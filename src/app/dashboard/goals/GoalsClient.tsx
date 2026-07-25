@@ -310,8 +310,8 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
         <div className="flex flex-wrap gap-1.5 rounded-2xl bg-white/[0.02] border border-white/5 p-1.5 max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
           {[
             { key: "overview", label: "Overview" },
-            { key: "trackers", label: "Goal Trackers", badge: stats.activeCount },
-            { key: "completed", label: "Completed Goals", badge: stats.completedCount }
+            { key: "trackers", label: "Goal Trackers" },
+            { key: "completed", label: "Completed Goals" }
           ].map((tab) => {
             const isActive = activeView === tab.key;
             
@@ -331,13 +331,6 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 }`}
               >
                 {tab.label}
-                {tab.badge !== undefined && (
-                  <span className={`flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1.5 text-[0.5625rem] font-black ${
-                    isActive ? "bg-white/20 text-white" : "bg-white/10 text-white"
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
