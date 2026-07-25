@@ -30,7 +30,7 @@ export default function MultiAccountSnapshot({ accounts = [], showUSD = false }:
         {items.map((acc: any) => (
           <div key={acc.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
             <div className="flex items-center gap-3">
-              <BankLogo bankName={acc.name || acc.bank_name} accountName={acc.name} type={acc.type} size={32} className="rounded-xl flex-shrink-0" />
+              <BankLogo bankName={acc.bank_name || acc.name} accountName={acc.name} type={acc.type} size={32} className="rounded-xl flex-shrink-0" />
               <div className="flex flex-col">
                 <span className="text-xs font-bold text-white truncate max-w-[140px] sm:max-w-[180px]">{acc.name || acc.bank_name || "Account"}</span>
                 <span className="text-[10px] font-medium text-[--text-muted] capitalize">{acc.type || "bank"}</span>
