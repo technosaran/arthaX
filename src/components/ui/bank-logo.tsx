@@ -44,7 +44,7 @@ export const BankLogo = memo(function BankLogo({
   bankName,
   accountName,
   type = "checking",
-  size = 54,
+  size = 72,
   className = "",
 }: BankLogoProps) {
   const domain = getBankDomain(bankName || accountName || "");

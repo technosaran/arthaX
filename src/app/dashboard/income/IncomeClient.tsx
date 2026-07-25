@@ -586,7 +586,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <CompanyLogo name={inc.description} category={inc.category} size={54} />
+                            <CompanyLogo name={inc.description} category={inc.category} size={72} />
                             <p className="text-sm font-medium group-hover:text-success transition-colors truncate max-w-[120px] md:max-w-none">{inc.description}</p>
                           </div>
                         </td>
@@ -595,7 +595,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-5 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2">
-                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={22} />
+                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={32} />
                             <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
@@ -636,7 +636,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                 <div key={inc.id} className="p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <CompanyLogo name={inc.description} category={inc.category} size={54} />
+                      <CompanyLogo name={inc.description} category={inc.category} size={64} />
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-[--text-primary] truncate">{inc.description}</span>
                         <span className="text-[0.5625rem] text-[--text-muted] uppercase font-bold">{inc.date ? format(parseISO(inc.date), "MMM d, yyyy") : "—"}</span>
@@ -649,7 +649,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                     <div className="flex items-center gap-1.5">
-                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={18} />
+                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={28} />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <button type="button" 
