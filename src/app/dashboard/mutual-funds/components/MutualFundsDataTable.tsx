@@ -17,7 +17,7 @@ interface MutualFundsDataTableProps {
 
 import AMCLogo from "@/components/ui/amc-logo";
 
-export function AMCAvatar({ amcName, fundName, size = 40 }: { amcName: string; fundName: string; size?: number }) {
+export function AMCAvatar({ amcName, fundName, size = 56 }: { amcName: string; fundName: string; size?: number }) {
   return <AMCLogo amcName={amcName} fundName={fundName} size={size} />;
 }
 

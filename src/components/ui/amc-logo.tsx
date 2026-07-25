@@ -14,7 +14,7 @@ interface AMCLogoProps {
 export const AMCLogo = memo(function AMCLogo({
   amcName,
   fundName,
-  size = 54,
+  size = 72,
   className = "",
 }: AMCLogoProps) {
   const domain = getAMCDomain(amcName, fundName);
