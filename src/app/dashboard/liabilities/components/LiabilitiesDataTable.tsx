@@ -279,11 +279,11 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
         <table className="w-full text-left border-collapse min-w-[800px]">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-white/5 bg-black/40">
+              <tr key={headerGroup.id} className="border-b border-white/10 bg-[#151515]">
                 {headerGroup.headers.map((header) => (
                   <th key={header.id} className={`px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] whitespace-nowrap ${getTableHeaderClass(header.column.id)}`}>
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}

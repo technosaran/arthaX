@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
-    return NextResponse.json({ error: "Google OAuth Client ID is not configured on the server" }, { status: 500 });
+    return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=Google%20OAuth%20Client%20ID%20is%20not%20configured%20on%20the%20server", req.url));
+  }
+
+  // Get current user to attach userId to OAuth state
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(new URL("/login?error=Please%20log%20in%20to%20connect%20Gmail", req.url));
   }
 
   // Construct target redirect URI using NEXT_PUBLIC_SITE_URL
@@ -22,12 +31,19 @@ export async function GET(req: NextRequest) {
   googleOAuthUrl.searchParams.append("access_type", "offline"); // Crucial to obtain a refresh token
   googleOAuthUrl.searchParams.append("prompt", "consent"); // Force consent to guarantee a new refresh token
   
-  // CSRF Protection: Generate a state token and store it in a cookie
-  const state = crypto.randomUUID();
-  googleOAuthUrl.searchParams.append("state", state);
+  // CSRF Protection & User Binding: state = `${user.id}:${randomUUID()}`
+  const randomState = crypto.randomUUID();
+  const fullState = `${user.id}:${randomState}`;
+  googleOAuthUrl.searchParams.append("state", fullState);
 
   const response = NextResponse.redirect(googleOAuthUrl.toString());
-  response.cookies.set("gmail_oauth_state", state, {
+
+  // Copy incoming cookies to preserve session across redirect
+  req.cookies.getAll().forEach((c) => {
+    response.cookies.set(c.name, c.value, { path: "/", sameSite: "lax" });
+  });
+
+  response.cookies.set("gmail_oauth_state", randomState, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

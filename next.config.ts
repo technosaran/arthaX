@@ -31,6 +31,13 @@ const nextConfig: NextConfig = {
     },
   ],
 
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 180,
+    },
+  },
+
   // Security headers — consolidated here. All non-cache headers live in
   // the middleware (src/proxy.ts) for dynamic routes. Only cache-control
   // and X-DNS-Prefetch-Control are kept here for static assets.
@@ -69,13 +76,15 @@ const nextConfig: NextConfig = {
     {
       source: "/sw.js",
       headers: [
-        { key: "Cache-Control", value: "public, max-age=0" },
+        { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        { key: "Pragma", value: "no-cache" },
+        { key: "Expires", value: "0" },
       ],
     },
     {
       source: "/workbox-:path.js",
       headers: [
-        { key: "Cache-Control", value: "public, max-age=0" },
+        { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
       ],
     },
   ],

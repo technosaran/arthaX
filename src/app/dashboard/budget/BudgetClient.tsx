@@ -332,34 +332,34 @@ return (
 
       {/* Top Key Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-2">Planned spend</p>
-          <p className="text-2xl font-black text-white">₹{totalBudgeted.toLocaleString()}</p>
-          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-60">Total monthly limit</p>
+        <div className="glass-card-static p-5 border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-transparent to-transparent shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400/80 mb-2">Planned spend</p>
+          <p className="text-2xl font-black text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">₹{totalBudgeted.toLocaleString()}</p>
+          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Total monthly limit</p>
         </div>
-        <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-2">Actual spend</p>
-          <p className={`text-2xl font-black ${totalSpent > totalBudgeted && totalBudgeted > 0 ? "text-rose-400" : "text-white"}`}>₹{totalSpent.toLocaleString()}</p>
-          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-60">Real-time outflow</p>
+        <div className="glass-card-static p-5 border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-400/80 mb-2">Actual spend</p>
+          <p className={`text-2xl font-black ${totalSpent > totalBudgeted && totalBudgeted > 0 ? "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]" : "text-amber-400 drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]"}`}>₹{totalSpent.toLocaleString()}</p>
+          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Real-time outflow</p>
         </div>
-        <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-2">Margin</p>
-          <p className={`text-2xl font-black ${totalBudgeted - totalSpent >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        <div className="glass-card-static p-5 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-2">Margin</p>
+          <p className={`text-2xl font-black ${totalBudgeted - totalSpent >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>
             ₹{(totalBudgeted - totalSpent).toLocaleString()}
           </p>
-          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-60">Remaining balance</p>
+          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Remaining balance</p>
         </div>
-        <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-2">Daily allowance</p>
-          <p className={`text-2xl font-black ${(daysInMonth - daysPassed) > 0 && (totalBudgeted - totalSpent) > 0 ? "text-sky-400" : "text-slate-500"}`}>
+        <div className="glass-card-static p-5 border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-transparent to-transparent shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-400/80 mb-2">Daily allowance</p>
+          <p className={`text-2xl font-black ${(daysInMonth - daysPassed) > 0 && (totalBudgeted - totalSpent) > 0 ? "text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]" : "text-slate-500"}`}>
             ₹{((daysInMonth - daysPassed) > 0 && (totalBudgeted - totalSpent) > 0 ? (totalBudgeted - totalSpent) / (daysInMonth - daysPassed) : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
-          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-60">Safe spend / day</p>
+          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Safe spend / day</p>
         </div>
-        <div className="glass-card-static p-5 border-white/5 bg-gradient-to-br from-[--accent-primary]/10 to-transparent col-span-2 md:col-span-1">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-2">Monthly income</p>
-          <p className="text-2xl font-black text-[--accent-primary-light]">₹{totalIncome.toLocaleString()}</p>
-          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-60">Total revenue stream</p>
+        <div className="glass-card-static p-5 border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent col-span-2 md:col-span-1 shadow-lg">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-400/80 mb-2">Monthly income</p>
+          <p className="text-2xl font-black text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.3)]">₹{totalIncome.toLocaleString()}</p>
+          <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Total revenue stream</p>
         </div>
       </div>
 
@@ -474,24 +474,25 @@ return (
               const spent = actualSpending[cat.label] || 0;
               const limit = Number(budget?.amount || 0);
               const percent = limit > 0 ? (spent / limit) * 100 : 0;
+              const remaining = limit - spent;
 
               return (
-                <div key={cat.label} className="glass-card-static p-4.5 flex flex-col justify-between border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent hover:from-white/[0.02] transition-all duration-300 min-h-[175px]">
+                <div key={cat.label} className="glass-card-static p-4.5 flex flex-col justify-between border-white/10 bg-gradient-to-b from-white/[0.02] to-transparent hover:border-cyan-500/30 transition-all duration-300 min-h-[185px] shadow-lg">
                   <div>
                     {/* Card Header */}
-                    <div className="flex justify-between items-start gap-2 mb-3.5">
+                    <div className="flex justify-between items-start gap-2 mb-3">
                       <div className="flex items-center gap-3">
                         <div className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
                           {limit > 0 ? (
                             <>
                               <svg className="w-full h-full transform -rotate-90 absolute">
-                                <circle cx="22" cy="22" r="18" className="stroke-white/5" strokeWidth="2.5" fill="transparent" />
+                                <circle cx="22" cy="22" r="18" className="stroke-white/10" strokeWidth="2.5" fill="transparent" />
                                 <circle
                                   cx="22"
                                   cy="22"
                                   r="18"
                                   className={`transition-all duration-1000 ${
-                                    percent > 90 ? "stroke-rose-500" : percent > 75 ? "stroke-amber-500" : "stroke-cyan-400"
+                                    percent > 90 ? "stroke-rose-500" : percent > 75 ? "stroke-amber-400" : "stroke-emerald-400"
                                   }`}
                                   strokeWidth="2.5"
                                   fill="transparent"
@@ -502,13 +503,13 @@ return (
                               <span className="text-lg z-10">{cat.icon}</span>
                             </>
                           ) : (
-                            <span className="text-lg p-2 bg-white/[0.02] rounded-2xl border border-white/5 shadow-inner">{cat.icon}</span>
+                            <span className="text-lg p-2 bg-white/[0.04] rounded-2xl border border-white/10 shadow-inner">{cat.icon}</span>
                           )}
                         </div>
                         <div>
                           <p className="text-xs font-black text-white">{cat.label}</p>
-                          <p className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider mt-0.5">
-                            Spent: ₹{spent.toLocaleString()}
+                          <p className="text-[0.625rem] font-bold text-gray-400 mt-0.5">
+                            Spent: <span className={`font-black ${percent > 100 ? 'text-rose-400' : percent > 80 ? 'text-amber-400' : 'text-emerald-400'}`}>₹{spent.toLocaleString()}</span>
                           </p>
                         </div>
                       </div>
@@ -516,38 +517,42 @@ return (
                       {/* Status Tag */}
                       {limit > 0 ? (
                         percent > 100 ? (
-                          <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">Over limit</span>
+                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-[0_0_8px_rgba(244,63,94,0.2)]">Over limit</span>
                         ) : percent > 80 ? (
-                          <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">Near limit</span>
+                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.2)]">Near limit</span>
                         ) : (
-                          <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">On track</span>
+                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.2)]">On track</span>
                         )
                       ) : (
-                        <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 text-[--text-muted] border border-white/10">No limit</span>
+                        <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 text-gray-500 border border-white/10">No limit</span>
                       )}
                     </div>
                   </div>
 
                   {/* Progress Bar with month progress pacing line */}
                   {limit > 0 && (
-                    <div className="my-2.5">
-                      <div className="flex justify-between text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mb-1">
-                        <span>{percent.toFixed(0)}% used</span>
-                        <span>Limit: ₹{limit.toLocaleString()}</span>
+                    <div className="my-2 space-y-1">
+                      <div className="flex justify-between text-[0.625rem] font-black uppercase tracking-wider mb-1">
+                        <span className={percent > 100 ? "text-rose-400" : percent > 80 ? "text-amber-400" : "text-emerald-400"}>{percent.toFixed(0)}% used</span>
+                        {remaining >= 0 ? (
+                          <span className="text-emerald-400 font-extrabold">₹{remaining.toLocaleString()} left</span>
+                        ) : (
+                          <span className="text-rose-400 font-extrabold">₹{Math.abs(remaining).toLocaleString()} over</span>
+                        )}
                       </div>
-                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex relative border border-white/5">
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden flex relative border border-white/10 shadow-inner">
                         <div 
                           className={`h-full transition-all duration-1000 ${
                             percent > 90 
-                              ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" 
+                              ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-[0_0_10px_rgba(244,63,94,0.5)]" 
                               : percent > 75 
-                                ? "bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.4)]" 
-                                : "bg-cyan-500 shadow-[0_0_6px_rgba(6,182,212,0.3)]"
+                                ? "bg-gradient-to-r from-amber-500 to-yellow-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
+                                : "bg-gradient-to-r from-cyan-500 to-emerald-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
                           }`} 
                           style={{ width: `${Math.min(percent, 100)}%` }} 
                         />
                         <div 
-                          className="absolute top-0 bottom-0 w-0.5 bg-sky-400/80 shadow-[0_0_6px_rgba(56,189,248,0.8)] z-10" 
+                          className="absolute top-0 bottom-0 w-0.5 bg-sky-400/90 shadow-[0_0_6px_rgba(56,189,248,0.9)] z-10" 
                           style={{ left: `${monthProgressPercent}%` }}
                           title={`Month progress line: ${monthProgressPercent.toFixed(0)}% passed`}
                         />
@@ -555,11 +560,11 @@ return (
                     </div>
                   )}
 
-                  <div className="mt-3.5 pt-3 border-t border-white/5 flex justify-between items-center">
-                    <span className="text-xs text-[--text-muted] font-medium">
+                  <div className="mt-3 pt-2.5 border-t border-white/5 flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-medium">
                       {limit > 0 ? (
                         <>
-                          Target: <span className="font-bold text-white">₹{limit.toLocaleString()}</span>
+                          Target Limit: <span className="font-extrabold text-cyan-400">₹{limit.toLocaleString()}</span>
                         </>
                       ) : (
                         "No limit set"
@@ -574,16 +579,16 @@ return (
                         setDrawerSpent(spent);
                         setDrawerOpen(true);
                       }}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer border ${
+                      className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer border ${
                         limit > 0
-                          ? "bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border-white/5 hover:border-white/10 active:scale-95"
-                          : "bg-[--accent-primary]/10 hover:bg-[--accent-primary]/25 text-[--accent-primary-light] hover:text-white border-[--accent-primary]/10 hover:border-[--accent-primary]/25 active:scale-95"
+                          ? "bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30 active:scale-95 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
+                          : "bg-white/5 hover:bg-white/10 text-gray-300 border-white/10 active:scale-95"
                       }`}
                     >
                       {limit > 0 ? (
-                        <Edit2 className="w-2.5 h-2.5" />
+                        <Edit2 className="w-3 h-3" />
                       ) : (
-                        <Plus className="w-2.5 h-2.5" />
+                        <Plus className="w-3 h-3" />
                       )}
                       <span>{limit > 0 ? "Adjust" : "Set Limit"}</span>
                     </button>
@@ -722,10 +727,10 @@ return (
           </div>
 
           {/* Savings Potential */}
-          <div className="glass-card-static p-5 text-center border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Savings Potential</h3>
-            <p className="text-3xl font-black text-white">₹{(totalIncome - totalSpent).toLocaleString()}</p>
-            <p className="text-[0.5625rem] font-black uppercase tracking-[0.25em] text-[--accent-primary-light] mt-1">Theoretical Surplus</p>
+          <div className="glass-card-static p-5 text-center border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-3">Savings Potential</h3>
+            <p className={`text-3xl font-black ${(totalIncome - totalSpent) >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>₹{(totalIncome - totalSpent).toLocaleString()}</p>
+            <p className="text-[0.5625rem] font-black uppercase tracking-[0.25em] text-emerald-400 mt-1">Theoretical Surplus</p>
             <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
                <div>
                  <p className="text-lg font-black text-emerald-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { format } from "date-fns";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -27,12 +28,14 @@ const CATEGORIES = [
 ];
 
 export default function LiabilitiesClient({ initialData }: { initialData?: FinanceData }) {
-  const { data: { liabilities, accounts }, mutate } = useFinanceData(initialData);
+  const { data: { liabilities, accounts, ledgerLogs, expenses }, mutate } = useFinanceData(initialData);
   const searchParams = useSearchParams();
   const [showAddModal, setShowAddModal] = useState(searchParams?.get("action") === "new");
   const [submitting, withLock] = useSubmitLock();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"overview" | "records">("overview");
+  const [activeView, setActiveView] = useState<"overview" | "records" | "history">("overview");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
 
   const mounted = useHasMounted();
 
@@ -61,6 +64,87 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
     
     return { totalDebt, monthlyEMI, highestInterest, weightedInterest, totalPrincipal, totalPaid, payoffPct };
   }, [liabilities]);
+
+  // Derived Loan History (ledger logs + EMI/Loan expense records)
+  const loanHistoryLogs = useMemo(() => {
+    const items: Array<{
+      id: string;
+      date: string;
+      title: string;
+      category: string;
+      type: "PAYMENT" | "LOG";
+      amount: number | null;
+      details: string;
+      badgeColor: string;
+    }> = [];
+
+    // 1. Filter ledger logs for liability events
+    (ledgerLogs || []).forEach((log) => {
+      const isLiabilityLog =
+        log.source_type === "liability" ||
+        log.source_type === "liabilities" ||
+        (log.details || "").toLowerCase().includes("loan") ||
+        (log.details || "").toLowerCase().includes("emi") ||
+        (log.details || "").toLowerCase().includes("liability");
+
+      if (isLiabilityLog && log.created_at) {
+        items.push({
+          id: `log-${log.id}`,
+          date: log.created_at,
+          title: log.account_name || "Loan Audit Entry",
+          category: log.action_type || "LIABILITY",
+          type: "LOG",
+          amount: log.amount,
+          details: log.details || "Liability audit log entry",
+          badgeColor: "bg-purple-500/15 border-purple-500/30 text-purple-400",
+        });
+      }
+    });
+
+    // 2. Filter expenses for EMI / Loan Repayments
+    (expenses || []).forEach((exp) => {
+      const catLower = (exp.category || "").toLowerCase();
+      const detLower = ((exp as any).details || (exp as any).merchant || exp.description || "").toLowerCase();
+      const isLoanExpense =
+        catLower.includes("emi") ||
+        catLower.includes("loan") ||
+        catLower.includes("credit card") ||
+        catLower.includes("vehicle") ||
+        catLower.includes("housing") ||
+        detLower.includes("emi") ||
+        detLower.includes("loan payment");
+
+      if (isLoanExpense && exp.date) {
+        items.push({
+          id: `exp-${exp.id}`,
+          date: exp.date,
+          title: (exp as any).merchant || (exp as any).details || exp.description || exp.category || "EMI Payment",
+          category: exp.category || "EMI",
+          type: "PAYMENT",
+          amount: Number(exp.amount),
+          details: (exp as any).details || exp.description || `Payment towards ${exp.category}`,
+          badgeColor: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+        });
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [ledgerLogs, expenses]);
+
+  const filteredHistoryLogs = useMemo(() => {
+    const q = historySearch.toLowerCase().trim();
+    return loanHistoryLogs.filter((item) => {
+      if (historyTypeFilter !== "all" && item.type !== historyTypeFilter) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.details.toLowerCase().includes(q)
+      );
+    });
+  }, [loanHistoryLogs, historySearch, historyTypeFilter]);
 
   const pieChartData = useMemo(() => {
     const catMap: Record<string, number> = {};
@@ -191,7 +275,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
         </button>
       </div>
 
-      {liabilities.length === 0 ? (
+      {liabilities.length === 0 && loanHistoryLogs.length === 0 ? (
         <div className="glass-card-static relative overflow-hidden p-8 md:p-16 text-center flex flex-col items-center justify-center min-h-[450px]">
           <div className="absolute -top-24 -left-24 w-96 h-96 bg-rose-500/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -243,7 +327,8 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
         <div className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
           {[
             { key: "overview", label: "Overview" },
-            { key: "records", label: "Debt Records", badge: liabilities.length }
+            { key: "records", label: "Debt Records", badge: liabilities.length },
+            { key: "history", label: "Loan History", badge: loanHistoryLogs.length }
           ].map((tab) => {
             const isActive = activeView === tab.key;
             
@@ -361,7 +446,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeView === "records" ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <LiabilitiesDataTable 
               liabilities={liabilities} 
@@ -383,6 +468,100 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               onDelete={handleDeleteLiability} 
               onAdd={() => setShowAddModal(true)} 
             />
+          </div>
+        ) : (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* History Header & Controls */}
+            <div className="glass-card-static p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/[0.02]">
+              <div>
+                <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>📜</span> Loan Payment & Audit History
+                </h3>
+                <p className="text-xs text-[--text-muted] mt-1">
+                  Complete timeline of EMI payments, loan adjustments, and balance audit logs.
+                </p>
+              </div>
+
+              {/* History Search & Type Filter */}
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search history..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="bg-[#151515] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-rose-500 w-full sm:w-48"
+                />
+                <select
+                  value={historyTypeFilter}
+                  onChange={(e) => setHistoryTypeFilter(e.target.value)}
+                  className="bg-[#151515] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-rose-500 cursor-pointer"
+                >
+                  <option value="all">All Events ({loanHistoryLogs.length})</option>
+                  <option value="PAYMENT">EMI Payments Only</option>
+                  <option value="LOG">Audit Logs Only</option>
+                </select>
+              </div>
+            </div>
+
+            {/* History Table / Timeline */}
+            {filteredHistoryLogs.length === 0 ? (
+              <div className="glass-card-static p-12 text-center text-gray-400 space-y-2">
+                <span className="text-3xl block">📜</span>
+                <p className="text-sm font-bold text-white">No Loan History Found</p>
+                <p className="text-xs text-gray-500">Record loan payments or EMIs to see history logged here automatically.</p>
+              </div>
+            ) : (
+              <div className="glass-card-static rounded-2xl overflow-hidden border border-white/5">
+                <div className="overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
+                      <tr className="border-b border-white/10 bg-[#151515]">
+                        <th className="px-5 py-3 text-xs font-black uppercase tracking-wider text-[--text-muted]">Date</th>
+                        <th className="px-5 py-3 text-xs font-black uppercase tracking-wider text-[--text-muted]">Category / Title</th>
+                        <th className="px-5 py-3 text-xs font-black uppercase tracking-wider text-[--text-muted]">Event Type</th>
+                        <th className="px-5 py-3 text-xs font-black uppercase tracking-wider text-[--text-muted]">Particulars / Details</th>
+                        <th className="px-5 py-3 text-xs font-black uppercase tracking-wider text-[--text-muted] text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-xs">
+                      {filteredHistoryLogs.map((item) => (
+                        <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-5 py-3.5 whitespace-nowrap text-gray-300 font-mono">
+                            {(() => {
+                              try {
+                                return format(new Date(item.date), "MMM d, yyyy • HH:mm");
+                              } catch {
+                                return item.date;
+                              }
+                            })()}
+                          </td>
+                          <td className="px-5 py-3.5 font-bold text-white">
+                            {item.title}
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className={`px-2.5 py-1 rounded-full text-[0.5625rem] font-black uppercase tracking-wider border ${item.badgeColor}`}>
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-gray-400 max-w-xs truncate">
+                            {item.details}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-black text-white whitespace-nowrap">
+                            {item.amount !== null && item.amount !== undefined ? (
+                              <span className={item.type === "PAYMENT" ? "text-emerald-400" : "text-rose-400"}>
+                                {item.type === "PAYMENT" ? "-" : ""}₹{Number(item.amount).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </>

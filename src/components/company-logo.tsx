@@ -83,6 +83,8 @@ function getCompanyDomain(name: string): string | null {
   return null;
 }
 
+const COMPANY_LOGO_CACHE = new Map<string, string>();
+
 export default function CompanyLogo({ companyName, category, size = 40, className = "" }: CompanyLogoProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [srcIndex, setSrcIndex] = useState(0);
@@ -94,10 +96,16 @@ export default function CompanyLogo({ companyName, category, size = 40, classNam
 
   const sources = useMemo(() => {
     if (!domain) return [];
-    return [
-      `https://logo.uplead.com/${domain}`,
+    const cached = COMPANY_LOGO_CACHE.get(domain.toLowerCase());
+    const defaults = [
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+      `https://unavatar.io/google/${domain}`,
       `https://icon.horse/icon/${domain}`,
     ];
+    if (cached) {
+      return [cached, ...defaults.filter((s) => s !== cached)];
+    }
+    return defaults;
   }, [domain]);
 
   const fallbackIcon = useMemo(() => {
@@ -115,6 +123,9 @@ export default function CompanyLogo({ companyName, category, size = 40, classNam
 
   const handleImgLoad = () => {
     setImgLoaded(true);
+    if (domain && sources[srcIndex]) {
+      COMPANY_LOGO_CACHE.set(domain.toLowerCase(), sources[srcIndex]);
+    }
   };
 
   const showImage = domain && !allFailed && sources.length > 0;

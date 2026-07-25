@@ -34,7 +34,7 @@ function createSecurityHeaders(nonce: string) {
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://va.vercel-scripts.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://companyenrich.com https://www.google.com https://icons.duckduckgo.com https://*.yahoo.com https://*.yahooapis.com https://logo.uplead.com https://icon.horse",
+    "img-src 'self' data: blob: https://companyenrich.com https://www.google.com https://icons.duckduckgo.com https://*.yahoo.com https://*.yahooapis.com https://assets.groww.in https://unavatar.io https://icon.horse",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.yahoo.com https://*.yahooapis.com https://api.mfapi.in https://www.alphavantage.co https://va.vercel-scripts.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
@@ -89,6 +89,11 @@ function applySecurityHeaders(response: NextResponse, headers: ReturnType<typeof
   // Cross-Origin-Embedder-Policy - credentialless allows cross-origin resources
   // (Google Fonts, Supabase, OAuth redirects) while still providing isolation
   response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+  
+  // Cache-Control for dynamic document pages to prevent stale HTML caching
+  if (!response.headers.has("Cache-Control")) {
+    response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  }
   
   return response;
 }
@@ -220,7 +225,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname === "/api/cron/telegram-alerts";
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname === "/api/cron/telegram-alerts";
 
   let finalResponse: NextResponse;
 

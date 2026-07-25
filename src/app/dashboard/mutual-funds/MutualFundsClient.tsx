@@ -306,8 +306,8 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Zerodha Coin Mutual Funds</h1>
-              <span className="text-[0.5625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">COIN PRO</span>
+              <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Mutual Funds Portfolio</h1>
+              <span className="text-[0.5625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">DIRECT MF</span>
             </div>
             <p className="text-[0.6875rem] text-[#848E9C] font-semibold flex items-center gap-1.5 mt-0.5">
               <span className="w-2 h-2 rounded-full bg-[#0ECB81] animate-pulse" />
@@ -758,7 +758,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                 {((parseFloat(formData.units) || 0) > 0) && (
                   <div className="bg-[#181A20] rounded-xl border border-[#FF5722]/30 p-3.5 flex flex-col gap-2 text-xs mt-4">
                     <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                      <span className="font-extrabold text-[#FF5722] uppercase tracking-wider text-[0.6875rem]">Coin Direct MF Tax Slip</span>
+                      <span className="font-extrabold text-[#FF5722] uppercase tracking-wider text-[0.6875rem]">Direct MF Tax Slip</span>
                       <span className="text-[0.625rem] bg-[#FF5722]/20 text-[#FF5722] px-2 py-0.5 rounded font-black uppercase">0% Commission</span>
                     </div>
 

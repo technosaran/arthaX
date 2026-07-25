@@ -234,11 +234,11 @@ export default function LedgerDataTable({
 
   return (
     <div className="glass-card-static p-0 min-h-[400px] rounded-[24px] border border-white/10 overflow-hidden bg-white/[0.01] shadow-lg shadow-black/25 flex flex-col">
-      <div className="w-full overflow-x-auto hidden md:block">
+      <div className="w-full overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar hidden md:block">
         <table className="min-w-full divide-y divide-white/10">
-          <thead className="bg-white/[0.02]">
+          <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-white/10">
+              <tr key={headerGroup.id} className="border-b border-white/10 bg-[#151515]">
                 {headerGroup.headers.map((header) => (
                   <th key={header.id} className={`px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] ${getTableHeaderClass(header.column.id)}`}>
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}

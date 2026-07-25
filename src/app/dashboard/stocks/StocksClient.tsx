@@ -395,8 +395,8 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Zerodha Kite Equity</h1>
-                <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">KITE PRO</span>
+                <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Equity Portfolio</h1>
+                <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">EQUITY PRO</span>
                 <span 
                   className="text-[0.625rem] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border tracking-wider"
                   style={{ 
@@ -514,7 +514,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                   </div>
                 ) : (
                   <div className="h-[260px] flex flex-col items-center justify-center text-[#848E9C] text-xs font-medium gap-3">
-                    <span>No stock holdings found in Zerodha Kite portfolio.</span>
+                    <span>No stock holdings found in your equity portfolio.</span>
                     <button
                       onClick={() => setShowAddModal(true)}
                       className="bg-[#387ED1] text-white font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider hover:bg-[#306eb8] transition-all shadow-md cursor-pointer"
@@ -814,7 +814,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                   <div className="glass-card-static border border-[#387ED1]/30 p-4 rounded-xl space-y-2.5 text-xs bg-[#191919] animate-fade-in">
                     <div className="flex justify-between items-center border-b border-[#333] pb-2">
                       <span className="text-xs font-black uppercase tracking-widest text-[#387ED1]">
-                        Zerodha Order Slip & Tax Breakdown
+                        Order Slip & Tax Breakdown
                       </span>
                       <span className="text-[0.625rem] bg-[#387ED1]/20 text-[#387ED1] px-2 py-0.5 rounded font-bold uppercase">
                         Equity Delivery
