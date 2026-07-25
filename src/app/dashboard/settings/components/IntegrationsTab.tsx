@@ -33,6 +33,13 @@ export default function IntegrationsTab({
   const telegramActive = !!profile?.telegram_chat_id;
   const geminiEnabled = (profile as any)?.gemini_enabled !== false;
   const hasGeminiKey = !!((profile as any)?.gemini_api_key || process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+  const isGeminiActive = geminiEnabled && hasGeminiKey;
+
+  React.useEffect(() => {
+    if (profile && (profile as any).gemini_api_key !== undefined) {
+      setGeminiKeyInput((profile as any).gemini_api_key || "");
+    }
+  }, [profile]);
 
   const handleSaveGeminiKey = async () => {
     setIsSavingGemini(true);
@@ -82,7 +89,7 @@ export default function IntegrationsTab({
             {[
               { label: "Gmail", active: gmailActive },
               { label: "Telegram", active: telegramActive },
-              { label: "Gemini AI", active: geminiEnabled && hasGeminiKey },
+              { label: "Gemini AI", active: isGeminiActive },
             ].map((s) => (
               <div
                 key={s.label}
@@ -123,7 +130,7 @@ export default function IntegrationsTab({
               {/* Enable / Disable Toggle Switch */}
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-gray-400">
-                  {geminiEnabled ? "AI Active" : "AI Turned OFF"}
+                  {!geminiEnabled ? "AI Turned OFF" : hasGeminiKey ? "AI Active & Ready" : "AI Enabled (Key Needed)"}
                 </span>
                 <button
                   type="button"
@@ -170,7 +177,7 @@ export default function IntegrationsTab({
                   <button
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white cursor-pointer"
                   >
                     {showApiKey ? "Hide" : "Show"}
                   </button>
@@ -186,7 +193,13 @@ export default function IntegrationsTab({
               </div>
 
               <p className="text-[0.6875rem] text-gray-500">
-                Status: {hasGeminiKey ? <span className="text-emerald-400 font-bold">API Key Configured</span> : <span className="text-amber-400 font-bold">Not Configured (Using Rule-Based Fallback)</span>}
+                Status: {!geminiEnabled ? (
+                  <span className="text-gray-400 font-bold">Turned OFF (Using Rule-Based Fallback)</span>
+                ) : hasGeminiKey ? (
+                  <span className="text-emerald-400 font-bold">API Key Configured & Ready</span>
+                ) : (
+                  <span className="text-amber-400 font-bold">Not Configured (Using Rule-Based Fallback)</span>
+                )}
               </p>
             </div>
           </div>
