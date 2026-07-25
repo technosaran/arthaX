@@ -6,26 +6,44 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get("code");
     const errorParam = searchParams.get("error");
-    const state = searchParams.get("state");
+    const state = searchParams.get("state") || "";
     const storedState = req.cookies.get("gmail_oauth_state")?.value;
 
+    // Helper to build redirect response preserving cookies
+    const makeRedirect = (url: URL) => {
+      const res = NextResponse.redirect(url);
+      req.cookies.getAll().forEach((c) => {
+        res.cookies.set(c.name, c.value, { path: "/", sameSite: "lax" });
+      });
+      return res;
+    };
+
     if (errorParam) {
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=" + encodeURIComponent(errorParam), req.url));
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=" + encodeURIComponent(errorParam), req.url));
     }
 
-    if (!state || state !== storedState) {
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=csrf_state_mismatch", req.url));
+    // Parse state: "userId:randomState" or "randomState"
+    let userIdFromState = "";
+    let randomState = state;
+    if (state.includes(":")) {
+      const parts = state.split(":");
+      userIdFromState = parts[0];
+      randomState = parts[1];
+    }
+
+    if (!state || (storedState && randomState !== storedState)) {
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=csrf_state_mismatch", req.url));
     }
 
     if (!code) {
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=no_code", req.url));
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=no_code", req.url));
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     if (!clientId || !clientSecret) {
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=missing_server_credentials", req.url));
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=missing_server_credentials", req.url));
     }
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/$/, "");
@@ -50,7 +68,7 @@ export async function GET(req: NextRequest) {
 
     if (!tokenResponse.ok || !tokenData.refresh_token) {
       console.error("Google token exchange failed:", tokenData);
-      return NextResponse.redirect(
+      return makeRedirect(
         new URL("/dashboard/settings?gmail=error&reason=" + encodeURIComponent(tokenData.error_description || tokenData.error || "token_exchange_failed"), req.url)
       );
     }
@@ -59,25 +77,27 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch authenticated Supabase client using request cookies
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=unauthenticated", req.url));
+    const targetUserId = user?.id || userIdFromState;
+
+    if (!targetUserId) {
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=unauthenticated", req.url));
     }
 
     // 3. Save the refresh token to the database
     const { error: dbError } = await supabase
       .from("profiles")
       .update({ gmail_refresh_token: refreshToken })
-      .eq("id", user.id);
+      .eq("id", targetUserId);
 
     if (dbError) {
       console.error("Failed to save Gmail refresh token:", dbError);
-      return NextResponse.redirect(new URL("/dashboard/settings?gmail=error&reason=db_write_failed", req.url));
+      return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=db_write_failed", req.url));
     }
 
-    // 4. Redirect the user back to settings with success status
-    return NextResponse.redirect(new URL("/dashboard/settings?gmail=success", req.url));
+    // 4. Redirect the user back to settings with success status while preserving cookies
+    return makeRedirect(new URL("/dashboard/settings?gmail=success", req.url));
   } catch (error: unknown) {
     const err = error as Error;
     console.error("Gmail OAuth callback exception:", err);

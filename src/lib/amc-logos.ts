@@ -47,8 +47,8 @@ export function getAMCLogoInfo(amcName: string, fundName?: string): AMCLogoInfo 
     if (fText.includes(key)) {
       const item = AMC_MAP[key];
       return {
-        logoUrl: item.localSvg || `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
-        fallbackLogoUrl: item.logo,
+        logoUrl: item.localSvg || item.logo || `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
+        fallbackLogoUrl: `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
         domain: item.domain,
         badge: item.badge,
         gradientColor: item.gradient,
@@ -62,8 +62,8 @@ export function getAMCLogoInfo(amcName: string, fundName?: string): AMCLogoInfo 
     if (aText.includes(key)) {
       const item = AMC_MAP[key];
       return {
-        logoUrl: item.localSvg || `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
-        fallbackLogoUrl: item.logo,
+        logoUrl: item.localSvg || item.logo || `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
+        fallbackLogoUrl: `https://www.google.com/s2/favicons?domain=${item.domain}&sz=128`,
         domain: item.domain,
         badge: item.badge,
         gradientColor: item.gradient,

@@ -1,4 +1,3 @@
-
 /* eslint-disable no-console */
 "use server";
 
@@ -97,6 +96,8 @@ type ProfileSettings = {
   gmail_refresh_token?: string | null;
   telegram_chat_id?: string | null;
   telegram_link_code?: string | null;
+  gemini_api_key?: string | null;
+  gemini_enabled?: boolean;
 };
 
 type SafeJson = string | number | boolean | null | { [key: string]: SafeJson | undefined } | SafeJson[];
@@ -107,7 +108,6 @@ export async function updateSettings(settings: ProfileSettings) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
-    // Build the update payload dynamically based on what was passed
     const payload: Record<string, unknown> = {};
     if (settings.enabled_modules !== undefined) payload.enabled_modules = settings.enabled_modules as unknown as SafeJson;
     if (settings.default_accounts !== undefined) payload.default_accounts = settings.default_accounts as unknown as SafeJson;
@@ -119,6 +119,8 @@ export async function updateSettings(settings: ProfileSettings) {
     if (settings.gmail_refresh_token !== undefined) payload.gmail_refresh_token = settings.gmail_refresh_token;
     if (settings.telegram_chat_id !== undefined) payload.telegram_chat_id = settings.telegram_chat_id;
     if (settings.telegram_link_code !== undefined) payload.telegram_link_code = settings.telegram_link_code;
+    if (settings.gemini_api_key !== undefined) payload.gemini_api_key = settings.gemini_api_key;
+    if (settings.gemini_enabled !== undefined) payload.gemini_enabled = settings.gemini_enabled;
 
     if (Object.keys(payload).length === 0) return { success: true, message: "Settings updated successfully" };
 
@@ -224,4 +226,3 @@ export async function checkApiHealth() {
 
   return { success: true, results };
 }
-

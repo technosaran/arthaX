@@ -70,8 +70,10 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
   const [endDate, setEndDate] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeQuickRange, setActiveQuickRange] = useState("All Time");
 
   const selectQuickRange = (range: string) => {
+    setActiveQuickRange(range);
     const today = new Date();
     const todayStr = format(today, "yyyy-MM-dd");
     
@@ -160,6 +162,7 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
   const resetRange = () => {
     setStartDate("");
     setEndDate("");
+    setActiveQuickRange("All Time");
   };
 
   const getActionConfig = (type: string) => {
@@ -239,86 +242,105 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
         </button>
       </header>
 
-      {/* Zerodha Console Filters Form */}
-      <section className="bg-[#151515] p-5 rounded border border-white/10 flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[200px] space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Search Logs</label>
-            <input
-              type="text"
-              placeholder="Search details, accounts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#1e1e1e] border border-white/10 rounded px-3 py-2 text-xs text-white outline-none focus:border-[#f26522]"
-            />
-          </div>
+      {/* Compact Filter Toolbar */}
+      <section className="bg-[#151515] p-3.5 rounded-xl border border-white/10 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Search & Account Select */}
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[180px]">
+              <svg className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search logs, details..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white outline-none focus:border-[#f26522] placeholder:text-gray-500 transition-all"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1.5 text-xs text-gray-500 hover:text-white">✕</button>
+              )}
+            </div>
 
-          <div className="flex-1 min-w-[200px] space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Account / Segment</label>
+            {/* Account Selector */}
             <select
-              className="w-full bg-[#1e1e1e] border border-white/10 rounded px-3 py-2 text-xs text-white outline-none focus:border-[#f26522]"
+              className="bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#f26522] cursor-pointer min-w-[140px]"
               value={selectedAccountId}
               onChange={(e) => setSelectedAccountId(e.target.value)}
             >
-              <option value="all" className="bg-[#181A20] text-white font-medium">All Accounts (Consolidated)</option>
+              <option value="all" className="bg-[#181A20] text-white">All Accounts</option>
               {accounts.map(acc => (
-                <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">{acc.name} ({acc.currency})</option>
+                <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white">{acc.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="flex-1 min-w-[150px] space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">From Date</label>
+          {/* Right: Quick Range Chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { label: "All", value: "All Time" },
+              { label: "Today", value: "Today" },
+              { label: "Yesterday", value: "Yesterday" },
+              { label: "This Month", value: "This Month" },
+              { label: "30 Days", value: "Last 30 Days" },
+            ].map((range) => {
+              const isActive = activeQuickRange === range.value;
+              return (
+                <button
+                  key={range.value}
+                  onClick={() => selectQuickRange(range.value)}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
+                    isActive
+                      ? "bg-[#f26522] text-white border-[#f26522] shadow-[0_0_10px_rgba(242,101,34,0.3)]"
+                      : "bg-[#1e1e1e] text-gray-400 border-white/5 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {range.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Date Filter & Active Filter Clear Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-xs text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="text-[0.6875rem] font-bold uppercase tracking-wider text-gray-500">Date Range:</span>
             <input
               type="date"
-              className="w-full bg-[#1e1e1e] border border-white/10 rounded px-3 py-2 text-xs text-[#fff] [color-scheme:dark] outline-none focus:border-[#f26522]"
+              className="bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 text-[0.6875rem] text-white [color-scheme:dark] outline-none focus:border-[#f26522]"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setActiveQuickRange("Custom");
+              }}
             />
-          </div>
-
-          <div className="flex-1 min-w-[150px] space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">To Date</label>
+            <span className="text-gray-500">—</span>
             <input
               type="date"
-              className="w-full bg-[#1e1e1e] border border-white/10 rounded px-3 py-2 text-xs text-[#fff] [color-scheme:dark] outline-none focus:border-[#f26522]"
+              className="bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 text-[0.6875rem] text-white [color-scheme:dark] outline-none focus:border-[#f26522]"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setActiveQuickRange("Custom");
+              }}
             />
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                // Trigger reload/filter
-              }}
-              className="h-[34px] px-5 bg-[#f26522] hover:bg-[#d85317] text-white text-xs font-bold rounded transition-colors"
-            >
-              View
-            </button>
+          {(startDate || endDate || selectedAccountId !== "all" || searchQuery || activeQuickRange !== "All Time") && (
             <button
               onClick={() => {
                 resetRange();
                 setSelectedAccountId("all");
+                setSearchQuery("");
               }}
-              className="h-[34px] px-5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-bold rounded border border-white/10 transition-colors"
+              className="text-[0.6875rem] text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
             >
-              Reset
+              <span>✕</span> Clear Filters
             </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mr-2">Quick Ranges:</span>
-          {["Today", "Yesterday", "This Month", "Last 30 Days", "All Time"].map((range) => (
-            <button
-              key={range}
-              onClick={() => selectQuickRange(range)}
-              className="px-3 py-1 bg-[#1e1e1e] hover:bg-white/5 border border-white/10 hover:border-white/20 text-gray-400 hover:text-white text-xs font-bold rounded transition-all"
-            >
-              {range}
-            </button>
-          ))}
+          )}
         </div>
       </section>
 

@@ -699,10 +699,10 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             <p className="text-sm text-[--text-muted] mt-1">Try another account filter or create activity.</p>
           </div>
         ) : (
-          <div className="w-full overflow-x-auto">
+          <div className="w-full overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5">
+              <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
+                <tr className="border-b border-white/10 bg-[#151515]">
                   <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Timestamp</th>
                   <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Account</th>
                   <th className="p-4 text-xs font-semibold text-[--text-muted] whitespace-nowrap">Action</th>

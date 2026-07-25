@@ -670,7 +670,7 @@ export default function CryptoClient() {
                 {!formData.symbol ? (
                   <div className="space-y-3 relative">
                     <div className="space-y-1.5 relative">
-                      <label className="text-xs font-bold text-[#848E9C] uppercase tracking-wide">Search Binance Coin / Ticker</label>
+                      <label className="text-xs font-bold text-[#848E9C] uppercase tracking-wide">Search Crypto Coin / Ticker</label>
                       <div className="relative">
                         <input 
                           autoFocus

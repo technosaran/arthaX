@@ -18,17 +18,17 @@ interface MutualFundsDataTableProps {
 import { getAMCLogoInfo } from "@/lib/amc-logos";
 
 export function AMCAvatar({ amcName, fundName }: { amcName: string; fundName: string }) {
-  const [imgStage, setImgStage] = useState<0 | 1 | 2 | 3>(0);
+  const [imgStage, setImgStage] = useState<0 | 1 | 2>(0);
   const info = getAMCLogoInfo(amcName, fundName);
 
-  const logoUrl = info.logoUrl;
-  const unavatarUrl = info.fallbackLogoUrl;
-  const clearbitUrl = info.domain ? `https://logo.clearbit.com/${info.domain}?size=512` : "";
+  // Priority order: 1. Local SVG / Groww Logo PNG -> 2. Google Favicon CDN (128px) -> 3. Gradient initials badge
+  const primaryUrl = info.logoUrl || info.fallbackLogoUrl;
+  const secondaryUrl = info.domain ? `https://www.google.com/s2/favicons?domain=${info.domain}&sz=128` : "";
 
-  if (logoUrl && imgStage === 0) {
+  if (primaryUrl && imgStage === 0) {
     return (
       <img 
-        src={logoUrl} 
+        src={primaryUrl} 
         alt={info.badge} 
         className="w-10 h-10 rounded-full bg-white object-contain p-1 flex-shrink-0 border border-white/10 shadow-md"
         onError={() => setImgStage(1)}
@@ -36,24 +36,13 @@ export function AMCAvatar({ amcName, fundName }: { amcName: string; fundName: st
     );
   }
 
-  if (unavatarUrl && imgStage === 1) {
+  if (secondaryUrl && imgStage === 1) {
     return (
       <img 
-        src={unavatarUrl} 
+        src={secondaryUrl} 
         alt={info.badge} 
         className="w-10 h-10 rounded-full bg-white object-contain p-1 flex-shrink-0 border border-white/10 shadow-md"
         onError={() => setImgStage(2)}
-      />
-    );
-  }
-
-  if (clearbitUrl && imgStage === 2) {
-    return (
-      <img 
-        src={clearbitUrl} 
-        alt={info.badge} 
-        className="w-10 h-10 rounded-full bg-white object-contain p-1 flex-shrink-0 border border-white/10 shadow-md"
-        onError={() => setImgStage(3)}
       />
     );
   }

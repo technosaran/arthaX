@@ -310,7 +310,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Zerodha Kite F&amp;O</h1>
+                <h1 className="text-base font-extrabold text-white tracking-wider uppercase">F&amp;O Derivatives</h1>
                 <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">DERIVATIVES PRO</span>
                 <span 
                   className="text-[0.625rem] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border tracking-wider"
@@ -513,7 +513,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
               
               {/* Zerodha Kite Search & Presets Bar */}
               <div className="relative z-[120] space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Search Zerodha F&O Contract / Option Chain</label>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Search F&amp;O Contract / Option Chain</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -791,7 +791,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
                       {((parseFloat(logFormData.quantity) || 0) > 0) && (
                         <div className="bg-[#191919] border border-[#387ED1]/30 p-4 rounded-xl space-y-2.5 text-xs text-gray-300">
                           <div className="flex justify-between items-center border-b border-[#333] pb-2">
-                            <span className="font-extrabold text-[#387ED1] uppercase tracking-wider text-[0.6875rem]">Zerodha Kite Derivatives Tax Slip</span>
+                            <span className="font-extrabold text-[#387ED1] uppercase tracking-wider text-[0.6875rem]">Derivatives Tax Slip</span>
                             <span className="text-[0.625rem] bg-[#387ED1]/20 text-[#387ED1] px-2 py-0.5 rounded font-black uppercase">
                               {logFormData.instrument_type === 'FUT' ? 'Futures' : 'Options'} ({logFormData.trade_type})
                             </span>

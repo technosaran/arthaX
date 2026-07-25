@@ -4,6 +4,7 @@ import logger from "@/lib/logger";
 import { sendTelegramMessage, answerCallbackQuery } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
+import { parseTransactionWithGemini } from "@/lib/gemini";
 
 const MAIN_MENU_KEYBOARD = {
   inline_keyboard: [
@@ -253,44 +254,49 @@ function levenshteinDistance(a: string, b: string): number {
 
 const CATEGORY_FUZZY_DICT: Record<string, string[]> = {
   Food: [
-    "food", "fud", "lunch", "lunh", "lnch", "lanch", "dinner", "dinr", "diner", "dnr",
-    "breakfast", "brkfast", "bf", "snack", "snak", "tea", "chai", "chaai", "coffee", "cofe",
-    "cfee", "cafe", "swiggy", "swigy", "zomato", "zomatoo", "zomat", "grocery", "groceries",
-    "grocry", "groceris", "grocries", "zepto", "blinkit", "milk", "kirana", "nashta", "khana",
-    "khrcha", "restaurant", "resturant", "restraunt", "biscuit", "pizza", "burger", "subway",
-    "mcdonalds", "kfc", "dominos", "swiggi", "eat", "eating"
+    "food", "fud", "fod", "eat", "eating", "lunch", "lunh", "lnch", "lanch", "dinner", "dinr", "diner", "dnr",
+    "breakfast", "brkfast", "bf", "snack", "snak", "tea", "chai", "chaai", "coffee", "cofe", "cfee", "cafe",
+    "swiggy", "swigy", "swiggi", "zomato", "zomatoo", "zomat", "grocery", "groceries", "grocry", "groceris", "grocries",
+    "zepto", "blinkit", "instamart", "bigbasket", "milk", "dahi", "paneer", "kirana", "ration", "nashta", "khana",
+    "khrcha", "restaurant", "resturant", "restraunt", "hotel", "dhaba", "biscuit", "pizza", "burger", "subway",
+    "mcdonalds", "mcd", "kfc", "dominos", "biryani", "momos", "rolls", "boba", "bakery", "cake", "pastry",
+    "icecream", "chocolate", "chips", "samosa", "kachori", "thali", "juice", "coconut", "maggie", "maggi", "noodle"
   ],
   Transport: [
-    "uber", "ubr", "ola", "rapido", "cab", "taxi", "txi", "ride", "auto", "autto", "otto",
-    "metro", "petrol", "petrl", "ptrol", "diesel", "disel", "fuel", "ful", "parking", "prking",
-    "toll", "bus", "train", "flight", "flite", "trvl", "travel", "travl", "ticket", "vahan",
-    "gaadi", "petrolpump"
+    "uber", "ubr", "ola", "rapido", "indrive", "cab", "cabs", "taxi", "txi", "ride", "auto", "autto", "otto",
+    "rickshaw", "metro", "petrol", "petrl", "ptrol", "diesel", "disel", "fuel", "ful", "gas", "ev", "charging",
+    "parking", "prking", "toll", "fastag", "bus", "train", "flight", "flite", "trvl", "travel", "travl", "ticket",
+    "vahan", "gaadi", "petrolpump", "mechanic", "puncture", "service", "garage"
   ],
   Entertainment: [
-    "netflix", "netflx", "prime", "hotstar", "spotify", "spotfy", "movie", "mvie", "pvr",
-    "show", "game", "playstation", "steam", "subscription", "subscriptn", "cinema", "pub"
+    "netflix", "netflx", "prime", "hotstar", "spotify", "spotfy", "movie", "mvie", "pvr", "inox", "bookmyshow",
+    "show", "game", "gaming", "playstation", "ps5", "xbox", "steam", "subscription", "subscriptn", "cinema",
+    "pub", "bar", "club", "party", "drinks", "beer", "wine", "alcohol", "bms", "concert", "event"
   ],
   Housing: [
-    "rent", "rnt", "house", "room", "flat", "flt", "maintenance", "maintnance", "pg", "kiraya"
+    "rent", "rnt", "house", "room", "flat", "flt", "maintenance", "maintnance", "pg", "kiraya", "broker",
+    "brokerage", "deposit", "furniture", "mattress", "bed", "curtains"
   ],
   Utilities: [
-    "electricity", "electrcty", "water", "watr", "gas", "wifi", "broadband", "airtel", "jio",
-    "vi", "recharge", "recharg", "mobile", "bill", "bil", "bijli", "phonebill"
+    "electricity", "electrcty", "water", "watr", "gas", "wifi", "broadband", "airtel", "jio", "vi", "bsnl",
+    "recharge", "recharg", "mobile", "bill", "bil", "bijli", "phonebill", "dth", "tataplay", "tatasat", "cylinder"
   ],
   Shopping: [
-    "amazon", "amzn", "flipkart", "flpkrt", "myntra", "ajio", "croma", "clothes", "cloths",
-    "shoes", "shos", "shopping", "shopyng", "shpping", "purchase", "samman", "kapde", "mall"
+    "amazon", "amzn", "flipkart", "flpkrt", "myntra", "ajio", "meesho", "nykaa", "croma", "clothes", "cloths",
+    "shoes", "shos", "shopping", "shopyng", "shpping", "purchase", "samman", "saman", "kapde", "mall", "electronics",
+    "phone", "laptop", "watch", "gadget", "headphones", "earbuds", "dress", "shirt", "pant", "tshirt", "chappal"
   ],
   Health: [
-    "doctor", "dr", "hospital", "hsptl", "medicine", "medcine", "pharmacy", "apollo", "1mg",
-    "gym", "fitness", "dawa", "dawai", "pharma", "clinic", "meds"
+    "doctor", "dr", "hospital", "hsptl", "medicine", "medcine", "pharmacy", "apollo", "1mg", "pharmeasy",
+    "gym", "fitness", "dawa", "dawai", "pharma", "clinic", "meds", "test", "bloodtest", "xray", "protein", "supplement"
   ]
 };
 
 const INCOME_FUZZY_KEYWORDS = [
-  "salary", "salry", "slry", "paycheck", "credit", "credt", "crdt", "credited", "crdited",
-  "received", "recived", "earned", "inflow", "refund", "refnd", "dividend", "bonus",
-  "cashback", "cshback", "got", "deposit", "kamai", "aaya"
+  "salary", "salry", "slry", "stipend", "paycheck", "credit", "credt", "crdt", "credited", "crdited",
+  "received", "recived", "recd", "earned", "inflow", "refund", "refnd", "dividend", "bonus",
+  "cashback", "cshback", "got", "deposit", "deposited", "kamai", "aaya", "aayi", "mila", "mile",
+  "freelance", "profit", "interest", "gifted", "reward"
 ];
 
 function classifyTextFuzzy(text: string): { type: "expense" | "income"; category: string } {
@@ -808,8 +814,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const COMMAND_ALIASES: Record<string, string> = {
+      bal: "balance",
+      balanace: "balance",
+      balence: "balance",
+      networth: "balance",
+      sumary: "summary",
+      sumry: "summary",
+      stat: "summary",
+      stats: "summary",
+      undoo: "undo",
+      revert: "undo",
+      helpp: "help",
+      info: "help",
+      recnt: "recent",
+      hist: "recent",
+      ledgr: "ledger",
+      audit: "ledger",
+      goal: "goals",
+      budgt: "budget",
+      budgets: "budget",
+      ai: "ai",
+      score: "ai",
+      health: "ai",
+      family: "family",
+      relatives: "family",
+      export: "export",
+      statement: "export",
+      download: "export",
+    };
+
     let lowerText = text.toLowerCase();
-    const commandText = lowerText.replace(/^\//, "").trim();
+    let rawCommand = lowerText.replace(/^\//, "").trim();
+    let commandText = COMMAND_ALIASES[rawCommand] || rawCommand;
 
     // 3. Handle System & Inquiry Commands (/menu, /ai, /family, /ledger, /calc, /help, /balance, /summary, /recent, /undo, /goals, /budget, /unlink)
     if (commandText === "menu") {
@@ -2139,6 +2176,63 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: true });
         }
       }
+      // ─── Gemini AI Parser Attempt (If enabled and API key is present) ───
+      const geminiApiKey = (profile as any)?.gemini_api_key || process.env.GEMINI_API_KEY;
+      const isGeminiEnabled = (profile as any)?.gemini_enabled !== false;
+
+      if (isGeminiEnabled && geminiApiKey && text.length > 2) {
+        try {
+          const aiResult = await parseTransactionWithGemini(text, geminiApiKey);
+          if (aiResult.success && aiResult.amount && (aiResult.intentType === "expense" || aiResult.intentType === "income")) {
+            const txType = aiResult.intentType;
+            const category = aiResult.category;
+            const description = aiResult.description || text;
+            const targetAccount = resolveAccount(txType, text);
+
+            if (targetAccount) {
+              const rpcName = txType === "expense" ? "record_expense" : "record_income";
+              const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName, {
+                p_user_id: profile.id,
+                p_description: `[Gemini AI] ${description}`,
+                p_amount: aiResult.amount,
+                p_category: category,
+                p_date: cleanDate,
+                p_account_id: targetAccount,
+              });
+
+              if (!rpcError && (!rpcData || (rpcData as any).success !== false)) {
+                if (txType === "expense") {
+                  await checkAndNotifyBudget(supabase, profile.id, chatId, category, aiResult.amount);
+                }
+                const accObj = accounts?.find((a: any) => a.id === targetAccount);
+                const { data: latestTx } = await supabase
+                  .from("transactions")
+                  .select("id")
+                  .eq("user_id", profile.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                const txId = latestTx?.id;
+                const keyboard = txId && txType === "expense" ? CATEGORY_KEYBOARD(txId) : TX_CONFIRM_KEYBOARD;
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *Gemini AI Logged ${txType === "expense" ? "Expense" : "Income"}*:\n` +
+                  `• *Amount*: ₹${aiResult.amount.toLocaleString("en-IN")}\n` +
+                  `• *Category*: ${category}\n` +
+                  `• *Account*: ${accObj?.name || "Default"}\n` +
+                  `• *Desc*: ${description}`,
+                  keyboard
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+        } catch (geminiErr) {
+          console.warn("Gemini AI parse failed, using rule-based fallback:", geminiErr);
+        }
+      }
 
       // ─── F. Universal Auto-Categorized Income & Expense Engine ───
       if (primaryAmount <= 0) {
@@ -2158,29 +2252,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
-      // Only ask clarifying question if text is literally just digits with zero description or letters
+      // Auto-Sense standalone digits (e.g. "450"): Automatically log as Expense and provide 1-tap category buttons
       if (/^\d+(?:\.\d{1,2})?$/.test(text.trim())) {
-        if (!isRedisConfigured()) {
+        const targetAccount = resolveAccount("expense", text);
+        if (!targetAccount) {
+          await sendTelegramMessage(chatId, NO_ACCOUNT_MSG);
+          return NextResponse.json({ success: true });
+        }
+
+        const rpcName = "record_expense";
+        const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName, {
+          p_user_id: profile.id,
+          p_description: "[Telegram] Uncategorized Expense",
+          p_amount: primaryAmount,
+          p_category: "Other",
+          p_date: cleanDate,
+          p_account_id: targetAccount,
+        });
+
+        if (!rpcError) {
+          const { data: latestTx } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const txId = latestTx?.id;
+          const keyboard = txId ? CATEGORY_KEYBOARD(txId) : TX_CONFIRM_KEYBOARD;
+          const accObj = accounts?.find((a: any) => a.id === targetAccount);
+
           await sendTelegramMessage(
             chatId,
-            `🤖 *Need Clarification for ₹${primaryAmount.toLocaleString("en-IN")}*:\n` +
-            `Since multi-step conversation caching (Redis) is not configured on this server, please resend your complete transaction in one line:\n` +
-            `• \`credit ${primaryAmount} salary\`\n` +
-            `• \`debit ${primaryAmount} food\``
+            `💸 *Auto-Logged Expense*: ₹${primaryAmount.toLocaleString("en-IN")}\n` +
+            `• *Category*: Other\n` +
+            `• *Account*: ${accObj?.name || "Default"}\n\n` +
+            `💡 _Tap a category below to re-assign instantly, or tap Undo:_`,
+            keyboard
           );
           return NextResponse.json({ success: true });
         }
-        await redisSet(pendingKey, JSON.stringify({ pending: true, reason: "unknown_type", amount: primaryAmount, description: "General Transaction" }), 600);
-        await sendTelegramMessage(
-          chatId,
-          `🤖 *Need Clarification for ₹${primaryAmount.toLocaleString("en-IN")}*:\n` +
-          `Was this money spent (debit) or received (credit)?\n\n` +
-          `💡 *Reply with one of these:*\n` +
-          `• \`credit salary\` (or just \`credit\`)\n` +
-          `• \`debit food\` (or just \`debit\`)\n` +
-          `• \`send rahul\` (if family transfer)`
-        );
-        return NextResponse.json({ success: true });
       }
 
       // Fault-tolerant Fuzzy NLP classifier (handles typos, misspellings, & slang)
