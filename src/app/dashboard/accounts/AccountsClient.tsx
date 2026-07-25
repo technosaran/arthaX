@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { toast } from "react-hot-toast";
 import { format } from "date-fns";
 import type { Tables } from "@/lib/database.types";
+import BankLogo from "@/components/ui/bank-logo";
 import { searchBanks, type Bank } from "@/lib/banks";
 import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance } from "./actions";
 import { Drawer } from "@/components/ui/drawer";
@@ -496,7 +497,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
                         <div className="relative flex-shrink-0">
-                          <CategoryIcon type={a.type} className="w-8 h-8" />
+                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={42} />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -618,7 +619,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                     >
                       <div className="relative flex-shrink-0">
-                        <CategoryIcon type={a.type} className="w-10 h-10" />
+                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={40} />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1 text-left">
                         <p className="font-bold text-xs md:text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -689,7 +690,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 >
                   <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: style.gradient }} />
                   <div className="flex justify-between items-start mb-6">
-                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><CategoryIcon type={a.type} className="w-12 h-12" /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
+                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={56} /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
                      {a.name !== "Cash" && <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>}
                   </div>
                   <div className="mt-auto">
@@ -930,9 +931,12 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                               </p>
                             </td>
                             <td className="p-4 whitespace-nowrap">
-                              <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                                {account?.name || log.account_name || "System"}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <BankLogo bankName={account?.bank_name} accountName={account?.name || log.account_name || undefined} type={account?.type} size={24} />
+                                <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                  {account?.name || log.account_name || "System"}
+                                </span>
+                              </div>
                             </td>
                             <td className="p-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
@@ -1011,19 +1015,26 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           )}
           <div ref={searchContainerRef} className="relative space-y-3">
             <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Bank Institution</label>
-            <input 
-              value={bankSearch} 
-              onChange={e => handleBankSearch(e.target.value)} 
-              onFocus={() => {
-                if (bankSearch) {
-                  const results = searchBanks(bankSearch);
-                  setBankResults(results);
-                }
-              }}
-              className="input-premium" 
-              placeholder="Search Banks..." 
-              autoComplete="off" 
-            />
+            <div className="relative flex items-center">
+              {bankSearch.trim().length > 0 && (
+                <div className="absolute left-3 flex items-center pointer-events-none z-10">
+                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={26} />
+                </div>
+              )}
+              <input 
+                value={bankSearch} 
+                onChange={e => handleBankSearch(e.target.value)} 
+                onFocus={() => {
+                  if (bankSearch) {
+                    const results = searchBanks(bankSearch);
+                    setBankResults(results);
+                  }
+                }}
+                className={`input-premium w-full ${bankSearch.trim().length > 0 ? "!pl-12" : ""}`} 
+                placeholder="Search Banks (e.g. SBI, HDFC, ICICI, Chase)..." 
+                autoComplete="off" 
+              />
+            </div>
             {bankResults.length > 0 && (
               <div 
                 className="absolute top-full left-0 right-0 mt-2 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-48 custom-scrollbar"
@@ -1036,9 +1047,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     onClick={() => selectBank(b)}
                     className="w-full p-3.5 flex items-center gap-3 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-indigo-400">
-                      🏦
-                    </div>
+                    <BankLogo bankName={b.name} accountName={b.name} size={32} />
                     <div>
                       <p className="font-bold text-sm text-white">{b.name}</p>
                       <p className="text-xs text-[--text-muted]">{b.domain}</p>
@@ -1050,7 +1059,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </div>
           <div className="pt-2 mt-4">
             <button type="submit" disabled={submitting} className="btn-primary w-full h-11 shadow-xl shadow-[--accent-primary]/20 transition-all text-xs font-black uppercase tracking-widest">
-              {submitting ? "Processing Registry..." : (editingId ? "Update Portfolio" : "Activate Account")}
+              {submitting ? "Saving..." : (editingId ? "Update Account" : "Add Account")}
             </button>
           </div>
         </form>

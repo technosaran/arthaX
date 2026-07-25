@@ -17,6 +17,7 @@ const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.R
 import { BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 
 import AlternativeAssetsDataTable from "./components/AlternativeAssetsDataTable";
+import { getChartColour } from "@/lib/chart-colours";
 
 const CATEGORIES = [
   { label: "Real Estate", icon: "🏙️" },
@@ -80,8 +81,8 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
       map[a.category] = (map[a.category] || 0) + Number(a.current_value);
     });
     return Object.entries(map).map(([name, value], idx) => {
-      const colors = ["#06B6D4", "#F97316", "#8B5CF6", "#22C55E", "#EC4899", "#EAB308", "#3B82F6"];
-      return { name, value, fill: colors[idx % colors.length] };
+      const fill = getChartColour(idx);
+      return { name, value, fill };
     });
   }, [alternativeAssets]);
 

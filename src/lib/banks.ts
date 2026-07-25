@@ -93,10 +93,21 @@ const BANKS: Bank[] = [
   { name: "Paytm Money",               domain: "paytmmoney.com" },
   { name: "Coin by Zerodha",            domain: "zerodha.com" },
   
-  // Custom / Added from user feedback
+  // Custom / International / Financial Platforms
   { name: "Chase Bank",                 domain: "chase.com" },
+  { name: "Bank of America",            domain: "bankofamerica.com" },
+  { name: "Wells Fargo",                domain: "wellsfargo.com" },
+  { name: "Capital One",                domain: "capitalone.com" },
+  { name: "Morgan Stanley",             domain: "morganstanley.com" },
+  { name: "Revolut",                    domain: "revolut.com" },
+  { name: "Wise",                       domain: "wise.com" },
+  { name: "PayPal",                     domain: "paypal.com" },
+  { name: "Robinhood",                  domain: "robinhood.com" },
+  { name: "Coinbase",                   domain: "coinbase.com" },
   { name: "Binance",                    domain: "binance.com" },
   { name: "SBI",                        domain: "sbi.co.in" },
+  { name: "HDFC",                       domain: "hdfcbank.com" },
+  { name: "ICICI",                      domain: "icicibank.com" },
 ];
 
 const SHORTHAND_DOMAINS: Record<string, string> = {
@@ -116,6 +127,13 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   yes: "yesbank.in",
   federal: "federalbank.co.in",
   rbl: "rblbank.com",
+  chase: "chase.com",
+  bofa: "bankofamerica.com",
+  wellsfargo: "wellsfargo.com",
+  capitalone: "capitalone.com",
+  revolut: "revolut.com",
+  wise: "wise.com",
+  paypal: "paypal.com",
   paytm: "paytm.com",
   phonepe: "phonepe.com",
   gpay: "pay.google.com",
@@ -124,16 +142,84 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   groww: "groww.in",
   upstox: "upstox.com",
   angelone: "angelone.in",
+  binance: "binance.com",
+  coinbase: "coinbase.com",
+};
+
+import { getFastLogoCandidateUrls } from "./logo-cache";
+
+const HD_BANK_LOGOS: Record<string, string[]> = {
+  "sbi.co.in": [
+    "https://logo.clearbit.com/sbi.co.in?size=512",
+    "https://cdn.brandfetch.io/sbi.co.in/w/512/h/512/theme/dark/icon",
+    "https://unavatar.io/sbi.co.in?ttl=28d",
+  ],
+  "hdfcbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
+    "https://logo.clearbit.com/hdfcbank.com?size=512",
+    "https://cdn.brandfetch.io/hdfcbank.com/w/512/h/512/theme/dark/icon",
+  ],
+  "icicibank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
+    "https://logo.clearbit.com/icicibank.com?size=512",
+  ],
+  "axisbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
+    "https://logo.clearbit.com/axisbank.com?size=512",
+  ],
+  "kotak.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
+    "https://logo.clearbit.com/kotak.com?size=512",
+  ],
+  "zerodha.com": [
+    "https://logo.clearbit.com/zerodha.com?size=512",
+    "https://cdn.brandfetch.io/zerodha.com/w/512/h/512/theme/dark/icon",
+  ],
+  "groww.in": [
+    "https://logo.clearbit.com/groww.in?size=512",
+    "https://cdn.brandfetch.io/groww.in/w/512/h/512/theme/dark/icon",
+  ],
+  "chase.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Chase_logo_2007.svg",
+    "https://logo.clearbit.com/chase.com?size=512",
+  ],
+  "bankofamerica.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/20/Bank_of_America_logo.svg",
+    "https://logo.clearbit.com/bankofamerica.com?size=512",
+  ],
 };
 
 /**
- * Get the domain registered for a bank name
+ * Get prioritized ultra-high-resolution online logo CDN URLs for a bank domain
+ */
+export function getBankLogoUrls(domain: string): string[] {
+  if (!domain) return [];
+  const clean = domain.trim().toLowerCase();
+  const list: string[] = [];
+  if (HD_BANK_LOGOS[clean]) {
+    list.push(...HD_BANK_LOGOS[clean]);
+  }
+  const defaults = getFastLogoCandidateUrls(clean);
+  return Array.from(new Set([...list, ...defaults]));
+}
+
+/**
+ * Get the domain registered for a bank name or account title
  */
 export function getBankDomain(bankName: string): string | null {
   if (!bankName) return null;
-  const normalizedSearch = bankName.toLowerCase().trim();
+  const raw = bankName.trim();
 
-  // 0. Shorthand override
+  // 0. Direct match if input already contains a domain (e.g. "sbi.co.in", "hdfcbank.com", "chase.com")
+  const domainRegex = /\b([a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money))\b/i;
+  const directMatch = raw.match(domainRegex);
+  if (directMatch) {
+    return directMatch[1].toLowerCase();
+  }
+
+  const normalizedSearch = raw.toLowerCase();
+
+  // 0B. Direct shorthand override
   if (SHORTHAND_DOMAINS[normalizedSearch]) {
     return SHORTHAND_DOMAINS[normalizedSearch];
   }
@@ -149,7 +235,7 @@ export function getBankDomain(bankName: string): string | null {
     });
   }
 
-  // 3. Match if the search query is fully contained within the bank name or vice-versa
+  // 3. Match if the search query is contained within the bank name or vice-versa
   if (!bank) {
     bank = BANKS.find((b) => {
       const name = b.name.toLowerCase();
@@ -157,10 +243,32 @@ export function getBankDomain(bankName: string): string | null {
     });
   }
 
-  return bank?.domain || null;
+  // 4. Token-based word match (e.g. "My SBI Salary" -> matches "sbi" in SHORTHAND_DOMAINS or BANKS)
+  if (!bank) {
+    const tokens = normalizedSearch.split(/[\s\-_\/]+/);
+    for (const token of tokens) {
+      if (SHORTHAND_DOMAINS[token]) {
+        return SHORTHAND_DOMAINS[token];
+      }
+      const matched = BANKS.find((b) => {
+        const bName = b.name.toLowerCase();
+        return bName === token || bName.split(" ")[0].toLowerCase() === token;
+      });
+      if (matched) return matched.domain;
+    }
+  }
+
+  if (bank) return bank.domain;
+
+  // 5. Fallback candidate (e.g. "Axis Savings" -> "axisbank.com" or "axis.com")
+  const cleanWord = normalizedSearch.replace(/\b(bank|checking|savings|account|wallet|card|primary|personal|business)\b/g, "").trim().split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+  if (cleanWord.length >= 3) {
+    if (SHORTHAND_DOMAINS[cleanWord]) return SHORTHAND_DOMAINS[cleanWord];
+    return `${cleanWord}.com`;
+  }
+
+  return null;
 }
-
-
 
 export function searchBanks(query: string): Bank[] {
   if (!query.trim()) return BANKS.slice(0, 15); // Show popular banks by default
@@ -180,3 +288,4 @@ export function searchBanks(query: string): Bank[] {
   })
   .slice(0, 12);
 }
+
