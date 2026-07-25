@@ -139,6 +139,11 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   gpay: "pay.google.com",
   cred: "cred.club",
   zerodha: "zerodha.com",
+  coin: "zerodha.com",
+  "coin by zerodha": "zerodha.com",
+  ippb: "ippbonline.com",
+  "india post": "ippbonline.com",
+  "india post payments bank": "ippbonline.com",
   groww: "groww.in",
   upstox: "upstox.com",
   angelone: "angelone.in",
@@ -149,15 +154,17 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
 import { getFastLogoCandidateUrls } from "./logo-cache";
 
 const HD_BANK_LOGOS: Record<string, string[]> = {
+  "ippbonline.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/e/e0/India_Post_Payments_Bank_logo.svg",
+    "https://logo.clearbit.com/ippbonline.com?size=512",
+  ],
   "sbi.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/c/cc/State_Bank_of_India_logo.svg",
     "https://logo.clearbit.com/sbi.co.in?size=512",
-    "https://cdn.brandfetch.io/sbi.co.in/w/512/h/512/theme/dark/icon",
-    "https://unavatar.io/sbi.co.in?ttl=28d",
   ],
   "hdfcbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
     "https://logo.clearbit.com/hdfcbank.com?size=512",
-    "https://cdn.brandfetch.io/hdfcbank.com/w/512/h/512/theme/dark/icon",
   ],
   "icicibank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
@@ -170,6 +177,50 @@ const HD_BANK_LOGOS: Record<string, string[]> = {
   "kotak.com": [
     "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
     "https://logo.clearbit.com/kotak.com?size=512",
+  ],
+  "pnbindia.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/4/4b/Punjab_National_Bank_Logo.svg",
+    "https://logo.clearbit.com/pnbindia.in?size=512",
+  ],
+  "bankofbaroda.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Bank_of_Baroda_logo.svg",
+    "https://logo.clearbit.com/bankofbaroda.in?size=512",
+  ],
+  "canarabank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/2a/Canara_Bank_Logo.svg",
+    "https://logo.clearbit.com/canarabank.com?size=512",
+  ],
+  "unionbankofindia.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/0/05/Union_Bank_of_India_Logo.svg",
+    "https://logo.clearbit.com/unionbankofindia.co.in?size=512",
+  ],
+  "idfcfirstbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/29/IDFC_First_Bank_logo.svg",
+    "https://logo.clearbit.com/idfcfirstbank.com?size=512",
+  ],
+  "indusind.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/8/82/IndusInd_Bank_logo.svg",
+    "https://logo.clearbit.com/indusind.com?size=512",
+  ],
+  "yesbank.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/4/49/Yes_Bank_Logo.svg",
+    "https://logo.clearbit.com/yesbank.in?size=512",
+  ],
+  "federalbank.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/27/Federal_Bank_Logo.svg",
+    "https://logo.clearbit.com/federalbank.co.in?size=512",
+  ],
+  "paytmbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
+    "https://logo.clearbit.com/paytm.com?size=512",
+  ],
+  "phonepe.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg",
+    "https://logo.clearbit.com/phonepe.com?size=512",
+  ],
+  "cred.club": [
+    "https://upload.wikimedia.org/wikipedia/commons/8/87/CRED_logo.svg",
+    "https://logo.clearbit.com/cred.club?size=512",
   ],
   "zerodha.com": [
     "https://logo.clearbit.com/zerodha.com?size=512",

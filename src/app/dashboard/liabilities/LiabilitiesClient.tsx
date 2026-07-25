@@ -371,23 +371,6 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
         {/* View Content */}
         {activeView === "overview" ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Debt Safety Index Banner */}
-            <div className={`p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in ${safetyIndex.color}`}>
-              <div className="flex items-center gap-4">
-                <span className="text-3xl">🛡️</span>
-                <div>
-                  <h4 className="text-sm font-black uppercase tracking-wider">Debt Safety Status: {safetyIndex.status}</h4>
-                  <p className="text-xs font-bold opacity-80 mt-1">{safetyIndex.text}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold opacity-60">Liquid Coverage Ratio:</span>
-                <span className="text-sm font-mono font-black bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl">
-                  {safetyIndex.ratio === 999 ? "∞" : `${safetyIndex.ratio.toFixed(2)}x`}
-                </span>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Paydown Bar Chart */}
               <div className="glass-card-static p-6 lg:col-span-2 min-h-[400px] flex flex-col">

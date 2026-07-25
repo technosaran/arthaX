@@ -250,10 +250,23 @@ export default function DashboardClient() {
     }).sort((a,b) => b.value - a.value);
 
     const totalDayPnL = (investments.reduce((sum, inv) => {
-      const dayChange = Number(inv.day_change || 0) * Number(inv.quantity || 0);
-      return sum + dayChange;
+      const quantity = Number(inv.quantity || 0);
+      const currentPrice = Number(inv.current_price || inv.buy_price || 0);
+      const prevClose = Number(inv.previous_close || 0);
+      const dayChangePerUnit = inv.day_change !== null && inv.day_change !== undefined
+        ? Number(inv.day_change)
+        : (prevClose > 0 ? currentPrice - prevClose : currentPrice - Number(inv.buy_price || 0));
+      return sum + (dayChangePerUnit * quantity);
     }, 0)) +
-    (mutualFunds.reduce((sum, mf) => sum + (Number(mf.day_change || 0) * Number(mf.units || 0)), 0));
+    (mutualFunds.reduce((sum, mf) => {
+      const units = Number(mf.units || 0);
+      const currentNav = Number(mf.current_nav || mf.avg_nav || 0);
+      const prevNav = Number(mf.previous_nav || 0);
+      const dayChangePerUnit = mf.day_change !== null && mf.day_change !== undefined
+        ? Number(mf.day_change)
+        : (prevNav > 0 ? currentNav - prevNav : currentNav - Number(mf.avg_nav || 0));
+      return sum + (dayChangePerUnit * units);
+    }, 0));
     const prevDayNetWorth = netWorth - totalDayPnL;
     const totalDayPnLPercent = prevDayNetWorth > 0 ? (totalDayPnL / prevDayNetWorth) * 100 : 0;
 

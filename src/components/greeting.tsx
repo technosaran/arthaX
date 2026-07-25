@@ -2,7 +2,13 @@
 
 import { useUser } from "@/context/user-context";
 
-export default function Greeting() {
+type GreetingProps = {
+  monthlySpend?: number;
+  monthlyIncome?: number;
+  budgetLimit?: number;
+};
+
+export default function Greeting({ monthlySpend = 0, monthlyIncome = 0, budgetLimit = 0 }: GreetingProps) {
   const { username, loading } = useUser();
 
   const now = new Date();
@@ -12,12 +18,7 @@ export default function Greeting() {
     hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : hour < 21 ? "Good evening" : "Good night";
   const emoji = hour < 5 ? "🌙" : hour < 12 ? "☀️" : hour < 17 ? "🌤️" : hour < 21 ? "🌆" : "🌙";
 
-  const subtitle =
-    hour < 12
-      ? "Here is your morning financial overview and live market status."
-      : hour < 17
-      ? "Here is your mid-day portfolio summary and net worth allocation."
-      : "Here is your end-of-day financial performance and asset breakdown.";
+  const subtitle = "Here is your financial portfolio and net worth command center.";
 
   return (
     <div className="animate-fade-in-up space-y-1.5">
@@ -40,3 +41,4 @@ export default function Greeting() {
     </div>
   );
 }
+

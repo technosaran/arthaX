@@ -24,7 +24,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; color: string; icon: string 
 export const CompanyLogo = memo(function CompanyLogo({
   name,
   category = "Salary",
-  size = 72,
+  size = 44,
   className = "",
 }: CompanyLogoProps) {
   const domain = getCompanyDomain(name || "");
