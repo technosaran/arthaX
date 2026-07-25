@@ -422,8 +422,6 @@ export default function SettingsPage() {
       {activeTab === "integrations" && (
         <IntegrationsTab
           profile={profile}
-          isGmailSyncing={isGmailSyncing}
-          handleGmailSync={handleGmailSync}
           mutate={mutate}
         />
       )}

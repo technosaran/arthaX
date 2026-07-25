@@ -40,6 +40,7 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   const { data: { budgets, expenses, incomes }, mutate } = useFinanceData(initialData);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [activeTab, setActiveTab] = useState<"allocations" | "analytics">("allocations");
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerCategory, setDrawerCategory] = useState<string>("");
@@ -363,12 +364,42 @@ return (
         </div>
       </div>
 
-      {/* Main Responsive Grid Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* LEFT COLUMN: Category Budgets (col-span-2) */}
-        <div className="lg:col-span-2 space-y-6">
-          
+      {/* Segmented Tab Switcher */}
+      <div className="flex gap-2 rounded-2xl bg-white/[0.02] border border-white/5 p-1.5 max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
+        <button
+          type="button"
+          onClick={() => setActiveTab("allocations")}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+            activeTab === "allocations"
+              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+              : "text-[--text-muted] hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>🎯 Category Allocations</span>
+          <span className="px-2 py-0.5 rounded-md bg-white/10 text-[0.625rem] font-bold">{dynamicCategories.length}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("analytics")}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+            activeTab === "analytics"
+              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+              : "text-[--text-muted] hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>📊 Analytics & Pacing</span>
+          {overBudgetCategories.length > 0 && (
+            <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[0.625rem] font-bold">
+              {overBudgetCategories.length} Over
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Tab 1: Category Allocations */}
+      {activeTab === "allocations" && (
+        <div className="space-y-6 animate-fade-in">
           {/* Section Header & Management Actions */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/[0.01] p-4.5 rounded-2xl border border-white/5 gap-4">
             <div>
@@ -380,7 +411,7 @@ return (
                 type="button"
                 onClick={handleCarryOver}
                 disabled={submitting}
-                className="btn-secondary !h-9 px-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 group transition-all duration-200"
+                className="btn-secondary !h-9 px-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 group transition-all duration-200 cursor-pointer"
                 title="Carry over last month's budget limits"
               >
                 <Copy className="w-3.5 h-3.5 text-[--text-secondary] group-hover:text-[--accent-primary-light] transition-colors" />
@@ -392,7 +423,7 @@ return (
                   type="button"
                   onClick={handleClearAll}
                   disabled={submitting}
-                  className="h-9 px-3.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-400 hover:text-rose-300 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all duration-200 group"
+                  className="h-9 px-3.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-400 hover:text-rose-300 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all duration-200 group cursor-pointer"
                   title="Clear all budget limits for this month"
                 >
                   <Trash2 className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
@@ -409,7 +440,7 @@ return (
                 <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 Over Budget Warnings
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {overBudgetCategories.map(cat => {
                   const budget = currentBudgets.find(b => b.category === cat.label);
                   const limit = Number(budget?.amount || 0);
@@ -429,46 +460,8 @@ return (
             </div>
           )}
 
-          {/* 6-Month Trend Chart */}
-          <div className="glass-card-static p-5 min-h-[300px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
-                <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
-              </div>
-            </div>
-            <div className="flex-1 min-h-[200px] w-full mt-2 -ml-4">
-              {mounted && (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dy={10} />
-                    <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dx={-10} />
-                    <RechartsTooltip 
-                      contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", boxShadow: "var(--shadow-lg)" }}
-                      itemStyle={{ color: "var(--text-primary)", fontWeight: "bold", fontSize: 12 }}
-                      formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, ""]}
-                    />
-                    <Area type="monotone" dataKey="Budget" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorBudget)" />
-                    <Area type="monotone" dataKey="Spent" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorSpent)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
           {/* Allocation Segment Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {dynamicCategories.map(cat => {
               const budget = currentBudgets.find(b => b.category === cat.label);
               const spent = actualSpending[cat.label] || 0;
@@ -598,157 +591,200 @@ return (
             })}
           </div>
         </div>
+      )}
 
-        {/* RIGHT COLUMN: Analytics, Legend, and pacing details (col-span-1) */}
-        <div className="space-y-6">
-          
-          {/* Status Color Legend Card */}
-          <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Status Legend</h3>
-            <div className="space-y-2.5 text-xs text-[--text-secondary]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                  <span>On Track</span>
-                </div>
-                <span className="text-xs text-[--text-muted] font-medium">&lt; 75% limit</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Near Limit</span>
-                </div>
-                <span className="text-xs text-[--text-muted] font-medium">75% - 90% limit</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span>Over Limit</span>
-                </div>
-                <span className="text-xs text-[--text-muted] font-medium">&gt; 90% limit</span>
-              </div>
-              <div className="pt-3 border-t border-white/5 flex items-start gap-2.5">
-                <span className="w-0.5 h-4 bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)] inline-block mt-0.5" />
+      {/* Tab 2: Analytics & Pacing */}
+      {activeTab === "analytics" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          {/* 6-Month Trend Chart (col-span-2) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="glass-card-static p-5 min-h-[340px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="font-bold text-white text-xs uppercase tracking-wider">Month Progress Line</p>
-                  <p className="text-xs text-[--text-muted] mt-1 leading-relaxed">The thin blue line shows calendar progress. Keep your colored spent bar behind it to pace yourself perfectly through the month.</p>
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
+                  <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
                 </div>
               </div>
+              <div className="flex-1 min-h-[240px] w-full mt-2 -ml-4">
+                {mounted && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dy={10} />
+                      <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dx={-10} />
+                      <RechartsTooltip 
+                        contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", boxShadow: "var(--shadow-lg)" }}
+                        itemStyle={{ color: "var(--text-primary)", fontWeight: "bold", fontSize: 12 }}
+                        formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, ""]}
+                      />
+                      <Area type="monotone" dataKey="Budget" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorBudget)" />
+                      <Area type="monotone" dataKey="Spent" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorSpent)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Pacing & Trajectory Card */}
-          <div className="glass-card-static p-5 relative overflow-hidden border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-            <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-[70px] pointer-events-none ${isBurningFast && totalBudgeted > 0 ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-5">Pacing & Velocity</h3>
-            <div className="grid grid-cols-2 gap-4 mb-5">
-              <div>
-                <p className="text-3xl font-black text-white">{daysInMonth - daysPassed}</p>
-                <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Days Remaining</p>
-              </div>
-              <div>
-                <p className={`text-3xl font-black ${isBurningFast && totalBudgeted > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{budgetBurnRatePercent.toFixed(0)}%</p>
-                <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Budget Burned</p>
-              </div>
-            </div>
-            
-            {totalBudgeted > 0 && (
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-start gap-3">
-                  <div className={`mt-0.5 p-1 rounded-lg ${isBurningFast ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                    {isBurningFast ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-[--text-primary]">
-                      {isBurningFast ? "Spending too fast" : "Pacing well"}
-                    </p>
-                    <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
-                      {isBurningFast 
-                        ? `You are running ahead of calendar pacing (${monthProgressPercent.toFixed(0)}% days passed).`
-                        : `Your burn velocity is slower than calendar progress (${monthProgressPercent.toFixed(0)}% passed).`
-                      }
-                    </p>
-                  </div>
-                </div>
-                
-                {predictiveDeplDate && budgetBurnRatePercent > 15 && (
-                  <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-3">
-                    <div className="text-xs mt-0.5">🔮</div>
-                    <div>
-                      <p className="text-xs font-bold text-white">Projected Exhaustion</p>
-                      <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
-                        Based on velocity, your budget will run out on <span className="font-bold text-white">{format(predictiveDeplDate, "MMM d, yyyy")}</span>.
-                      </p>
-                    </div>
+            {/* Target Allocation Pie Chart */}
+            <div className="glass-card-static p-5 flex flex-col items-center justify-center relative min-h-[300px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-5 left-5">Target Allocation</h3>
+              <div className="w-full h-[180px] mt-4">
+                {mounted && pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
+                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
+                      </Pie>
+                      <RechartsTooltip 
+                        contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", fontSize: 11 }}
+                        itemStyle={{ color: "var(--text-primary)", fontWeight: "bold" }}
+                        formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, "Budget"]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
+                     <span className="text-xl mb-1">📊</span>
+                     <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget Limits</span>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* Target Allocation Pie Chart */}
-          <div className="glass-card-static p-5 flex flex-col items-center justify-center relative min-h-[280px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-5 left-5">Target Allocation</h3>
-            <div className="w-full h-[160px] mt-4">
-              {mounted && pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value">
-                      {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
-                    </Pie>
-                    <RechartsTooltip 
-                      contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", fontSize: 11 }}
-                      itemStyle={{ color: "var(--text-primary)", fontWeight: "bold" }}
-                      formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, "Budget"]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
-                   <span className="text-xl mb-1">📊</span>
-                   <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget Limits</span>
+              {pieData.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
+                  {pieData.slice(0, 6).map((entry, index) => (
+                    <div key={index} className="flex items-center gap-1.5 text-[0.5625rem]">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
+                      <span className="text-[--text-secondary] font-medium">{entry.name}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-            {pieData.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
-                {pieData.slice(0, 4).map((entry, index) => (
-                  <div key={index} className="flex items-center gap-1.5 text-[0.5625rem]">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
-                    <span className="text-[--text-secondary] font-medium">{entry.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Savings Potential */}
-          <div className="glass-card-static p-5 text-center border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-3">Savings Potential</h3>
-            <p className={`text-3xl font-black ${(totalIncome - totalSpent) >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>₹{(totalIncome - totalSpent).toLocaleString()}</p>
-            <p className="text-[0.5625rem] font-black uppercase tracking-[0.25em] text-emerald-400 mt-1">Theoretical Surplus</p>
-            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
-               <div>
-                 <p className="text-lg font-black text-emerald-400">
-                   {totalIncome > 0 ? ((totalIncome - totalSpent) / totalIncome * 100).toFixed(1) : 0}%
-                 </p>
-                 <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Savings Rate</p>
-               </div>
-               <div>
-                 <p className="text-lg font-black text-amber-500">
-                   {totalIncome > 0 ? (totalSpent / totalIncome * 100).toFixed(1) : 0}%
-                 </p>
-                 <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Expense Ratio</p>
-               </div>
+          {/* Right Column: Pacing, Savings, Legend */}
+          <div className="space-y-6">
+            {/* Status Color Legend Card */}
+            <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Status Legend</h3>
+              <div className="space-y-2.5 text-xs text-[--text-secondary]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <span>On Track</span>
+                  </div>
+                  <span className="text-xs text-[--text-muted] font-medium">&lt; 75% limit</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>Near Limit</span>
+                  </div>
+                  <span className="text-xs text-[--text-muted] font-medium">75% - 90% limit</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    <span>Over Limit</span>
+                  </div>
+                  <span className="text-xs text-[--text-muted] font-medium">&gt; 90% limit</span>
+                </div>
+                <div className="pt-3 border-t border-white/5 flex items-start gap-2.5">
+                  <span className="w-0.5 h-4 bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)] inline-block mt-0.5" />
+                  <div>
+                    <p className="font-bold text-white text-xs uppercase tracking-wider">Month Progress Line</p>
+                    <p className="text-xs text-[--text-muted] mt-1 leading-relaxed">The thin blue line shows calendar progress. Keep your colored spent bar behind it to pace yourself perfectly through the month.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pacing & Trajectory Card */}
+            <div className="glass-card-static p-5 relative overflow-hidden border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+              <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-[70px] pointer-events-none ${isBurningFast && totalBudgeted > 0 ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-5">Pacing & Velocity</h3>
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <p className="text-3xl font-black text-white">{daysInMonth - daysPassed}</p>
+                  <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Days Remaining</p>
+                </div>
+                <div>
+                  <p className={`text-3xl font-black ${isBurningFast && totalBudgeted > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{budgetBurnRatePercent.toFixed(0)}%</p>
+                  <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Budget Burned</p>
+                </div>
+              </div>
+              
+              {totalBudgeted > 0 && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-start gap-3">
+                    <div className={`mt-0.5 p-1 rounded-lg ${isBurningFast ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {isBurningFast ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-[--text-primary]">
+                        {isBurningFast ? "Spending too fast" : "Pacing well"}
+                      </p>
+                      <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
+                        {isBurningFast 
+                          ? `You are running ahead of calendar pacing (${monthProgressPercent.toFixed(0)}% days passed).`
+                          : `Your burn velocity is slower than calendar progress (${monthProgressPercent.toFixed(0)}% passed).`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {predictiveDeplDate && budgetBurnRatePercent > 15 && (
+                    <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-3">
+                      <div className="text-xs mt-0.5">🔮</div>
+                      <div>
+                        <p className="text-xs font-bold text-white">Projected Exhaustion</p>
+                        <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
+                          Based on velocity, your budget will run out on <span className="font-bold text-white">{format(predictiveDeplDate, "MMM d, yyyy")}</span>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Savings Potential */}
+            <div className="glass-card-static p-5 text-center border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-3">Savings Potential</h3>
+              <p className={`text-3xl font-black ${(totalIncome - totalSpent) >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>₹{(totalIncome - totalSpent).toLocaleString()}</p>
+              <p className="text-[0.5625rem] font-black uppercase tracking-[0.25em] text-emerald-400 mt-1">Theoretical Surplus</p>
+              <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                 <div>
+                   <p className="text-lg font-black text-emerald-400">
+                     {totalIncome > 0 ? ((totalIncome - totalSpent) / totalIncome * 100).toFixed(1) : 0}%
+                   </p>
+                   <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Savings Rate</p>
+                 </div>
+                 <div>
+                   <p className="text-lg font-black text-amber-500">
+                     {totalIncome > 0 ? (totalSpent / totalIncome * 100).toFixed(1) : 0}%
+                   </p>
+                   <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Expense Ratio</p>
+                 </div>
+              </div>
             </div>
           </div>
-
         </div>
-      </div>
+      )}
 
       {/* Slide-out Category Allocation Drawer */}
       {drawerOpen && (
