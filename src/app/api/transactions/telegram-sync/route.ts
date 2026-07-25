@@ -670,7 +670,7 @@ export async function POST(req: NextRequest) {
       const { data: rpcRes, error: rpcErr } = await supabase.rpc("create_account_atomic", {
         p_user_id: profile.id,
         p_name: accName,
-        p_type: "Bank",
+        p_type: "checking",
         p_balance: initialBalance,
         p_currency: profile.base_currency || "INR",
         p_bank_name: accName,
@@ -683,9 +683,10 @@ export async function POST(req: NextRequest) {
           .insert({
             user_id: profile.id,
             name: accName,
-            type: "Bank",
+            type: "checking",
             balance: initialBalance,
             currency: profile.base_currency || "INR",
+            bank_name: accName,
           })
           .select("id, name, balance")
           .single();

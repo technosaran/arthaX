@@ -594,9 +594,9 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                           <span className="px-2 py-0.5 rounded-full text-[0.5625rem] font-black uppercase tracking-[0.1em] bg-success/5 border border-success/10 text-success" style={{color: theme.color}}>{inc.category}</span>
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
-                          <div className="flex items-center gap-2">
-                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={20} />
-                            <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
+                          <div className="flex items-center gap-2.5">
+                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={44} />
+                            <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap text-right">
@@ -648,8 +648,8 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                     </div>
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
-                    <div className="flex items-center gap-1.5">
-                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={20} />
+                    <div className="flex items-center gap-2">
+                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={44} />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <button type="button" 

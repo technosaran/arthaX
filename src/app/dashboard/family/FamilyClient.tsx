@@ -117,6 +117,11 @@ export default function FamilyClient() {
     keepPreviousData: true,
   });
 
+  /* ── Month & Year Filter State ── */
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [showAllTime, setShowAllTime] = useState(false);
+
   const members = useMemo(() => familyData?.members ?? [], [familyData?.members]);
   const transfers = useMemo(() => familyData?.transfers ?? [], [familyData?.transfers]);
 
@@ -124,40 +129,55 @@ export default function FamilyClient() {
     return members.reduce((acc, m) => acc + Number(m.balance || 0), 0);
   }, [members]);
 
-  const totalSentThisMonth = useMemo(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return transfers.reduce((acc, t) => {
-      const date = new Date(t.transfer_date);
-      if (date >= startOfMonth) {
-        return acc + Number(t.amount || 0);
+  const monthTransfers = useMemo(() => {
+    if (showAllTime) return transfers;
+    return transfers.filter((t) => {
+      if (!t.transfer_date) return false;
+      try {
+        const d = parseISO(t.transfer_date);
+        return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+      } catch {
+        return false;
       }
-      return acc;
-    }, 0);
-  }, [transfers]);
+    });
+  }, [transfers, selectedMonth, selectedYear, showAllTime]);
+
+  const totalSentSelectedPeriod = useMemo(() => {
+    return monthTransfers.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+  }, [monthTransfers]);
 
   const avgTransferAmount = useMemo(() => {
-    if (!transfers.length) return 0;
-    const total = transfers.reduce((acc, t) => acc + Number(t.amount || 0), 0);
-    return total / transfers.length;
-  }, [transfers]);
+    if (!monthTransfers.length) return 0;
+    const total = monthTransfers.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+    return total / monthTransfers.length;
+  }, [monthTransfers]);
 
   const pieChartData = useMemo(() => {
     if (!members.length) return [];
+    
+    // Per-member support in selected month/period
+    const memberSpendMap: Record<string, number> = {};
+    monthTransfers.forEach((t) => {
+      if (!t.family_member_id) return;
+      memberSpendMap[t.family_member_id] = (memberSpendMap[t.family_member_id] || 0) + Number(t.amount || 0);
+    });
+
+    const hasPeriodTransfers = Object.values(memberSpendMap).some((v) => v > 0);
+
     return members
       .map((m, idx) => ({
         name: m.name,
-        value: Number(m.balance || 0),
+        value: hasPeriodTransfers ? (memberSpendMap[m.id] || 0) : Number(m.balance || 0),
         fill: FAMILY_PALETTE[idx % FAMILY_PALETTE.length],
       }))
       .filter((d) => d.value > 0);
-  }, [members]);
+  }, [members, monthTransfers]);
 
   const monthlyTrendData = useMemo(() => {
     const monthsMap: Record<string, number> = {};
-    const today = new Date();
+    const anchorDate = new Date(selectedYear, selectedMonth - 1, 1);
     for (let i = 5; i >= 0; i--) {
-      const d = subMonths(today, i);
+      const d = subMonths(anchorDate, i);
       monthsMap[format(d, "MMM yy")] = 0;
     }
     transfers.forEach((t) => {
@@ -172,9 +192,7 @@ export default function FamilyClient() {
       }
     });
     return Object.entries(monthsMap).map(([month, amount]) => ({ month, amount }));
-  }, [transfers]);
-
-
+  }, [transfers, selectedMonth, selectedYear]);
 
   /* ── Tab state ── */
   const [activeTab, setActiveTab] = useState<"directory" | "history">("directory");
@@ -212,14 +230,15 @@ export default function FamilyClient() {
   }, [members]);
 
   const filteredTransfers = useMemo(() => {
-    if (!historySearch.trim()) return transfers;
+    let baseList = monthTransfers;
+    if (!historySearch.trim()) return baseList;
     const q = historySearch.toLowerCase();
-    return transfers.filter(t => {
+    return baseList.filter(t => {
       const memberName = getMemberName(t.family_member_id).toLowerCase();
       const note = (t.note || "").toLowerCase();
       return memberName.includes(q) || note.includes(q);
     });
-  }, [transfers, historySearch, getMemberName]);
+  }, [monthTransfers, historySearch, getMemberName]);
 
   const resetMemberForm = () => {
     setMemberForm({ name: "", relationship: "Other" });
@@ -336,30 +355,120 @@ export default function FamilyClient() {
   return (
     <div className="animate-fade-in text-[#d1d4dc] max-w-7xl mx-auto w-full px-4 py-6">
 
-      {/* ═══ PAGE HEADER ═══ */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+      {/* ═══ PAGE HEADER & MONTH SWITCHER ═══ */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Family Tracker</h1>
           <p className="text-xs text-[--text-muted] font-black uppercase tracking-[0.3em] mt-1.5">
             Log and monitor money sent to family members
           </p>
         </div>
-        <div className="flex gap-3">
-          <button
-            className="relative bg-gradient-to-r from-pink-500 to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] flex items-center gap-2 active:scale-95 cursor-pointer"
-            onClick={() => openSendMoney()}
-            disabled={members.length === 0}
-          >
-            <Send className="w-3.5 h-3.5" />
-            Send Money
-          </button>
-          <button
-            className="bg-[#1e1e1e] hover:bg-white/5 text-white border border-white/10 hover:border-white/20 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 active:scale-95 cursor-pointer"
-            onClick={() => { resetMemberForm(); setShowMemberModal(true); }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Member
-          </button>
+
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Month Switcher Controls */}
+          <div className="flex items-center gap-1 bg-white/5 border border-white/10 p-1.5 rounded-xl shadow-lg">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAllTime(false);
+                if (selectedMonth === 1) {
+                  setSelectedMonth(12);
+                  setSelectedYear((prev) => prev - 1);
+                } else {
+                  setSelectedMonth((prev) => prev - 1);
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-black text-[--text-muted] hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95"
+              aria-label="Previous month"
+            >
+              ◀
+            </button>
+
+            <div className="px-2.5 py-1.5 text-xs font-black uppercase tracking-wider text-pink-400 select-none min-w-[85px] text-center">
+              {showAllTime ? "All Time" : format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowAllTime(false);
+                if (selectedMonth === 12) {
+                  setSelectedMonth(1);
+                  setSelectedYear((prev) => prev + 1);
+                } else {
+                  setSelectedMonth((prev) => prev + 1);
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-black text-[--text-muted] hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95"
+              aria-label="Next month"
+            >
+              ▶
+            </button>
+
+            <select
+              value={selectedMonth}
+              onChange={(e) => {
+                setShowAllTime(false);
+                setSelectedMonth(parseInt(e.target.value));
+              }}
+              disabled={showAllTime}
+              className="bg-black/40 text-white text-xs font-bold px-2 py-1.5 rounded-lg border border-white/10 outline-none cursor-pointer hover:border-pink-500/40 transition-colors"
+              aria-label="Select month"
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1} className="bg-[#121214]">
+                  {format(new Date(2020, i, 1), "MMM")}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                setShowAllTime(false);
+                setSelectedYear(parseInt(e.target.value));
+              }}
+              disabled={showAllTime}
+              className="bg-black/40 text-white text-xs font-bold px-2 py-1.5 rounded-lg border border-white/10 outline-none cursor-pointer hover:border-pink-500/40 transition-colors"
+              aria-label="Select year"
+            >
+              {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((yr) => (
+                <option key={yr} value={yr} className="bg-[#121214]">
+                  {yr}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setShowAllTime((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 ${
+                showAllTime
+                  ? "bg-pink-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.4)]"
+                  : "bg-white/5 text-[--text-muted] hover:text-white border border-white/10"
+              }`}
+            >
+              {showAllTime ? "✓ All" : "All Time"}
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              className="relative bg-gradient-to-r from-pink-500 to-rose-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] flex items-center gap-2 active:scale-95 cursor-pointer"
+              onClick={() => openSendMoney()}
+              disabled={members.length === 0}
+            >
+              <Send className="w-3.5 h-3.5" />
+              Send Money
+            </button>
+            <button
+              className="bg-[#1e1e1e] hover:bg-white/5 text-white border border-white/10 hover:border-white/20 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 active:scale-95 cursor-pointer"
+              onClick={() => { resetMemberForm(); setShowMemberModal(true); }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Member
+            </button>
+          </div>
         </div>
       </div>
 
@@ -373,9 +482,9 @@ export default function FamilyClient() {
             color: "text-white",
           },
           {
-            label: "Sent This Month",
-            value: fmt.format(Number(totalSentThisMonth)),
-            subtext: "Current month outflow",
+            label: showAllTime ? "Sent (All Time)" : `Sent (${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")})`,
+            value: fmt.format(Number(totalSentSelectedPeriod)),
+            subtext: showAllTime ? "Total historical outflow" : `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM")} outflow`,
             color: "text-pink-400",
           },
           {
@@ -386,8 +495,8 @@ export default function FamilyClient() {
           },
           {
             label: "Avg. Transfer Size",
-            value: transfers.length > 0 ? fmt.format(avgTransferAmount) : "—",
-            subtext: "Average size of family transfers",
+            value: monthTransfers.length > 0 ? fmt.format(avgTransferAmount) : "—",
+            subtext: showAllTime ? "Overall transfer size" : `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")} average`,
             color: "text-fuchsia-400",
           },
         ].map((s, i) => (
@@ -618,6 +727,20 @@ export default function FamilyClient() {
                   className="input-premium pl-9 py-2 text-sm w-full sm:w-64 !bg-black/20"
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[--text-muted]">
+                  Period: <span className="text-pink-400 font-extrabold">{showAllTime ? "All Time" : format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy")}</span>
+                </span>
+                {!showAllTime && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTime(true)}
+                    className="text-[10px] font-black uppercase text-pink-400 hover:text-pink-300 bg-pink-500/10 border border-pink-500/20 px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95"
+                  >
+                    View All Time
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -661,7 +784,20 @@ export default function FamilyClient() {
                   {filteredTransfers.length === 0 && (
                     <tr>
                       <td colSpan={5} className="py-12 text-center text-xs font-bold text-[--text-muted] uppercase tracking-[0.3em]">
-                        No historical records detected
+                        {showAllTime 
+                          ? "No historical records detected" 
+                          : `No transfers recorded for ${format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy")}`}
+                        {!showAllTime && (
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              onClick={() => setShowAllTime(true)}
+                              className="text-[11px] font-black uppercase tracking-wider text-white bg-gradient-to-r from-pink-500 to-rose-600 px-4 py-2 rounded-xl shadow-md hover:shadow-pink-500/25 transition-all cursor-pointer"
+                            >
+                              Show All Time Transfers
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}
