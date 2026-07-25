@@ -29,6 +29,9 @@ const ResponsiveContainer = dynamic(
 
 import { getChartColour } from "@/lib/chart-colours";
 
+import BudgetOverviewWidget from "@/components/dashboard/budget-overview-widget";
+
+
 type PieEntry = {
   name: string;
   value: number;
@@ -241,11 +244,13 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
   return (
     <div className="hidden md:flex flex-col gap-8 animate-fade-in relative z-20 pb-10">
       
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-2">
-        <div className="flex flex-col gap-1">
-          <Greeting />
+      {/* Dynamic Header */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-2">
+          <Greeting monthlySpend={stats.monthlySpend} monthlyIncome={stats.monthlyIncome} budgetLimit={stats.monthlyIncome * 0.7} />
         </div>
       </div>
+
 
       {!isLoading && stats.totalAssets === 0 && recentLogs.length === 0 && (
         <div className="glass-card-static rich-border relative overflow-hidden p-8 md:p-10 border border-white/10 bg-white/[0.02]">
@@ -295,24 +300,22 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                   <svg className="w-3.5 h-3.5 text-[--text-muted] opacity-50 group-hover/nw:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
-                  {stats.totalDayPnL !== 0 && (
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-                      stats.totalDayPnL >= 0 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]' 
-                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
-                    }`}>
-                      <span>{stats.totalDayPnL >= 0 ? "▲ +" : "▼ "}</span>
-                      <span>
-                        {showUSD 
-                          ? `$${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                          : `₹${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                        }
-                      </span>
-                      <span className="opacity-75">
-                        ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{stats.totalDayPnLPercent.toFixed(2)}%)
-                      </span>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                    stats.totalDayPnL >= 0 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
+                  }`}>
+                    <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
+                    <span>
+                      {showUSD 
+                        ? `$${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        : `₹${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                      }
                     </span>
-                  )}
+                    <span className="opacity-75">
+                      ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(2)}%)
+                    </span>
+                  </span>
                 </div>
                 <div className="relative flex items-center justify-start h-[3.5rem] md:h-[4rem] w-[280px] sm:w-[450px]">
                   <AnimatePresence>
@@ -338,6 +341,34 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
               </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-4 sm:gap-6">
+                <motion.div 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all cursor-default ${
+                    stats.totalDayPnL >= 0 
+                      ? 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10' 
+                      : 'bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-inner ${
+                    stats.totalDayPnL >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                  }`}>
+                    {stats.totalDayPnL >= 0 ? "⚡" : "📉"}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-[--text-muted]">Today's Return</span>
+                    <span className={`text-sm sm:text-base font-black ${stats.totalDayPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {stats.totalDayPnL >= 0 ? "+" : "-"}
+                      {showUSD 
+                        ? `$${Math.abs(stats.totalDayPnL).toLocaleString()}` 
+                        : `₹${Math.abs(stats.totalDayPnL).toLocaleString()}`
+                      }
+                      <span className="text-xs font-bold ml-1.5 opacity-80">
+                        ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(2)}%)
+                      </span>
+                    </span>
+                  </div>
+                </motion.div>
                 <motion.div 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -424,8 +455,8 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
           {(enabledModules.includes("Income") || enabledModules.includes("Expenses")) && (
             <div className="glass-card-static rich-border p-6 md:p-8 animate-fade-in">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
@@ -593,10 +624,6 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
               </div>
             </div>
           )}
-        </div>
-
-        {/* RIGHT COLUMN: STATS (Span 1) */}
-        <div className="flex flex-col gap-6">
         </div>
 
       </div>

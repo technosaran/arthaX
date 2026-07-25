@@ -497,7 +497,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
                         <div className="relative flex-shrink-0">
-                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={56} />
+                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={42} />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -619,7 +619,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                     >
                       <div className="relative flex-shrink-0">
-                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={48} />
+                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={36} />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1 text-left">
                         <p className="font-bold text-xs md:text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -690,7 +690,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 >
                   <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: style.gradient }} />
                   <div className="flex justify-between items-start mb-6">
-                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={72} /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
+                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={48} /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
                      {a.name !== "Cash" && <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>}
                   </div>
                   <div className="mt-auto">

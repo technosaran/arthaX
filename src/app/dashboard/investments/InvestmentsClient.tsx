@@ -205,12 +205,11 @@ export default function InvestmentsClient() {
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 w-full">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white uppercase italic">
-            Investments Portfolio
-          </h1>
-          <p className="text-xs text-[--text-muted] font-black uppercase tracking-[0.4em] mt-2 ml-1">Asset Allocation & Performance</p>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white uppercase italic">Investments Hub</h1>
+          <p className="text-sm text-[--text-secondary] mt-1">Multi-asset portfolio management, equity, mutual funds &amp; alternative assets.</p>
         </div>
       </div>
 

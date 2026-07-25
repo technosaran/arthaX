@@ -22,6 +22,7 @@ const RechartsTooltip = dynamic(() => import("recharts").then((mod) => mod.Toolt
 
 import { Drawer } from "@/components/ui/drawer";
 import { Copy, Trash2, Edit2, Plus, Check } from "lucide-react";
+import BudgetOverviewWidget from "@/components/dashboard/budget-overview-widget";
 
 const BUDGET_CATEGORIES = [
   { label: "Rent", icon: "🏠" },
@@ -595,7 +596,11 @@ return (
 
       {/* Tab 2: Analytics & Pacing */}
       {activeTab === "analytics" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
+          {/* Embedded Decision-Driven Budget Overview */}
+          <BudgetOverviewWidget />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 6-Month Trend Chart (col-span-2) */}
           <div className="lg:col-span-2 space-y-6">
             <div className="glass-card-static p-5 min-h-[340px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
@@ -784,6 +789,7 @@ return (
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* Slide-out Category Allocation Drawer */}

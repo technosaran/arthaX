@@ -44,10 +44,10 @@ export const BankLogo = memo(function BankLogo({
   bankName,
   accountName,
   type = "checking",
-  size = 72,
+  size = 24,
   className = "",
 }: BankLogoProps) {
-  const domain = getBankDomain(bankName || accountName || "");
+  const domain = (accountName ? getBankDomain(accountName) : null) || (bankName ? getBankDomain(bankName) : null);
   const cachedUrl = domain ? getResolvedLogoUrl(domain) : null;
 
   const [urlIndex, setUrlIndex] = useState(0);
@@ -77,7 +77,7 @@ export const BankLogo = memo(function BankLogo({
           minWidth: size,
           minHeight: size,
         }}
-        title={bankName || accountName || type}
+        title={accountName || bankName || type}
       >
         <svg
           className="w-1/2 h-1/2"
@@ -114,23 +114,23 @@ export const BankLogo = memo(function BankLogo({
 
   return (
     <div
-      className={`relative flex items-center justify-center rounded-2xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.35)] border border-white/30 overflow-hidden flex-shrink-0 transition-transform hover:scale-105 ${className}`}
+      className={`relative flex items-center justify-center rounded-2xl bg-white shadow-lg border border-white/20 overflow-hidden flex-shrink-0 transition-transform hover:scale-105 ${className}`}
       style={{
         width: size,
         height: size,
         minWidth: size,
         minHeight: size,
       }}
-      title={bankName || accountName || "Bank Logo"}
+      title={accountName || bankName || "Bank Logo"}
     >
       <img
         key={currentUrl}
         src={currentUrl}
-        alt={bankName || accountName || "Bank Logo"}
+        alt={accountName || bankName || "Bank Logo"}
         onLoad={handleImageLoad}
         onError={handleImageError}
         style={{ imageRendering: "-webkit-optimize-contrast" }}
-        className="w-full h-full object-contain p-1 transition-opacity duration-150 opacity-100"
+        className="w-full h-full object-contain p-1.5 transition-opacity duration-150 opacity-100"
         loading="eager"
         decoding="async"
       />

@@ -50,6 +50,14 @@ const COMPANIES: Company[] = [
   { name: "Flipkart", domain: "flipkart.com" },
   { name: "Swiggy", domain: "swiggy.in" },
   { name: "Zomato", domain: "zomato.com" },
+  { name: "KFC", domain: "kfc.com" },
+  { name: "Kentucky Fried Chicken", domain: "kfc.com" },
+  { name: "McDonalds", domain: "mcdonalds.com" },
+  { name: "McDonald's", domain: "mcdonalds.com" },
+  { name: "Dominos", domain: "dominos.com" },
+  { name: "Domino's", domain: "dominos.com" },
+  { name: "Starbucks", domain: "starbucks.com" },
+  { name: "Burger King", domain: "bk.com" },
   { name: "Razorpay", domain: "razorpay.com" },
   { name: "Paytm", domain: "paytm.com" },
   { name: "PhonePe", domain: "phonepe.com" },
@@ -87,6 +95,17 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   amazon: "amazon.com",
   meta: "meta.com",
   fb: "meta.com",
+  openai: "openai.com",
+  chatgpt: "openai.com",
+  kfc: "kfc.com",
+  "kentucky fried chicken": "kfc.com",
+  mcdonalds: "mcdonalds.com",
+  "mcdonald's": "mcdonalds.com",
+  dominos: "dominos.com",
+  "domino's": "dominos.com",
+  starbucks: "starbucks.com",
+  "burger king": "bk.com",
+  bk: "bk.com",
   tcs: "tcs.com",
   infy: "infosys.com",
   infosys: "infosys.com",
@@ -111,6 +130,16 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
 import { getFastLogoCandidateUrls } from "./logo-cache";
 
 const HD_COMPANY_LOGOS: Record<string, string[]> = {
+  "openai.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg",
+    "https://cdn.brandfetch.io/openai.com/w/512/h/512/theme/dark/icon",
+    "https://logo.clearbit.com/openai.com?size=512",
+  ],
+  "kfc.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/bf/KFC_logo.svg",
+    "https://cdn.brandfetch.io/kfc.com/w/512/h/512/theme/dark/icon",
+    "https://logo.clearbit.com/kfc.com?size=512",
+  ],
   "infosys.com": [
     "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
     "https://logo.clearbit.com/infosys.com?size=512",
@@ -168,6 +197,22 @@ const HD_COMPANY_LOGOS: Record<string, string[]> = {
   "zomato.com": [
     "https://upload.wikimedia.org/wikipedia/commons/b/bd/Zomato_Logo.svg",
     "https://logo.clearbit.com/zomato.com?size=512",
+  ],
+  "mcdonalds.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
+    "https://logo.clearbit.com/mcdonalds.com?size=512",
+  ],
+  "dominos.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/74/Dominos_pizza_logo.svg",
+    "https://logo.clearbit.com/dominos.com?size=512",
+  ],
+  "starbucks.com": [
+    "https://upload.wikimedia.org/wikipedia/en/d/d3/Starbucks_Corporation_Logo_2011.svg",
+    "https://logo.clearbit.com/starbucks.com?size=512",
+  ],
+  "bk.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/c/cc/Burger_King_2020.svg",
+    "https://logo.clearbit.com/bk.com?size=512",
   ],
   "upwork.com": [
     "https://upload.wikimedia.org/wikipedia/commons/d/d2/Upwork-logo.svg",
