@@ -42,7 +42,7 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   const { data: { budgets, expenses, incomes }, mutate } = useFinanceData(initialData);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [activeTab, setActiveTab] = useState<"allocations" | "analytics">("allocations");
+  const [activeTab, setActiveTab] = useState<"allocations" | "analytics" | "insights">("allocations");
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerCategory, setDrawerCategory] = useState<string>("");
@@ -50,7 +50,6 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   const [drawerAmount, setDrawerAmount] = useState<string>("");
   const [drawerSpent, setDrawerSpent] = useState<number>(0);
 
-  // #15/#20 — custom confirm modal instead of window.confirm
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     title: string;
@@ -65,6 +64,12 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const formatCurrency = (val: number) => {
+    if (val >= 100000) return `₹${(val / 1000).toFixed(0)}k`;
+    if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
+    return `₹${val}`;
+  };
 
   const actualSpending = useMemo(() => {
     const spending: Record<string, number> = {};
@@ -114,15 +119,34 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   const budgetBurnRatePercent = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
   const isBurningFast = budgetBurnRatePercent > monthProgressPercent;
 
-  const predictiveDeplDate = useMemo(() => {
+  const predictiveDeplInfo = useMemo(() => {
     if (totalSpent <= 0 || daysPassed <= 0 || totalBudgeted <= 0) return null;
     const avgDailySpent = totalSpent / daysPassed;
     if (avgDailySpent <= 0) return null;
     const daysToBurn = totalBudgeted / avgDailySpent;
-    const date = new Date(selectedYear, selectedMonth - 1, 1);
-    date.setDate(1 + Math.floor(daysToBurn));
-    return date;
-  }, [totalSpent, daysPassed, totalBudgeted, selectedMonth, selectedYear]);
+    
+    if (daysToBurn < daysPassed) {
+      const dayNum = Math.max(1, Math.floor(daysToBurn));
+      const date = new Date(selectedYear, selectedMonth - 1, dayNum);
+      return {
+        isExhausted: true,
+        dateText: format(date, "MMM d, yyyy"),
+        label: `Exhausted on ${format(date, "MMM d, yyyy")}`
+      };
+    }
+
+    if (daysToBurn <= daysInMonth) {
+      const dayNum = Math.min(daysInMonth, Math.floor(daysToBurn));
+      const date = new Date(selectedYear, selectedMonth - 1, dayNum);
+      return {
+        isExhausted: false,
+        dateText: format(date, "MMM d, yyyy"),
+        label: `Projected run out on ${format(date, "MMM d, yyyy")}`
+      };
+    }
+
+    return null;
+  }, [totalSpent, daysPassed, totalBudgeted, daysInMonth, selectedMonth, selectedYear]);
 
   const dynamicCategories = useMemo(() => {
     const catsMap = new Map<string, string>();
@@ -154,6 +178,20 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
     });
   }, [actualSpending, currentBudgets]);
 
+  const overviewItems = useMemo(() => {
+    return dynamicCategories.map(cat => {
+      const budget = currentBudgets.find(b => b.category === cat.label);
+      const limit = Number(budget?.amount || 0);
+      const spent = actualSpending[cat.label] || 0;
+      return {
+        name: cat.label,
+        spent,
+        limit,
+        icon: cat.icon
+      };
+    }).filter(item => item.spent > 0 || item.limit > 0);
+  }, [dynamicCategories, currentBudgets, actualSpending]);
+
   const overBudgetCategories = useMemo(() => {
     return dynamicCategories.filter(cat => {
       const budget = currentBudgets.find(b => b.category === cat.label);
@@ -181,7 +219,7 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
         Budget: b,
         Spent: s,
       };
-    }).reverse();
+    });
   }, [budgets, expenses, selectedMonth, selectedYear]);
 
   const pieData = useMemo(() => {
@@ -250,7 +288,6 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
       fromYear = selectedYear - 1;
     }
 
-    // #15 — include categories with actual spending this month even if not in previous budgets
     const spentCategoryLabels = Object.keys(actualSpending);
     const prevBudgets = budgets.filter(b => b.period_month === fromMonth && b.period_year === fromYear);
     const prevBudgetCategories = prevBudgets.map(b => b.category);
@@ -280,7 +317,6 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   }
 
   async function handleClearAll() {
-    // #18/#20 — custom modal instead of window.confirm
     setConfirmModal({
       open: true,
       title: "Clear all budget limits?",
@@ -302,21 +338,12 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
     });
   }
 
-
-
-  const formatCurrency = (value: number) => {
-    if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)}Cr`;
-    if (value >= 100000) return `₹${(value / 100000).toFixed(2)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}k`;
-    return `₹${value.toLocaleString()}`;
-  };
-
-return (
-    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-[--text-primary]">Budget Planner</h1>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[--text-primary]">Budget Planner</h1>
           <p className="text-sm md:text-sm mt-1 text-[--text-secondary]">Fiscal strategy, category limits, and monthly controls.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -366,12 +393,12 @@ return (
         </div>
       </div>
 
-      {/* Segmented Tab Switcher */}
-      <div className="flex gap-2 rounded-2xl bg-white/[0.02] border border-white/5 p-1.5 max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
+      {/* Segmented 3-Tab Switcher */}
+      <div className="flex flex-wrap gap-2 rounded-2xl bg-white/[0.02] border border-white/5 p-1.5 max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
         <button
           type="button"
           onClick={() => setActiveTab("allocations")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
             activeTab === "allocations"
               ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
               : "text-[--text-muted] hover:text-white hover:bg-white/5"
@@ -383,7 +410,7 @@ return (
         <button
           type="button"
           onClick={() => setActiveTab("analytics")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
             activeTab === "analytics"
               ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
               : "text-[--text-muted] hover:text-white hover:bg-white/5"
@@ -395,6 +422,18 @@ return (
               {overBudgetCategories.length} Over
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("insights")}
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+            activeTab === "insights"
+              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+              : "text-[--text-muted] hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <span>💡 Insights & Comparison</span>
         </button>
       </div>
 
@@ -507,23 +546,10 @@ return (
                           </p>
                         </div>
                       </div>
-
-                      {/* Status Tag */}
-                      {limit > 0 ? (
-                        percent > 100 ? (
-                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-[0_0_8px_rgba(244,63,94,0.2)]">Over limit</span>
-                        ) : percent > 80 ? (
-                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.2)]">Near limit</span>
-                        ) : (
-                          <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.2)]">On track</span>
-                        )
-                      ) : (
-                        <span className="text-[0.5625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 text-gray-500 border border-white/10">No limit</span>
-                      )}
                     </div>
                   </div>
 
-                  {/* Progress Bar with month progress pacing line */}
+                  {/* Progress Bar */}
                   {limit > 0 && (
                     <div className="my-2 space-y-1">
                       <div className="flex justify-between text-[0.625rem] font-black uppercase tracking-wider mb-1">
@@ -544,11 +570,6 @@ return (
                                 : "bg-gradient-to-r from-cyan-500 to-emerald-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
                           }`} 
                           style={{ width: `${Math.min(percent, 100)}%` }} 
-                        />
-                        <div 
-                          className="absolute top-0 bottom-0 w-0.5 bg-sky-400/90 shadow-[0_0_6px_rgba(56,189,248,0.9)] z-10" 
-                          style={{ left: `${monthProgressPercent}%` }}
-                          title={`Month progress line: ${monthProgressPercent.toFixed(0)}% passed`}
                         />
                       </div>
                     </div>
@@ -597,241 +618,339 @@ return (
       {/* Tab 2: Analytics & Pacing */}
       {activeTab === "analytics" && (
         <div className="space-y-6 animate-fade-in">
-          {/* Embedded Decision-Driven Budget Overview */}
-          <BudgetOverviewWidget />
+          {/* Embedded Real-Time Budget Overview */}
+          <BudgetOverviewWidget items={overviewItems} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 6-Month Trend Chart (col-span-2) */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="glass-card-static p-5 min-h-[340px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
-                  <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
-                </div>
-              </div>
-              <div className="flex-1 min-h-[240px] w-full mt-2 -ml-4">
-                {mounted && (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dy={10} />
-                      <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dx={-10} />
-                      <RechartsTooltip 
-                        contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", boxShadow: "var(--shadow-lg)" }}
-                        itemStyle={{ color: "var(--text-primary)", fontWeight: "bold", fontSize: 12 }}
-                        formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, ""]}
-                      />
-                      <Area type="monotone" dataKey="Budget" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorBudget)" />
-                      <Area type="monotone" dataKey="Spent" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorSpent)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-
-            {/* Target Allocation Pie Chart */}
-            <div className="glass-card-static p-5 flex flex-col items-center justify-center relative min-h-[300px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-5 left-5">Target Allocation</h3>
-              <div className="w-full h-[180px] mt-4">
-                {mounted && pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
-                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", fontSize: 11 }}
-                        itemStyle={{ color: "var(--text-primary)", fontWeight: "bold" }}
-                        formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, "Budget"]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
-                     <span className="text-xl mb-1">📊</span>
-                     <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget Limits</span>
-                  </div>
-                )}
-              </div>
-              {pieData.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
-                  {pieData.slice(0, 6).map((entry, index) => (
-                    <div key={index} className="flex items-center gap-1.5 text-[0.5625rem]">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
-                      <span className="text-[--text-secondary] font-medium">{entry.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Pacing, Savings, Legend */}
-          <div className="space-y-6">
-            {/* Status Color Legend Card */}
-            <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Status Legend</h3>
-              <div className="space-y-2.5 text-xs text-[--text-secondary]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                    <span>On Track</span>
-                  </div>
-                  <span className="text-xs text-[--text-muted] font-medium">&lt; 75% limit</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span>Near Limit</span>
-                  </div>
-                  <span className="text-xs text-[--text-muted] font-medium">75% - 90% limit</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    <span>Over Limit</span>
-                  </div>
-                  <span className="text-xs text-[--text-muted] font-medium">&gt; 90% limit</span>
-                </div>
-                <div className="pt-3 border-t border-white/5 flex items-start gap-2.5">
-                  <span className="w-0.5 h-4 bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)] inline-block mt-0.5" />
+            {/* 6-Month Trend Chart (col-span-2) */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="glass-card-static p-5 min-h-[340px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+                <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="font-bold text-white text-xs uppercase tracking-wider">Month Progress Line</p>
-                    <p className="text-xs text-[--text-muted] mt-1 leading-relaxed">The thin blue line shows calendar progress. Keep your colored spent bar behind it to pace yourself perfectly through the month.</p>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
+                    <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
                   </div>
                 </div>
+                <div className="flex-1 min-h-[240px] w-full mt-2 -ml-4">
+                  {mounted && (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                      <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dy={10} />
+                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dx={-10} />
+                        <RechartsTooltip 
+                          contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", boxShadow: "var(--shadow-lg)" }}
+                          itemStyle={{ color: "var(--text-primary)", fontWeight: "bold", fontSize: 12 }}
+                          formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, ""]}
+                        />
+                        <Area type="monotone" dataKey="Budget" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorBudget)" />
+                        <Area type="monotone" dataKey="Spent" stroke="#EF4444" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSpent)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Pacing & Trajectory Card */}
-            <div className="glass-card-static p-5 relative overflow-hidden border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-              <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-[70px] pointer-events-none ${isBurningFast && totalBudgeted > 0 ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-5">Pacing & Velocity</h3>
-              <div className="grid grid-cols-2 gap-4 mb-5">
-                <div>
-                  <p className="text-3xl font-black text-white">{daysInMonth - daysPassed}</p>
-                  <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Days Remaining</p>
-                </div>
-                <div>
-                  <p className={`text-3xl font-black ${isBurningFast && totalBudgeted > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{budgetBurnRatePercent.toFixed(0)}%</p>
-                  <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Budget Burned</p>
-                </div>
-              </div>
-              
-              {totalBudgeted > 0 && (
-                <div className="space-y-3">
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-start gap-3">
-                    <div className={`mt-0.5 p-1 rounded-lg ${isBurningFast ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {isBurningFast ? (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-[--text-primary]">
-                        {isBurningFast ? "Spending too fast" : "Pacing well"}
-                      </p>
-                      <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
-                        {isBurningFast 
-                          ? `You are running ahead of calendar pacing (${monthProgressPercent.toFixed(0)}% days passed).`
-                          : `Your burn velocity is slower than calendar progress (${monthProgressPercent.toFixed(0)}% passed).`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {predictiveDeplDate && budgetBurnRatePercent > 15 && (
-                    <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-3">
-                      <div className="text-xs mt-0.5">🔮</div>
-                      <div>
-                        <p className="text-xs font-bold text-white">Projected Exhaustion</p>
-                        <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
-                          Based on velocity, your budget will run out on <span className="font-bold text-white">{format(predictiveDeplDate, "MMM d, yyyy")}</span>.
-                        </p>
-                      </div>
+              {/* Target Allocation Pie Chart */}
+              <div className="glass-card-static p-5 flex flex-col items-center justify-center relative min-h-[300px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-5 left-5">Target Allocation</h3>
+                <div className="w-full h-[180px] mt-4">
+                  {mounted && pieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                      <PieChart>
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
+                          {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
+                        </Pie>
+                        <RechartsTooltip 
+                          contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", fontSize: 11 }}
+                          itemStyle={{ color: "var(--text-primary)", fontWeight: "bold" }}
+                          formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, "Budget"]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
+                       <span className="text-xl mb-1">📊</span>
+                       <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget Limits</span>
                     </div>
                   )}
                 </div>
-              )}
+                {pieData.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
+                    {pieData.slice(0, 6).map((entry, index) => (
+                      <div key={index} className="flex items-center gap-1.5 text-[0.5625rem]">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
+                        <span className="text-[--text-secondary] font-medium">{entry.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Savings Potential */}
-            <div className="glass-card-static p-5 text-center border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-3">Savings Potential</h3>
-              <p className={`text-3xl font-black ${(totalIncome - totalSpent) >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>₹{(totalIncome - totalSpent).toLocaleString()}</p>
-              <p className="text-[0.5625rem] font-black uppercase tracking-[0.25em] text-emerald-400 mt-1">Theoretical Surplus</p>
-              <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
-                 <div>
-                   <p className="text-lg font-black text-emerald-400">
-                     {totalIncome > 0 ? ((totalIncome - totalSpent) / totalIncome * 100).toFixed(1) : 0}%
-                   </p>
-                   <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Savings Rate</p>
-                 </div>
-                 <div>
-                   <p className="text-lg font-black text-amber-500">
-                     {totalIncome > 0 ? (totalSpent / totalIncome * 100).toFixed(1) : 0}%
-                   </p>
-                   <p className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] mt-0.5">Expense Ratio</p>
-                 </div>
+            {/* Right Column: Pacing, Savings, Legend */}
+            <div className="space-y-6">
+              {/* Status Color Legend Card */}
+              <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Status Legend</h3>
+                <div className="space-y-2.5 text-xs text-[--text-secondary]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                      <span>On Track</span>
+                    </div>
+                    <span className="text-xs text-[--text-muted] font-medium">&lt; 75% limit</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>Near Limit</span>
+                    </div>
+                    <span className="text-xs text-[--text-muted] font-medium">75% - 90% limit</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      <span>Over Limit</span>
+                    </div>
+                    <span className="text-xs text-[--text-muted] font-medium">&gt; 90% limit</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pacing & Trajectory Card */}
+              <div className="glass-card-static p-5 relative overflow-hidden border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
+                <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-[70px] pointer-events-none ${isBurningFast && totalBudgeted > 0 ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-5">Pacing & Velocity</h3>
+                <div className="grid grid-cols-2 gap-4 mb-5">
+                  <div>
+                    <p className="text-3xl font-black text-white">{daysInMonth - daysPassed}</p>
+                    <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Days Remaining</p>
+                  </div>
+                  <div>
+                    <p className={`text-3xl font-black ${isBurningFast && totalBudgeted > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{budgetBurnRatePercent.toFixed(0)}%</p>
+                    <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-1">Budget Burned</p>
+                  </div>
+                </div>
+                
+                {totalBudgeted > 0 && (
+                  <div className="space-y-3">
+                    {predictiveDeplInfo && (
+                      <div className={`p-3 rounded-xl flex items-start gap-3 ${predictiveDeplInfo.isExhausted ? 'bg-rose-500/10 border border-rose-500/20' : 'bg-indigo-500/5 border border-indigo-500/10'}`}>
+                        <div className="text-xs mt-0.5">{predictiveDeplInfo.isExhausted ? '⚠️' : '🔮'}</div>
+                        <div>
+                          <p className={`text-xs font-bold ${predictiveDeplInfo.isExhausted ? 'text-rose-400' : 'text-white'}`}>
+                            {predictiveDeplInfo.isExhausted ? "Budget Limit Exceeded" : "Projected Exhaustion"}
+                          </p>
+                          <p className="text-xs text-[--text-secondary] mt-0.5 leading-relaxed">
+                            {predictiveDeplInfo.isExhausted
+                              ? `Your monthly limit was reached on ${predictiveDeplInfo.dateText}.`
+                              : `Based on spending velocity, budget will run out on ${predictiveDeplInfo.dateText}.`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
 
-      {/* Slide-out Category Allocation Drawer */}
+      {/* Tab 3: Insights & Comparison */}
+      {activeTab === "insights" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="glass-card-static p-6 border-white/10 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-transparent">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-lg font-black text-white tracking-tight">Fiscal Ratio & Outflow Comparison</h3>
+                <p className="text-xs text-[--text-muted] mt-1">Real-time comparison between monthly income, set budget limits, and actual expenditure.</p>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <p className="text-xs text-[--text-muted] font-bold">INCOME</p>
+                  <p className="text-lg font-black text-purple-400">₹{totalIncome.toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-[--text-muted] font-bold">BUDGET</p>
+                  <p className="text-lg font-black text-cyan-400">₹{totalBudgeted.toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-[--text-muted] font-bold">SPENT</p>
+                  <p className="text-lg font-black text-rose-400">₹{totalSpent.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 space-y-2">
+              <div className="flex justify-between text-xs font-bold text-[--text-muted]">
+                <span>Outflow vs Income Capacity</span>
+                <span className="text-white font-extrabold">{totalIncome > 0 ? ((totalSpent / totalIncome) * 100).toFixed(0) : 0}% Consumed</span>
+              </div>
+              <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden flex border border-white/10 p-0.5">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 transition-all duration-700" 
+                  style={{ width: `${totalIncome > 0 ? Math.min(100, (totalSpent / totalIncome) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card-static p-6 border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-black text-white tracking-tight">Category Breakdown Table</h3>
+              <span className="text-xs text-[--text-muted] font-semibold">{dynamicCategories.length} categories logged</span>
+            </div>
+            <div className="overflow-x-auto w-full">
+              <table className="min-w-full divide-y divide-white/10">
+                <thead className="bg-white/[0.02]">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[--text-muted]">Category</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[--text-muted]">Limit</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[--text-muted]">Actual Spent</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[--text-muted]">Remaining</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-[--text-muted]">Usage Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[--text-muted]">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {dynamicCategories.map(cat => {
+                    const budget = currentBudgets.find(b => b.category === cat.label);
+                    const limit = Number(budget?.amount || 0);
+                    const spent = actualSpending[cat.label] || 0;
+                    const remaining = limit - spent;
+                    const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                    const isExceeded = limit > 0 && spent > limit;
+
+                    return (
+                      <tr key={cat.label} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl p-1.5 bg-white/5 rounded-xl border border-white/10">{cat.icon}</span>
+                            <span className="text-sm font-bold text-white">{cat.label}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap text-sm font-bold text-cyan-400">
+                          {limit > 0 ? `₹${limit.toLocaleString()}` : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap text-sm font-black text-rose-400">
+                          ₹{spent.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap text-sm font-bold">
+                          {limit > 0 ? (
+                            remaining >= 0 ? (
+                              <span className="text-emerald-400">₹{remaining.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-rose-400">-₹{Math.abs(remaining).toLocaleString()}</span>
+                            )
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          {limit > 0 ? (
+                            isExceeded ? (
+                              <span className="px-2.5 py-1 rounded-lg text-[0.625rem] font-black uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                {pct}% (Over)
+                              </span>
+                            ) : pct >= 80 ? (
+                              <span className="px-2.5 py-1 rounded-lg text-[0.625rem] font-black uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                {pct}% (Near)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg text-[0.625rem] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                {pct}% (OK)
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs text-[--text-muted]">No Cap</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDrawerCategory(cat.label);
+                              setDrawerIcon(cat.icon);
+                              setDrawerAmount(limit ? limit.toString() : "");
+                              setDrawerSpent(spent);
+                              setDrawerOpen(true);
+                            }}
+                            className="px-3 py-1 rounded-lg text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all active:scale-95"
+                          >
+                            {limit > 0 ? "Edit" : "Set"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Centered Category Allocation Modal */}
       {drawerOpen && (
         <Drawer
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
-          title={`Limit: ${drawerCategory}`}
+          title={`Budget Limit: ${drawerCategory}`}
+          variant="center"
+          width="max-w-lg md:max-w-xl"
         >
           <div className="space-y-6">
-            <div className="flex items-center gap-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5">
-              <span className="text-4xl p-2 bg-white/[0.02] rounded-2xl border border-white/5 shadow-inner">{drawerIcon}</span>
-              <div>
-                <h4 className="text-sm font-black text-white">{drawerCategory}</h4>
-                <p className="text-xs text-[--text-muted] mt-0.5">Spent this month: <span className="font-bold text-white">₹{drawerSpent.toLocaleString()}</span></p>
+            {/* Category Banner */}
+            <div className="flex items-center gap-4 bg-white/[0.03] p-4 sm:p-5 rounded-2xl border border-white/10 shadow-inner">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/10 shrink-0">
+                {drawerIcon}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h4 className="text-lg font-black text-white tracking-tight">{drawerCategory}</h4>
+                <p className="text-xs text-[--text-muted] mt-0.5 flex items-center gap-1.5">
+                  Spent this month: 
+                  <span className="font-extrabold text-white bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+                    ₹{drawerSpent.toLocaleString()}
+                  </span>
+                </p>
               </div>
             </div>
 
+            {/* Budget Limit Input */}
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="drawer-limit-amount">
+              <label className="block text-xs font-black uppercase tracking-widest text-[--text-muted]" htmlFor="drawer-limit-amount">
                 Budget Limit (₹)
               </label>
-              <div className="relative">
+              <div className="relative flex items-center">
+                <span className="absolute left-4 text-xl font-black text-indigo-400 select-none">₹</span>
                 <input
                   type="number"
                   placeholder="e.g. 5000"
                   value={drawerAmount}
                   onChange={(e) => setDrawerAmount(e.target.value)}
-                  className="w-full bg-[#151515] border border-white/10 rounded-xl px-4 py-3 text-lg font-black text-white outline-none focus:border-[#2185d0] text-right"
+                  className="w-full bg-white/[0.03] border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-2xl pl-10 pr-4 py-3.5 text-xl font-black text-white outline-none transition-all tabular-nums text-right placeholder-[--text-muted]"
                   autoComplete="off"
                   inputMode="decimal"
                   id="drawer-limit-amount"
                 />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₹</span>
               </div>
             </div>
 
             {/* Range Slider for quick adjustments */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+            <div className="space-y-2.5 bg-white/[0.02] p-4 rounded-2xl border border-white/5">
+              <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-[--text-muted]">
                 <span>Adjust Slider</span>
-                <span className="text-[--accent-primary-light] font-black">
+                <span className="text-indigo-400 font-extrabold text-sm">
                   ₹{Number(drawerAmount || 0).toLocaleString()}
                 </span>
               </div>
@@ -842,10 +961,10 @@ return (
                 step="500"
                 value={Number(drawerAmount || 0)}
                 onChange={(e) => setDrawerAmount(e.target.value)}
-                className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[--accent-primary]"
+                className="w-full h-2 bg-white/15 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                 aria-label="Budget limit range slider"
               />
-              <div className="flex justify-between text-[0.5625rem] font-bold text-[--text-muted]">
+              <div className="flex justify-between text-[0.625rem] font-extrabold text-[--text-muted]">
                 <span>₹0</span>
                 <span>₹{Math.max(100000, Number(drawerAmount || 0) * 1.5).toLocaleString()}</span>
               </div>
@@ -853,14 +972,14 @@ return (
 
             {/* Quick preset buttons */}
             <div className="space-y-2">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Presets</p>
+              <p className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Quick Presets</p>
               <div className="flex flex-wrap gap-2">
                 {[2000, 5000, 10000, 20000, 50000].map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setDrawerAmount(preset.toString())}
-                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 active:scale-95 border border-white/5 hover:border-white/10 text-xs font-semibold text-gray-300 hover:text-white transition-all cursor-pointer"
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-indigo-500/15 border border-white/10 hover:border-indigo-500/30 text-xs font-bold text-gray-200 hover:text-white transition-all cursor-pointer active:scale-95"
                   >
                     ₹{preset.toLocaleString()}
                   </button>
@@ -871,7 +990,7 @@ return (
                     const curr = Number(drawerAmount || 0);
                     setDrawerAmount((curr + 1000).toString());
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-[--accent-primary]/10 hover:bg-[--accent-primary]/20 active:scale-95 border border-[--accent-primary]/10 hover:border-[--accent-primary]/25 text-[--accent-primary-light] text-xs font-bold transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs font-black transition-all cursor-pointer active:scale-95"
                 >
                   +1k
                 </button>
@@ -881,7 +1000,7 @@ return (
                     const curr = Number(drawerAmount || 0);
                     setDrawerAmount((curr + 5000).toString());
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-[--accent-primary]/10 hover:bg-[--accent-primary]/20 active:scale-95 border border-[--accent-primary]/10 hover:border-[--accent-primary]/25 text-[--accent-primary-light] text-xs font-bold transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs font-black transition-all cursor-pointer active:scale-95"
                 >
                   +5k
                 </button>
@@ -889,27 +1008,13 @@ return (
             </div>
 
             {/* Save / Clear actions */}
-            <div className="pt-6 border-t border-white/5 flex gap-3">
+            <div className="pt-4 border-t border-white/10 flex items-center gap-3">
               <button
                 type="button"
-                onClick={async () => {
-                  await handleBudgetChange(drawerCategory, drawerAmount);
-                  setDrawerOpen(false);
-                }}
-                disabled={submitting}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[--accent-primary] to-indigo-600 hover:from-[--accent-primary-hover] hover:to-indigo-700 text-white text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                onClick={() => setDrawerOpen(false)}
+                className="h-12 px-5 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-all active:scale-95"
               >
-                {submitting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Save Allocation</span>
-                  </>
-                )}
+                Cancel
               </button>
               {Number(drawerAmount) > 0 && (
                 <button
@@ -919,12 +1024,33 @@ return (
                     setDrawerOpen(false);
                   }}
                   disabled={submitting}
-                  className="px-5 py-3 rounded-xl bg-rose-500/5 hover:bg-rose-500/15 text-rose-400 hover:text-rose-300 text-xs font-black uppercase tracking-wider transition-all border border-rose-500/10 hover:border-rose-500/30 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  className="h-12 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold uppercase transition-all border border-rose-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                   <span>Clear</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleBudgetChange(drawerCategory, drawerAmount);
+                  setDrawerOpen(false);
+                }}
+                disabled={submitting}
+                className="flex-1 h-12 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Save Allocation</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </Drawer>

@@ -333,7 +333,7 @@ export const BankLogo = memo(function BankLogo({
         style={{
           color: fallbackStyle.color,
           fontSize: fallbackStyle.fontSize,
-          opacity: imgLoaded || (sources.length > 0 && !allFailed) ? 0 : 1,
+          opacity: imgLoaded ? 0 : 1,
           transition: "opacity 0.3s ease",
           letterSpacing: "0.3px",
           fontWeight: 900,
@@ -370,6 +370,7 @@ export const BankLogo = memo(function BankLogo({
             opacity: imgLoaded ? 1 : 0,
             transition: "opacity 0.3s ease",
             zIndex: 3,
+            imageRendering: "-webkit-optimize-contrast",
           }}
         />
       )}

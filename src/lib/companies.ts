@@ -95,6 +95,19 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   amazon: "amazon.com",
   meta: "meta.com",
   fb: "meta.com",
+  salesforce: "salesforce.com",
+  zoom: "zoom.us",
+  adobe: "adobe.com",
+  oracle: "oracle.com",
+  ibm: "ibm.com",
+  nvidia: "nvidia.com",
+  spotify: "spotify.com",
+  uber: "uber.com",
+  airbnb: "airbnb.com",
+  atlassian: "atlassian.com",
+  github: "github.com",
+  gitlab: "gitlab.com",
+  slack: "slack.com",
   openai: "openai.com",
   chatgpt: "openai.com",
   kfc: "kfc.com",
@@ -130,6 +143,58 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
 import { getFastLogoCandidateUrls } from "./logo-cache";
 
 const HD_COMPANY_LOGOS: Record<string, string[]> = {
+  "salesforce.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg",
+    "https://logo.clearbit.com/salesforce.com?size=512",
+  ],
+  "zoom.us": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
+    "https://logo.clearbit.com/zoom.us?size=512",
+  ],
+  "adobe.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Adobe_Systems_logo_2020.svg",
+    "https://logo.clearbit.com/adobe.com?size=512",
+  ],
+  "oracle.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/5/50/Oracle_logo.svg",
+    "https://logo.clearbit.com/oracle.com?size=512",
+  ],
+  "ibm.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg",
+    "https://logo.clearbit.com/ibm.com?size=512",
+  ],
+  "nvidia.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/21/Nvidia_logo.svg",
+    "https://logo.clearbit.com/nvidia.com?size=512",
+  ],
+  "spotify.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
+    "https://logo.clearbit.com/spotify.com?size=512",
+  ],
+  "uber.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.svg",
+    "https://logo.clearbit.com/uber.com?size=512",
+  ],
+  "airbnb.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/6/69/Airbnb_Logo_B%C3%A9lo.svg",
+    "https://logo.clearbit.com/airbnb.com?size=512",
+  ],
+  "atlassian.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/0/00/Atlassian_logo_2017.svg",
+    "https://logo.clearbit.com/atlassian.com?size=512",
+  ],
+  "github.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg",
+    "https://logo.clearbit.com/github.com?size=512",
+  ],
+  "gitlab.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/e/e1/GitLab_logo.svg",
+    "https://logo.clearbit.com/gitlab.com?size=512",
+  ],
+  "slack.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
+    "https://logo.clearbit.com/slack.com?size=512",
+  ],
   "openai.com": [
     "https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg",
     "https://cdn.brandfetch.io/openai.com/w/512/h/512/theme/dark/icon",

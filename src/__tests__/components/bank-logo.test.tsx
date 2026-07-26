@@ -9,6 +9,9 @@ describe("Bank Domain Resolution", () => {
     expect(getBankDomain("State Bank of India")).toBe("sbi.co.in");
     expect(getBankDomain("SBI")).toBe("sbi.co.in");
     expect(getBankDomain("SBI Savings Account")).toBe("sbi.co.in");
+    expect(getBankDomain("Indian Bank")).toBe("indianbank.in");
+    expect(getBankDomain("Bank of India")).toBe("bankofindia.co.in");
+    expect(getBankDomain("RBL Bank")).toBe("rblbank.com");
     expect(getBankDomain("HDFC Bank")).toBe("hdfcbank.com");
     expect(getBankDomain("ICICI")).toBe("icicibank.com");
     expect(getBankDomain("Axis Bank")).toBe("axisbank.com");

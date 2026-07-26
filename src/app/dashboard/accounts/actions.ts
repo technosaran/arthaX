@@ -219,14 +219,28 @@ export async function createTransfer(data: TransferData) {
       }
     }
 
-    const { data: rpcData, error } = await supabase.rpc("process_transfer", {
+    const rpcPayload: Record<string, any> = {
       p_user_id: user.id,
       p_from_account_id: data.from_account_id,
       p_to_account_id: data.to_account_id,
       p_amount: data.amount,
-      p_note: data.note || undefined,
-      p_converted_amount: isCrossCurrency ? data.converted_amount : undefined
-    });
+    };
+    if (data.note?.trim()) {
+      rpcPayload.p_note = data.note.trim();
+    }
+    if (isCrossCurrency && data.converted_amount) {
+      rpcPayload.p_converted_amount = data.converted_amount;
+    }
+
+    let { data: rpcData, error } = await supabase.rpc("process_transfer", rpcPayload as any);
+
+    // Fallback: If 6-parameter signature is not in schema cache, try 5-parameter version
+    if (error && (error.message?.includes("schema cache") || error.code === "PGRST202") && rpcPayload.p_converted_amount !== undefined) {
+      delete rpcPayload.p_converted_amount;
+      const fallback = await supabase.rpc("process_transfer", rpcPayload as any);
+      rpcData = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) return { error: getFriendlyErrorMessage(error) };
     const result = rpcData as { success: boolean, error?: string } | null;

@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addExpense, deleteExpense, cleanupCorruptedPDFDescriptions } from "./actions";
+import { addExpense, updateExpense, deleteExpense, cleanupCorruptedPDFDescriptions } from "./actions";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";

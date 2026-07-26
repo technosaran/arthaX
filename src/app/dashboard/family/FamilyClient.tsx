@@ -438,9 +438,9 @@ export default function FamilyClient() {
             color: "text-white",
           },
           {
-            label: showAllTime ? "Sent (All Time)" : `Sent (${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")})`,
+            label: `Monthly Outflow (${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")})`,
             value: fmt.format(Number(totalSentSelectedPeriod)),
-            subtext: showAllTime ? "Total historical outflow" : `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM")} outflow`,
+            subtext: `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM")} outflow`,
             color: "text-pink-400",
           },
           {
@@ -452,7 +452,7 @@ export default function FamilyClient() {
           {
             label: "Avg. Transfer Size",
             value: monthTransfers.length > 0 ? fmt.format(avgTransferAmount) : "—",
-            subtext: showAllTime ? "Overall transfer size" : `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")} average`,
+            subtext: `${format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")} average`,
             color: "text-fuchsia-400",
           },
         ].map((s, i) => (

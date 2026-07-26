@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, memo } from "react";
 import Image from "next/image";
-import { getCompanyDomain } from "@/lib/companies";
+import { getCompanyDomain, getCompanyLogoUrls } from "@/lib/companies";
 
 type CompanyLogoProps = {
   name?: string | null;
@@ -25,15 +25,7 @@ const CATEGORIES: Record<string, string> = {
 function getLogoSources(companyName: string): string[] {
   const domain = getCompanyDomain(companyName);
   if (!domain) return [];
-
-  return [
-    `https://cdn.brandfetch.io/${domain}/w/512/h/512/theme/dark/icon`,
-    `https://logo.uplead.com/${domain}`,
-    `https://icon.horse/icon/${domain}`,
-    `https://unavatar.io/${domain}?fallback=false`,
-    `https://logos.hunter.io/${domain}`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-  ];
+  return getCompanyLogoUrls(domain);
 }
 
 export const CompanyLogo = memo(function CompanyLogo({
@@ -123,6 +115,7 @@ export const CompanyLogo = memo(function CompanyLogo({
             padding: `${Math.max(size * 0.1, 4)}px`,
             borderRadius: "var(--radius-md, 14px)",
             zIndex: 3,
+            imageRendering: "-webkit-optimize-contrast",
           }}
           onError={handleImgError}
           onLoad={handleImgLoad}

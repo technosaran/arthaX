@@ -49,20 +49,20 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
   const totalPnLPct = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
 
   return (
-    <div className="glass-card-static rounded-3xl overflow-hidden flex flex-col border border-white/10 bg-white/[0.02] backdrop-blur-2xl shadow-2xl w-full relative">
-      <div className="w-full">
-        <table className="w-full text-left border-collapse">
+    <div className="rounded-2xl overflow-hidden flex flex-col border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl w-full relative">
+      <div className="w-full overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse min-w-[700px]">
           <thead>
-            <tr className="border-b border-white/10 bg-black/60 backdrop-blur-md text-[0.5625rem] sm:text-xs font-extrabold uppercase tracking-[0.15em] text-gray-400">
-              <th className="px-3 sm:px-4 py-3.5">Fund Name</th>
-              <th className="px-2 sm:px-3 py-3.5 text-center">Type</th>
-              <th className="px-2 sm:px-3 py-3.5 text-right">Units</th>
-              <th className="px-2 sm:px-3 py-3.5 text-right">Avg. NAV</th>
-              <th className="px-2 sm:px-3 py-3.5 text-right">Current NAV</th>
-              <th className="px-2 sm:px-3 py-3.5 text-right">Invested Value</th>
-              <th className="px-2 sm:px-3 py-3.5 text-right">Current Value</th>
-              <th className="px-3 sm:px-4 py-3.5 text-right">P&L / Return</th>
-              <th className="px-3 sm:px-4 py-3.5 text-right">Actions</th>
+            <tr className="border-b border-white/10 bg-black/80 text-[0.6875rem] font-black uppercase tracking-[0.12em] text-gray-400">
+              <th className="px-4 py-3.5">Fund Name</th>
+              <th className="px-3 py-3.5 text-center">Type</th>
+              <th className="px-3 py-3.5 text-right">Units</th>
+              <th className="px-3 py-3.5 text-right">Avg. NAV</th>
+              <th className="px-3 py-3.5 text-right">Current NAV</th>
+              <th className="px-3 py-3.5 text-right">Invested Value</th>
+              <th className="px-3 py-3.5 text-right">Current Value</th>
+              <th className="px-4 py-3.5 text-right">P&L / Return</th>
+              <th className="px-4 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -76,13 +76,13 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
               const amc = fund.amc_name || "";
 
               return (
-                <tr key={fund.id}>
+                <tr key={fund.id} className="hover:bg-white/[0.02] transition-colors">
                   {/* Fund Name */}
-                  <td className="px-3 sm:px-4 py-3">
-                    <div className="flex items-center gap-2.5">
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
                       <AMCAvatar amcName={amc} fundName={fund.fund_name} />
                       <div className="min-w-0">
-                        <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[180px] lg:max-w-[260px]" title={fund.fund_name}>
+                        <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[300px]" title={fund.fund_name}>
                           {fund.fund_name}
                         </span>
                         <span className="text-[0.5625rem] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
@@ -93,70 +93,69 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
                   </td>
 
                   {/* Type */}
-                  <td className="px-2 sm:px-3 py-3 text-center">
-                    <span className="text-[0.5625rem] font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">
+                  <td className="px-3 py-3.5 text-center">
+                    <span className="text-[0.5625rem] font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded uppercase tracking-wider">
                       {fund.investment_type || "SIP"}
                     </span>
                   </td>
 
                   {/* Units */}
-                  <td className="px-2 sm:px-3 py-3 text-right font-mono text-xs text-white">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs sm:text-sm font-medium text-gray-200">
                     {Number(fund.units).toFixed(3)}
                   </td>
 
                   {/* Avg NAV */}
-                  <td className="px-2 sm:px-3 py-3 text-right font-mono text-xs text-[--text-secondary]">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs sm:text-sm font-medium text-gray-400">
                     ₹{formatMoney(Number(fund.avg_nav))}
                   </td>
 
                   {/* Current NAV */}
-                  <td className="px-2 sm:px-3 py-3 text-right font-mono text-xs text-white">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs sm:text-sm font-bold text-white">
                     ₹{formatMoney(Number(fund.current_nav))}
                   </td>
 
                   {/* Invested Value */}
-                  <td className="px-2 sm:px-3 py-3 text-right font-mono text-xs text-[--text-secondary]">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs sm:text-sm font-medium text-gray-300">
                     ₹{formatMoney(invested)}
                   </td>
 
                   {/* Current Value */}
-                  <td className="px-2 sm:px-3 py-3 text-right font-mono text-xs text-white font-bold">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs sm:text-sm font-extrabold text-white">
                     ₹{formatMoney(current)}
                   </td>
 
                   {/* P&L */}
-                  <td className="px-3 sm:px-4 py-3 text-right">
+                  <td className="px-4 py-3.5 text-right">
                     <div 
-                      className="text-xs font-black inline-flex flex-col items-end"
+                      className="font-mono text-xs sm:text-sm font-bold inline-flex flex-col items-end"
                       style={{
-                        color: isPositive ? '#34d399' : '#f87171',
-                        textShadow: isPositive ? '0 0 8px rgba(52,211,153,0.35)' : '0 0 8px rgba(248,113,113,0.35)'
+                        color: isPositive ? '#10b981' : '#f87171',
                       }}
                     >
                       <span>{isPositive ? '+' : ''}₹{formatMoney(pnl)}</span>
-                      <span className="text-xs opacity-80 mt-0.5">{isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%</span>
+                      <span className="text-[0.6875rem] font-mono opacity-90 mt-0.5">{isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%</span>
                     </div>
                   </td>
 
                   {/* Actions */}
-                  <td className="px-3 sm:px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-4 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onEdit(fund)}
-                        className="p-1 sm:p-1.5 rounded-lg bg-white/5 text-xs font-bold text-gray-300 cursor-pointer"
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 transition-colors cursor-pointer"
                         title="Edit details"
                       >
                         ✏️
                       </button>
                       <button
                         onClick={() => onBuy(fund)}
-                        className="px-1.5 sm:px-2 py-1 rounded bg-[--accent-primary]/10 text-[--accent-primary] text-[0.5625rem] font-black uppercase tracking-wider cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[0.625rem] font-black uppercase tracking-wider transition-colors cursor-pointer border border-emerald-500/20"
                       >
                         Buy
                       </button>
                       <button
                         onClick={() => onSell(fund)}
-                        className="px-1.5 sm:px-2 py-1 rounded border border-rose-500/30 text-rose-400 text-[0.5625rem] font-black uppercase tracking-wider cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[0.625rem] font-black uppercase tracking-wider transition-colors cursor-pointer border border-rose-500/20"
                       >
                         Redeem
                       </button>
@@ -169,23 +168,22 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
           
           {/* Zerodha-Style Summary Row */}
           <tfoot>
-            <tr className="border-t-2 border-white/10 bg-black/60 font-black text-xs">
-              <td className="px-3 sm:px-4 py-3.5 text-white uppercase tracking-wider" colSpan={5}>Total Holdings ({funds.length})</td>
-              <td className="px-2 sm:px-3 py-3.5 text-right font-mono text-white">₹{formatMoney(totalInvested)}</td>
-              <td className="px-2 sm:px-3 py-3.5 text-right font-mono text-white">₹{formatMoney(totalCurrent)}</td>
-              <td className="px-3 sm:px-4 py-3.5 text-right">
+            <tr className="border-t-2 border-white/10 bg-black/80 font-black text-xs">
+              <td className="px-4 py-4 text-white uppercase tracking-wider" colSpan={5}>Total Holdings ({funds.length})</td>
+              <td className="px-3 py-4 text-right font-mono text-xs sm:text-sm text-gray-300 font-semibold">₹{formatMoney(totalInvested)}</td>
+              <td className="px-3 py-4 text-right font-mono text-xs sm:text-sm text-white font-extrabold">₹{formatMoney(totalCurrent)}</td>
+              <td className="px-4 py-4 text-right">
                 <div 
-                  className="font-mono font-black inline-flex flex-col items-end"
+                  className="font-mono text-xs sm:text-sm font-extrabold inline-flex flex-col items-end"
                   style={{
-                    color: totalPnL >= 0 ? '#34d399' : '#f87171',
-                    textShadow: totalPnL >= 0 ? '0 0 10px rgba(52,211,153,0.4)' : '0 0 10px rgba(248,113,113,0.4)'
+                    color: totalPnL >= 0 ? '#10b981' : '#f87171',
                   }}
                 >
                   <span>{totalPnL >= 0 ? '+' : ''}₹{formatMoney(totalPnL)}</span>
-                  <span className="text-xs opacity-80 mt-0.5">{totalPnL >= 0 ? '+' : ''}{totalPnLPct.toFixed(2)}%</span>
+                  <span className="text-[0.6875rem] font-mono opacity-90 mt-0.5">{totalPnL >= 0 ? '+' : ''}{totalPnLPct.toFixed(2)}%</span>
                 </div>
               </td>
-              <td className="px-3 sm:px-4 py-3.5"></td>
+              <td className="px-4 py-4"></td>
             </tr>
           </tfoot>
         </table>

@@ -30,6 +30,8 @@ type Account = {
   name: string;
   currency: string;
   balance: number;
+  bank_name?: string | null;
+  type?: string;
 };
 
 interface ExpenseDataTableProps {
@@ -40,6 +42,9 @@ interface ExpenseDataTableProps {
   onAdd: () => void;
   categories: { label: string; icon: string; color: string }[];
 }
+
+import BankLogo from "@/components/ui/bank-logo";
+import CompanyLogo from "@/components/ui/company-logo";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
@@ -66,25 +71,30 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           </button>
         ),
         cell: (info) => (
-          <p className="text-sm font-bold text-[--text-primary]">
-            {info.getValue() ? format(parseISO(info.getValue() as string), "MMM d, yy") : "—"}
-          </p>
+          <div className="flex flex-col">
+            <p className="text-sm font-bold text-[--text-primary]">
+              {info.getValue() ? format(parseISO(info.getValue() as string), "MMM d, yy") : "—"}
+            </p>
+            <span className="text-[0.625rem] font-semibold uppercase text-danger/70">Debited</span>
+          </div>
         ),
         sortingFn: "datetime"
       }),
       columnHelper.accessor("description", {
-        header: "Description",
+        header: "Merchant & Details",
         cell: (info) => {
           const cat = info.row.original.category;
-          const theme = categories.find((c) => c.label === cat) || categories[7];
           return (
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-lg flex-shrink-0">
-                {theme.icon}
+              <CompanyLogo name={info.getValue()} category={cat} size={38} />
+              <div className="flex flex-col min-w-0">
+                <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
+                  {info.getValue()}
+                </p>
+                <span className="text-[0.625rem] font-semibold text-[--text-muted] truncate">
+                  {cat} Outflow
+                </span>
               </div>
-              <p className="text-sm font-medium text-[--text-primary] group-hover:text-[--accent-primary] transition-colors truncate max-w-[120px] md:max-w-none">
-                {info.getValue()}
-              </p>
             </div>
           );
         },
@@ -95,20 +105,24 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const val = info.getValue();
           const theme = categories.find((c) => c.label === val) || categories[7];
           return (
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/5 border border-white/10" style={{ color: theme.color }}>
+            <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500/10 border border-rose-500/20" style={{ color: theme.color }}>
               {val}
             </span>
           );
         },
       }),
       columnHelper.accessor("account_id", {
-        header: "Account",
+        header: "Payment Source",
         cell: (info) => {
           const account = accounts.find((a) => a.id === info.getValue());
+          const payMode = !account ? "Cash Reserve" : account.type === "cash" ? "Cash Reserve" : account.type === "credit" ? "Credit Line" : "Bank Transfer / UPI";
           return (
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-              <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Cash"}</span>
+            <div className="flex items-center gap-2.5">
+              <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={32} />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-[--text-primary] truncate">{account?.name || "Cash Reserve"}</span>
+                <span className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider">{payMode}</span>
+              </div>
             </div>
           );
         },
@@ -141,7 +155,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
               <button
                 type="button"
                 onClick={() => onEdit(info.row.original)}
-                className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted]"
+                className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white hover:bg-white/10 transition-all"
                 title="Edit Expense"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -150,7 +164,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
             <button
               type="button"
               onClick={() => onDelete(info.row.original.id)}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted]"
+              className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-rose-400 hover:bg-rose-500/10 transition-all"
               title="Delete Transaction"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -278,9 +292,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
               <div key={row.id} className="p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-lg flex-shrink-0">
-                      {theme.icon}
-                    </div>
+                    <CompanyLogo name={exp.description} category={exp.category} size={40} />
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-bold text-white truncate">{exp.description}</span>
                       <span className="text-xs text-[--text-muted]">{exp.date ? format(parseISO(exp.date), "MMM d, yyyy") : "—"}</span>
@@ -288,13 +300,13 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">
                     <span className="text-[15px] font-black tabular-nums tracking-tight text-danger">-{getAccountCurrency(exp.account_id) === 'USD' ? '$' : '₹'}{Number(exp.amount).toLocaleString()}</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/5 border border-white/10" style={{color: theme.color}}>{exp.category}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/10 border border-rose-500/20 text-rose-400" style={{color: theme.color}}>{exp.category}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Cash"}</span>
+                  <div className="flex items-center gap-2">
+                    <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={28} />
+                    <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Cash Reserve"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {onEdit && (
