@@ -12,9 +12,7 @@ import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
 import PnLValue from "@/components/pnl-value";
 
-import dynamic from "next/dynamic";
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
 
 import AlternativeAssetsDataTable from "./components/AlternativeAssetsDataTable";
 import { getChartColour } from "@/lib/chart-colours";

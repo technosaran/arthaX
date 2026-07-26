@@ -8,7 +8,6 @@ import Greeting from "@/components/greeting";
 
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { MODULE_KEYS } from "@/lib/modules";
-import dynamic from "next/dynamic";
 import { 
   Tooltip, 
   PieChart, 
@@ -18,14 +17,10 @@ import {
   Area, 
   XAxis, 
   YAxis, 
-  CartesianGrid 
-} from "recharts";
+  CartesianGrid,
+  ResponsiveContainer 
+} from "@/components/ui/recharts";
 import type { Tables } from "@/lib/database.types";
-
-const ResponsiveContainer = dynamic(
-  () => import("recharts").then((mod) => mod.ResponsiveContainer),
-  { ssr: false }
-);
 
 import { getChartColour } from "@/lib/chart-colours";
 

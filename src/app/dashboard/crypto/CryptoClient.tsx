@@ -15,9 +15,7 @@ import {
   searchCrypto
 } from "./actions";
 
-import dynamic from "next/dynamic";
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
 
 type CryptoAsset = {
   id: string;

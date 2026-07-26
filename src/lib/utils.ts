@@ -129,3 +129,27 @@ export async function getExchangeRate(baseCurrency: string, targetCurrency: stri
   return 85.0; // Clean fallback for USD/general foreign currencies if unknown
 }
 
+export function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+  if (!/^[\da-f]{3}$|^[\da-f]{6}$/i.test(normalized)) {
+    return `rgba(148, 163, 184, ${alpha})`;
+  }
+
+  const safeHex = normalized.length === 3
+    ? normalized.split("").map((char) => `${char}${char}`).join("")
+    : normalized;
+
+  const value = Number.parseInt(safeHex, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+export function getHistoryCutoff(range: string): Date | null {
+  if (range === "all") return null;
+  const days = range === "90d" ? 90 : 30;
+  return new Date(Date.now() - days * 86400_000);
+}
+

@@ -24,7 +24,7 @@ import {
   AreaChart,
   Area,
   ResponsiveContainer,
-} from "recharts";
+} from "@/components/ui/recharts";
 
 const FAMILY_PALETTE = ["#ec4899", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#06b6d4", "#f43f5e"];
 import {

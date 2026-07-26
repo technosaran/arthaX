@@ -22,9 +22,7 @@ import { Drawer } from "@/components/ui/drawer";
 import PnLValue from "@/components/pnl-value";
 import type { Tables } from "@/lib/database.types";
 
-import dynamic from "next/dynamic";
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
 
 import ForexDataTable from "./components/ForexDataTable";
 

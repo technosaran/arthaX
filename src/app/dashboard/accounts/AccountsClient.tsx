@@ -16,19 +16,9 @@ import { useHasMounted } from "@/hooks/use-has-mounted";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { getChartColour } from "@/lib/chart-colours";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
-import { getCurrencySymbol } from "@/lib/utils";
+import { getCurrencySymbol, hexToRgba, getHistoryCutoff } from "@/lib/utils";
 
-// Dynamic imports for chart performance
-const PieChart = dynamic(() => import("recharts").then(mod => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import("recharts").then(mod => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import("recharts").then(mod => mod.Cell), { ssr: false });
-const ResponsiveContainer = dynamic(() => import("recharts").then(mod => mod.ResponsiveContainer), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then(mod => mod.Tooltip), { ssr: false });
-const AreaChart = dynamic(() => import("recharts").then(mod => mod.AreaChart), { ssr: false });
-const Area = dynamic(() => import("recharts").then(mod => mod.Area), { ssr: false });
-const XAxis = dynamic(() => import("recharts").then(mod => mod.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then(mod => mod.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import("recharts").then(mod => mod.CartesianGrid), { ssr: false });
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "@/components/ui/recharts";
 
 type Account = Tables<"accounts">;
 type LedgerLog = Tables<"ledger_logs">;
@@ -60,31 +50,7 @@ const TYPE_STYLES: Record<string, { gradient: string; badge: string; badgeBorder
 const ACCOUNT_HISTORY_ACTIONS = new Set(["CREATE", "UPDATE", "DELETE", "TRANSFER_IN", "TRANSFER_OUT", "ADJUST_UP", "ADJUST_DOWN"]);
 const DEBIT_ACCOUNT_ACTIONS = new Set(["ADJUST_DOWN", "TRANSFER_OUT", "DELETE"]);
 
-function getHistoryCutoff(range: string): Date | null {
-  if (range === "all") return null;
-  const days = range === "90d" ? 90 : 30;
-  return new Date(Date.now() - days * 86400_000);
-}
 
-
-
-function hexToRgba(hex: string, alpha: number): string {
-  const normalized = hex.replace("#", "");
-  if (!/^[\da-f]{3}$|^[\da-f]{6}$/i.test(normalized)) {
-    return `rgba(148, 163, 184, ${alpha})`;
-  }
-
-  const safeHex = normalized.length === 3
-    ? normalized.split("").map((char) => `${char}${char}`).join("")
-    : normalized;
-
-  const value = Number.parseInt(safeHex, 16);
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
 
 export default function AccountsClient({ initialData }: { initialData?: FinanceData }) {
   const { data: { accounts, ledgerLogs }, isValidating, mutate } = useFinanceData(initialData);

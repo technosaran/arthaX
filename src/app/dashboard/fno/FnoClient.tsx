@@ -11,9 +11,7 @@ import { useFinanceData, type FinanceData, type FnoTrade } from "@/hooks/use-fin
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
 
-import dynamic from "next/dynamic";
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
 
 import FNODataTable from "./components/FNODataTable";
 import { calculateFnoFuturesCharges, calculateFnoOptionsCharges } from "@/lib/zerodha-charges";

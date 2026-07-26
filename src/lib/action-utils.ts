@@ -65,3 +65,11 @@ export async function logLedgerEntry(
   }
 }
 
+export async function requireAuthUser(supabase: any) {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    return { user: null, error: "Not authenticated" };
+  }
+  return { user, error: null };
+}
+
