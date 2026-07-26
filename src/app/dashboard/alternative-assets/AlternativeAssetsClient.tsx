@@ -427,8 +427,8 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
           onClose={() => { setShowAddModal(false); setEditingId(null); setSelectedCategory(null); setSearchQuery(""); }}
           title={editingId ? "Update Asset" : "Establish Asset"}
         >
-          <div className="p-4 max-w-2xl mx-auto w-full">
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="w-full">
+            <form onSubmit={handleSubmit} className="space-y-5">
               
               {/* Search Section & Quick Category Chips - Only for new assets */}
               {!editingId && !formData.category && (
@@ -442,6 +442,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-sm font-bold text-white placeholder:text-white/20 focus:outline-none focus:border-[--accent-primary] transition-all shadow-inner"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        autoFocus
                       />
                     </div>
                     {searchResults.length > 0 && searchQuery.length > 0 && (
@@ -485,11 +486,12 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
               {/* Form Content - Shows if a category is selected or editing */}
               {(editingId || formData.category) && (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Asset Name</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Asset Name *</label>
                       <input 
                         required 
+                        autoFocus
                         className="input-premium" 
                         placeholder="e.g. 2BHK Apartment" 
                         value={formData.name} 
@@ -497,8 +499,19 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                         autoComplete="off" 
                       />
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Classification</label>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Classification</label>
+                        {!editingId && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, category: "" })}
+                            className="text-[0.65rem] text-[--accent-primary-light] hover:underline font-bold"
+                          >
+                            Change
+                          </button>
+                        )}
+                      </div>
                       <div className="input-premium flex items-center gap-3 bg-white/5 pointer-events-none">
                         <span>{selectedCategory?.icon || "💎"}</span>
                         <span className="text-white font-bold">{formData.category}</span>
@@ -506,25 +519,27 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Acquisition Cost (₹)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Acquisition Cost (₹) *</label>
                       <input 
                         required 
                         type="number" 
                         className="input-premium tabular-nums" 
+                        placeholder="0"
                         value={formData.purchase_price} 
                         onChange={e => setFormData({...formData, purchase_price: e.target.value})} 
                         autoComplete="off" 
                         inputMode="decimal" 
                       />
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Current Valuation (₹)</label>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Current Valuation (₹) *</label>
                       <input 
                         required 
                         type="number" 
                         className="input-premium tabular-nums" 
+                        placeholder="0"
                         value={formData.current_value} 
                         onChange={e => setFormData({...formData, current_value: e.target.value})} 
                         autoComplete="off" 
@@ -533,13 +548,14 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                     </div>
                   </div>
 
-                  <details className="group glass-card-static border border-white/5 rounded-xl overflow-hidden mt-6" open>
-                    <summary className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] p-4 cursor-pointer outline-none hover:text-white transition-colors bg-white/[0.01]">
-                      Additional Details
+                  <details className="group glass-card-static border border-white/5 rounded-xl overflow-hidden mt-4">
+                    <summary className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] p-3.5 cursor-pointer outline-none hover:text-white transition-colors bg-white/[0.01] flex items-center justify-between">
+                      <span>Additional Details (Date, Account, Notes)</span>
+                      <span className="text-xs text-white/40 group-open:rotate-180 transition-transform">▼</span>
                     </summary>
-                    <div className="p-4 pt-0 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
+                    <div className="p-4 pt-2 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
                           <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Acquisition Date</label>
                           <input 
                             type="date" 
@@ -548,7 +564,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                             onChange={e => setFormData({...formData, purchase_date: e.target.value})} 
                           />
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Source Account (Optional)</label>
                           <select 
                             aria-label="Select account" 
@@ -564,7 +580,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                         </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Notes / Location</label>
                         <input 
                           type="text" 
@@ -578,7 +594,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                     </div>
                   </details>
 
-                  <div className="pt-4 mt-8">
+                  <div className="pt-2 mt-6">
                     <button type="submit" disabled={submitting} className="btn-primary w-full h-12 shadow-xl shadow-[--accent-primary]/20 text-xs font-black uppercase tracking-widest cursor-pointer">
                       {submitting ? "Processing..." : editingId ? "Update Asset" : "Establish Asset"}
                     </button>

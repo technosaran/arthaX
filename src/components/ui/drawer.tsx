@@ -22,10 +22,14 @@ export function Drawer({
   variant = "center" 
 }: DrawerProps) {
   const mounted = useHasMounted();
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
     } else {
       document.body.style.overflow = "unset";
     }
@@ -33,6 +37,12 @@ export function Drawer({
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [isOpen, children]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -68,7 +78,7 @@ export function Drawer({
             </div>
             <p className="text-[0.5625rem] font-bold uppercase tracking-widest text-[--text-muted]">Data Entry / Actions</p>
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative z-10">
+          <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 relative z-10">
             {children}
           </div>
         </div>
@@ -111,7 +121,7 @@ export function Drawer({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-8 space-y-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-8 space-y-6">
           {children}
         </div>
       </div>
