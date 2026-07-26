@@ -245,50 +245,17 @@ function levenshteinDistance(a: string, b: string): number {
 }
 
 const CATEGORY_FUZZY_DICT: Record<string, string[]> = {
-  Food: [
-    "food", "fud", "fod", "eat", "eating", "lunch", "lunh", "lnch", "lanch", "dinner", "dinr", "diner", "dnr",
-    "breakfast", "brkfast", "bf", "snack", "snak", "tea", "chai", "chaai", "coffee", "cofe", "cfee", "cafe",
-    "swiggy", "swigy", "swiggi", "zomato", "zomatoo", "zomat", "grocery", "groceries", "grocry", "groceris", "grocries",
-    "zepto", "blinkit", "instamart", "bigbasket", "milk", "dahi", "paneer", "kirana", "ration", "nashta", "khana",
-    "khrcha", "restaurant", "resturant", "restraunt", "hotel", "dhaba", "biscuit", "pizza", "burger", "subway",
-    "mcdonalds", "mcd", "kfc", "dominos", "biryani", "momos", "rolls", "boba", "bakery", "cake", "pastry",
-    "icecream", "chocolate", "chips", "samosa", "kachori", "thali", "juice", "coconut", "maggie", "maggi", "noodle"
-  ],
-  Transport: [
-    "uber", "ubr", "ola", "rapido", "indrive", "cab", "cabs", "taxi", "txi", "ride", "auto", "autto", "otto",
-    "rickshaw", "metro", "petrol", "petrl", "ptrol", "diesel", "disel", "fuel", "ful", "gas", "ev", "charging",
-    "parking", "prking", "toll", "fastag", "bus", "train", "flight", "flite", "trvl", "travel", "travl", "ticket",
-    "vahan", "gaadi", "petrolpump", "mechanic", "puncture", "service", "garage"
-  ],
-  Entertainment: [
-    "netflix", "netflx", "prime", "hotstar", "spotify", "spotfy", "movie", "mvie", "pvr", "inox", "bookmyshow",
-    "show", "game", "gaming", "playstation", "ps5", "xbox", "steam", "subscription", "subscriptn", "cinema",
-    "pub", "bar", "club", "party", "drinks", "beer", "wine", "alcohol", "bms", "concert", "event"
-  ],
-  Housing: [
-    "rent", "rnt", "house", "room", "flat", "flt", "maintenance", "maintnance", "pg", "kiraya", "broker",
-    "brokerage", "deposit", "furniture", "mattress", "bed", "curtains"
-  ],
-  Utilities: [
-    "electricity", "electrcty", "water", "watr", "gas", "wifi", "broadband", "airtel", "jio", "vi", "bsnl",
-    "recharge", "recharg", "mobile", "bill", "bil", "bijli", "phonebill", "dth", "tataplay", "tatasat", "cylinder"
-  ],
-  Shopping: [
-    "amazon", "amzn", "flipkart", "flpkrt", "myntra", "ajio", "meesho", "nykaa", "croma", "clothes", "cloths",
-    "shoes", "shos", "shopping", "shopyng", "shpping", "purchase", "samman", "saman", "kapde", "mall", "electronics",
-    "phone", "laptop", "watch", "gadget", "headphones", "earbuds", "dress", "shirt", "pant", "tshirt", "chappal"
-  ],
-  Health: [
-    "doctor", "dr", "hospital", "hsptl", "medicine", "medcine", "pharmacy", "apollo", "1mg", "pharmeasy",
-    "gym", "fitness", "dawa", "dawai", "pharma", "clinic", "meds", "test", "bloodtest", "xray", "protein", "supplement"
-  ]
+  Food: ["food", "eat", "lunch", "dinner", "breakfast", "snack", "tea", "chai", "coffee", "cafe", "swiggy", "zomato", "grocery", "zepto", "blinkit", "instamart", "bigbasket", "milk", "paneer", "kirana", "restaurant", "hotel", "dhaba", "pizza", "burger", "subway", "mcdonalds", "kfc", "dominos", "biryani", "momos", "bakery", "cake", "pastry", "icecream", "chocolate", "samosa", "thali", "juice", "noodle"],
+  Transport: ["uber", "ola", "rapido", "indrive", "cab", "taxi", "ride", "auto", "rickshaw", "metro", "petrol", "diesel", "fuel", "gas", "ev", "charging", "parking", "toll", "fastag", "bus", "train", "flight", "travel", "ticket", "vahan", "gaadi", "mechanic", "garage"],
+  Entertainment: ["netflix", "prime", "hotstar", "spotify", "movie", "pvr", "inox", "bookmyshow", "game", "playstation", "xbox", "steam", "subscription", "cinema", "pub", "bar", "club", "party", "drinks", "beer", "wine", "alcohol", "concert", "event"],
+  Housing: ["rent", "house", "room", "flat", "maintenance", "pg", "kiraya", "broker", "brokerage", "deposit", "furniture", "bed", "curtains"],
+  Utilities: ["electricity", "water", "gas", "wifi", "broadband", "airtel", "jio", "vi", "bsnl", "recharge", "mobile", "bill", "bijli", "phonebill", "dth", "tataplay", "cylinder"],
+  Shopping: ["amazon", "flipkart", "myntra", "ajio", "meesho", "nykaa", "croma", "clothes", "shoes", "shopping", "purchase", "saman", "kapde", "mall", "electronics", "phone", "laptop", "watch", "gadget", "headphones", "dress", "shirt", "pant"],
+  Health: ["doctor", "hospital", "medicine", "pharmacy", "apollo", "1mg", "pharmeasy", "gym", "fitness", "dawa", "clinic", "meds", "test", "bloodtest", "xray", "protein", "supplement"]
 };
 
 const INCOME_FUZZY_KEYWORDS = [
-  "salary", "salry", "slry", "stipend", "paycheck", "credit", "credt", "crdt", "credited", "crdited",
-  "received", "recived", "recd", "earned", "inflow", "refund", "refnd", "dividend", "bonus",
-  "cashback", "cshback", "got", "deposit", "deposited", "kamai", "aaya", "aayi", "mila", "mile",
-  "freelance", "profit", "interest", "gifted", "reward"
+  "salary", "stipend", "paycheck", "credit", "credited", "received", "earned", "inflow", "refund", "dividend", "bonus", "cashback", "deposit", "deposited", "kamai", "aaya", "mila", "freelance", "profit", "interest", "gifted", "reward"
 ];
 
 function classifyTextFuzzy(text: string): { type: "expense" | "income"; category: string } {

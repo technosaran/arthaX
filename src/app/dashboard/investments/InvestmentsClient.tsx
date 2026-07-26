@@ -7,11 +7,7 @@ import { useHasMounted } from "@/hooks/use-has-mounted";
 import { getColorByLabel } from "@/lib/chart-colours";
 import dynamic from "next/dynamic";
 
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
-const RechartsTooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
 
 // Import sub-clients
 import StocksClient from "@/app/dashboard/stocks/StocksClient";

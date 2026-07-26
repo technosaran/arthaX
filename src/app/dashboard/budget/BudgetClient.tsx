@@ -19,7 +19,7 @@ import {
   XAxis,
   YAxis,
   Tooltip as RechartsTooltip,
-} from "recharts";
+} from "@/components/ui/recharts";
 
 import { Drawer } from "@/components/ui/drawer";
 import { Copy, Trash2, Edit2, Plus, Check } from "lucide-react";
