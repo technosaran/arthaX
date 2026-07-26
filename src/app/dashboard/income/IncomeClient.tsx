@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addIncome, deleteIncome } from "./actions";
+import { addIncome, updateIncome, deleteIncome } from "./actions";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";

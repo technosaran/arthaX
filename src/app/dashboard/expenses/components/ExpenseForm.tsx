@@ -123,12 +123,12 @@ export default function ExpenseForm({
     ) : null;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Group 1: Merchant & Amount */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Description */}
         <div className="space-y-1.5">
-          <label htmlFor="expense-description" className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+          <label htmlFor="expense-description" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">
             {["Food", "Shopping", "Entertainment"].includes(formData.category) ? "Merchant / Store" : "Description"}
           </label>
           <input
@@ -137,8 +137,12 @@ export default function ExpenseForm({
             required
             id="expense-description"
             name="description"
-            className={`input-premium py-2 text-xs ${touched.description && errors.description ? "border-rose-500/50 focus:border-rose-500" : ""}`}
-            placeholder="e.g. Starbucks"
+            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
+              touched.description && errors.description 
+                ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
+                : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
+            }`}
+            placeholder="e.g. Starbucks, Amazon"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             onBlur={() => handleBlur("description")}
@@ -151,61 +155,74 @@ export default function ExpenseForm({
 
         {/* Amount */}
         <div className="space-y-1.5">
-          <label htmlFor="expense-amount" className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Amount</label>
-          <input
-            type="number"
-            required
-            id="expense-amount"
-            name="amount"
-            className={`input-premium py-2 text-xs ${touched.amount && errors.amount ? "border-rose-500/50 focus:border-rose-500" : ""}`}
-            placeholder="0.00"
-            min="0.01"
-            step="0.01"
-            value={formData.amount}
-            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-            onBlur={() => handleBlur("amount")}
-            autoComplete="off"
-            inputMode="decimal"
-            aria-invalid={!!errors.amount}
-            aria-describedby={errors.amount ? "err-amount" : undefined}
-          />
+          <label htmlFor="expense-amount" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Amount</label>
+          <div className="relative">
+            <input
+              type="number"
+              required
+              id="expense-amount"
+              name="amount"
+              className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-bold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
+                touched.amount && errors.amount 
+                  ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
+                  : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
+              }`}
+              placeholder="0.00"
+              min="0.01"
+              step="0.01"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              onBlur={() => handleBlur("amount")}
+              autoComplete="off"
+              inputMode="decimal"
+              aria-invalid={!!errors.amount}
+              aria-describedby={errors.amount ? "err-amount" : undefined}
+            />
+          </div>
           <span id="err-amount">{fieldError("amount")}</span>
         </div>
       </div>
 
       {/* Category Chips */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Category</label>
+      <div className="space-y-2">
+        <label className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Category</label>
         <div className="flex flex-wrap gap-2 pt-0.5">
-          {categories.map((c) => (
-            <button
-              key={c.label}
-              type="button"
-              onClick={() => setFormData({ ...formData, category: c.label })}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                formData.category === c.label
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-400 font-bold shadow-[0_2px_10px_rgba(244,63,94,0.15)]"
-                  : "bg-white/5 border-white/10 text-[--text-muted] hover:text-white"
-              }`}
-            >
-              {c.icon && <span className="mr-1">{c.icon}</span>}
-              {c.label}
-            </button>
-          ))}
+          {categories.map((c) => {
+            const isActive = formData.category === c.label;
+            return (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => setFormData({ ...formData, category: c.label })}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                  isActive
+                    ? "bg-rose-500/15 border-rose-500/40 text-rose-400 font-extrabold shadow-[0_4px_15px_rgba(244,63,94,0.2)] scale-[1.02]"
+                    : "bg-white/[0.03] border-white/10 text-[--text-muted] hover:text-white hover:bg-white/10 hover:border-white/20"
+                }`}
+              >
+                {c.icon && <span className="text-sm">{c.icon}</span>}
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Group 2: Date & Account */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Date */}
         <div className="space-y-1.5">
-          <label htmlFor="expense-date" className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Date</label>
+          <label htmlFor="expense-date" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Date</label>
           <input
             type="date"
             required
             id="expense-date"
             name="date"
-            className={`input-premium py-2 text-xs ${touched.date && errors.date ? "border-rose-500/50 focus:border-rose-500" : ""}`}
+            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
+              touched.date && errors.date 
+                ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
+                : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
+            }`}
             value={formData.date}
             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
             onBlur={() => handleBlur("date")}
@@ -218,11 +235,15 @@ export default function ExpenseForm({
 
         {/* Account */}
         <div className="space-y-1.5">
-          <label htmlFor="expense-account" className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Account</label>
+          <label htmlFor="expense-account" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Debit Account</label>
           <select
             id="expense-account"
             name="account_id"
-            className={`input-premium py-2 text-xs ${touched.account_id && errors.account_id ? "border-rose-500/50 focus:border-rose-500" : ""}`}
+            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
+              touched.account_id && errors.account_id 
+                ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
+                : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
+            }`}
             value={formData.account_id}
             onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
             onBlur={() => handleBlur("account_id")}
@@ -230,9 +251,9 @@ export default function ExpenseForm({
             aria-invalid={!!errors.account_id}
             aria-describedby={errors.account_id ? "err-account_id" : undefined}
           >
-            <option value="" disabled className="bg-[--bg-surface]">Select Account</option>
+            <option value="" disabled className="bg-[#12141c] text-white">Select Account</option>
             {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id} className="bg-[--bg-surface]">
+              <option key={acc.id} value={acc.id} className="bg-[#12141c] text-white">
                 {acc.name} ({acc.currency === "USD" ? "$" : "₹"}{acc.balance.toLocaleString()})
               </option>
             ))}
@@ -244,23 +265,29 @@ export default function ExpenseForm({
       {formData.account_id && (() => {
         const sel = accounts.find((a) => a.id === formData.account_id);
         return sel ? (
-          <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs text-[--text-secondary] animate-fade-in">
-            <span>Selected balance</span>
-            <span className="font-bold text-white">{sel.currency === "USD" ? "$" : "₹"}{sel.balance.toLocaleString()}</span>
+          <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-between text-xs text-[--text-secondary] animate-fade-in">
+            <span className="font-semibold">Selected Account Balance</span>
+            <span className="font-black text-rose-400 text-sm">{sel.currency === "USD" ? "$" : "₹"}{sel.balance.toLocaleString()}</span>
           </div>
         ) : null;
       })()}
 
-      <div className="pt-2">
+      <div className="pt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={_onClose}
+          className="h-12 px-6 rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10 transition-all active:scale-95"
+        >
+          Cancel
+        </button>
         <button
           type="submit"
           disabled={submitting}
-          className="btn-primary w-full h-11 shadow-xl shadow-[--accent-primary]/20 text-xs font-black uppercase tracking-widest animate-fade-in"
+          className="flex-1 h-12 rounded-xl bg-gradient-to-r from-rose-500 via-rose-600 to-pink-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-rose-500/25 hover:shadow-rose-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? "Processing…" : editingExpense ? "Save Changes" : "Confirm Record"}
         </button>
       </div>
     </form>
-
   );
 }

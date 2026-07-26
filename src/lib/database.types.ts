@@ -1457,6 +1457,7 @@ export type Database = {
           p_note?: string
           p_to_account_id: string
           p_user_id: string
+          p_converted_amount?: number
         }
         Returns: Json
       }

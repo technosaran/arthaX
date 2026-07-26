@@ -228,37 +228,15 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
   return (
     <div className="glass-card-static rounded-2xl overflow-hidden flex flex-col border border-white/5">
       <div className="p-4 md:p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.02]">
-        <div className="flex flex-col gap-3 w-full">
-          <div className="relative w-full sm:w-72">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--text-muted]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input
-              type="text"
-              placeholder="Search goals..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="input-premium pl-9 py-2 text-sm w-full !bg-black/20"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: "all", label: "All" },
-              { key: "active", label: "Active" },
-              { key: "completed", label: "Completed" },
-            ].map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={() => setGoalFilter(filter.key as typeof goalFilter)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-[0.18em] border transition-colors ${
-                  goalFilter === filter.key
-                    ? "bg-[--accent-primary]/20 border-[--accent-primary]/40 text-white"
-                    : "bg-white/5 border-white/10 text-[--text-muted]"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+        <div className="relative w-full sm:w-72">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--text-muted]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input
+            type="text"
+            placeholder="Search goals..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="input-premium pl-9 py-2 text-sm w-full !bg-black/20"
+          />
         </div>
 
         {/* View Mode Toggle */}

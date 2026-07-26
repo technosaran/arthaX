@@ -426,7 +426,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
 
       {/* Contribute Modal */}
       {showContributeModal && (
-        <Drawer isOpen={showContributeModal} onClose={() => setShowContributeModal(false)} title="Add to Goal">
+        <Drawer isOpen={showContributeModal} onClose={() => setShowContributeModal(false)} title="Add to Goal" variant="center">
         <div className="p-2 max-w-sm mx-auto w-full">
           <form onSubmit={handleContribute} className="space-y-4">
             <div>
@@ -473,8 +473,8 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
           setShowAddModal(false);
           setEditingGoalId(null);
           setFormData({ name: "", target_amount: "", current_amount: "0", deadline: "", category: "Others", account_id: "" });
-        }} title={editingGoalId ? "Edit Goal" : "Create New Goal"}>
-        <div className="p-2 max-w-md mx-auto w-full">
+        }} title={editingGoalId ? "Edit Goal" : "Create New Goal"} variant="center" width="max-w-xl">
+        <div className="p-2 w-full">
           <form onSubmit={handleAddGoal} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-[--text-muted] uppercase tracking-widest mb-2">Goal Name</label>
@@ -487,7 +487,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 placeholder="e.g. New Car"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[--text-muted] uppercase tracking-widest mb-2">Target Amount</label>
                 <div className="relative">
@@ -570,7 +570,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <Drawer isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Goal?">
+        <Drawer isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Goal?" variant="center">
         <div className="p-2 max-w-sm mx-auto w-full text-center">
           <div className="w-16 h-16 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto mb-6">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>

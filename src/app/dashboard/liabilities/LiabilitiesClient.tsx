@@ -554,9 +554,11 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
           isOpen={showAddModal}
           onClose={() => { setShowAddModal(false); setEditingId(null); }}
           title={editingId ? "Update Liability" : "Record Liability"}
+          variant="center"
+          width="max-w-2xl"
         >
-          <form onSubmit={handleSubmit} className="space-y-4 p-2">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Liability Name</label>
                 <input required className="input-premium !h-10 text-xs" placeholder="e.g. HDFC Home Loan" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} autoComplete="new-password" />
@@ -569,7 +571,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Total Principal (₹)</label>
                 <input required type="number" className="input-premium !h-10 text-xs tabular-nums" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: e.target.value})} autoComplete="new-password" inputMode="decimal" />
@@ -580,7 +582,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Interest Rate (%)</label>
                 <input type="number" step="0.01" className="input-premium !h-10 text-xs tabular-nums" value={formData.interest_rate} onChange={e => setFormData({...formData, interest_rate: e.target.value})} autoComplete="new-password" inputMode="decimal" />
@@ -591,7 +593,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Next Due Date</label>
                 <input type="date" className="input-premium !h-10 text-xs" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} autoComplete="new-password" />
@@ -621,8 +623,19 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             </div>
 
-            <div className="pt-2 mt-4">
-              <button type="submit" disabled={submitting} className="btn-primary w-full h-11 text-xs font-bold shadow-xl shadow-[--danger]/20 !bg-danger hover:!bg-rose-600 uppercase tracking-widest cursor-pointer">
+            <div className="flex gap-3 pt-3">
+              <button 
+                type="button" 
+                onClick={() => { setShowAddModal(false); setEditingId(null); }} 
+                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/10"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={submitting} 
+                className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-600 hover:bg-rose-500 text-white transition-all shadow-lg shadow-rose-600/30 cursor-pointer"
+              >
                 {submitting ? "Processing..." : (editingId ? "Update Record" : "Register Liability")}
               </button>
             </div>

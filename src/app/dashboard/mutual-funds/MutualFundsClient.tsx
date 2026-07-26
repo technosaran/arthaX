@@ -56,6 +56,18 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (searchQuery.length > 2) {
       setIsSearching(true);
@@ -290,37 +302,14 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   const formatMoney = (val: number) => val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="flex flex-col animate-in fade-in duration-700 w-full bg-[#131722] min-h-screen text-[#E0E0E0] relative font-sans">
-      {/* Background Ambient Coin Glows */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-[550px] h-[550px] bg-[#FF5722]/10 rounded-full blur-[160px]" />
-        <div className="absolute top-1/2 -left-32 w-[550px] h-[550px] bg-sky-500/10 rounded-full blur-[160px]" />
-      </div>
-
-      {/* Zerodha Coin Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-8 py-3.5 border-b border-[#2B313A] bg-[#181A20] relative z-10 shadow-xl gap-4">
-        <div className="flex items-center gap-4">
-          {/* Zerodha Coin Emblem */}
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF5722]/20 to-[#FF7043]/10 border border-[#FF5722]/40 flex items-center justify-center text-[#FF5722] shadow-[0_0_15px_rgba(255,87,34,0.3)]">
-            <span className="text-lg font-black tracking-tighter text-[#FF5722]">©</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Mutual Funds Portfolio</h1>
-              <span className="text-[0.5625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">DIRECT MF</span>
-            </div>
-            <p className="text-[0.6875rem] text-[#848E9C] font-semibold flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-[#0ECB81] animate-pulse" />
-              0% Commission Direct Mutual Funds • Live NAV Tracker
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div className="flex gap-1.5 rounded-xl bg-[#131722] border border-[#2B313A] p-1 shadow-inner">
+    <div className="flex flex-col animate-in fade-in duration-700 w-full relative font-sans space-y-4">
+      {/* Sub-Header Actions Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-1">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5 rounded-xl bg-white/[0.03] border border-white/10 p-1 shadow-inner">
             <button 
               onClick={() => setActiveTab("dashboard")} 
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                 activeTab === "dashboard" 
                   ? "bg-[#FF5722] text-white shadow-[0_0_15px_rgba(255,87,34,0.4)]" 
                   : "text-[#848E9C] hover:text-white hover:bg-white/5"
@@ -330,7 +319,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
             </button>
             <button 
               onClick={() => setActiveTab("holdings")} 
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                 activeTab === "holdings" 
                   ? "bg-[#FF5722] text-white shadow-[0_0_15px_rgba(255,87,34,0.4)]" 
                   : "text-[#848E9C] hover:text-white hover:bg-white/5"
@@ -340,7 +329,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
             </button>
             <button 
               onClick={() => setActiveTab("history")} 
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                 activeTab === "history" 
                   ? "bg-[#FF5722] text-white shadow-[0_0_15px_rgba(255,87,34,0.4)]" 
                   : "text-[#848E9C] hover:text-white hover:bg-white/5"
@@ -349,46 +338,47 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
               SIP &amp; Orders
             </button>
           </div>
+          <span className="text-[0.625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-2 py-0.5 rounded font-black tracking-widest uppercase hidden sm:inline-block">DIRECT MF</span>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setShowCASModal(true)} 
-              className="bg-[#2B313A]/50 hover:bg-[#2B313A] border border-purple-500/30 text-purple-300 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Import CAS
-            </button>
-            <button 
-              onClick={handleRefreshNAV} 
-              disabled={isRefreshing || rawMfs.length === 0}
-              className="bg-[#2B313A]/50 hover:bg-[#2B313A] border border-[#2B313A] text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-            >
-              {isRefreshing ? (
-                <svg className="w-3.5 h-3.5 animate-spin text-[#FF5722]" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg>
-              ) : (
-                <svg className="w-3.5 h-3.5 text-[#FF5722]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              )}
-              Refresh NAV
-            </button>
-            <button 
-              onClick={() => { 
-                setFormData({
-                  fund_name: "", scheme_code: "", units: "", nav: "", current_nav: "",
-                  investment_type: "SIP", category: "Equity", amc_name: "HDFC",
-                  date: new Date().toISOString().split("T")[0], account_id: "", trade_type: "buy"
-                });
-                setEditingId(null);
-                setShowAddModal(true); 
-              }} 
-              className="bg-[#FF5722] hover:bg-[#e04a1b] text-white font-extrabold px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(255,87,34,0.3)] cursor-pointer"
-            >
-              + Start SIP / Invest
-            </button>
-          </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          <button 
+            onClick={() => setShowCASModal(true)} 
+            className="bg-white/5 hover:bg-white/10 border border-purple-500/30 text-purple-300 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Import CAS
+          </button>
+          <button 
+            onClick={handleRefreshNAV} 
+            disabled={isRefreshing || rawMfs.length === 0}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+          >
+            {isRefreshing ? (
+              <svg className="w-3.5 h-3.5 animate-spin text-[#FF5722]" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-[#FF5722]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            )}
+            Refresh NAV
+          </button>
+          <button 
+            onClick={() => { 
+              setFormData({
+                fund_name: "", scheme_code: "", units: "", nav: "", current_nav: "",
+                investment_type: "SIP", category: "Equity", amc_name: "HDFC",
+                date: new Date().toISOString().split("T")[0], account_id: "", trade_type: "buy"
+              });
+              setEditingId(null);
+              setShowAddModal(true); 
+            }} 
+            className="bg-[#FF5722] hover:bg-[#e04a1b] text-white font-black px-4 py-1.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(255,87,34,0.3)] cursor-pointer"
+          >
+            + Start SIP / Invest
+          </button>
         </div>
       </div>
 
-      <div className="p-4 sm:p-6 w-full relative z-10">
+      <div className="w-full relative z-10">
         {activeTab === "dashboard" && (
           <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-stretch mt-4">
             {/* Left: Large Allocation Donut Card */}
@@ -514,376 +504,360 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
       {showAddModal && (
         <Drawer
           isOpen={showAddModal}
-          onClose={() => { setShowAddModal(false); setEditingId(null); }}
+          onClose={() => { setShowAddModal(false); setEditingId(null); setSearchQuery(""); setShowSearchDropdown(false); }}
           title={editingId ? `Update ${formData.fund_name}` : "Investment Ticket"}
         >
-          {/* Custom Coin styling */}
-          <div className="p-0 -mx-6 -mt-6">
-            <div className={`p-4 rounded-t flex items-center justify-between ${
-              formData.trade_type === "buy" ? "bg-[var(--accent-primary)]" : "bg-[#ff5722]"
-            } text-white`}>
-              <div>
-                <span className="text-base font-bold uppercase tracking-wider">{editingId ? "Modify" : formData.trade_type === "buy" ? "Invest" : "Redeem"} {formData.fund_name || "Fund"}</span>
-                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded font-black tracking-widest">COIN</span>
+          <div className="space-y-5 animate-fade-in pt-1">
+            {/* Header Banner */}
+            <div className={`p-4 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 ${
+              formData.trade_type === "buy" 
+                ? "bg-gradient-to-r from-emerald-600/30 via-teal-600/20 to-transparent border-emerald-500/30" 
+                : "bg-gradient-to-r from-rose-600/30 via-red-600/20 to-transparent border-rose-500/30"
+            }`}>
+              <div className="flex items-center gap-3">
+                <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name || "Fund"} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-white uppercase tracking-wider">{editingId ? "Modify" : formData.trade_type === "buy" ? "Invest" : "Redeem"} {formData.fund_name || "Fund"}</span>
+                    <span className="text-[0.625rem] bg-white/10 text-white px-2 py-0.5 rounded-full font-black tracking-widest border border-white/10">COIN</span>
+                  </div>
+                  <p className="text-[0.6875rem] text-[--text-muted] mt-0.5">Direct Mutual Funds Zero Commission Platform</p>
+                </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-white/70">LTP NAV</span>
-                <span className="ml-1 text-sm font-bold">₹{parseFloat(formData.current_nav || "0").toFixed(4)}</span>
+                <span className="text-[0.625rem] uppercase font-bold text-[--text-muted] block">LTP NAV</span>
+                <span className="text-sm font-black text-emerald-400">₹{parseFloat(formData.current_nav || "0").toFixed(4)}</span>
               </div>
             </div>
 
-            <div className="p-5 space-y-5 bg-[var(--bg-card)]">
-              {/* Investment type toggle (SIP vs Lumpsum) */}
-              {!editingId && formData.trade_type === "buy" && (
-                <div className="flex bg-[var(--bg-card)] rounded p-1 border border-white/5">
-                  <button 
-                    type="button"
-                    onClick={() => setFormData({ ...formData, investment_type: "SIP" })}
-                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition-all ${
-                      formData.investment_type === "SIP" ? "bg-[var(--accent-primary)] text-white shadow-md" : "text-gray-500 hover:text-white"
-                    }`}
-                  >
-                    SIP Mode
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setFormData({ ...formData, investment_type: "LUMPSUM" })}
-                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition-all ${
-                      formData.investment_type === "LUMPSUM" ? "bg-[var(--accent-primary)] text-white shadow-md" : "text-gray-500 hover:text-white"
-                    }`}
-                  >
-                    Lumpsum Mode
-                  </button>
-                </div>
-              )}
+            {/* Investment mode toggle (SIP vs Lumpsum) */}
+            {!editingId && formData.trade_type === "buy" && (
+              <div className="flex bg-white/[0.02] rounded-xl p-1 border border-white/10 shadow-inner">
+                <button 
+                  type="button"
+                  onClick={() => setFormData({ ...formData, investment_type: "SIP" })}
+                  className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    formData.investment_type === "SIP" ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  ⚡ SIP Mode
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({ ...formData, investment_type: "LUMPSUM" })}
+                  className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    formData.investment_type === "LUMPSUM" ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  💰 Lumpsum Mode
+                </button>
+              </div>
+            )}
 
-              <form onSubmit={handleAddMF} className="space-y-4">
-                {/* Search / Manual Fund Selection */}
-                {!formData.scheme_code ? (
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Search or Enter Fund Name</label>
-                    <div className="relative">
-                      <input 
-                        className="w-full bg-[#181A20] border border-white/10 rounded px-3 py-2 text-xs text-white outline-none focus:border-[#FF5722] placeholder-gray-500 font-medium" 
-                        placeholder="e.g. Parag Parikh Flexi Cap" 
-                        value={searchQuery || formData.fund_name} 
-                        onChange={e => {
-                          setSearchQuery(e.target.value);
-                          setFormData({...formData, fund_name: e.target.value});
-                        }} 
-                      />
-                      {isSearching && (
-                        <div className="absolute right-3 top-2.5">
-                          <svg className="w-3.5 h-3.5 animate-spin text-[#FF5722]" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg>
+            <form onSubmit={handleAddMF} className="space-y-4">
+              {/* Search / Manual Fund Selection */}
+              {!formData.scheme_code ? (
+                <div ref={searchDropdownRef} className="space-y-1.5 relative">
+                  <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">Search Fund Name</label>
+                  <div className="relative">
+                    <input 
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500/60 transition-all placeholder-gray-500 font-medium" 
+                      placeholder="e.g. Parag Parikh Flexi Cap, SBI Bluechip..." 
+                      value={searchQuery || formData.fund_name} 
+                      onChange={e => {
+                        setSearchQuery(e.target.value);
+                        setFormData({...formData, fund_name: e.target.value});
+                        setShowSearchDropdown(true);
+                      }} 
+                      onFocus={() => {
+                        if (searchQuery.length > 2) setShowSearchDropdown(true);
+                      }}
+                    />
+                    {isSearching && (
+                      <div className="absolute right-3.5 top-3">
+                        <svg className="w-4 h-4 animate-spin text-emerald-400" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {showSearchDropdown && searchResults.length > 0 && (
+                    <div className="relative z-[200] mt-2 bg-[#12141c] border border-emerald-500/40 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto custom-scrollbar">
+                      {searchResults.map((res, i) => (
+                        <div 
+                          key={i} 
+                          className="px-3.5 py-2.5 hover:bg-emerald-500/10 cursor-pointer transition-colors border-b border-white/5 last:border-0 flex items-center justify-between gap-3"
+                          onClick={async () => {
+                            const derivedAmc = res.schemeName.trim().split(" ")[0];
+                            setFormData({
+                              ...formData, 
+                              fund_name: res.schemeName, 
+                              scheme_code: res.schemeCode,
+                              amc_name: derivedAmc
+                            });
+                            setSearchQuery("");
+                            setShowSearchDropdown(false);
+                            if (res.schemeCode) {
+                              const liveData = await fetchLiveMFNAV(res.schemeCode);
+                              if (liveData) {
+                                setFormData(prev => ({
+                                  ...prev, 
+                                  current_nav: liveData.nav.toString(),
+                                  nav: prev.nav ? prev.nav : liveData.nav.toString()
+                                }));
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <AMCAvatar amcName="" fundName={res.schemeName} />
+                            <span className="text-xs font-bold text-white truncate">{res.schemeName}</span>
+                          </div>
+                          <span className="text-[0.625rem] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded shrink-0 border border-emerald-500/20">{res.schemeCode}</span>
+                        </div>
+                      ))}
+                      {formData.fund_name.trim().length > 0 && (
+                        <div 
+                          className="px-3.5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 cursor-pointer transition-colors border-t border-emerald-500/30 flex items-center justify-between"
+                          onClick={() => {
+                            setShowSearchDropdown(false);
+                            if (!formData.scheme_code) {
+                              setFormData(prev => ({ ...prev, scheme_code: "MANUAL-" + Date.now() }));
+                            }
+                          }}
+                        >
+                          <span className="text-xs font-black text-white uppercase tracking-wider">Use &quot;{formData.fund_name}&quot; Manually</span>
+                          <span className="text-[0.625rem] bg-emerald-500 text-white px-2 py-0.5 rounded font-black">✓ SELECT</span>
                         </div>
                       )}
                     </div>
-
-                    {showSearchDropdown && (
-                      <div className="absolute z-[120] left-0 right-0 top-[100%] mt-1 bg-[#181A20] border border-[#FF5722]/40 rounded-xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
-                        {searchResults.map((res, i) => (
-                          <div 
-                            key={i} 
-                            className="px-3.5 py-2.5 hover:bg-[#FF5722]/10 cursor-pointer transition-colors border-b border-white/5 last:border-0 flex items-center justify-between gap-3"
-                            onClick={async () => {
-                              const derivedAmc = res.schemeName.trim().split(" ")[0];
-                              setFormData({
-                                ...formData, 
-                                fund_name: res.schemeName, 
-                                scheme_code: res.schemeCode,
-                                amc_name: derivedAmc
-                              });
-                              setSearchQuery("");
-                              setShowSearchDropdown(false);
-                              if (res.schemeCode) {
-                                const liveData = await fetchLiveMFNAV(res.schemeCode);
-                                if (liveData) {
-                                  setFormData(prev => ({
-                                    ...prev, 
-                                    current_nav: liveData.nav.toString(),
-                                    nav: prev.nav ? prev.nav : liveData.nav.toString()
-                                  }));
-                                }
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <AMCAvatar amcName="" fundName={res.schemeName} />
-                              <span className="text-xs font-bold text-white truncate">{res.schemeName}</span>
-                            </div>
-                            <span className="text-[0.625rem] font-bold text-[#FF5722] bg-[#FF5722]/10 px-1.5 py-0.5 rounded shrink-0">{res.schemeCode}</span>
-                          </div>
-                        ))}
-                        {formData.fund_name.trim().length > 0 && (
-                          <div 
-                            className="px-3.5 py-2.5 bg-[#FF5722]/20 hover:bg-[#FF5722]/30 cursor-pointer transition-colors border-t border-[#FF5722]/30 flex items-center justify-between"
-                            onClick={() => {
-                              setShowSearchDropdown(false);
-                              if (!formData.scheme_code) {
-                                setFormData(prev => ({ ...prev, scheme_code: "MANUAL-" + Date.now() }));
-                              }
-                            }}
-                          >
-                            <span className="text-xs font-black text-white uppercase tracking-wider">Use &quot;{formData.fund_name}&quot; Manually</span>
-                            <span className="text-[0.625rem] bg-[#FF5722] text-white px-2 py-0.5 rounded font-black">✓ SELECT</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Selected Fund Card with AMC Logo */
-                  <div className="bg-[#181A20] border border-[#FF5722]/30 p-3.5 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name} />
-                      <div>
-                        <p className="text-xs font-bold text-white">{formData.fund_name}</p>
-                        <p className="text-[0.6875rem] text-[#FF5722] font-semibold">Scheme Code: {formData.scheme_code}</p>
-                      </div>
-                    </div>
-                    {!editingId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, scheme_code: "", fund_name: "" }));
-                        }}
-                        className="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white px-2 py-1 rounded transition-all font-bold"
-                      >
-                        Change Fund
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Hidden auto-fetched field */}
-                <input type="hidden" value={formData.current_nav} />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Units</label>
-                    <input 
-                      required 
-                      type="number" 
-                      step="any" 
-                      className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                      value={formData.units} 
-                      onChange={e => setFormData({...formData, units: e.target.value})} 
-                      inputMode="decimal" 
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                      {formData.trade_type === 'buy' ? 'Purchase NAV' : 'Redemption NAV'}
-                    </label>
-                    <input 
-                      required 
-                      type="number" 
-                      step="any" 
-                      className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                      value={formData.nav} 
-                      onChange={e => setFormData({...formData, nav: e.target.value})} 
-                      inputMode="decimal" 
-                    />
-                  </div>
+                  )}
                 </div>
+              ) : (
+                /* Selected Fund Card with AMC Logo */
+                <div className="bg-white/[0.03] border border-emerald-500/30 p-3.5 rounded-xl flex items-center justify-between shadow-md">
+                  <div className="flex items-center gap-3">
+                    <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name} />
+                    <div>
+                      <p className="text-xs font-black text-white">{formData.fund_name}</p>
+                      <p className="text-[0.6875rem] text-emerald-400 font-bold mt-0.5">Scheme Code: {formData.scheme_code}</p>
+                    </div>
+                  </div>
+                  {!editingId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, scheme_code: "", fund_name: "" }));
+                      }}
+                      className="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white px-2.5 py-1 rounded-lg transition-all font-bold cursor-pointer"
+                    >
+                      Change Fund
+                    </button>
+                  )}
+                </div>
+              )}
 
+              {/* Hidden auto-fetched field */}
+              <input type="hidden" value={formData.current_nav} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">Units</label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="any" 
+                    placeholder="0.0000"
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-emerald-500/60 transition-all font-mono" 
+                    value={formData.units} 
+                    onChange={e => setFormData({...formData, units: e.target.value})} 
+                    inputMode="decimal" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">
+                    {formData.trade_type === 'buy' ? 'Purchase NAV (₹)' : 'Redemption NAV (₹)'}
+                  </label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="any" 
+                    placeholder="0.0000"
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-emerald-500/60 transition-all font-mono" 
+                    value={formData.nav} 
+                    onChange={e => setFormData({...formData, nav: e.target.value})} 
+                    inputMode="decimal" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">Category</label>
+                  <select 
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-emerald-500/60 transition-all" 
+                    value={formData.category} 
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                  >
+                    <option value="Equity" className="bg-[#181A20] text-white">Equity</option>
+                    <option value="Debt" className="bg-[#181A20] text-white">Debt</option>
+                    <option value="Hybrid" className="bg-[#181A20] text-white">Hybrid</option>
+                    <option value="Liquid" className="bg-[#181A20] text-white">Liquid</option>
+                    <option value="Index" className="bg-[#181A20] text-white">Index</option>
+                    <option value="ELSS" className="bg-[#181A20] text-white">ELSS</option>
+                  </select>
+                </div>
+              </div>
+
+              {!editingId && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Category</label>
+                    <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">Date</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-emerald-500/60 transition-all" 
+                      value={formData.date} 
+                      onChange={e => setFormData({...formData, date: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-[--text-muted] uppercase tracking-wider">
+                      {formData.trade_type === 'buy' ? 'Deduct From' : 'Deposit To'}
+                    </label>
                     <select 
-                      className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                      value={formData.category} 
-                      onChange={e => setFormData({...formData, category: e.target.value})}
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-emerald-500/60 transition-all" 
+                      value={formData.account_id} 
+                      onChange={e => setFormData({...formData, account_id: e.target.value})}
                     >
-                      <option value="Equity">Equity</option>
-                      <option value="Debt">Debt</option>
-                      <option value="Hybrid">Hybrid</option>
-                      <option value="Liquid">Liquid</option>
-                      <option value="Index">Index</option>
-                      <option value="ELSS">ELSS</option>
+                      <option value="" disabled className="bg-[#181A20] text-white font-medium">Select Account</option>
+                      {accounts.map(acc => (
+                        <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">{acc.name} (₹{acc.balance.toLocaleString()})</option>
+                      ))}
                     </select>
                   </div>
                 </div>
+              )}
 
-                <details className="group border border-white/5 bg-white/[0.02] rounded-xl overflow-hidden mt-4">
-                  <summary className="text-xs font-bold text-gray-400 p-3 cursor-pointer outline-none hover:text-white transition-colors bg-white/[0.02]">
-                    Advanced Options (AMC, Scheme Code)
-                  </summary>
-                  <div className="p-3 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">AMC/Provider</label>
-                      <input 
-                        className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                        placeholder="e.g. PPFAS" 
-                        value={formData.amc_name} 
-                        onChange={e => setFormData({...formData, amc_name: e.target.value})} 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Scheme Code</label>
-                      <input 
-                        className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                        placeholder="e.g. 122639" 
-                        value={formData.scheme_code} 
-                        onChange={e => setFormData({...formData, scheme_code: e.target.value})} 
-                      />
-                    </div>
+              {/* Direct MF Tax Calculation Details */}
+              {((parseFloat(formData.units) || 0) > 0) && (
+                <div className="bg-white/[0.02] rounded-xl border border-emerald-500/20 p-3.5 flex flex-col gap-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="font-extrabold text-emerald-400 uppercase tracking-wider text-[0.6875rem]">Direct MF Tax Slip</span>
+                    <span className="text-[0.625rem] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase">0% Commission</span>
                   </div>
-                </details>
 
-                {!editingId && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Date</label>
-                        <input 
-                          type="date" 
-                          className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent-primary)]" 
-                          value={formData.date} 
-                          onChange={e => setFormData({...formData, date: e.target.value})} 
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                          {formData.trade_type === 'buy' ? 'Deduct From' : 'Deposit To'}
-                        </label>
-                        <select 
-                          className="w-full bg-[var(--bg-card)] border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-[#FF5722]" 
-                          value={formData.account_id} 
-                          onChange={e => setFormData({...formData, account_id: e.target.value})}
-                        >
-                          <option value="" disabled className="bg-[#181A20] text-white font-medium">Select Account</option>
-                          {accounts.map(acc => (
-                            <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Zerodha Coin Direct MF Tax Calculation Details */}
-                {((parseFloat(formData.units) || 0) > 0) && (
-                  <div className="bg-[#181A20] rounded-xl border border-[#FF5722]/30 p-3.5 flex flex-col gap-2 text-xs mt-4">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                      <span className="font-extrabold text-[#FF5722] uppercase tracking-wider text-[0.6875rem]">Direct MF Tax Slip</span>
-                      <span className="text-[0.625rem] bg-[#FF5722]/20 text-[#FF5722] px-2 py-0.5 rounded font-black uppercase">0% Commission</span>
-                    </div>
+                  {(() => {
+                    const u = parseFloat(formData.units) || 0;
+                    const n = parseFloat(formData.nav) || 0;
+                    const turnover = u * n;
+                    const isBuy = formData.trade_type === "buy";
+                    const calc = calculateMutualFundCharges(turnover, isBuy);
+                    const currentCharges = parseFloat(charges) || 0;
 
-                    {(() => {
-                      const u = parseFloat(formData.units) || 0;
-                      const n = parseFloat(formData.nav) || 0;
-                      const turnover = u * n;
-                      const isBuy = formData.trade_type === "buy";
-                      const calc = calculateMutualFundCharges(turnover, isBuy);
-                      const currentCharges = parseFloat(charges) || 0;
+                    return (
+                      <>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-400">Total Investment Value:</span>
+                          <span className="text-white font-bold">₹{turnover.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[0.6875rem] text-gray-400">
+                          <span>Brokerage:</span>
+                          <span className="text-emerald-400 font-bold">₹0.00 (Direct MF)</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[0.6875rem] text-gray-400">
+                          <span>{isBuy ? "Government Stamp Duty (0.005%)" : "STT Redemption (0.001%)"}:</span>
+                          <span className="text-white font-mono">₹{(isBuy ? calc.stampDuty : calc.stt).toFixed(2)}</span>
+                        </div>
 
-                      return (
-                        <>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-400">Total Investment Value:</span>
-                            <span className="text-white font-bold">₹{turnover.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[0.6875rem] text-gray-400">
-                            <span>Brokerage:</span>
-                            <span className="text-emerald-400 font-bold">₹0.00 (Direct MF)</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[0.6875rem] text-gray-400">
-                            <span>{isBuy ? "Government Stamp Duty (0.005%)" : "STT Redemption (0.001%)"}:</span>
-                            <span className="text-white font-mono">₹{(isBuy ? calc.stampDuty : calc.stt).toFixed(2)}</span>
-                          </div>
-
-                          {/* Prominent Auto-Calculated Total Charges Display & Edit Row */}
-                          <div className="flex justify-between items-center bg-[#252525] px-3.5 py-2.5 rounded-xl border border-[#FF5722]/30 mt-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-200 font-extrabold text-[0.6875rem] uppercase tracking-wider">Total Charges / Stamp Duty:</span>
-                              {!isCustomCharges ? (
-                                <span className="text-[0.5625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-1.5 py-0.5 rounded font-black uppercase tracking-widest">
-                                  Auto-Calculated
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsCustomCharges(false);
-                                    const calcRef = calculateMutualFundCharges(turnover, isBuy);
-                                    setCharges(calcRef.totalCharges.toString());
-                                  }}
-                                  className="text-[0.625rem] text-[#FF5722] hover:underline font-bold"
-                                >
-                                  (Reset)
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-white font-mono font-extrabold text-sm">
-                                ₹{isCustomCharges ? (parseFloat(charges) || 0).toFixed(2) : calc.totalCharges.toFixed(2)}
+                        <div className="flex justify-between items-center bg-white/[0.04] px-3.5 py-2 rounded-xl border border-white/5 mt-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-200 font-extrabold text-[0.6875rem] uppercase tracking-wider">Total Charges / Stamp Duty:</span>
+                            {!isCustomCharges ? (
+                              <span className="text-[0.5625rem] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black uppercase tracking-widest">
+                                Auto-Calculated
                               </span>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (!isCustomCharges) {
-                                    setIsCustomCharges(true);
-                                    setCharges(calc.totalCharges.toString());
-                                  }
+                                  setIsCustomCharges(false);
+                                  const calcRef = calculateMutualFundCharges(turnover, isBuy);
+                                  setCharges(calcRef.totalCharges.toString());
                                 }}
-                                className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
-                                title="Manual Edit Charges"
+                                className="text-[0.625rem] text-emerald-400 hover:underline font-bold"
                               >
-                                ✏️
+                                (Reset)
                               </button>
-                            </div>
+                            )}
                           </div>
-
-                          {isCustomCharges && (
-                            <div className="flex items-center justify-between gap-2 bg-[#181A20] p-2 rounded-lg border border-[#FF5722]/50 animate-fade-in">
-                              <span className="text-[0.6875rem] text-gray-400 font-semibold">Custom Manual Charges (₹):</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={charges}
-                                onChange={(e) => {
-                                  setIsCustomCharges(true);
-                                  setCharges(e.target.value);
-                                }}
-                                className="w-28 bg-[#252525] border border-[#FF5722] rounded px-2.5 py-1 text-xs text-white font-mono font-bold outline-none text-right"
-                                placeholder="0.00"
-                              />
-                            </div>
-                          )}
-                          <div className="flex justify-between items-center pt-2 border-t border-white/10 font-black text-xs">
-                            <span className="text-white">Estimated Net {isBuy ? 'Outflow' : 'Inflow'}:</span>
-                            <span className={isBuy ? 'text-[#FF5722]' : 'text-emerald-400'}>
-                              ₹{(isBuy ? turnover + currentCharges : turnover - currentCharges).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-mono font-extrabold text-sm">
+                              ₹{isCustomCharges ? (parseFloat(charges) || 0).toFixed(2) : calc.totalCharges.toFixed(2)}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!isCustomCharges) {
+                                  setIsCustomCharges(true);
+                                  setCharges(calc.totalCharges.toString());
+                                }
+                              }}
+                              className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
+                              title="Manual Edit Charges"
+                            >
+                              ✏️
+                            </button>
                           </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                        </div>
 
-                {/* Modal actions */}
-                <div className="flex gap-3 pt-2">
-                  <button 
-                    type="submit" 
-                    disabled={submitting} 
-                    className={`flex-1 py-2 rounded text-xs font-bold transition-all text-white shadow-md active:scale-[0.98] ${
-                      editingId ? "bg-indigo-600 hover:bg-indigo-700" :
-                      formData.trade_type === 'sell' ? "bg-[#ff5722] hover:bg-[#e64a19]" : "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
-                    }`}
-                  >
-                    {submitting ? "Processing..." : (editingId ? "Modify" : formData.trade_type === 'buy' ? "Invest Now" : "Redeem Now")}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => { setShowAddModal(false); setEditingId(null); }} 
-                    className="px-4 py-2 rounded text-xs font-bold bg-[#333] hover:bg-[#444] text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
+                        {isCustomCharges && (
+                          <div className="flex items-center justify-between gap-2 bg-[#181A20] p-2 rounded-lg border border-emerald-500/50 animate-fade-in">
+                            <span className="text-[0.6875rem] text-gray-400 font-semibold">Custom Manual Charges (₹):</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={charges}
+                              onChange={(e) => {
+                                setIsCustomCharges(true);
+                                setCharges(e.target.value);
+                              }}
+                              className="w-28 bg-[#252525] border border-emerald-500 rounded px-2.5 py-1 text-xs text-white font-mono font-bold outline-none text-right"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center pt-2 border-t border-white/10 font-black text-xs">
+                          <span className="text-white">Estimated Net {isBuy ? 'Outflow' : 'Inflow'}:</span>
+                          <span className={isBuy ? 'text-emerald-400' : 'text-emerald-400'}>
+                            ₹{(isBuy ? turnover + currentCharges : turnover - currentCharges).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
-              </form>
-            </div>
+              )}
+
+              {/* Modal actions */}
+              <div className="flex gap-3 pt-3">
+                <button 
+                  type="button" 
+                  onClick={() => { setShowAddModal(false); setEditingId(null); setSearchQuery(""); setShowSearchDropdown(false); }} 
+                  className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer border border-white/10"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={submitting} 
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-white shadow-lg cursor-pointer ${
+                    editingId ? "bg-indigo-600 hover:bg-indigo-700" :
+                    formData.trade_type === 'sell' ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-500 hover:bg-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                  }`}
+                >
+                  {submitting ? "Processing..." : (editingId ? "Modify Investment" : formData.trade_type === 'buy' ? "Invest Now" : "Redeem Now")}
+                </button>
+              </div>
+            </form>
           </div>
         </Drawer>
       )}

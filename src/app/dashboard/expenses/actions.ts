@@ -197,3 +197,167 @@ export async function cleanupCorruptedPDFDescriptions() {
     return { error: getFriendlyErrorMessage(err) };
   }
 }
+
+export async function updateExpense(formData: {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  account_id?: string;
+}) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+
+    if (!formData.id) {
+      return { error: "Expense ID is required for editing" };
+    }
+    if (!formData.description || formData.description.trim().length === 0) {
+      return { error: "Description is required" };
+    }
+    if (!formData.amount || formData.amount <= 0 || !Number.isFinite(formData.amount)) {
+      return { error: "Amount must be a positive number" };
+    }
+    if (!formData.category || formData.category.trim().length === 0) {
+      return { error: "Category is required" };
+    }
+    if (!formData.date) {
+      return { error: "Date is required" };
+    }
+
+    const { data: oldExpense, error: fetchErr } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("id", formData.id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchErr || !oldExpense) {
+      return { error: "Expense record not found" };
+    }
+
+    const cleanDate = parseToISODate(formData.date);
+    const oldAccountId = oldExpense.account_id;
+    const newAccountId = formData.account_id || null;
+    const oldAmount = Number(oldExpense.amount);
+    const newAmount = Number(formData.amount);
+
+    if (oldAccountId !== newAccountId || oldAmount !== newAmount) {
+      if (oldAccountId) {
+        const { data: oldAcc } = await supabase
+          .from("accounts")
+          .select("balance")
+          .eq("id", oldAccountId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (oldAcc) {
+          await supabase
+            .from("accounts")
+            .update({ balance: oldAcc.balance + oldAmount })
+            .eq("id", oldAccountId)
+            .eq("user_id", user.id);
+        }
+      }
+
+      if (newAccountId) {
+        const { data: newAcc } = await supabase
+          .from("accounts")
+          .select("balance, name")
+          .eq("id", newAccountId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (!newAcc) {
+          return { error: "Target account not found" };
+        }
+
+        if (newAcc.balance < newAmount) {
+          if (oldAccountId) {
+            const { data: oldAcc } = await supabase
+              .from("accounts")
+              .select("balance")
+              .eq("id", oldAccountId)
+              .eq("user_id", user.id)
+              .single();
+            if (oldAcc) {
+              await supabase
+                .from("accounts")
+                .update({ balance: oldAcc.balance - oldAmount })
+                .eq("id", oldAccountId)
+                .eq("user_id", user.id);
+            }
+          }
+          return { error: `Insufficient balance in ${newAcc.name}` };
+        }
+
+        await supabase
+          .from("accounts")
+          .update({ balance: newAcc.balance - newAmount })
+          .eq("id", newAccountId)
+          .eq("user_id", user.id);
+      }
+    }
+
+    const { error: updateErr } = await supabase
+      .from("expenses")
+      .update({
+        description: formData.description.trim(),
+        amount: newAmount,
+        category: formData.category,
+        date: cleanDate,
+        account_id: newAccountId,
+      })
+      .eq("id", formData.id)
+      .eq("user_id", user.id);
+
+    if (updateErr) {
+      console.error("Error updating expense:", updateErr);
+      return { error: updateErr.message };
+    }
+
+    const { data: logs } = await supabase
+      .from("ledger_logs")
+      .select("id")
+      .eq("source_id", formData.id)
+      .eq("source_type", "expense")
+      .eq("user_id", user.id);
+
+    if (logs && logs.length > 0) {
+      let accName = "Cash";
+      if (newAccountId) {
+        const { data: acc } = await supabase
+          .from("accounts")
+          .select("name")
+          .eq("id", newAccountId)
+          .single();
+        if (acc) accName = acc.name;
+      }
+      await supabase
+        .from("ledger_logs")
+        .update({
+          account_id: newAccountId,
+          account_name: accName,
+          amount: newAmount,
+          details: `Expense: ${formData.description.trim()} (${formData.category})`,
+        })
+        .eq("id", logs[0].id)
+        .eq("user_id", user.id);
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/expenses");
+    revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/ledger");
+
+    return { success: true, message: "Expense updated successfully" };
+  } catch (err) {
+    console.error("Error in updateExpense:", err);
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}

@@ -36,9 +36,9 @@ export default function StocksHistoryTable({ trades }: StocksHistoryTableProps) 
     () => [
       columnHelper.accessor("trade_date", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center gap-1 hover:text-[--text-primary] transition-colors">
-            Date
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer">
+            <span>Date</span>
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
           </button>
         ),
         cell: (info) => <div className="text-sm text-[--text-secondary] whitespace-nowrap">{formatDate(info.getValue() || info.row.original.created_at || "")}</div>,
@@ -52,69 +52,71 @@ export default function StocksHistoryTable({ trades }: StocksHistoryTableProps) 
         ),
       }),
       columnHelper.accessor("trade_type", {
-        header: "Type",
+        header: () => <div className="text-center w-full">Type</div>,
         cell: (info) => {
           const type = info.getValue().toUpperCase();
           const isBuy = type === "BUY";
           return (
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isBuy ? 'bg-blue-500/10 text-blue-500' : 'bg-rose-500/10 text-rose-500'}`}>
-              {type}
-            </span>
+            <div className="flex justify-center">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isBuy ? 'bg-blue-500/10 text-blue-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                {type}
+              </span>
+            </div>
           );
         },
       }),
       columnHelper.accessor("quantity", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Qty.
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Qty.</span>
           </button>
         ),
-        cell: (info) => <div className="text-right text-sm text-[--text-secondary]">{Number(info.getValue()).toString()}</div>,
+        cell: (info) => <div className="text-right text-sm text-[--text-secondary] font-medium">{Number(info.getValue()).toString()}</div>,
       }),
       columnHelper.accessor("price", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Price
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Price</span>
           </button>
         ),
-        cell: (info) => <div className="text-right text-sm text-[--text-secondary]">{formatMoney(Number(info.getValue()))}</div>,
+        cell: (info) => <div className="text-right text-sm text-[--text-secondary] font-medium">{formatMoney(Number(info.getValue()))}</div>,
       }),
       columnHelper.accessor("total_amount", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Total Value
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Total Value</span>
           </button>
         ),
-        cell: (info) => <div className="text-right text-sm text-[--text-secondary]">{formatMoney(Number(info.getValue()))}</div>,
+        cell: (info) => <div className="text-right text-sm text-[--text-secondary] font-medium">{formatMoney(Number(info.getValue()))}</div>,
       }),
       columnHelper.accessor("charges", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Charges
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Charges</span>
           </button>
         ),
         cell: (info) => {
           const val = info.getValue();
-          return <div className="text-right text-sm text-[--text-secondary]">{val !== null && val !== undefined ? formatMoney(Number(val)) : "—"}</div>;
+          return <div className="text-right text-sm text-[--text-secondary] font-medium">{val !== null && val !== undefined ? formatMoney(Number(val)) : "—"}</div>;
         },
       }),
       columnHelper.accessor("realized_pnl", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Realized P&L
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Realized P&L</span>
           </button>
         ),
         cell: (info) => {
           const val = info.getValue();
-          if (val === null || val === undefined) return <div className="text-right text-sm text-[--text-muted]">-</div>;
+          if (val === null || val === undefined) return <div className="text-right text-sm text-[--text-muted] font-medium">-</div>;
           const isPositive = val >= 0;
           return (
-            <div className={`text-right text-sm ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <div className={`text-right text-sm font-medium ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
               {isPositive ? '+' : ''}{formatMoney(val)}
             </div>
           );

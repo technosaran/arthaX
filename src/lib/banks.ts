@@ -123,20 +123,76 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   kotak: "kotak.com",
   "kotak bank": "kotak.com",
   "kotak mahindra": "kotak.com",
+  "kotak mahindra bank": "kotak.com",
   pnb: "pnbindia.in",
+  "punjab national bank": "pnbindia.in",
   bob: "bankofbaroda.in",
   baroda: "bankofbaroda.in",
+  "bank of baroda": "bankofbaroda.in",
   canara: "canarabank.com",
+  "canara bank": "canarabank.com",
   union: "unionbankofindia.co.in",
+  "union bank": "unionbankofindia.co.in",
+  "union bank of india": "unionbankofindia.co.in",
   boi: "bankofindia.co.in",
+  "bank of india": "bankofindia.co.in",
   indianbank: "indianbank.in",
+  "indian bank": "indianbank.in",
+  cbi: "centralbankofindia.co.in",
+  "central bank": "centralbankofindia.co.in",
+  "central bank of india": "centralbankofindia.co.in",
+  iob: "iob.in",
+  "indian overseas bank": "iob.in",
+  uco: "ucobank.com",
+  "uco bank": "ucobank.com",
+  bom: "bankofmaharashtra.in",
+  "bank of maharashtra": "bankofmaharashtra.in",
+  psb: "punjabandsindbank.co.in",
+  "punjab & sind bank": "punjabandsindbank.co.in",
   idfc: "idfcfirstbank.com",
   "idfc first": "idfcfirstbank.com",
   "idfc bank": "idfcfirstbank.com",
+  "idfc first bank": "idfcfirstbank.com",
   indusind: "indusind.com",
+  "indusind bank": "indusind.com",
   yes: "yesbank.in",
+  "yes bank": "yesbank.in",
   federal: "federalbank.co.in",
+  "federal bank": "federalbank.co.in",
   rbl: "rblbank.com",
+  "rbl bank": "rblbank.com",
+  sib: "southindianbank.com",
+  "south indian bank": "southindianbank.com",
+  karnataka: "karnatakabank.com",
+  "karnataka bank": "karnatakabank.com",
+  kvb: "kvb.co.in",
+  "karur vysya bank": "kvb.co.in",
+  bandhan: "bandhanbank.com",
+  "bandhan bank": "bandhanbank.com",
+  idbi: "idbibank.in",
+  "idbi bank": "idbibank.in",
+  cub: "cityunionbank.com",
+  "city union bank": "cityunionbank.com",
+  dcb: "dcbbank.com",
+  "dcb bank": "dcbbank.com",
+  tmb: "tmb.in",
+  "tamilnad mercantile bank": "tmb.in",
+  au: "aubank.in",
+  "au bank": "aubank.in",
+  "au small finance bank": "aubank.in",
+  equitas: "equitasbank.com",
+  "equitas small finance bank": "equitasbank.com",
+  ujjivan: "ujjivansfb.in",
+  "ujjivan small finance bank": "ujjivansfb.in",
+  hsbc: "hsbc.co.in",
+  "hsbc bank": "hsbc.co.in",
+  "hsbc india": "hsbc.co.in",
+  "standard chartered": "sc.com",
+  citi: "citibank.co.in",
+  citibank: "citibank.co.in",
+  "citibank india": "citibank.co.in",
+  dbs: "dbs.com",
+  "dbs bank": "dbs.com",
   chase: "chase.com",
   bofa: "bankofamerica.com",
   "bank of america": "bankofamerica.com",
@@ -167,13 +223,85 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
 import { getFastLogoCandidateUrls } from "./logo-cache";
 
 const HD_BANK_LOGOS: Record<string, string[]> = {
-  "ippbonline.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/e/e0/India_Post_Payments_Bank_logo.svg",
-    "https://logo.clearbit.com/ippbonline.com?size=512",
-  ],
   "sbi.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/c/cc/State_Bank_of_India_logo.svg",
     "https://logo.clearbit.com/sbi.co.in?size=512",
+  ],
+  "indianbank.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/e/ea/Indian_Bank_logo.svg",
+    "https://logo.clearbit.com/indianbank.in?size=512",
+  ],
+  "bankofindia.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/6/69/Bank_of_India_logo.svg",
+    "https://logo.clearbit.com/bankofindia.co.in?size=512",
+  ],
+  "rblbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/a2/RBL_Bank_logo.svg",
+    "https://logo.clearbit.com/rblbank.com?size=512",
+  ],
+  "centralbankofindia.co.in": [
+    "https://upload.wikimedia.org/wikipedia/en/e/e6/Central_Bank_of_India_logo.svg",
+    "https://logo.clearbit.com/centralbankofindia.co.in?size=512",
+  ],
+  "iob.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/ba/Indian_Overseas_Bank_logo.svg",
+    "https://logo.clearbit.com/iob.in?size=512",
+  ],
+  "ucobank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/aa/UCO_Bank_Logo.svg",
+    "https://logo.clearbit.com/ucobank.com?size=512",
+  ],
+  "bankofmaharashtra.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/4/40/Bank_of_Maharashtra_logo.svg",
+    "https://logo.clearbit.com/bankofmaharashtra.in?size=512",
+  ],
+  "punjabandsindbank.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/9/9b/Punjab_%26_Sind_Bank_logo.svg",
+    "https://logo.clearbit.com/punjabandsindbank.co.in?size=512",
+  ],
+  "southindianbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7d/South_Indian_Bank_Logo.svg",
+    "https://logo.clearbit.com/southindianbank.com?size=512",
+  ],
+  "karnatakabank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/b5/Karnataka_Bank_Logo.svg",
+    "https://logo.clearbit.com/karnatakabank.com?size=512",
+  ],
+  "kvb.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/9/90/Karur_Vysya_Bank_logo.svg",
+    "https://logo.clearbit.com/kvb.co.in?size=512",
+  ],
+  "bandhanbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/c/c8/Bandhan_Bank_logo.svg",
+    "https://logo.clearbit.com/bandhanbank.com?size=512",
+  ],
+  "idbibank.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/b5/IDBI_Bank_logo.svg",
+    "https://logo.clearbit.com/idbibank.in?size=512",
+  ],
+  "cityunionbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/14/City_Union_Bank_logo.svg",
+    "https://logo.clearbit.com/cityunionbank.com?size=512",
+  ],
+  "dcbbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/a6/DCB_Bank_logo.svg",
+    "https://logo.clearbit.com/dcbbank.com?size=512",
+  ],
+  "aubank.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/4/46/AU_Small_Finance_Bank_logo.svg",
+    "https://logo.clearbit.com/aubank.in?size=512",
+  ],
+  "equitasbank.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/8/87/Equitas_Small_Finance_Bank_logo.svg",
+    "https://logo.clearbit.com/equitasbank.com?size=512",
+  ],
+  "ujjivansfb.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/0/06/Ujjivan_Small_Finance_Bank_logo.svg",
+    "https://logo.clearbit.com/ujjivansfb.in?size=512",
+  ],
+  "ippbonline.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/e/e0/India_Post_Payments_Bank_logo.svg",
+    "https://logo.clearbit.com/ippbonline.com?size=512",
   ],
   "hdfcbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
@@ -243,6 +371,22 @@ const HD_BANK_LOGOS: Record<string, string[]> = {
     "https://logo.clearbit.com/groww.in?size=512",
     "https://cdn.brandfetch.io/groww.in/w/512/h/512/theme/dark/icon",
   ],
+  "hsbc.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/aa/HSBC_logo_%282018%29.svg",
+    "https://logo.clearbit.com/hsbc.co.in?size=512",
+  ],
+  "sc.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/a0/Standard_Chartered_logo.svg",
+    "https://logo.clearbit.com/sc.com?size=512",
+  ],
+  "citibank.co.in": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/1b/Citibank.svg",
+    "https://logo.clearbit.com/citibank.co.in?size=512",
+  ],
+  "dbs.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/a/a4/DBS_Bank_logo.svg",
+    "https://logo.clearbit.com/dbs.com?size=512",
+  ],
   "chase.com": [
     "https://upload.wikimedia.org/wikipedia/commons/7/7b/Chase_logo_2007.svg",
     "https://logo.clearbit.com/chase.com?size=512",
@@ -281,15 +425,18 @@ export function getBankDomain(bankName: string): string | null {
     return directMatch[1].toLowerCase();
   }
 
-  const normalizedSearch = raw.toLowerCase();
+  const normalizedSearch = raw.toLowerCase().trim();
 
   // 0B. Direct shorthand override
   if (SHORTHAND_DOMAINS[normalizedSearch]) {
     return SHORTHAND_DOMAINS[normalizedSearch];
   }
 
-  // 1. Exact match
-  let bank = BANKS.find((b) => b.name.toLowerCase() === normalizedSearch);
+  // Helper to get clean bank name without parenthetical acronyms (e.g. "State Bank of India (SBI)" -> "state bank of india")
+  const cleanBankName = (bName: string) => bName.replace(/\s*\([^)]*\)/g, "").toLowerCase().trim();
+
+  // 1. Exact match against full name or clean name without parentheticals
+  let bank = BANKS.find((b) => b.name.toLowerCase() === normalizedSearch || cleanBankName(b.name) === normalizedSearch);
   
   // 2. Acronym match (e.g., matching "SBI" in "State Bank of India (SBI)")
   if (!bank) {
@@ -299,33 +446,54 @@ export function getBankDomain(bankName: string): string | null {
     });
   }
 
-  // 3. Match if the search query is contained within the bank name or vice-versa
+  // 3. Exact clean name match
   if (!bank) {
-    bank = BANKS.find((b) => {
-      const name = b.name.toLowerCase();
-      return name.includes(normalizedSearch) || normalizedSearch.includes(name);
-    });
+    bank = BANKS.find((b) => cleanBankName(b.name) === normalizedSearch);
   }
 
   // 4. Token-based word match (e.g. "My SBI Salary" -> matches "sbi" in SHORTHAND_DOMAINS or BANKS)
   if (!bank) {
     const tokens = normalizedSearch.split(/[\s\-_\/]+/);
     for (const token of tokens) {
-      if (SHORTHAND_DOMAINS[token]) {
+      if (token.length >= 2 && SHORTHAND_DOMAINS[token]) {
         return SHORTHAND_DOMAINS[token];
       }
       const matched = BANKS.find((b) => {
-        const bName = b.name.toLowerCase();
-        return bName === token || bName.split(" ")[0].toLowerCase() === token;
+        const clean = cleanBankName(b.name);
+        return clean === token || clean.split(" ")[0] === token;
       });
       if (matched) return matched.domain;
     }
   }
 
+  // 5. Substring match with length closeness sorting to prevent matching "State Bank of India" when query is "Bank of India"
+  if (!bank) {
+    const candidates = BANKS.filter((b) => {
+      const clean = cleanBankName(b.name);
+      return clean.includes(normalizedSearch) || normalizedSearch.includes(clean);
+    });
+
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => {
+        const cleanA = cleanBankName(a.name);
+        const cleanB = cleanBankName(b.name);
+        const diffA = Math.abs(cleanA.length - normalizedSearch.length);
+        const diffB = Math.abs(cleanB.length - normalizedSearch.length);
+        return diffA - diffB;
+      });
+      bank = candidates[0];
+    }
+  }
+
   if (bank) return bank.domain;
 
-  // 5. Fallback candidate (e.g. "Axis Savings" -> "axisbank.com" or "axis.com")
-  const cleanWord = normalizedSearch.replace(/\b(bank|checking|savings|account|wallet|card|primary|personal|business)\b/g, "").trim().split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+  // 6. Fallback candidate (e.g. "Axis Savings" -> "axisbank.com" or "axis.com")
+  const cleanWord = normalizedSearch
+    .replace(/\b(bank|checking|savings|account|wallet|card|primary|personal|business)\b/g, "")
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/[^a-z0-9]/g, "");
+
   if (cleanWord.length >= 3) {
     if (SHORTHAND_DOMAINS[cleanWord]) return SHORTHAND_DOMAINS[cleanWord];
     return `${cleanWord}.com`;
@@ -352,4 +520,5 @@ export function searchBanks(query: string): Bank[] {
   })
   .slice(0, 12);
 }
+
 

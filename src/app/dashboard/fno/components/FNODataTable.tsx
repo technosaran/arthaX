@@ -66,21 +66,21 @@ export default function FNODataTable({ trades, onCloseTrade, onDeleteTrade, onAd
       }),
       columnHelper.accessor("quantity", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Qty.
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Qty.</span>
           </button>
         ),
-        cell: (info) => <div className="text-right text-sm text-[--text-secondary]">{info.getValue()}</div>,
+        cell: (info) => <div className="text-right text-sm text-[--text-secondary] font-medium">{info.getValue()}</div>,
       }),
       columnHelper.accessor("entry_price", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            Avg. price
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>Avg. price</span>
           </button>
         ),
-        cell: (info) => <div className="text-right text-sm text-[--text-secondary]">{formatMoney(Number(info.getValue()))}</div>,
+        cell: (info) => <div className="text-right text-sm text-[--text-secondary] font-medium">{formatMoney(Number(info.getValue()))}</div>,
       }),
       columnHelper.display({
         id: "ltp_or_exit",
@@ -89,17 +89,17 @@ export default function FNODataTable({ trades, onCloseTrade, onDeleteTrade, onAd
           const trade = info.row.original;
           if (trade.status === 'OPEN') {
             const price = livePrices?.[trade.symbol]?.price;
-            return <div className="text-right text-sm text-[--text-secondary]">{price ? `₹${formatMoney(price)}` : "—"}</div>;
+            return <div className="text-right text-sm text-[--text-secondary] font-medium">{price ? `₹${formatMoney(price)}` : "—"}</div>;
           } else {
-            return <div className="text-right text-sm text-[--text-secondary]">{trade.exit_price ? `₹${formatMoney(Number(trade.exit_price))}` : "—"}</div>;
+            return <div className="text-right text-sm text-[--text-secondary] font-medium">{trade.exit_price ? `₹${formatMoney(Number(trade.exit_price))}` : "—"}</div>;
           }
         }
       }),
       columnHelper.accessor("pnl", {
         header: ({ column }) => (
-          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="flex items-center justify-end w-full gap-1 hover:text-[--text-primary] transition-colors">
-            P&L
-            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="inline-flex items-center justify-end w-full gap-1.5 hover:text-[--text-primary] transition-colors cursor-pointer text-right">
+            {column.getIsSorted() === "asc" ? <ArrowUp className="w-3 h-3 text-cyan-400" /> : column.getIsSorted() === "desc" ? <ArrowDown className="w-3 h-3 text-cyan-400" /> : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+            <span>P&L</span>
           </button>
         ),
         cell: (info) => {
