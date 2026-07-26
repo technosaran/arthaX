@@ -37,6 +37,13 @@ export async function GET(req: NextRequest) {
       logger.info("Executing Gemini migration SQL...");
       await client.query(sql2);
     }
+
+    const geminiTelegramCtxPath = path.join(process.cwd(), "supabase", "migrations", "20260726000000_add_gemini_key_to_telegram_context.sql");
+    if (fs.existsSync(geminiTelegramCtxPath)) {
+      const sql3 = fs.readFileSync(geminiTelegramCtxPath, "utf8");
+      logger.info("Executing Gemini Telegram context migration SQL...");
+      await client.query(sql3);
+    }
     
     logger.info("Reloading PostgREST schema cache...");
     await client.query("NOTIFY pgrst, 'reload schema';");
