@@ -98,6 +98,12 @@ const BANK_BRANDS: Record<string, { abbr: string; bg: string; fg: string }> = {
   "chase":                       { abbr: "CHASE", bg: "#005ea6", fg: "#ffffff" },
   "bank of america":             { abbr: "BOFA",  bg: "#d4001a", fg: "#ffffff" },
   "wells fargo":                 { abbr: "WF",    bg: "#cd1409", fg: "#ffff00" },
+  "savings":                     { abbr: "🏦",    bg: "#059669", fg: "#ffffff" },
+  "savings 2":                   { abbr: "🏦",    bg: "#0d9488", fg: "#ffffff" },
+  "checking":                    { abbr: "💳",    bg: "#4f46e5", fg: "#ffffff" },
+  "cash":                        { abbr: "💵",    bg: "#15803d", fg: "#ffffff" },
+  "cash reserve":                { abbr: "💵",    bg: "#15803d", fg: "#ffffff" },
+  "salary":                      { abbr: "💼",    bg: "#2563eb", fg: "#ffffff" },
   "capital one":                 { abbr: "CAP1",  bg: "#004977", fg: "#ffffff" },
   "wise":                        { abbr: "WISE",  bg: "#9fe870", fg: "#2e008b" },
   "revolut":                     { abbr: "REV",   bg: "#000000", fg: "#ffffff" },
@@ -168,8 +174,7 @@ function resolveBankBrand(queryName: string, domain?: string | null): { abbr: st
 }
 
 /**
- * Build a list of real logo image URLs from free, no-API-key logo services.
- * Tries multiple CDNs in priority order for maximum coverage.
+ * Build a list of real logo image URLs from fast, high-reliability logo CDNs.
  */
 function getLogoSources(queryName: string): string[] {
   const domain = getBankDomain(queryName);
@@ -177,12 +182,10 @@ function getLogoSources(queryName: string): string[] {
 
   const hdCandidateUrls = getBankLogoUrls(domain);
   const fallbacks = [
-    `https://icon.horse/icon/${domain}`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
     `https://cdn.brandfetch.io/${domain}/w/512/h/512/theme/dark/icon`,
     `https://unavatar.io/${domain}?fallback=false`,
-    `https://logo.uplead.com/${domain}`,
-    `https://logos.hunter.io/${domain}`,
+    `https://logo.clearbit.com/${domain}?size=512`,
   ];
 
   return Array.from(new Set([...hdCandidateUrls, ...fallbacks]));

@@ -118,7 +118,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const payMode = !account ? "Cash Reserve" : account.type === "cash" ? "Cash Reserve" : account.type === "credit" ? "Credit Line" : "Bank Transfer / UPI";
           return (
             <div className="flex items-center gap-2.5">
-              <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={32} />
+              <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={32} />
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[--text-primary] truncate">{account?.name || "Cash Reserve"}</span>
                 <span className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider">{payMode}</span>
