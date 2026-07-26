@@ -525,7 +525,7 @@ export async function POST(req: NextRequest) {
       // Fallback direct reads
       const { data: profData, error: profError } = await supabase
         .from("profiles")
-        .select("id, sms_sync_token, default_accounts, username, base_currency")
+        .select("id, sms_sync_token, default_accounts, username, base_currency, gemini_api_key, gemini_enabled")
         .eq("telegram_chat_id", String(chatId))
         .maybeSingle();
 
