@@ -561,7 +561,9 @@ export async function POST(req: NextRequest) {
     const cleanRaw = rawText.trim().toLowerCase();
     const isGreeting = /^(hi|hello|hey|hlo|hy|hola|yo|sup|\/start|start|good\s*morning|good\s*evening|good\s*afternoon|who\s*are\s*you|\/menu|\/help|menu|help)$/i.test(cleanRaw);
 
-    if (isGreeting) {
+    // Only show static greeting if AI is NOT available — otherwise let AI handle it
+    const hasGeminiKey = !!getGeminiApiKeyForProfile(profile);
+    if (isGreeting && !hasGeminiKey) {
       const userName = profile.username || profile.full_name || "there";
       const greetingMsg = `👋 *Hello ${userName}!* Welcome to your *AI Wealth & Financial Terminal*.\n\n` +
         `You can perform *all web dashboard actions* directly here in Telegram:\n\n` +
@@ -636,6 +638,100 @@ export async function POST(req: NextRequest) {
           // 2. Autonomous FINANCIAL_QUERY
           if (decision.action === "FINANCIAL_QUERY" && decision.replyMessage) {
             await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`, MAIN_MENU_KEYBOARD);
+            return NextResponse.json({ success: true });
+          }
+
+          // 3. Autonomous DELETE_ACCOUNT
+          if (decision.action === "DELETE_ACCOUNT") {
+            const targetName = (decision.accountName || "").toLowerCase().trim();
+            if (targetName && accounts.length > 0) {
+              // Fuzzy match against existing accounts
+              const matchedAccount = accounts.find((a: any) => {
+                const aName = (a.name || "").toLowerCase().trim();
+                const aBankName = (a.bank_name || "").toLowerCase().trim();
+                return aName === targetName || aBankName === targetName ||
+                  aName.includes(targetName) || targetName.includes(aName) ||
+                  aBankName.includes(targetName) || targetName.includes(aBankName);
+              });
+
+              if (matchedAccount) {
+                const balance = parseFloat(matchedAccount.balance) || 0;
+                const { error: delErr } = await supabase
+                  .from("accounts")
+                  .delete()
+                  .eq("id", matchedAccount.id)
+                  .eq("user_id", profile.id);
+
+                if (!delErr) {
+                  // Log to audit trail
+                  await supabase.from("audit_logs").insert({
+                    user_id: profile.id,
+                    action: "DELETE",
+                    entity_type: "account",
+                    entity_id: matchedAccount.id,
+                    entity_name: matchedAccount.name,
+                    amount: balance,
+                    details: `Deleted account: ${matchedAccount.name}`,
+                  }).then(() => {});
+
+                  await sendTelegramMessage(
+                    chatId,
+                    `🤖 *AI Decision*: Account Deleted!\n\n` +
+                    `• *Account*: ${matchedAccount.name}\n` +
+                    `• *Balance was*: ₹${balance.toLocaleString("en-IN")}\n` +
+                    `• *Reasoning*: ${decision.reasoning || "User requested account deletion."}\n\n` +
+                    `⚡ *Status*: Synced with dashboard.`,
+                    MAIN_MENU_KEYBOARD
+                  );
+                  return NextResponse.json({ success: true });
+                }
+              } else {
+                await sendTelegramMessage(
+                  chatId,
+                  `❌ *Account not found*: Could not find an account matching "${decision.accountName}".\n\nYour accounts: ${accounts.map((a: any) => a.name).join(", ")}`,
+                  MAIN_MENU_KEYBOARD
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 4. Autonomous ADD_FAMILY_MEMBER
+          if (decision.action === "ADD_FAMILY_MEMBER") {
+            const memberName = (decision.familyMemberName || "").trim();
+            if (memberName) {
+              const relationship = decision.familyRelationship || "Other";
+              const { error: famErr } = await supabase
+                .from("family_members")
+                .insert({
+                  user_id: profile.id,
+                  name: memberName.charAt(0).toUpperCase() + memberName.slice(1),
+                  relationship: relationship,
+                  balance: 0,
+                });
+
+              if (!famErr) {
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Family Member Added!\n\n` +
+                  `• *Name*: ${memberName.charAt(0).toUpperCase() + memberName.slice(1)}\n` +
+                  `• *Relationship*: ${relationship}\n` +
+                  `• *Balance*: ₹0\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`,
+                  MAIN_MENU_KEYBOARD
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 5. Autonomous GREETING — AI-powered welcome
+          if (decision.action === "GREETING") {
+            const userName = profile.username || profile.full_name || "there";
+            const aiGreeting = decision.replyMessage || `Hey ${userName}! 👋`;
+            const greetingMsg = `${aiGreeting}\n\n` +
+              `💡 *Quick Actions*: Send \`/balance\`, \`/summary\`, or just ask me anything in natural language!`;
+            await sendTelegramMessage(chatId, greetingMsg, MAIN_MENU_KEYBOARD);
             return NextResponse.json({ success: true });
           }
         }
