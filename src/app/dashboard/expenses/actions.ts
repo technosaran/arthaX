@@ -24,7 +24,6 @@ export async function addExpense(formData: {
       return { error: "Not authenticated" };
     }
 
-    // Input validation
     if (!formData.description || formData.description.trim().length === 0) {
       return { error: "Description is required" };
     }
@@ -40,9 +39,6 @@ export async function addExpense(formData: {
 
     const cleanDate = parseToISODate(formData.date);
 
-    // Call the atomic RPC function
-    // This ensures that balance deduction, ledger logging, and expense recording
-    // all happen or all fail (transactional integrity).
     const { data, error } = await supabase.rpc("record_expense", {
       p_user_id: user.id,
       p_description: formData.description,
@@ -65,7 +61,6 @@ export async function addExpense(formData: {
       return { error: result.error || "Failed to process transaction" };
     }
 
-    // If marked as recurring, perform secondary update
     if (result.success && formData.is_recurring && result.expense_id) {
       const { error: updateErr } = await supabase
         .from("expenses")
@@ -81,7 +76,6 @@ export async function addExpense(formData: {
       }
     }
 
-    // Global revalidation
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/expenses");
     revalidatePath("/dashboard/accounts");
@@ -103,7 +97,6 @@ export async function deleteExpense(id: string) {
       return { error: "Not authenticated" };
     }
 
-    // 1. Find the associated ledger log for this expense
     const { data: logs, error: logErr } = await supabase
       .from("ledger_logs")
       .select("id")
@@ -116,7 +109,6 @@ export async function deleteExpense(id: string) {
       console.error("Error checking ledger logs for expense deletion:", logErr);
     }
 
-    // 2. If a ledger log is found, revert it (this also deletes the expense atomically)
     if (logs && logs.length > 0) {
       const { data: rpcRes, error: rpcErr } = await supabase.rpc("revert_ledger_log", {
         p_log_id: logs[0].id,
@@ -136,7 +128,6 @@ export async function deleteExpense(id: string) {
         return { error: result.error || "Failed to revert transaction" };
       }
     } else {
-      // 3. Fallback: if no ledger log found, delete directly from expenses table
       const { error: delErr } = await supabase
         .from("expenses")
         .delete()
@@ -149,7 +140,6 @@ export async function deleteExpense(id: string) {
       }
     }
 
-    // Global revalidation
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/expenses");
     revalidatePath("/dashboard/accounts");
@@ -158,6 +148,52 @@ export async function deleteExpense(id: string) {
     return { success: true, message: "Expense deleted successfully" };
   } catch (err) {
     console.error("Error in deleteExpense:", err);
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+
+export async function cleanupCorruptedPDFDescriptions() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    const { data: badExpenses } = await supabase
+      .from("expenses")
+      .select("id, description")
+      .eq("user_id", user.id)
+      .or("description.ilike.%subtype%,description.ilike.%xobject%,description.ilike.%flatedecode%");
+
+    if (badExpenses && badExpenses.length > 0) {
+      for (const exp of badExpenses) {
+        await supabase
+          .from("expenses")
+          .update({ description: "Bank Statement Expense" })
+          .eq("id", exp.id);
+      }
+    }
+
+    const { data: badTxs } = await supabase
+      .from("transactions")
+      .select("id, description")
+      .eq("user_id", user.id)
+      .or("description.ilike.%subtype%,description.ilike.%xobject%,description.ilike.%flatedecode%");
+
+    if (badTxs && badTxs.length > 0) {
+      for (const tx of badTxs) {
+        await supabase
+          .from("transactions")
+          .update({ description: "Bank Statement Transaction" })
+          .eq("id", tx.id);
+      }
+    }
+
+    revalidatePath("/dashboard/expenses");
+    revalidatePath("/dashboard/transactions");
+    revalidatePath("/dashboard");
+    return { success: true, message: `Cleaned up ${badExpenses?.length || 0} statement descriptions!` };
+  } catch (err) {
+    console.error("Error cleaning up PDF descriptions:", err);
     return { error: getFriendlyErrorMessage(err) };
   }
 }

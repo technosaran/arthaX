@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     description: "Track your global financial footprint from a single premium console.",
     creator: "@technosaran",
   },
-  manifest: "/manifest.webmanifest?v=2.1",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
