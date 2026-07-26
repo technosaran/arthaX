@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { getFriendlyErrorMessage } from "@/lib/action-utils";
+import { getFriendlyErrorMessage, logLedgerEntry } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 
 type GoalRpcResult = {
@@ -152,7 +152,19 @@ export async function updateGoal(id: string, data: { name: string; target_amount
         }).eq("id", id).eq("user_id", user.id);
 
         if (error) return { error: getFriendlyErrorMessage(error) };
+
+        await logLedgerEntry(supabase, {
+            user_id: user.id,
+            action_type: "GOAL_UPDATE",
+            amount: data.target_amount,
+            details: `Updated goal details for '${data.name}': Target ₹${data.target_amount.toLocaleString()}`,
+            source_type: "goal",
+            source_id: id,
+            metadata: data
+        });
+
         revalidatePath("/dashboard/goals");
+        revalidatePath("/dashboard/ledger");
         return { success: true, message: "Goal updated successfully" };
     } catch (err) {
         console.error("Error in updateGoal:", err);

@@ -10,20 +10,22 @@ import useSWR from "swr";
 import { createClient } from "@/lib/supabase-browser";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
-import dynamic from "next/dynamic";
 import { format, subMonths, parseISO } from "date-fns";
 import { Edit2, Trash2, Send, Plus, Users, History, TrendingUp, PieChart as PieIcon } from "lucide-react";
 
-const XAxis = dynamic(() => import("recharts").then((mod) => mod.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then((mod) => mod.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import("recharts").then((mod) => mod.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
-const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
-const AreaChart = dynamic(() => import("recharts").then((mod) => mod.AreaChart), { ssr: false });
-const Area = dynamic(() => import("recharts").then((mod) => mod.Area), { ssr: false });
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  ResponsiveContainer,
+} from "recharts";
+
 const FAMILY_PALETTE = ["#ec4899", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#06b6d4", "#f43f5e"];
 import {
   addFamilyMember,
@@ -481,7 +483,7 @@ export default function FamilyClient() {
           </div>
           <div className="w-full h-[240px]">
             {mounted && (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <AreaChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="familyFlowGrad" x1="0" y1="0" x2="0" y2="1">
@@ -515,7 +517,7 @@ export default function FamilyClient() {
           <p className="text-xl font-black text-white">Support by Member</p>
           <div className="w-full h-[200px] my-auto">
             {mounted && pieChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <PieChart>
                   <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value">
                     {pieChartData.map((entry, index) => (

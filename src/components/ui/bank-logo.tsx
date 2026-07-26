@@ -191,7 +191,6 @@ function getLogoSources(queryName: string): string[] {
 export const BankLogo = memo(function BankLogo({
   bankName,
   accountName,
-  type = "checking",
   size = 40,
   className = "",
 }: BankLogoProps) {
@@ -226,23 +225,23 @@ export const BankLogo = memo(function BankLogo({
     return resolveBankBrand(queryName, domain);
   }, [queryName, domain]);
 
-  const getInitials = (name: string) => {
-    if (!name) return "?";
-    if (brand) return brand.abbr;
-    return (
-      name
-        .replace(/\(.*?\)/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length > 0)
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase() || name.charAt(0).toUpperCase()
-    );
-  };
-
   const fallbackStyle = useMemo(() => {
-    const abbrStr = getInitials(queryName);
+    const getInitialsInternal = (name: string) => {
+      if (!name) return "?";
+      if (brand) return brand.abbr;
+      return (
+        name
+          .replace(/\(.*?\)/g, "")
+          .split(/\s+/)
+          .filter((w) => w.length > 0)
+          .slice(0, 2)
+          .map((w) => w[0])
+          .join("")
+          .toUpperCase() || name.charAt(0).toUpperCase()
+      );
+    };
+
+    const abbrStr = getInitialsInternal(queryName);
     if (brand) {
       const fontSize = size * (abbrStr.length > 3 ? 0.22 : abbrStr.length > 2 ? 0.26 : 0.34);
       return {
@@ -334,7 +333,7 @@ export const BankLogo = memo(function BankLogo({
         style={{
           color: fallbackStyle.color,
           fontSize: fallbackStyle.fontSize,
-          opacity: imgLoaded ? 0 : 1,
+          opacity: imgLoaded || (sources.length > 0 && !allFailed) ? 0 : 1,
           transition: "opacity 0.3s ease",
           letterSpacing: "0.3px",
           fontWeight: 900,

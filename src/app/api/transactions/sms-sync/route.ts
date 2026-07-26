@@ -232,16 +232,16 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Helper to parse UPI / Debit / Credit bank SMS text structures
+// Helper to parse UPI / Debit / Credit bank SMS text structures for Indian banks
 function parseSms(text: string, sender: string) {
-  // Ignore OTP or balance check SMS messages
-  if (/otp|verification|verification code|password|one time password/i.test(text)) {
+  // Ignore OTP, authentication, or balance inquiry SMS messages
+  if (/otp|verification|verification code|password|one time password|secret code|login alert|balance is/i.test(text)) {
     return null;
   }
 
   // 1. Amount Extraction
-  // Matches Rs. 100, Rs.100, Rs 100, INR 100.50, spent Rs100, debited by Rs.100, ₹100 etc.
-  const amountRegex = /(?:Rs\.?|INR|debited by|credited by|spent|₹)\s*([\d,]+(?:\.\d{2})?)/i;
+  // Matches Rs. 100, Rs.100, Rs 100, INR 100.50, spent Rs100, debited by Rs.100, ₹100, paid Rs 100 etc.
+  const amountRegex = /(?:Rs\.?|INR|debited by|credited by|spent|paid|transferred|₹)\s*:?\s*([\d,]+(?:\.\d{2})?)/i;
   const amountMatch = text.match(amountRegex);
   if (!amountMatch) return null;
   const amount = parseFloat(amountMatch[1].replace(/,/g, ""));
@@ -259,24 +259,43 @@ function parseSms(text: string, sender: string) {
 
   // 3. Merchant / Source Extraction
   let merchant = "Online Transaction";
-  // Matches "at [Merchant] on", "to [Merchant] on", "using [Card] at [Merchant]", "vpa [Merchant]"
-  const merchantRegex = /(?:at|to|vpa|transfer to|spent on)\s+([A-Za-z0-9\s*#&-]+?)(?:\s+on|\s+using|\s+vpa|Ref|Ref\.?|UPI|ending|A\/c|\.|\d{2}-\d{2}-\d{4})/i;
+
+  // Matches Indian Bank UPI patterns:
+  // "to VPA merchant@upi", "paid to Merchant on", "at Merchant on", "info: UPI/RRN/Merchant", "transferred to Merchant"
+  const merchantRegex = /(?:at|to|vpa|transfer to|transferred to|spent on|paid to|info:?\s*upi\/[0-9]+\/)\s+([A-Za-z0-9\s*#&.-]+?)(?:\s+on|\s+using|\s+vpa|\s+ref|\s+upi|ending|a\/c|\.|\d{2}-\d{2}-\d{4}|$)/i;
   const merchantMatch = text.match(merchantRegex);
+
   if (merchantMatch && merchantMatch[1].trim().length > 0) {
     merchant = merchantMatch[1].trim();
   } else {
-    // Try matching simply uppercase words or default to sender name
-    merchant = `${sender.replace(/[^A-Za-z]/g, "")} Pay`;
+    // Recognize bank sender tags (e.g. AXISBK, HDFCBK, SBININ, ICICIB, KOTAKB, BARB, FDRL, INDUS, YESB, UBIN, IDFB, PUNB, CNRB, PAYTM)
+    const cleanSender = sender.toUpperCase().replace(/[^A-Z]/g, "");
+    if (cleanSender.includes("SBI")) merchant = "State Bank of India";
+    else if (cleanSender.includes("HDFC")) merchant = "HDFC Bank";
+    else if (cleanSender.includes("ICICI")) merchant = "ICICI Bank";
+    else if (cleanSender.includes("AXIS") || cleanSender.includes("UTIB")) merchant = "Axis Bank";
+    else if (cleanSender.includes("KOTAK")) merchant = "Kotak Mahindra Bank";
+    else if (cleanSender.includes("BARB") || cleanSender.includes("BOB")) merchant = "Bank of Baroda";
+    else if (cleanSender.includes("FDRL") || cleanSender.includes("FED")) merchant = "Federal Bank";
+    else if (cleanSender.includes("INDUS") || cleanSender.includes("INDB")) merchant = "IndusInd Bank";
+    else if (cleanSender.includes("YESB")) merchant = "Yes Bank";
+    else if (cleanSender.includes("UBIN")) merchant = "Union Bank of India";
+    else if (cleanSender.includes("IDFB") || cleanSender.includes("IDFC")) merchant = "IDFC First Bank";
+    else if (cleanSender.includes("PUNB") || cleanSender.includes("PNB")) merchant = "Punjab National Bank";
+    else if (cleanSender.includes("CNRB")) merchant = "Canara Bank";
+    else if (cleanSender.includes("PAYTM") || cleanSender.includes("PYTM")) merchant = "Paytm Bank";
+    else merchant = `${sender.replace(/[^A-Za-z]/g, "") || "Bank"} Pay`;
   }
 
-  // Limit merchant name to a clean string
+  // Clean up merchant name strings
+  merchant = merchant.replace(/^(vpa|to|at)\s+/i, "").trim();
   if (merchant.length > 50) {
     merchant = merchant.substring(0, 50) + "...";
   }
 
-  // 4. Account ending digits (e.g. ending 1234, x1234, ending with 1234)
+  // 4. Account ending digits (e.g. ending 1234, A/c XX1234, A/c *1234, Card ending 1234)
   let accountEnding: string | null = null;
-  const accountRegex = /(?:A\/c|account|card|ending|ending in|ending with|ending ending|xx|x)\s*(\d{4})/i;
+  const accountRegex = /(?:a\/c|account|card|ending|ending in|ending with|xx|\*+)\s*:?\s*(\d{4})/i;
   const accountMatch = text.match(accountRegex);
   if (accountMatch) {
     accountEnding = accountMatch[1];

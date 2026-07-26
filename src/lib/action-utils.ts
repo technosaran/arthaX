@@ -24,11 +24,44 @@ export function getFriendlyErrorMessage(err: unknown): string {
     if (lower.includes("column") && lower.includes("does not exist")) {
       return "Database schema column missing. Applied automatic patch, please try again.";
     }
-    if (lower.includes("unauthorized") || lower.includes("not authenticated")) {
-      return "You must be logged in to perform this action.";
-    }
     return message;
   }
 
   return "An unexpected error occurred.";
 }
+
+export async function logLedgerEntry(
+  supabase: any,
+  params: {
+    user_id: string;
+    action_type: string;
+    account_id?: string | null;
+    account_name?: string | null;
+    amount?: number | null;
+    previous_balance?: number | null;
+    new_balance?: number | null;
+    details?: string | null;
+    source_type?: string | null;
+    source_id?: string | null;
+    metadata?: any;
+  }
+) {
+  try {
+    await supabase.from("ledger_logs").insert({
+      user_id: params.user_id,
+      action_type: params.action_type,
+      account_id: params.account_id || null,
+      account_name: params.account_name || null,
+      amount: params.amount ?? null,
+      previous_balance: params.previous_balance ?? null,
+      new_balance: params.new_balance ?? null,
+      details: params.details || null,
+      source_type: params.source_type || null,
+      source_id: params.source_id || null,
+      metadata: params.metadata || null,
+    });
+  } catch (err) {
+    console.error("Failed to insert ledger log:", err);
+  }
+}
+

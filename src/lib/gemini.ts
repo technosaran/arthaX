@@ -25,7 +25,7 @@ export interface GeminiParsedIntent {
 export function isGeminiActiveForProfile(profile: any): boolean {
   if (!profile) return false;
   if (profile.gemini_enabled === false) return false;
-  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY;
   return !!key && key.trim().length > 0;
 }
 
@@ -34,7 +34,7 @@ export function isGeminiActiveForProfile(profile: any): boolean {
  */
 export function getGeminiApiKeyForProfile(profile: any): string | null {
   if (!profile || profile.gemini_enabled === false) return null;
-  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const key = profile.gemini_api_key || process.env.GEMINI_API_KEY;
   return key?.trim() || null;
 }
 
@@ -67,7 +67,6 @@ export async function callGeminiApi(
 
   // Model fallback list for maximum reliability across API keys
   const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-  let responseText = "";
   let lastError = "";
 
   for (const model of models) {

@@ -22,7 +22,7 @@ export default function IntegrationsTab({
 
   const telegramActive = !!profile?.telegram_chat_id;
   const geminiEnabled = (profile as any)?.gemini_enabled !== false;
-  const hasGeminiKey = !!((profile as any)?.gemini_api_key || process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+  const hasGeminiKey = !!(profile as any)?.gemini_api_key;
   const isGeminiActive = geminiEnabled && hasGeminiKey;
 
   useEffect(() => {
