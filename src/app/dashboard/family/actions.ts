@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { getFriendlyErrorMessage } from "@/lib/action-utils";
+import { getFriendlyErrorMessage, logLedgerEntry } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 
 type RpcResult = {
@@ -24,15 +24,26 @@ export async function addFamilyMember(data: { name: string; relationship: string
       return { error: "Relationship is required" };
     }
 
-    const { error } = await supabase.from("family_members").insert({
+    const { data: insertData, error } = await supabase.from("family_members").insert({
       user_id: user.id,
       name: data.name.trim(),
       relationship: data.relationship.trim(),
       balance: 0,
-    });
+    }).select("id").single();
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_MEMBER_ADD",
+      details: `Added family member: ${data.name.trim()} (${data.relationship.trim()})`,
+      source_type: "family_member",
+      source_id: insertData?.id || null,
+      metadata: data
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Family Member added successfully" };
   } catch (err) {
     console.error("Error in addFamilyMember:", err);
@@ -64,7 +75,18 @@ export async function updateFamilyMember(id: string, data: { name: string; relat
       .eq("user_id", user.id);
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_MEMBER_UPDATE",
+      details: `Updated family member: ${data.name.trim()} (${data.relationship.trim()})`,
+      source_type: "family_member",
+      source_id: id,
+      metadata: data
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Family Member updated successfully" };
   } catch (err) {
     console.error("Error in updateFamilyMember:", err);
@@ -88,7 +110,16 @@ export async function deleteFamilyMember(id: string) {
 
     if (error) return { error: getFriendlyErrorMessage(error) };
 
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_MEMBER_DELETE",
+      details: `Deleted family member profile`,
+      source_type: "family_member",
+      source_id: id
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Family Member deleted successfully" };
   } catch (err) {
     console.error("Error in deleteFamilyMember:", err);
@@ -117,15 +148,27 @@ export async function createAllowance(data: {
     if (!frequency) {
       return { error: "Frequency is required" };
     }
-    const { error } = await supabase.from("family_allowances").insert({
+    const { data: insertData, error } = await supabase.from("family_allowances").insert({
       user_id: user.id,
       family_member_id: familyMemberId,
       amount: data.amount,
       frequency,
-    });
+    }).select("id").single();
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_ALLOWANCE_ADD",
+      amount: data.amount,
+      details: `Configured ${frequency} allowance of ₹${data.amount.toLocaleString()}`,
+      source_type: "family_allowance",
+      source_id: insertData?.id || null,
+      metadata: data
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Allowance created successfully" };
   } catch (err) {
     console.error("Error in createAllowance:", err);
@@ -165,7 +208,19 @@ export async function updateAllowance(
       .eq("user_id", user.id);
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_ALLOWANCE_UPDATE",
+      amount: data.amount,
+      details: `Updated allowance to ${frequency} ₹${data.amount.toLocaleString()}`,
+      source_type: "family_allowance",
+      source_id: allowanceId,
+      metadata: data
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Allowance updated successfully" };
   } catch (err) {
     console.error("Error in updateAllowance:", err);
@@ -189,7 +244,17 @@ export async function deleteAllowance(id: string) {
       .eq("user_id", user.id);
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_ALLOWANCE_DELETE",
+      details: `Deleted family allowance configuration`,
+      source_type: "family_allowance",
+      source_id: allowanceId
+    });
+
     revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Allowance deleted successfully" };
   } catch (err) {
     console.error("Error in deleteAllowance:", err);

@@ -31,18 +31,24 @@ export function RealtimeSyncProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const handleChange = (table: string) => {
-      let key = "finance_summary";
-      if (["investments", "mutual_funds", "bonds", "alternative_assets", "stock_trades", "mutual_fund_trades", "bond_transactions", "fno_trades"].includes(table)) {
-        key = "finance_investments";
-      } else if (["incomes", "expenses", "budgets", "goals", "liabilities"].includes(table)) {
-        key = "finance_cashflow";
-      } else if (["forex_accounts", "forex_trades", "forex_transactions"].includes(table)) {
-        key = "finance_forex";
-      } else if (table === "transfers") {
-        key = "finance_summary";
+      const isInvest = ["investments", "mutual_funds", "bonds", "alternative_assets", "stock_trades", "mutual_fund_trades", "bond_transactions", "fno_trades"].includes(table);
+      const isCashflow = ["incomes", "expenses", "budgets", "goals", "liabilities"].includes(table);
+      const isForex = ["forex_accounts", "forex_trades", "forex_transactions"].includes(table);
+      
+      // If table affects cashflow or investments or forex, it might also affect account balances (finance_summary)
+      if (isInvest) {
+        updateQueueRef.current.add("finance_investments");
+        updateQueueRef.current.add("finance_summary");
+      } else if (isCashflow) {
+        updateQueueRef.current.add("finance_cashflow");
+        updateQueueRef.current.add("finance_summary");
+      } else if (isForex) {
+        updateQueueRef.current.add("finance_forex");
+        updateQueueRef.current.add("finance_summary");
+      } else {
+        updateQueueRef.current.add("finance_summary");
       }
       
-      updateQueueRef.current.add(key);
       debouncedMutate();
     };
 

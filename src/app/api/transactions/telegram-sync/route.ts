@@ -6,34 +6,26 @@ import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
 import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent } from "@/lib/gemini";
 
-const MAIN_MENU_KEYBOARD = {
-  inline_keyboard: [
+// Persistent Telegram Reply Keyboard (docked cleanly at the bottom drawer of Telegram text input)
+const MAIN_REPLY_KEYBOARD = {
+  keyboard: [
     [
-      { text: "💳 Balances", callback_data: "cmd_balance" },
-      { text: "📊 Summary", callback_data: "cmd_summary" }
+      { text: "💳 Balances" },
+      { text: "📊 Summary" },
+      { text: "🤖 AI Score" }
     ],
     [
-      { text: "🤖 AI Health Score", callback_data: "cmd_ai" },
-      { text: "📥 Export Statement", callback_data: "cmd_export" }
-    ],
-    [
-      { text: "🎯 Savings Goals", callback_data: "cmd_goals" },
-      { text: "📊 Budgets", callback_data: "cmd_budget" }
-    ],
-    [
-      { text: "💱 Currency Convert", callback_data: "cmd_convert" },
-      { text: "👨‍👩‍👧 Family Balances", callback_data: "cmd_family" }
-    ],
-    [
-      { text: "📜 Recent Logs", callback_data: "cmd_recent" },
-      { text: "📑 Audit Ledger", callback_data: "cmd_ledger" }
-    ],
-    [
-      { text: "↩️ Undo Last", callback_data: "cmd_undo" },
-      { text: "💡 Commands & Help", callback_data: "cmd_help" }
+      { text: "📜 Recent Logs" },
+      { text: "🎯 Goals" },
+      { text: "💡 Commands & Help" }
     ]
-  ]
+  ],
+  resize_keyboard: true,
+  is_persistent: true
 };
+
+const MAIN_MENU_KEYBOARD = MAIN_REPLY_KEYBOARD;
+
 
 const TX_CONFIRM_KEYBOARD = {
   inline_keyboard: [
@@ -501,7 +493,7 @@ export async function POST(req: NextRequest) {
         `• Monthly summary: \`/summary\`\n` +
         `• Undo mistakes: \`/undo\`\n\n` +
         `👇 Tap any button below to open the interactive control menu!`,
-        MAIN_MENU_KEYBOARD
+        MAIN_REPLY_KEYBOARD
       );
       return NextResponse.json({ success: true });
     }
@@ -585,7 +577,7 @@ export async function POST(req: NextRequest) {
         `🤖 *AI Chat & Financial Coach*\n` +
         `• Ask me anything! e.g. *"What is my net worth?"*, *"How much did I spend this month?"*, or *"Give me tips to save money"*`;
 
-      await sendTelegramMessage(chatId, greetingMsg, MAIN_MENU_KEYBOARD);
+      await sendTelegramMessage(chatId, greetingMsg, MAIN_REPLY_KEYBOARD);
       return NextResponse.json({ success: true });
     }
 
@@ -628,8 +620,7 @@ export async function POST(req: NextRequest) {
                 `• *Type*: ${accType.toUpperCase()}\n` +
                 `• *Initial Balance*: ₹${initialBalance.toLocaleString("en-IN")}\n` +
                 `• *Reasoning*: ${decision.reasoning || "Autonomously initialized bank account."}\n\n` +
-                `⚡ *Status*: Synced live with website dashboard.`,
-                MAIN_MENU_KEYBOARD
+                `⚡ *Status*: Synced live with website dashboard.`
               );
               return NextResponse.json({ success: true });
             }
@@ -637,7 +628,7 @@ export async function POST(req: NextRequest) {
 
           // 2. Autonomous FINANCIAL_QUERY
           if (decision.action === "FINANCIAL_QUERY" && decision.replyMessage) {
-            await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`, MAIN_MENU_KEYBOARD);
+            await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`);
             return NextResponse.json({ success: true });
           }
 
@@ -680,16 +671,14 @@ export async function POST(req: NextRequest) {
                     `• *Account*: ${matchedAccount.name}\n` +
                     `• *Balance was*: ₹${balance.toLocaleString("en-IN")}\n` +
                     `• *Reasoning*: ${decision.reasoning || "User requested account deletion."}\n\n` +
-                    `⚡ *Status*: Synced with dashboard.`,
-                    MAIN_MENU_KEYBOARD
+                    `⚡ *Status*: Synced with dashboard.`
                   );
                   return NextResponse.json({ success: true });
                 }
               } else {
                 await sendTelegramMessage(
                   chatId,
-                  `❌ *Account not found*: Could not find an account matching "${decision.accountName}".\n\nYour accounts: ${accounts.map((a: any) => a.name).join(", ")}`,
-                  MAIN_MENU_KEYBOARD
+                  `❌ *Account not found*: Could not find an account matching "${decision.accountName}".\n\nYour accounts: ${accounts.map((a: any) => a.name).join(", ")}`
                 );
                 return NextResponse.json({ success: true });
               }
@@ -717,8 +706,7 @@ export async function POST(req: NextRequest) {
                   `• *Name*: ${memberName.charAt(0).toUpperCase() + memberName.slice(1)}\n` +
                   `• *Relationship*: ${relationship}\n` +
                   `• *Balance*: ₹0\n\n` +
-                  `⚡ *Status*: Synced with dashboard.`,
-                  MAIN_MENU_KEYBOARD
+                  `⚡ *Status*: Synced with dashboard.`
                 );
                 return NextResponse.json({ success: true });
               }
@@ -731,7 +719,7 @@ export async function POST(req: NextRequest) {
             const aiGreeting = decision.replyMessage || `Hey ${userName}! 👋`;
             const greetingMsg = `${aiGreeting}\n\n` +
               `💡 *Quick Actions*: Send \`/balance\`, \`/summary\`, or just ask me anything in natural language!`;
-            await sendTelegramMessage(chatId, greetingMsg, MAIN_MENU_KEYBOARD);
+            await sendTelegramMessage(chatId, greetingMsg, MAIN_REPLY_KEYBOARD);
             return NextResponse.json({ success: true });
           }
         }
@@ -1002,6 +990,7 @@ export async function POST(req: NextRequest) {
       bal: "balance",
       balanace: "balance",
       balence: "balance",
+      balances: "balance",
       networth: "balance",
       sumary: "summary",
       sumry: "summary",
@@ -1013,12 +1002,16 @@ export async function POST(req: NextRequest) {
       info: "help",
       recnt: "recent",
       hist: "recent",
+      "recent logs": "recent",
       ledgr: "ledger",
       audit: "ledger",
       goal: "goals",
       budgt: "budget",
       budgets: "budget",
       ai: "ai",
+      "ai score": "ai",
+      "ai health": "ai",
+      "ai health score": "ai",
       score: "ai",
       health: "ai",
       family: "family",
@@ -1026,10 +1019,14 @@ export async function POST(req: NextRequest) {
       export: "export",
       statement: "export",
       download: "export",
+      "commands & help": "help",
+      "commands and help": "help",
     };
 
     let lowerText = text.toLowerCase();
-    let rawCommand = lowerText.replace(/^\//, "").trim();
+    // Clean emojis from button taps so "💳 Balances" -> "balances"
+    const cleanedText = lowerText.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, "").trim();
+    let rawCommand = cleanedText.replace(/^\//, "").trim();
     let commandText = COMMAND_ALIASES[rawCommand] || rawCommand;
 
     // 3. Handle System & Inquiry Commands (/menu, /ai, /family, /ledger, /calc, /help, /balance, /summary, /recent, /undo, /goals, /budget, /unlink)
@@ -1206,7 +1203,7 @@ export async function POST(req: NextRequest) {
         msg += `ℹ️ No expenses recorded for this month yet.`;
       }
 
-      await sendTelegramMessage(chatId, msg, MAIN_MENU_KEYBOARD);
+      await sendTelegramMessage(chatId, msg);
       return NextResponse.json({ success: true });
     }
 
@@ -1245,27 +1242,38 @@ export async function POST(req: NextRequest) {
       await sendTelegramMessage(
         chatId,
         "💡 *Universal Dashboard Assistant*\n\n" +
-        "*📊 Quick Control Menu*\n" +
-        "• `/menu` — Interactive control panel buttons\n" +
-        "• `/ai` — Instant Financial Health Score & AI Coaching\n" +
-        "• `/balance` — Check active bank accounts & total net worth\n" +
-        "• `/summary` — Current month income, expenses & savings rate\n" +
-        "• `/report` — Intelligence report: top categories & highest expense\n" +
-        "• `/search <keyword>` — Search recent transactions\n" +
-        "• `/recent` — View last 5 transactions\n" +
-        "• `/family` — View family balances & send transfers\n" +
-        "• `/ledger` — Live double-entry audit trail\n" +
-        "• `/calc 1500 * 12` — Financial calculator & currency converter\n" +
-        "• `/undo` — Delete the last logged transaction\n" +
-        "• `/goals` — View savings goals progress\n" +
-        "• `/budget` — Check monthly spending budget vs actuals\n\n" +
-        "*⚡ Smart Transaction Logging*\n" +
-        "• `50 Tea` or `credit 5000 Salary` (Smart Credit/Debit sensing)\n" +
-        "• `450 yesterday Swiggy` (Natural Dates!)\n" +
-        "• `120 + 45 + 30 Lunch` (Supports inline math!)\n" +
-        "• Forward or paste any Bank SMS/Notification directly into chat!\n\n" +
-        "*Options*: `/unlink` — Disconnect bot",
-        MAIN_MENU_KEYBOARD
+        "*📱 Core Navigation*\n" +
+        "• `/menu` — Toggle bottom button menu\n" +
+        "• `/balance` — Check bank accounts & net worth\n" +
+        "• `/summary` — Monthly income, expenses & savings rate\n" +
+        "• `/ai` — Instant AI Health Score & coaching\n" +
+        "• `/recent` — Last 5 transactions & `/undo` to revert\n" +
+        "• `/search <keyword>` — Search transactions\n\n" +
+        "*🏦 Bank Accounts*\n" +
+        "• `add account SBI 5000` — Create new bank account\n" +
+        "• `delete account SBI` — Delete account\n" +
+        "• `transfer 2000 from SBI to HDFC` — Inter-account transfer\n\n" +
+        "*💸 Expenses & Income*\n" +
+        "• `450 Swiggy` or `debit 1200 Petrol`\n" +
+        "• `salary 50000` or `credit 5000 freelance`\n" +
+        "• Forward any Bank SMS or paste notification!\n\n" +
+        "*📈 Investments (Stocks, MFs, Crypto, Bonds, FnO, Forex)*\n" +
+        "• `/stocks` — View holdings or `buy 10 TATAMOTORS at 950`\n" +
+        "• `/mf` — View funds or `invest 5000 in Parag Parikh`\n" +
+        "• `/crypto` — View crypto or `buy 0.05 BTC at 65000`\n" +
+        "• `/bonds` — View bonds or `buy 10 SGB 6000`\n" +
+        "• `/fno` — View derivatives or `fno buy 25 NIFTY 24500 CE 150`\n" +
+        "• `/forex` — View forex or `forex buy 100 USD`\n" +
+        "• `/alt` — View alt assets or `alt buy 25000 Gold`\n\n" +
+        "*🎯 Family, Goals, Budgets & Liabilities*\n" +
+        "• `/family` — Family balances or `send 500 to Mom`\n" +
+        "• `/goals` — View goals or `add goal Car 500000`\n" +
+        "• `/budget` — View budgets or `set budget Food 10000`\n" +
+        "• `/liabilities` — View debts or `pay emi Home Loan 25000`\n" +
+        "• `/ledger` — View live double-entry audit trail\n" +
+        "• `/export` — Generate monthly statement report\n" +
+        "• `/calc 1500 * 12` — Financial calculator & currency converter",
+        MAIN_REPLY_KEYBOARD
       );
       return NextResponse.json({ success: true });
     }

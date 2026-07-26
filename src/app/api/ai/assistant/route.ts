@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     const profileData = profile as any;
-    const apiKey = profileData?.gemini_api_key || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = profileData?.gemini_api_key || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(

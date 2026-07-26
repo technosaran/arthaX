@@ -91,14 +91,23 @@ export const AMCLogo = memo(function AMCLogo({
       }}
       title={amcName || fundName || "AMC Logo"}
     >
+      {/* Show fallback badge while image is loading */}
+      {!loaded && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800"
+          style={{ zIndex: 1 }}
+        >
+          <div className="absolute inset-0 animate-pulse bg-white/10" style={{ zIndex: 2 }} />
+        </div>
+      )}
       <img
         key={currentUrl}
         src={currentUrl}
         alt={amcName || fundName || "AMC Logo"}
         onLoad={handleImageLoad}
         onError={handleImageError}
-        style={{ imageRendering: "-webkit-optimize-contrast" }}
-        className="w-full h-full object-contain p-1 transition-opacity duration-150 opacity-100"
+        style={{ imageRendering: "-webkit-optimize-contrast", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", zIndex: 3 }}
+        className="w-full h-full object-contain p-1"
         loading="eager"
         decoding="async"
       />

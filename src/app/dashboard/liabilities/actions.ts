@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { getFriendlyErrorMessage } from "@/lib/action-utils";
+import { getFriendlyErrorMessage, logLedgerEntry } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 
 export async function addLiability(formData: {
@@ -20,7 +20,6 @@ export async function addLiability(formData: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Not authenticated" };
 
-    // Use typed RPC cast for new atomic function (types will be auto-generated after migration deploys)
     type AtomicResult = { success: boolean; error?: string } | null;
     const rpc = supabase.rpc.bind(supabase) as unknown as (
       fn: "add_liability_atomic",
@@ -38,7 +37,6 @@ export async function addLiability(formData: {
       }
     ) => Promise<{ data: AtomicResult; error: { message: string } | null }>;
 
-    // Use atomic RPC that handles insert + balance adjustment in a single transaction
     const { data: rpcData, error } = await rpc("add_liability_atomic", {
       p_user_id: user.id,
       p_name: formData.name,
@@ -99,7 +97,19 @@ export async function updateLiability(id: string, formData: LiabilityUpdate) {
       .eq("user_id", user.id);
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "LIABILITY_UPDATE",
+      amount: formData.remaining_amount || formData.total_amount,
+      details: `Updated liability details for '${formData.name || id}'`,
+      source_type: "liability",
+      source_id: id,
+      metadata: formData
+    });
+
     revalidatePath("/dashboard/liabilities");
+    revalidatePath("/dashboard/ledger");
     return { success: true, message: "Liability updated successfully" };
   } catch (err) {
     console.error("Error in updateLiability:", err);

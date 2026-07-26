@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { getFriendlyErrorMessage } from "@/lib/action-utils";
+import { getFriendlyErrorMessage, logLedgerEntry } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
+import { fetchWithMarketCache } from "@/lib/market-cache";
 
 export type CryptoMarketData = {
   symbol: string;
@@ -39,42 +40,45 @@ const COINGECKO_ID_MAP: Record<string, string> = {
 // ─── Fetch Single Ticker ─────────────────────────────────────────────────────
 export async function fetchBinancePrice(symbol: string): Promise<{ price?: number; error?: string }> {
   const symbolUpper = symbol.toUpperCase().trim();
-  
-  // 1. Try Primary Binance Ticker API
-  try {
-    const formattedSymbol = symbolUpper + "USDT";
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${formattedSymbol}`, {
-      next: { revalidate: 10 },
-      signal: AbortSignal.timeout(4000)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.price) return { price: parseFloat(data.price) };
-    }
-  } catch {
-    // Continue to fallback
-  }
+  const cacheKey = `crypto_price_${symbolUpper}`;
 
-  // 2. Fallback to CoinGecko Simple Price API
-  try {
-    const cgId = COINGECKO_ID_MAP[symbolUpper];
-    if (cgId) {
-      const cgRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, {
-        next: { revalidate: 30 },
+  return fetchWithMarketCache(cacheKey, async () => {
+    // 1. Try Primary Binance Ticker API
+    try {
+      const formattedSymbol = symbolUpper + "USDT";
+      const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${formattedSymbol}`, {
+        next: { revalidate: 10 },
         signal: AbortSignal.timeout(4000)
       });
-      if (cgRes.ok) {
-        const cgData = await cgRes.json();
-        if (cgData?.[cgId]?.usd) {
-          return { price: parseFloat(cgData[cgId].usd) };
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.price) return { price: parseFloat(data.price) };
+      }
+    } catch {
+      // Continue to fallback
+    }
+
+    // 2. Fallback to CoinGecko Simple Price API
+    try {
+      const cgId = COINGECKO_ID_MAP[symbolUpper];
+      if (cgId) {
+        const cgRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, {
+          next: { revalidate: 30 },
+          signal: AbortSignal.timeout(4000)
+        });
+        if (cgRes.ok) {
+          const cgData = await cgRes.json();
+          if (cgData?.[cgId]?.usd) {
+            return { price: parseFloat(cgData[cgId].usd) };
+          }
         }
       }
+    } catch {
+      // Fallback failed
     }
-  } catch {
-    // Fallback failed
-  }
 
-  return { error: `Price for ${symbolUpper} could not be retrieved from primary or secondary crypto APIs.` };
+    return { error: `Price for ${symbolUpper} could not be retrieved from primary or secondary crypto APIs.` };
+  }, 30);
 }
 
 // ─── Fetch Batch Tickers ─────────────────────────────────────────────────────
@@ -359,8 +363,19 @@ export async function updateCryptoHolding(id: string, data: {
 
     if (error) return { error: getFriendlyErrorMessage(error) };
 
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "CRYPTO_UPDATE",
+      amount: data.current_price || data.buy_price,
+      details: `Updated crypto holding '${data.name} (${data.symbol})'`,
+      source_type: "investment",
+      source_id: id,
+      metadata: data
+    });
+
     revalidatePath("/dashboard/investments");
     revalidatePath("/dashboard/crypto");
+    revalidatePath("/dashboard/ledger");
     revalidatePath("/dashboard");
     return { success: true, message: "Crypto Holding updated successfully" };
   } catch (err) {
@@ -375,16 +390,19 @@ export async function deleteCryptoHolding(id: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
-    const { error } = await supabase
-      .from("investments")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+    const { data, error } = await supabase.rpc("atomic_delete_entity", {
+      p_user_id: user.id,
+      p_entity_type: "investment",
+      p_entity_id: id
+    });
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+    const res = data as { success: boolean; error?: string };
+    if (!res?.success) return { error: res?.error || "Failed to delete crypto holding" };
 
     revalidatePath("/dashboard/investments");
     revalidatePath("/dashboard/crypto");
+    revalidatePath("/dashboard/ledger");
     revalidatePath("/dashboard");
     return { success: true, message: "Crypto Holding deleted successfully" };
   } catch (err) {

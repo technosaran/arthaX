@@ -13,10 +13,19 @@ export async function POST(req: NextRequest) {
 
 async function handleCronAlerts(req: NextRequest) {
   try {
-    // Optional cron secret check if configured
-    const cronSecret = req.headers.get("x-cron-secret") || new URL(req.url).searchParams.get("secret");
-    if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: "Unauthorized cron request" }, { status: 401 });
+    const authHeader = req.headers.get("authorization");
+    const cronSecretHeader = req.headers.get("x-cron-secret");
+    const secretParam = new URL(req.url).searchParams.get("secret");
+    const expectedSecret = process.env.CRON_SECRET;
+
+    if (expectedSecret) {
+      const isAuthorized =
+        authHeader === `Bearer ${expectedSecret}` ||
+        cronSecretHeader === expectedSecret ||
+        secretParam === expectedSecret;
+      if (!isAuthorized) {
+        return NextResponse.json({ error: "Unauthorized cron request" }, { status: 401 });
+      }
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

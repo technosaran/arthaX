@@ -31,18 +31,18 @@ export function calculateFinancialHealthScore(params: {
   } = params;
 
   const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlySpend) / monthlyIncome) * 100 : 0;
-  let savingsRateScore = savingsRate >= 40 ? 100 : savingsRate >= 25 ? 80 : savingsRate >= 10 ? 60 : savingsRate >= 0 ? 40 : 20;
+  const savingsRateScore = savingsRate >= 40 ? 100 : savingsRate >= 25 ? 80 : savingsRate >= 10 ? 60 : savingsRate >= 0 ? 40 : 20;
 
   const monthlyBurn = monthlySpend > 0 ? monthlySpend : 30000;
   const runwayMonths = cashBalance / monthlyBurn;
-  let emergencyScore = runwayMonths >= 6 ? 100 : runwayMonths >= 3 ? 75 : runwayMonths >= 1 ? 50 : 25;
+  const emergencyScore = runwayMonths >= 6 ? 100 : runwayMonths >= 3 ? 75 : runwayMonths >= 1 ? 50 : 25;
 
   const totalAssets = Math.max(1, netWorth + debtBalance);
   const debtRatio = (debtBalance / totalAssets) * 100;
-  let debtScore = debtRatio <= 10 ? 100 : debtRatio <= 30 ? 80 : debtRatio <= 50 ? 60 : 30;
+  const debtScore = debtRatio <= 10 ? 100 : debtRatio <= 30 ? 80 : debtRatio <= 50 ? 60 : 30;
 
   const invRatio = totalAssets > 0 ? (investmentBalance / totalAssets) * 100 : 0;
-  let investmentScore = invRatio >= 50 ? 100 : invRatio >= 30 ? 80 : invRatio >= 15 ? 60 : 30;
+  const investmentScore = invRatio >= 50 ? 100 : invRatio >= 30 ? 80 : invRatio >= 15 ? 60 : 30;
 
   let budgetScore = 75;
   if (budgetLimit > 0) {

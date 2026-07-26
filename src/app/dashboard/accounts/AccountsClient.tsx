@@ -378,9 +378,15 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </div>
           <div className={`status-dot scale-90 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400 opacity-50'}`} />
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <button type="button" onClick={() => { setTransferFromId(null); setShowTransferModal(true); }} className="btn-secondary h-11 w-full sm:w-auto flex items-center justify-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>Transfer</button>
-          <button type="button" onClick={() => setShowForm(true)} className="btn-primary h-11 w-full sm:w-auto flex items-center justify-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>New Account</button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => { setTransferFromId(null); setShowTransferModal(true); }} className="btn-secondary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+            <span>Transfer</span>
+          </button>
+          <button type="button" onClick={() => setShowForm(true)} className="btn-primary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
+            <span>New Account</span>
+          </button>
         </div>
       </div>
 
@@ -989,37 +995,37 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
         onClose={resetForm}
         title={editingId ? "Update Account" : "Open New Account"}
       >
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Account Label</label>
-            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium py-2 text-xs" placeholder="e.g. Primary Savings" autoComplete="new-password" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Account Label</label>
+            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium !h-11 text-xs font-semibold" placeholder="e.g. Primary Savings" autoComplete="new-password" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Asset Category</label>
-              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium py-2 text-xs">
-                {Object.keys(TYPE_STYLES).map(t => <option key={t} value={t} className="bg-[#181A20] text-white font-medium">{t.toUpperCase()}</option>)}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Asset Category</label>
+              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
+                {Object.keys(TYPE_STYLES).map(t => <option key={t} value={t} className="bg-[#151922] text-white font-medium">{t.toUpperCase()}</option>)}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Currency</label>
-              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium py-2 text-xs">
-                <option value="INR" className="bg-[#181A20] text-white font-medium">INR (₹)</option>
-                <option value="USD" className="bg-[#181A20] text-white font-medium">USD ($)</option>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Currency</label>
+              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
+                <option value="INR" className="bg-[#151922] text-white font-medium">INR (₹)</option>
+                <option value="USD" className="bg-[#151922] text-white font-medium">USD ($)</option>
               </select>
             </div>
           </div>
           {!editingId && (
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Opening Balance</label>
-              <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium py-2 text-xs" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Opening Balance</label>
+              <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium !h-11 text-xs font-semibold" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
             </div>
           )}
-          <div ref={searchContainerRef} className="relative space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-[--text-muted]">Bank Institution</label>
+          <div ref={searchContainerRef} className="relative space-y-2">
+            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Bank Institution</label>
             <div className="relative flex items-center">
               {bankSearch.trim().length > 0 && (
-                <div className="absolute left-2.5 flex items-center pointer-events-none z-10">
+                <div className="absolute left-3 flex items-center pointer-events-none z-10">
                   <BankLogo bankName={bankSearch} accountName={bankSearch} size={22} />
                 </div>
               )}
@@ -1032,7 +1038,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     setBankResults(results);
                   }
                 }}
-                className={`input-premium py-2 text-xs w-full ${bankSearch.trim().length > 0 ? "!pl-10" : ""}`} 
+                className={`input-premium !h-11 text-xs font-semibold w-full ${bankSearch.trim().length > 0 ? "!pl-10" : ""}`} 
                 placeholder="Search Banks (e.g. SBI, HDFC, ICICI, Chase)..." 
                 autoComplete="off" 
               />
@@ -1059,8 +1065,8 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
               </div>
             )}
           </div>
-          <div className="pt-1 mt-3">
-            <button type="submit" disabled={submitting} className="btn-primary w-full h-10 shadow-lg shadow-[--accent-primary]/20 transition-all text-xs font-black uppercase tracking-widest">
+          <div className="pt-2">
+            <button type="submit" disabled={submitting} className="btn-primary w-full !h-11 text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-40">
               {submitting ? "Saving..." : (editingId ? "Update Account" : "Add Account")}
             </button>
           </div>
@@ -1077,28 +1083,28 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             <button 
               type="button" 
               onClick={() => setAdjustData({...adjustData, type: 'add'})} 
-              className={`py-4 rounded-xl font-bold text-sm transition-all border shadow-lg ${adjustData.type === 'add' ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}
+              className={`py-3 rounded-xl font-bold text-xs transition-all border shadow-lg flex items-center justify-center gap-1.5 cursor-pointer ${adjustData.type === 'add' ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}
             >
               + Add funds
             </button>
             <button 
               type="button" 
               onClick={() => setAdjustData({...adjustData, type: 'subtract'})} 
-              className={`py-4 rounded-xl font-bold text-sm transition-all border shadow-lg ${adjustData.type === 'subtract' ? 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}
+              className={`py-3 rounded-xl font-bold text-xs transition-all border shadow-lg flex items-center justify-center gap-1.5 cursor-pointer ${adjustData.type === 'subtract' ? 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}
             >
               − Remove funds
             </button>
           </div>
-          <div className="space-y-3">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Amount</label>
-            <input required type="number" step="0.01" value={adjustData.amount} onChange={e => setAdjustData({...adjustData, amount: e.target.value})} className="input-premium !h-14 text-xl font-black" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Amount</label>
+            <input required type="number" step="0.01" value={adjustData.amount} onChange={e => setAdjustData({...adjustData, amount: e.target.value})} className="input-premium !h-11 text-sm font-bold" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
           </div>
-          <div className="space-y-3">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Reason / Note</label>
-            <input value={adjustData.note} onChange={e => setAdjustData({...adjustData, note: e.target.value})} className="input-premium" placeholder="Why the change?" autoComplete="new-password" />
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Reason / Note</label>
+            <input value={adjustData.note} onChange={e => setAdjustData({...adjustData, note: e.target.value})} className="input-premium !h-11 text-xs font-semibold" placeholder="Why the change?" autoComplete="new-password" />
           </div>
-          <div className="pt-2 mt-4">
-            <button type="submit" disabled={submitting} className="btn-primary w-full h-11 text-xs font-black uppercase tracking-widest shadow-xl shadow-[--accent-primary]/20">
+          <div className="pt-2">
+            <button type="submit" disabled={submitting} className="btn-primary w-full !h-11 text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-40">
               {submitting ? "Processing..." : "Finalize Adjustment"}
             </button>
           </div>
@@ -1116,32 +1122,32 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
         title="Inter-Account Transfer"
       >
         <form onSubmit={handleTransfer} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">SOURCE ACCOUNT</label>
-              <select aria-label="Select source account" id="transfer-source" name="from_account" required value={transferFromId || ""} onChange={e => setTransferFromId(e.target.value)} className="input-premium text-xs">
-                <option value="" className="bg-[#181A20] text-white font-medium">Select source</option>
-                {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SOURCE ACCOUNT</label>
+              <select aria-label="Select source account" id="transfer-source" name="from_account" required value={transferFromId || ""} onChange={e => setTransferFromId(e.target.value)} className="input-premium !h-11 text-xs font-semibold">
+                <option value="" className="bg-[#151922] text-white font-medium">Select source</option>
+                {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">DESTINATION ACCOUNT</label>
-              <select aria-label="Select destination account" id="transfer-destination" name="to_account" required value={transferData.to_account_id} onChange={e => setTransferData({...transferData, to_account_id: e.target.value})} className="input-premium text-xs">
-                <option value="" className="bg-[#181A20] text-white font-medium">Select target</option>
-                {accounts.map(a => a.id !== transferFromId && <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">DESTINATION ACCOUNT</label>
+              <select aria-label="Select destination account" id="transfer-destination" name="to_account" required value={transferData.to_account_id} onChange={e => setTransferData({...transferData, to_account_id: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
+                <option value="" className="bg-[#151922] text-white font-medium">Select target</option>
+                {accounts.map(a => a.id !== transferFromId && <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
               </select>
             </div>
           </div>
 
-          <div className={isCrossCurrency ? "grid grid-cols-2 gap-4" : "space-y-2"}>
+          <div className={isCrossCurrency ? "grid grid-cols-2 gap-3" : "space-y-2"}>
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">AMOUNT</label>
-              <input required type="number" step="0.01" value={transferData.amount} onChange={e => setTransferData({...transferData, amount: e.target.value})} className="input-premium text-base font-black" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">AMOUNT</label>
+              <input required type="number" step="0.01" value={transferData.amount} onChange={e => setTransferData({...transferData, amount: e.target.value})} className="input-premium !h-11 text-sm font-bold" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
             </div>
             {isCrossCurrency && (
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">CONVERSION RATE</label>
-                <input required type="number" step="0.0001" value={conversionRate} onChange={e => setConversionRate(e.target.value)} className="input-premium text-base font-black bg-white/[0.02]" placeholder="e.g. 83.50" autoComplete="off" inputMode="decimal" />
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">CONVERSION RATE</label>
+                <input required type="number" step="0.0001" value={conversionRate} onChange={e => setConversionRate(e.target.value)} className="input-premium !h-11 text-sm font-bold bg-white/[0.02]" placeholder="e.g. 83.50" autoComplete="off" inputMode="decimal" />
               </div>
             )}
           </div>
@@ -1153,7 +1159,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span className="text-[0.5625rem] font-black uppercase tracking-wider">Multi-Currency: {fromAccount?.currency} to {toAccount?.currency}</span>
+                <span className="text-[0.625rem] font-bold uppercase tracking-wider">Multi-Currency: {fromAccount?.currency} to {toAccount?.currency}</span>
               </div>
 
               {transferData.amount && conversionRate && parseFloat(transferData.amount) > 0 && parseFloat(conversionRate) > 0 && (
@@ -1172,11 +1178,11 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Note / Description</label>
+            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Note / Description</label>
             <input 
               value={transferData.note} 
               onChange={e => setTransferData({...transferData, note: e.target.value})} 
-              className="input-premium" 
+              className="input-premium !h-11 text-xs font-semibold" 
               placeholder="What is this transfer for?" 
               autoComplete="off" 
             />
@@ -1186,7 +1192,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             <button 
               type="submit" 
               disabled={submitting || !transferFromId || !transferData.to_account_id || !transferData.amount || (isCrossCurrency && !conversionRate)} 
-              className="btn-primary w-full h-11 shadow-xl shadow-[--accent-primary]/20 text-xs font-black uppercase tracking-widest disabled:opacity-50"
+              className="btn-primary w-full !h-11 text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting ? "Processing..." : "Execute Transfer"}
             </button>
@@ -1196,18 +1202,18 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
 
       {showDeleteConfirm && (
         <div className="mobile-dialog-shell fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[--bg-base]/80 backdrop-blur-md animate-fade-in">
-          <div className="mobile-dialog-panel glass-card-static w-full max-w-sm p-8 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="mobile-dialog-panel glass-card-static w-full max-w-sm p-6 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/10 rounded-2xl">
             <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center">
-                <svg className="w-7 h-7 text-rose-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center">
+                <svg className="w-6 h-6 text-rose-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </div>
               <div>
-                <h3 className="text-xl font-black text-[--text-primary]">Delete Account</h3>
-                <p className="text-sm text-[--text-secondary] mt-2">Are you sure you want to delete <span className="font-bold text-rose-400">{accounts.find(a => a.id === deletingAccountId)?.name}</span>? This action cannot be undone.</p>
+                <h3 className="text-lg font-black text-[--text-primary]">Delete Account</h3>
+                <p className="text-xs text-[--text-secondary] mt-1.5 leading-relaxed">Are you sure you want to delete <span className="font-bold text-rose-400">{accounts.find(a => a.id === deletingAccountId)?.name}</span>? This action cannot be undone.</p>
               </div>
               <div className="flex gap-3 w-full mt-2">
-                <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeletingAccountId(null); }} className="btn-secondary flex-1 h-11 font-bold rounded-xl">Cancel</button>
-                <button type="button" onClick={confirmDelete} className="btn-danger flex-1 h-11 font-bold rounded-xl">Delete</button>
+                <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeletingAccountId(null); }} className="btn-secondary flex-1 !h-10 text-xs font-bold rounded-xl cursor-pointer">Cancel</button>
+                <button type="button" onClick={confirmDelete} className="btn-danger flex-1 !h-10 text-xs font-bold rounded-xl cursor-pointer">Delete</button>
               </div>
             </div>
           </div>
@@ -1257,31 +1263,32 @@ function CenteredModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[200] flex items-center justify-center p-3 bg-black/65 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-card-static relative w-full max-w-sm overflow-hidden border border-white/10 rounded-xl shadow-xl animate-scale-in"
+        className="glass-card-static relative w-full max-w-md overflow-hidden border border-white/10 rounded-2xl shadow-2xl animate-scale-in"
+        style={{ backgroundColor: "rgba(18, 22, 32, 0.95)" }}
       >
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500" />
         
         {/* Header */}
-        <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+        <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
           <div>
-            <h2 className="text-sm font-black text-white tracking-tight">{title}</h2>
-            <p className="text-[0.45rem] font-bold uppercase tracking-widest text-[--text-muted] mt-0.5">{subtitle}</p>
+            <h2 className="text-base font-black text-white tracking-tight">{title}</h2>
+            <p className="text-[0.625rem] font-bold uppercase tracking-widest text-[--text-muted] mt-0.5">{subtitle}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[--text-muted] hover:text-white transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[--text-muted] hover:text-white transition-colors cursor-pointer"
           >
-            <X className="w-3 h-3" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <div className="p-3.5 sm:p-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <div className="p-5 max-h-[85vh] overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </div>

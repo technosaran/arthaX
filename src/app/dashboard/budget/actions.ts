@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { getFriendlyErrorMessage } from "@/lib/action-utils";
+import { getFriendlyErrorMessage, logLedgerEntry } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 
 export async function upsertBudget(formData: {
@@ -22,6 +22,16 @@ export async function upsertBudget(formData: {
       });
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "BUDGET_UPSERT",
+      amount: formData.amount,
+      details: `Budget limit set for ${formData.category}: ₹${formData.amount.toLocaleString()} (${formData.period_month}/${formData.period_year})`,
+      source_type: "budget",
+      metadata: formData
+    });
+
     revalidatePath("/dashboard/budget");
     return { success: true, message: "Upsert Budget successful" };
   } catch (err) {
@@ -96,6 +106,14 @@ export async function copyPreviousMonthBudgets(
 
     if (upsertErr) return { error: upsertErr.message };
 
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "BUDGET_CARRY_OVER",
+      details: `Carried over ${sourceBudgets.length} budget limits from ${fromMonth}/${fromYear} to ${toMonth}/${toYear}`,
+      source_type: "budget",
+      metadata: { fromMonth, fromYear, toMonth, toYear, count: sourceBudgets.length }
+    });
+
     revalidatePath("/dashboard/budget");
     return { success: true, count: sourceBudgets.length };
   } catch (err) {
@@ -118,6 +136,15 @@ export async function clearAllBudgets(month: number, year: number) {
       .eq("period_year", year);
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "BUDGET_CLEAR",
+      details: `Cleared all budget limits for ${month}/${year}`,
+      source_type: "budget",
+      metadata: { month, year }
+    });
+
     revalidatePath("/dashboard/budget");
     return { success: true, message: "Clear All Budgets successful" };
   } catch (err) {
@@ -158,6 +185,15 @@ export async function setDefaultBudgets(month: number, year: number) {
       });
 
     if (error) return { error: getFriendlyErrorMessage(error) };
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "BUDGET_DEFAULTS",
+      details: `Set ${defaultBudgets.length} default category budget limits for ${month}/${year}`,
+      source_type: "budget",
+      metadata: { month, year, count: defaultBudgets.length }
+    });
+
     revalidatePath("/dashboard/budget");
     return { success: true, count: defaultBudgets.length };
   } catch (err) {

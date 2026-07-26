@@ -26,7 +26,6 @@ function isStaticAsset(pathname: string) {
 function createSecurityHeaders(nonce: string) {
   const isDev = process.env.NODE_ENV === "development";
   
-  // Content Security Policy - Prevents XSS attacks
   const cspHeaderParts = [
     "default-src 'self'",
     isDev
@@ -52,45 +51,18 @@ function createSecurityHeaders(nonce: string) {
   };
 }
 
-/**
- * Applies comprehensive security headers to the response
- * Headers follow OWASP security best practices and meet requirements 1.7 and 1.12
- */
 function applySecurityHeaders(response: NextResponse, headers: ReturnType<typeof createSecurityHeaders>) {
-  // Content Security Policy - Prevents XSS, injection attacks
   response.headers.set("Content-Security-Policy", headers.csp);
   response.headers.set("x-nonce", headers.nonce);
-  
-  // X-Frame-Options - Prevents clickjacking attacks
   response.headers.set("X-Frame-Options", "DENY");
-  
-  // X-Content-Type-Options - Prevents MIME type sniffing
   response.headers.set("X-Content-Type-Options", "nosniff");
-  
-  // X-XSS-Protection - Legacy XSS protection (for older browsers)
   response.headers.set("X-XSS-Protection", "1; mode=block");
-  
-  // Strict-Transport-Security - Enforces HTTPS
-  // max-age=31536000 (1 year), includeSubDomains, preload eligible
   response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-  
-  // Referrer-Policy - Controls referrer information
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  
-  // Permissions-Policy - Restricts browser features
-  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()");
-  
-  // Cross-Origin-Opener-Policy - Prevents cross-origin attacks
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-  
-  // Cross-Origin-Resource-Policy - Restricts resource loading
   response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
-  
-  // Cross-Origin-Embedder-Policy - credentialless allows cross-origin resources
-  // (Google Fonts, Supabase, OAuth redirects) while still providing isolation
   response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
   
-  // Cache-Control for dynamic document pages to prevent stale HTML caching
   if (!response.headers.has("Cache-Control")) {
     response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
   }
@@ -107,20 +79,15 @@ function createPassThroughResponse(requestHeaders: Headers) {
 }
 
 /**
- * Next.js proxy middleware for authentication and security headers
- * - Handles Supabase authentication
- * - Applies comprehensive security headers
- * - Manages route protection
+ * Next.js Proxy middleware for authentication and security headers
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip proxy for static assets
   if (isStaticAsset(pathname)) {
     return NextResponse.next();
   }
 
-  // Generate nonce for CSP
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const securityHeaders = createSecurityHeaders(nonce);
   const requestHeaders = new Headers(request.headers);
@@ -165,7 +132,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. CSRF Protection Check
-  if (pathname.startsWith("/api/") && pathname !== "/api/transactions/telegram-sync" && pathname !== "/api/transactions/sms-sync" && pathname !== "/api/run-migration") {
+  if (pathname.startsWith("/api/") && pathname !== "/api/transactions/telegram-sync" && pathname !== "/api/transactions/sms-sync" && pathname !== "/api/run-migration" && !pathname.startsWith("/api/cron/")) {
     const csrfResponse = await csrfMiddleware(request);
     if (csrfResponse) {
       SecurityLogger.logEvent({
@@ -180,9 +147,8 @@ export async function proxy(request: NextRequest) {
 
   let supabaseResponse = createPassThroughResponse(requestHeaders);
 
-  const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30; // 30 days (1 month persistent session)
+  const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30; // 30 days persistent session
 
-  // Initialize Supabase client for authentication
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -196,12 +162,9 @@ export async function proxy(request: NextRequest) {
             request.cookies.set(name, value)
           );
 
-          // CRITICAL FIX: Rebuild cookie header for downstream route handlers.
-          // This prevents the "double-refresh" bug where a route handler receives
-          // the old expired token and invalidates the newly refreshed session.
           const updatedCookies = request.cookies
             .getAll()
-            .map((c) => `${c.name}=${c.value}`)
+            .map((c: { name: string; value: string }) => `${c.name}=${c.value}`)
             .join("; ");
           requestHeaders.set("cookie", updatedCookies);
 
@@ -220,31 +183,24 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Check authentication status
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname === "/api/cron/telegram-alerts";
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname.startsWith("/api/cron/");
 
   let finalResponse: NextResponse;
 
-  // Redirect to login if not authenticated
   if (!user && !isPublicRoute) {
     finalResponse = NextResponse.redirect(new URL("/login", request.url));
   } else if (user && pathname === "/login") {
-    // Redirect to dashboard if authenticated user tries to access login
     finalResponse = NextResponse.redirect(new URL("/dashboard", request.url));
   } else {
     finalResponse = supabaseResponse;
   }
 
-  // CRITICAL: Copy refreshed auth cookies from supabaseResponse onto any redirect response.
-  // When getUser() refreshes an expired access token, the new tokens are written to supabaseResponse.
-  // If we created a new redirect response above, those cookies would be lost, causing session expiry.
   if (finalResponse !== supabaseResponse) {
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      // Pass the entire cookie object to preserve all attributes including `expires` and `maxAge`
+    supabaseResponse.cookies.getAll().forEach((cookie: { name: string; value: string; maxAge?: number }) => {
       finalResponse.cookies.set(cookie.name, cookie.value, {
         ...cookie,
         maxAge: cookie.maxAge ?? THIRTY_DAYS_IN_SECONDS,
@@ -254,7 +210,6 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  // Attach Rate Limit headers to successful API response
   if (rateLimitResult && finalResponse) {
     finalResponse.headers.set("X-RateLimit-Limit", rateLimitResult.limit.toString());
     finalResponse.headers.set("X-RateLimit-Remaining", rateLimitResult.remaining.toString());
