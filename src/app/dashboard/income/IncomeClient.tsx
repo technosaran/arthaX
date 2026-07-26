@@ -580,7 +580,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2.5">
-                            <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={44} />
+                            <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={44} />
                             <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
@@ -634,7 +634,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                     <div className="flex items-center gap-2">
-                      <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={44} />
+                      <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={44} />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <button type="button" 

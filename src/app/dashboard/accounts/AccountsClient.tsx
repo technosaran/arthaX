@@ -683,7 +683,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                          {isCashReserve ? "In-built Cash Reserve" : a.type}
                        </span>
                        <div className="flex items-center gap-3 mt-4">
-                         <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={48} />
+                         <BankLogo bankName={a.bank_name || a.name} accountName={a.name} type={a.type} size={48} />
                          <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
                        </div>
                      </div>

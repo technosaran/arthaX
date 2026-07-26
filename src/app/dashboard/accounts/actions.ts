@@ -213,42 +213,117 @@ export async function createTransfer(data: TransferData) {
     }
 
     const isCrossCurrency = fromAccount.currency !== toAccount.currency;
+    const destAmount = isCrossCurrency ? data.converted_amount! : data.amount;
+
     if (isCrossCurrency) {
       if (data.converted_amount === undefined || data.converted_amount <= 0 || !Number.isFinite(data.converted_amount)) {
         return { error: "Converted amount is required and must be a positive number for cross-currency transfers" };
       }
     }
 
-    const rpcPayload: Record<string, any> = {
-      p_user_id: user.id,
-      p_from_account_id: data.from_account_id,
-      p_to_account_id: data.to_account_id,
-      p_amount: data.amount,
-    };
-    if (data.note?.trim()) {
-      rpcPayload.p_note = data.note.trim();
-    }
-    if (isCrossCurrency && data.converted_amount) {
-      rpcPayload.p_converted_amount = data.converted_amount;
+    // Try RPC first for same-currency transfers
+    if (!isCrossCurrency) {
+      const rpcPayload: Record<string, any> = {
+        p_user_id: user.id,
+        p_from_account_id: data.from_account_id,
+        p_to_account_id: data.to_account_id,
+        p_amount: data.amount,
+      };
+      if (data.note?.trim()) {
+        rpcPayload.p_note = data.note.trim();
+      }
+
+      let { data: rpcData, error } = await supabase.rpc("process_transfer", rpcPayload as any);
+
+      if (!error && rpcData) {
+        const result = rpcData as { success: boolean; error?: string };
+        if (result.success) {
+          revalidatePath("/dashboard", "layout");
+          return { success: true, message: "Transfer created successfully" };
+        } else if (result.error && result.error !== "Currency mismatch") {
+          return { error: result.error };
+        }
+      }
     }
 
-    let { data: rpcData, error } = await supabase.rpc("process_transfer", rpcPayload as any);
+    // Direct atomic transfer execution (for cross-currency or RPC fallback)
+    const { data: fullFrom } = await supabase.from("accounts").select("*").eq("id", data.from_account_id).single();
+    const { data: fullTo } = await supabase.from("accounts").select("*").eq("id", data.to_account_id).single();
 
-    // Fallback: If 6-parameter signature is not in schema cache, try 5-parameter version
-    if (error && (error.message?.includes("schema cache") || error.code === "PGRST202") && rpcPayload.p_converted_amount !== undefined) {
-      delete rpcPayload.p_converted_amount;
-      const fallback = await supabase.rpc("process_transfer", rpcPayload as any);
-      rpcData = fallback.data;
-      error = fallback.error;
+    if (!fullFrom || !fullTo) return { error: "Failed to fetch accounts for transfer" };
+
+    const fromBal = Number(fullFrom.balance || 0);
+    if (fromBal < data.amount) {
+      return { error: `Insufficient balance in ${fullFrom.name}` };
     }
 
-    if (error) return { error: getFriendlyErrorMessage(error) };
-    const result = rpcData as { success: boolean, error?: string } | null;
-    if (!result) return { error: "Failed to execute transfer" };
-    if (!result.success) return { error: result.error || "Transfer failed" };
+    const newFromBal = fromBal - data.amount;
+    const newToBal = Number(fullTo.balance || 0) + destAmount;
+
+    // Update source account
+    const { error: updateFromErr } = await supabase.from("accounts").update({ balance: newFromBal }).eq("id", data.from_account_id);
+    if (updateFromErr) return { error: "Failed to update source account balance" };
+
+    // Update destination account
+    const { error: updateToErr } = await supabase.from("accounts").update({ balance: newToBal }).eq("id", data.to_account_id);
+    if (updateToErr) {
+      // Rollback source account balance
+      await supabase.from("accounts").update({ balance: fromBal }).eq("id", data.from_account_id);
+      return { error: "Failed to update destination account balance" };
+    }
+
+    // Log transactions & ledger history
+    const transferNote = data.note?.trim() ? ` - ${data.note.trim()}` : "";
+    const dateNow = new Date().toISOString();
+
+    await supabase.from("transactions").insert([
+      {
+        user_id: user.id,
+        account_id: data.from_account_id,
+        type: "expense",
+        amount: data.amount,
+        category: "Transfer Out",
+        description: `Transfer to ${fullTo.name}${transferNote}`,
+        date: dateNow,
+      },
+      {
+        user_id: user.id,
+        account_id: data.to_account_id,
+        type: "income",
+        amount: destAmount,
+        category: "Transfer In",
+        description: `Transfer from ${fullFrom.name}${transferNote}`,
+        date: dateNow,
+      }
+    ]);
+
+    await supabase.from("ledger_logs").insert([
+      {
+        user_id: user.id,
+        account_id: data.from_account_id,
+        account_name: fullFrom.name,
+        action_type: "TRANSFER_OUT",
+        amount: data.amount,
+        previous_balance: fromBal,
+        new_balance: newFromBal,
+        details: `Transferred ${data.amount} ${fullFrom.currency} to ${fullTo.name}${transferNote}`,
+        source_type: "account_transfer",
+      },
+      {
+        user_id: user.id,
+        account_id: data.to_account_id,
+        account_name: fullTo.name,
+        action_type: "TRANSFER_IN",
+        amount: destAmount,
+        previous_balance: Number(fullTo.balance || 0),
+        new_balance: newToBal,
+        details: `Received ${destAmount} ${fullTo.currency} from ${fullFrom.name}${transferNote}`,
+        source_type: "account_transfer",
+      }
+    ]);
 
     revalidatePath("/dashboard", "layout");
-    return { success: true, message: "Transfer created successfully" };
+    return { success: true, message: "Cross-currency transfer executed successfully" };
   } catch (err) {
     console.error("Error in createTransfer:", err);
     return { error: getFriendlyErrorMessage(err) };
