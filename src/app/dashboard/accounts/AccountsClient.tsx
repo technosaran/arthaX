@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import type { Tables } from "@/lib/database.types";
 import BankLogo from "@/components/ui/bank-logo";
 import { searchBanks, type Bank } from "@/lib/banks";
-import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance } from "./actions";
+import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance, ensureCashReserveAccount } from "./actions";
 import { Drawer } from "@/components/ui/drawer";
 import { X } from "lucide-react";
 import { useHasMounted } from "@/hooks/use-has-mounted";
@@ -17,6 +17,7 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { getChartColour } from "@/lib/chart-colours";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { getCurrencySymbol, hexToRgba, getHistoryCutoff } from "@/lib/utils";
+import BankStatementParserModal from "@/components/BankStatementParserModal";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "@/components/ui/recharts";
 
@@ -72,6 +73,13 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const hasCashAccount = accounts.some(a => a.type === "cash" || a.name.toLowerCase().includes("cash"));
+    if (!hasCashAccount) {
+      ensureCashReserveAccount().then(() => mutate());
+    }
+  }, [accounts, mutate]);
   const [submitting, withLock] = useSubmitLock();
   const [showTransferModal, setShowTransferModal] = useState(searchParams.get("action") === "transfer");
   const [transferFromId, setTransferFromId] = useState<string | null>(null);
@@ -92,6 +100,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
     return amt * rate;
   }, [transferData.amount, conversionRate]);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showParserModal, setShowParserModal] = useState(false);
   const [adjustingAccountId, setAdjustingAccountId] = useState<string | null>(null);
   const [adjustData, setAdjustData] = useState({ amount: "", note: "", type: "add" as "add" | "subtract" });
   const [formData, setFormData] = useState({ name: "", type: "checking", balance: "0", currency: "INR", bank_name: "" });
@@ -161,7 +170,10 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
 
   async function handleDelete(id: string) {
     const account = accounts.find((a: Account) => a.id === id);
-    if (account?.name === "Cash") { toast.error("Cannot delete Cash"); return; }
+    if (account && (account.type === "cash" || account.name.toLowerCase().includes("cash"))) {
+      toast.error("The built-in Cash Reserve account is permanent and cannot be deleted.");
+      return;
+    }
     setDeletingAccountId(id);
     setShowDeleteConfirm(true);
   }
@@ -345,6 +357,10 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           <div className={`status-dot scale-90 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400 opacity-50'}`} />
         </div>
         <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setShowParserModal(true)} className="btn-secondary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
+            <svg className="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            <span>Import Statement</span>
+          </button>
           <button type="button" onClick={() => { setTransferFromId(null); setShowTransferModal(true); }} className="btn-secondary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
             <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
             <span>Transfer</span>
@@ -644,6 +660,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
               </div>
             )}
             {filteredAccounts.map((a) => {
+              const isCashReserve = a.type === "cash" || a.name.toLowerCase().includes("cash");
               const style = TYPE_STYLES[a.type] || TYPE_STYLES.checking;
               const glowRgb = {
                 checking: "14, 165, 233",
@@ -664,8 +681,16 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 >
                   <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: style.gradient }} />
                   <div className="flex justify-between items-start mb-6">
-                     <div><span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>{a.type}</span><div className="flex items-center gap-3 mt-4"><BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={48} /><span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span></div></div>
-                     {a.name !== "Cash" && <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>}
+                     <div>
+                       <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" style={{ background: style.badge, color: style.color, border: `1px solid ${style.badgeBorder}` }}>
+                         {isCashReserve ? "In-built Cash Reserve" : a.type}
+                       </span>
+                       <div className="flex items-center gap-3 mt-4">
+                         <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={48} />
+                         <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
+                       </div>
+                     </div>
+                     <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
                   </div>
                   <div className="mt-auto">
                     <h3 className="text-lg font-bold truncate">{a.name}</h3>
@@ -675,7 +700,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                         Adjust ±
                       </button>
-                      {a.name !== "Cash" && <button type="button" onClick={() => handleDelete(a.id)} className="w-11 h-11 rounded-xl bg-danger/10 border border-danger/20 text-danger hover:bg-danger/20 transition-all flex items-center justify-center"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                      {!isCashReserve && <button type="button" onClick={() => handleDelete(a.id)} className="w-11 h-11 rounded-xl bg-danger/10 border border-danger/20 text-danger hover:bg-danger/20 transition-all flex items-center justify-center"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
                     </div>
                   </div>
                 </div>
@@ -1185,6 +1210,13 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </div>
         </div>
       )}
+
+      <BankStatementParserModal
+        isOpen={showParserModal}
+        onClose={() => setShowParserModal(false)}
+        accounts={accounts}
+        onSuccess={() => mutate()}
+      />
     </>
   );
 }

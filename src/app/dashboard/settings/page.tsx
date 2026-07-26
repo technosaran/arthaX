@@ -13,6 +13,7 @@ import dynamic from "next/dynamic";
 import ProfileTab from "./components/ProfileTab";
 import ModulesTab from "./components/ModulesTab";
 import DefaultsTab from "./components/DefaultsTab";
+import ImportsTab from "./components/ImportsTab";
 import IntegrationsTab from "./components/IntegrationsTab";
 import SystemStatusTab from "./components/SystemStatusTab";
 import DangerZoneTab from "./components/DangerZoneTab";
@@ -22,7 +23,7 @@ const ReportDownloadButton = dynamic(
   { ssr: false }
 );
 
-type TabKey = "profile" | "modules" | "defaults" | "integrations" | "exports" | "status" | "danger";
+type TabKey = "profile" | "modules" | "defaults" | "imports" | "integrations" | "exports" | "status" | "danger";
 
 export default function SettingsPage() {
   const { username, setUsername, loading, isSyncing } = useUser();
@@ -241,15 +242,15 @@ export default function SettingsPage() {
   };
 
   const SECTIONS_REQUIRING_ACCOUNT = [
-    { key: "expenses", label: "Expenses Section", icon: "🔴" },
-    { key: "income", label: "Income Section", icon: "🟢" },
+    { key: "expenses", label: "Expenses", icon: "💳" },
+    { key: "income", label: "Income", icon: "💰" },
     { key: "family", label: "Family Transfers", icon: "💜" },
-    { key: "forex", label: "Forex Operations", icon: "💱" },
     { key: "goals", label: "Goals & Savings", icon: "🎯" },
-    { key: "fno", label: "Futures & Options", icon: "📈" },
     { key: "stocks", label: "Stock Portfolio", icon: "📊" },
     { key: "mutual_funds", label: "Mutual Funds", icon: "🏦" },
     { key: "bonds", label: "Bond Investments", icon: "🔏" },
+    { key: "fno", label: "Futures & Options", icon: "📈" },
+    { key: "forex", label: "Forex Operations", icon: "💱" },
   ];
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -367,6 +368,7 @@ export default function SettingsPage() {
           { key: "profile", label: "Profile" },
           { key: "modules", label: "Modules" },
           { key: "defaults", label: "Defaults" },
+          { key: "imports", label: "Data Imports" },
           { key: "integrations", label: "Integrations" },
           { key: "status", label: "System Status" },
           { key: "danger", label: "Danger Zone" },
@@ -374,6 +376,7 @@ export default function SettingsPage() {
           const isActive = activeTab === tab.key;
 
           let activeStyles = "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]";
+          if (tab.key === "imports") activeStyles = "bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]";
           if (tab.key === "danger") activeStyles = "bg-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.3)]";
 
           return (
@@ -417,6 +420,10 @@ export default function SettingsPage() {
           handleDefaultAccountChange={handleDefaultAccountChange}
           sectionsRequiringAccount={SECTIONS_REQUIRING_ACCOUNT}
         />
+      )}
+
+      {activeTab === "imports" && (
+        <ImportsTab accounts={accounts} mutate={mutate} />
       )}
 
       {activeTab === "integrations" && (

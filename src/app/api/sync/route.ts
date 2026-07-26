@@ -4,6 +4,8 @@ import * as schema from "@/db/schema";
 import { eq, gt, and } from "drizzle-orm";
 import { fetchLiveMFNAV } from "@/app/dashboard/mutual-funds/actions";
 import { fetchLiveStockPrice } from "@/app/dashboard/stocks/actions";
+import { fetchBatchCryptoPrices } from "@/lib/market-scrapers/crypto-sync";
+import { fetchLiveGoldSilverRates } from "@/lib/market-scrapers/gold-silver-scraper";
 
 export async function GET(request: Request) {
   try {
@@ -73,6 +75,72 @@ export async function GET(request: Request) {
       } catch (err) {
         console.error(`Failed to sync price for stock: ${stock.symbol}`, err);
       }
+    }
+
+    // 4b. Sync Crypto Prices
+    let cryptoUpdated = 0;
+    const activeCrypto = await db
+      .selectDistinct({ symbol: schema.investments.symbol })
+      .from(schema.investments)
+      .where(and(eq(schema.investments.type, "crypto"), gt(schema.investments.quantity, "0")));
+
+    if (activeCrypto.length > 0) {
+      const cryptoSymbols = activeCrypto.map((c) => c.symbol).filter(Boolean) as string[];
+      const cryptoPrices = await fetchBatchCryptoPrices(cryptoSymbols);
+
+      for (const sym of cryptoSymbols) {
+        const priceInfo = cryptoPrices[sym.toUpperCase()];
+        if (priceInfo && priceInfo.priceInr > 0) {
+          await db
+            .update(schema.investments)
+            .set({
+              current_price: priceInfo.priceInr.toString(),
+              day_change_percent: priceInfo.dayChangePercent ? priceInfo.dayChangePercent.toString() : undefined,
+              last_fetch_at: now,
+              updated_at: now,
+            })
+            .where(and(eq(schema.investments.type, "crypto"), eq(schema.investments.symbol, sym)));
+          cryptoUpdated++;
+        }
+      }
+    }
+
+    // 4c. Sync Gold & Silver Bullion Rates
+    let bullionUpdated = 0;
+    try {
+      const bullionRates = await fetchLiveGoldSilverRates();
+      const altAssets = await db.select().from(schema.alternativeAssets);
+
+      for (const asset of altAssets) {
+        const categoryLower = (asset.category || "").toLowerCase();
+        const nameLower = (asset.name || "").toLowerCase();
+
+        if (categoryLower.includes("gold") || nameLower.includes("gold")) {
+          // If notes contain gram count (e.g. "10 grams")
+          const gramMatch = (asset.notes || "").match(/(\d+(\.\d+)?)\s*g/i);
+          const grams = gramMatch ? parseFloat(gramMatch[1]) : 10;
+          const ratePerGram = nameLower.includes("22k") ? bullionRates.gold22kPerGram : bullionRates.gold24kPerGram;
+          const newValue = grams * ratePerGram;
+
+          await db
+            .update(schema.alternativeAssets)
+            .set({ current_value: newValue.toString(), updated_at: now })
+            .where(eq(schema.alternativeAssets.id, asset.id));
+          bullionUpdated++;
+        } else if (categoryLower.includes("silver") || nameLower.includes("silver")) {
+          const gramMatch = (asset.notes || "").match(/(\d+(\.\d+)?)\s*g/i);
+          const grams = gramMatch ? parseFloat(gramMatch[1]) : 100;
+          const newValue = grams * bullionRates.silverPerGram;
+
+          await db
+            .update(schema.alternativeAssets)
+            .set({ current_value: newValue.toString(), updated_at: now })
+            .where(eq(schema.alternativeAssets.id, asset.id));
+          bullionUpdated++;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to sync bullion rates:", err);
     }
 
     // 5. Auto-Execute Recurring Expenses
@@ -305,6 +373,8 @@ export async function GET(request: Request) {
       success: true,
       stocks_updated: stocksUpdated,
       mfs_updated: mfsUpdated,
+      crypto_updated: cryptoUpdated,
+      bullion_updated: bullionUpdated,
       expenses_generated: expensesGenerated,
       incomes_generated: incomesGenerated,
     });

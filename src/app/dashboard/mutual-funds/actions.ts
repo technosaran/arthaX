@@ -346,3 +346,66 @@ export async function updateMFHolding(id: string, data: {
     return { error: getFriendlyErrorMessage(err) };
   }
 }
+
+export async function importCASPortfolio(items: Array<{
+  assetClass: "mutual_fund" | "stock";
+  name: string;
+  symbolOrSchemeCode?: string;
+  unitsOrQuantity: number;
+  currentNavOrPrice: number;
+}>) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    if (!items || items.length === 0) return { error: "No portfolio items selected for import" };
+
+    let importedMf = 0;
+    let importedStock = 0;
+
+    for (const item of items) {
+      if (item.assetClass === "mutual_fund") {
+        await supabase.from("mutual_funds").insert({
+          user_id: user.id,
+          fund_name: item.name,
+          units: item.unitsOrQuantity,
+          avg_nav: item.currentNavOrPrice,
+          current_nav: item.currentNavOrPrice,
+          category: "Direct Growth",
+        });
+        importedMf++;
+      } else {
+        await supabase.from("investments").insert({
+          user_id: user.id,
+          name: item.name,
+          type: "stock",
+          symbol: item.symbolOrSchemeCode || item.name.substring(0, 10).toUpperCase(),
+          quantity: item.unitsOrQuantity,
+          buy_price: item.currentNavOrPrice,
+          current_price: item.currentNavOrPrice,
+        });
+        importedStock++;
+      }
+    }
+
+    await supabase.from("ledger_logs").insert({
+      user_id: user.id,
+      action_type: "CAS_IMPORT",
+      details: `CAS Portfolio Import: ${importedMf} Mutual Funds and ${importedStock} Stocks imported.`,
+      source_type: "cas_import",
+    });
+
+    revalidatePath("/dashboard/mutual-funds");
+    revalidatePath("/dashboard/stocks");
+    revalidatePath("/dashboard");
+    return {
+      success: true,
+      message: `Successfully imported ${importedMf} Mutual Funds and ${importedStock} Stocks!`,
+    };
+  } catch (err) {
+    console.error("Error in importCASPortfolio:", err);
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+

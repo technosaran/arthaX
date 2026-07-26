@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addExpense, deleteExpense } from "./actions";
+import { addExpense, deleteExpense, cleanupCorruptedPDFDescriptions } from "./actions";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
@@ -38,7 +38,6 @@ export default function ExpensesClient({ initialData }: { initialData?: FinanceD
   const [showAddModal, setShowAddModal] = useState(searchParams.get("action") === "new");
   const [editingExpense, setEditingExpense] = useState<{ id: string; description: string; amount: string | number; category: string; date: string | null; account_id: string | null } | null>(null);
   const [submitting, withLock] = useSubmitLock();
-
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 

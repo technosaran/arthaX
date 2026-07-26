@@ -1,0 +1,18 @@
+{
+  "name": "FinanceOS - ArthaX Personal Finance",
+  "short_name": "FinanceOS",
+  "description": "Comprehensive personal finance, bank statement parsing, investments, and AI net worth tracker",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0d0f17",
+  "theme_color": "#12141c",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

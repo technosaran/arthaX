@@ -132,7 +132,16 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. CSRF Protection Check
-  if (pathname.startsWith("/api/") && pathname !== "/api/transactions/telegram-sync" && pathname !== "/api/transactions/sms-sync" && pathname !== "/api/run-migration" && !pathname.startsWith("/api/cron/")) {
+  if (
+    pathname.startsWith("/api/") &&
+    !pathname.startsWith("/api/mcp") &&
+    !pathname.startsWith("/api/bank-parser") &&
+    !pathname.startsWith("/api/cas-parser") &&
+    pathname !== "/api/transactions/telegram-sync" &&
+    pathname !== "/api/transactions/sms-sync" &&
+    pathname !== "/api/run-migration" &&
+    !pathname.startsWith("/api/cron/")
+  ) {
     const csrfResponse = await csrfMiddleware(request);
     if (csrfResponse) {
       SecurityLogger.logEvent({

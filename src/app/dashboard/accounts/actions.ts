@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { getFriendlyErrorMessage } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
+import { parseToISODate } from "@/lib/utils";
 
 export async function createAccount(data: {
   name: string;
@@ -85,14 +86,57 @@ export async function updateAccount(id: string, data: Record<string, unknown>) {
   }
 }
 
+export async function ensureCashReserveAccount() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: existingCash } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .or("type.eq.cash,name.ilike.%cash%");
+
+    if (!existingCash || existingCash.length === 0) {
+      await supabase.rpc("create_account_atomic", {
+        p_user_id: user.id,
+        p_name: "Cash Reserve",
+        p_type: "cash",
+        p_balance: 0,
+        p_currency: "INR",
+        p_bank_name: "Cash",
+      });
+      revalidatePath("/dashboard", "layout");
+    }
+  } catch (err) {
+    console.error("Error ensuring Cash Reserve account:", err);
+  }
+}
+
 export async function deleteAccount(id: string) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
+    const { data: targetAccount } = await supabase
+      .from("accounts")
+      .select("name, type")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (
+      targetAccount &&
+      (targetAccount.type === "cash" ||
+        targetAccount.name.toLowerCase().includes("cash reserve") ||
+        targetAccount.name.toLowerCase() === "cash")
+    ) {
+      return { error: "The built-in Cash Reserve account is permanent and cannot be deleted." };
+    }
+
     // Unlink any transactions that reference this account to prevent foreign key constraint violations
-    // We set the account_id to null instead of deleting the trades, preserving the user's portfolio history
     const unlinkResults = await Promise.all([
       supabase.from("forex_transactions").update({ bank_account_id: null }).eq("bank_account_id", id),
       supabase.from("bond_transactions").update({ account_id: null }).eq("account_id", id),
@@ -231,3 +275,97 @@ export async function adjustBalance(id: string, amount: number, note: string) {
     return { error: getFriendlyErrorMessage(err) };
   }
 }
+
+export async function importParsedTransactions(
+  accountId: string,
+  transactions: Array<{
+    date: string;
+    description: string;
+    type: "expense" | "income";
+    amount: number;
+    category: string;
+  }>
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    if (!accountId) return { error: "Target account ID is required" };
+    if (!transactions || transactions.length === 0) return { error: "No transactions selected for import" };
+
+    const { data: account, error: accErr } = await supabase
+      .from("accounts")
+      .select("*")
+      .eq("id", accountId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (accErr || !account) return { error: "Account not found" };
+
+    let currentBalance = Number(account.balance || 0);
+    const oldBalance = currentBalance;
+
+    let importedCount = 0;
+
+    for (const tx of transactions) {
+      const safeDateStr = parseToISODate(tx.date);
+      if (tx.type === "expense") {
+        currentBalance -= tx.amount;
+        await supabase.from("expenses").insert({
+          user_id: user.id,
+          account_id: accountId,
+          description: tx.description,
+          amount: tx.amount,
+          category: tx.category,
+          date: safeDateStr,
+        });
+      } else {
+        currentBalance += tx.amount;
+        await supabase.from("incomes").insert({
+          user_id: user.id,
+          account_id: accountId,
+          description: tx.description,
+          amount: tx.amount,
+          category: tx.category,
+          date: safeDateStr,
+        });
+      }
+
+      await supabase.from("transactions").insert({
+        user_id: user.id,
+        account_id: accountId,
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description,
+        category: tx.category,
+        date: safeDateStr,
+      });
+
+      importedCount++;
+    }
+
+    // Update final account balance
+    await supabase.from("accounts").update({ balance: currentBalance }).eq("id", accountId);
+
+    // Audit log
+    await supabase.from("ledger_logs").insert({
+      user_id: user.id,
+      account_id: accountId,
+      account_name: account.name,
+      action_type: "STATEMENT_IMPORT",
+      amount: Math.abs(currentBalance - oldBalance),
+      previous_balance: oldBalance,
+      new_balance: currentBalance,
+      details: `Bank Statement Import: ${importedCount} transactions imported`,
+      source_type: "statement_import",
+    });
+
+    revalidatePath("/dashboard", "layout");
+    return { success: true, count: importedCount, message: `Successfully imported ${importedCount} transactions!` };
+  } catch (err) {
+    console.error("Error in importParsedTransactions:", err);
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+

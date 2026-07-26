@@ -84,10 +84,17 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
     return null;
   }
 
-  // Skip CSRF check for authenticated API routes that use session or token auth
+  // Skip CSRF check for authenticated API routes that use session, token auth, or file uploads
   const pathname = request.nextUrl.pathname;
-  if (pathname.startsWith("/api/sync") || pathname.startsWith("/api/transactions/") || pathname.startsWith("/api/ai/")) {
-    // Sync, transaction, and AI endpoints use session/auth tokens
+  if (
+    pathname.startsWith("/api/sync") ||
+    pathname.startsWith("/api/transactions/") ||
+    pathname.startsWith("/api/ai/") ||
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/api/bank-parser") ||
+    pathname.startsWith("/api/cas-parser")
+  ) {
+    // Sync, transaction, AI, MCP, and statement parser endpoints use session/auth tokens or standalone uploads
     return null;
   }
 
