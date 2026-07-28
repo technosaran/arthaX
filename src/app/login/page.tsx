@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { login, signup } from "./actions";
 import { createClient } from "@/lib/supabase-browser";
+import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import zxcvbn from "zxcvbn";
@@ -187,11 +188,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10">
-          <div className="w-14 h-14 bg-gradient-to-br from-sky-400 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-500/20 mb-8">
-            <svg width="24" height="24" fill="none" stroke="white" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
-          </div>
+          <Image src="/icon.svg" alt="arthaX Logo" width={82} height={82} className="rounded-2xl shadow-2xl shadow-sky-500/30 mb-6 object-contain" />
           <h1 className="text-[clamp(2.5rem,4vw,3.5rem)] font-black text-white tracking-tight mb-4">
             artha<span className="text-sky-400">X</span>
           </h1>
@@ -229,11 +226,7 @@ export default function LoginPage() {
         >
           {/* Mobile Logo */}
           <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-8">
-            <div className="w-12 h-12 bg-gradient-to-br from-sky-400 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-500/20 mb-4">
-              <svg width="20" height="20" fill="none" stroke="white" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
+            <Image src="/icon.svg" alt="arthaX Logo" width={68} height={68} className="rounded-2xl shadow-xl shadow-sky-500/30 mb-4 object-contain" />
             <h1 className="text-3xl font-black text-white tracking-tight">
               artha<span className="text-sky-400">X</span>
             </h1>

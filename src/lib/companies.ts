@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Company Registry mapping names to official web domains
  * Used for fetching real company/employer logos for the Income section
  */
@@ -73,6 +73,65 @@ const COMPANIES: Company[] = [
   { name: "Gumroad", domain: "gumroad.com" },
   { name: "Udemy", domain: "udemy.com" },
   { name: "Coursera", domain: "coursera.org" },
+
+  // Indian Industrial & Conglomerates
+  { name: "Reliance Industries", domain: "ril.com" },
+  { name: "Jio", domain: "jio.com" },
+  { name: "Tata Group", domain: "tata.com" },
+  { name: "Aditya Birla Group", domain: "adityabirla.com" },
+  { name: "Mahindra & Mahindra", domain: "mahindra.com" },
+  { name: "Bajaj Finserv", domain: "bajajfinserv.in" },
+  { name: "Larsen & Toubro", domain: "larsentoubro.com" },
+  { name: "Adani Group", domain: "adani.com" },
+  { name: "Airtel", domain: "airtel.in" },
+  { name: "Godrej", domain: "godrej.com" },
+  { name: "ITC", domain: "itcportal.com" },
+  { name: "Hindustan Unilever", domain: "hul.co.in" },
+  { name: "Dabur", domain: "dabur.com" },
+  { name: "Britannia", domain: "britannia.co.in" },
+  { name: "Asian Paints", domain: "asianpaints.com" },
+  { name: "Titan", domain: "titan.co.in" },
+  { name: "Avenue Supermarts (DMart)", domain: "dmartindia.com" },
+
+  // E-Commerce, Retail & Quick Commerce
+  { name: "Myntra", domain: "myntra.com" },
+  { name: "Nykaa", domain: "nykaa.com" },
+  { name: "Ajio", domain: "ajio.com" },
+  { name: "Meesho", domain: "meesho.com" },
+  { name: "Blinkit", domain: "blinkit.com" },
+  { name: "Zepto", domain: "zepto.now" },
+  { name: "BigBasket", domain: "bigbasket.com" },
+  { name: "Urban Company", domain: "urbancompany.com" },
+  { name: "Ola Cabs", domain: "olacabs.com" },
+  { name: "Rapido", domain: "rapido.bike" },
+  { name: "BookMyShow", domain: "bookmyshow.com" },
+  { name: "MakeMyTrip", domain: "makemytrip.com" },
+
+  // Automobile & EV Giants
+  { name: "Maruti Suzuki", domain: "marutisuzuki.com" },
+  { name: "Hyundai Motors", domain: "hyundai.com" },
+  { name: "Tata Motors", domain: "tatamotors.com" },
+  { name: "Hero MotoCorp", domain: "heromotocorp.com" },
+  { name: "TVS Motor", domain: "tvsmotor.com" },
+  { name: "Royal Enfield", domain: "royalenfield.com" },
+  { name: "Ather Energy", domain: "atherenergy.com" },
+  { name: "Tesla", domain: "tesla.com" },
+
+  // Global Enterprise Tech, Cloud & AI
+  { name: "Intel", domain: "intel.com" },
+  { name: "AMD", domain: "amd.com" },
+  { name: "Qualcomm", domain: "qualcomm.com" },
+  { name: "Cisco", domain: "cisco.com" },
+  { name: "SAP", domain: "sap.com" },
+  { name: "ServiceNow", domain: "servicenow.com" },
+  { name: "Snowflake", domain: "snowflake.com" },
+  { name: "Databricks", domain: "databricks.com" },
+  { name: "Cloudflare", domain: "cloudflare.com" },
+  { name: "Palantir", domain: "palantir.com" },
+  { name: "Notion", domain: "notion.so" },
+  { name: "Figma", domain: "figma.com" },
+  { name: "Canva", domain: "canva.com" },
+  { name: "Shopify", domain: "shopify.com" },
 
   // Consulting & Finance Employers
   { name: "Deloitte", domain: "deloitte.com" },
@@ -181,202 +240,156 @@ import { getFastLogoCandidateUrls } from "./logo-cache";
 
 const HD_COMPANY_LOGOS: Record<string, string[]> = {
   "google.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg",
     "https://cdn.simpleicons.org/google",
-    "https://cdn.brandfetch.io/google.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=google.com&sz=256",
   ],
   "microsoft.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg",
     "https://cdn.simpleicons.org/microsoft",
-    "https://cdn.brandfetch.io/microsoft.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=microsoft.com&sz=256",
   ],
   "apple.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
     "https://cdn.simpleicons.org/apple",
-    "https://cdn.brandfetch.io/apple.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=apple.com&sz=256",
   ],
   "amazon.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
     "https://cdn.simpleicons.org/amazon",
-    "https://cdn.brandfetch.io/amazon.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=amazon.com&sz=256",
   ],
   "meta.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg",
     "https://cdn.simpleicons.org/meta",
-    "https://cdn.brandfetch.io/meta.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=meta.com&sz=256",
   ],
   "netflix.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg",
     "https://cdn.simpleicons.org/netflix",
-    "https://cdn.brandfetch.io/netflix.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=netflix.com&sz=256",
   ],
   "salesforce.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg",
     "https://cdn.simpleicons.org/salesforce",
-    "https://cdn.brandfetch.io/salesforce.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=salesforce.com&sz=256",
   ],
   "zoom.us": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
     "https://cdn.simpleicons.org/zoom",
-    "https://cdn.brandfetch.io/zoom.us/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=zoom.us&sz=256",
   ],
   "adobe.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/18/Adobe_Corporate_logo.svg",
     "https://cdn.simpleicons.org/adobe",
-    "https://cdn.brandfetch.io/adobe.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=adobe.com&sz=256",
   ],
   "oracle.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/5/50/Oracle_logo.svg",
     "https://cdn.simpleicons.org/oracle",
-    "https://cdn.brandfetch.io/oracle.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=oracle.com&sz=256",
   ],
   "ibm.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg",
     "https://cdn.simpleicons.org/ibm",
-    "https://cdn.brandfetch.io/ibm.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=ibm.com&sz=256",
   ],
   "nvidia.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/21/Nvidia_logo.svg",
     "https://cdn.simpleicons.org/nvidia",
-    "https://cdn.brandfetch.io/nvidia.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=nvidia.com&sz=256",
   ],
   "spotify.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/19/Spotify_logo_without_text.svg",
     "https://cdn.simpleicons.org/spotify",
-    "https://cdn.brandfetch.io/spotify.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=spotify.com&sz=256",
   ],
   "uber.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.svg",
     "https://cdn.simpleicons.org/uber",
-    "https://cdn.brandfetch.io/uber.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=uber.com&sz=256",
   ],
   "airbnb.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/6/69/Airbnb_Logo_B%C3%A9lo.svg",
     "https://cdn.simpleicons.org/airbnb",
-    "https://cdn.brandfetch.io/airbnb.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=airbnb.com&sz=256",
   ],
   "atlassian.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/74/Atlassian-icon-logo.svg",
     "https://cdn.simpleicons.org/atlassian",
-    "https://cdn.brandfetch.io/atlassian.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=atlassian.com&sz=256",
   ],
   "github.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/c2/GitHub_Invertocat_Logo.svg",
     "https://cdn.simpleicons.org/github",
-    "https://cdn.brandfetch.io/github.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=github.com&sz=256",
   ],
   "gitlab.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/e/e1/GitLab_logo.svg",
     "https://cdn.simpleicons.org/gitlab",
-    "https://cdn.brandfetch.io/gitlab.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=gitlab.com&sz=256",
   ],
   "slack.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
     "https://cdn.simpleicons.org/slack",
-    "https://cdn.brandfetch.io/slack.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=slack.com&sz=256",
   ],
   "openai.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg",
     "https://cdn.simpleicons.org/openai",
-    "https://cdn.brandfetch.io/openai.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=openai.com&sz=256",
   ],
   "kfc.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/bf/KFC_logo.svg",
     "https://cdn.simpleicons.org/kfc",
-    "https://cdn.brandfetch.io/kfc.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=kfc.com&sz=256",
   ],
   "infosys.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
-    "https://cdn.brandfetch.io/infosys.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=infosys.com&sz=256",
   ],
   "tcs.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg",
-    "https://cdn.brandfetch.io/tcs.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=tcs.com&sz=256",
   ],
   "wipro.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg",
     "https://cdn.simpleicons.org/wipro",
-    "https://cdn.brandfetch.io/wipro.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=wipro.com&sz=256",
   ],
   "hcltech.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/79/HCLTech_Logo.svg",
-    "https://cdn.brandfetch.io/hcltech.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=hcltech.com&sz=256",
   ],
   "accenture.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cd/Accenture.svg",
     "https://cdn.simpleicons.org/accenture",
-    "https://cdn.brandfetch.io/accenture.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=accenture.com&sz=256",
   ],
   "cognizant.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/30/Cognizant_logo_2022.svg",
-    "https://cdn.brandfetch.io/cognizant.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=cognizant.com&sz=256",
   ],
   "capgemini.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a2/Capgemini_logo.svg",
-    "https://cdn.brandfetch.io/capgemini.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=capgemini.com&sz=256",
   ],
   "swiggy.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/12/Swiggy_logo.svg",
     "https://cdn.simpleicons.org/swiggy",
-    "https://cdn.brandfetch.io/swiggy.in/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=swiggy.in&sz=256",
   ],
   "zomato.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b3/Zomato_logo.svg",
     "https://cdn.simpleicons.org/zomato",
-    "https://cdn.brandfetch.io/zomato.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=zomato.com&sz=256",
   ],
   "mcdonalds.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
     "https://cdn.simpleicons.org/mcdonalds",
-    "https://cdn.brandfetch.io/mcdonalds.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=mcdonalds.com&sz=256",
   ],
   "dominos.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/74/Dominos_pizza_logo.svg",
     "https://cdn.simpleicons.org/dominos",
-    "https://cdn.brandfetch.io/dominos.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=dominos.com&sz=256",
   ],
   "starbucks.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/4/45/Starbucks_Corporation_Logo_2011.svg",
     "https://cdn.simpleicons.org/starbucks",
-    "https://cdn.brandfetch.io/starbucks.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=starbucks.com&sz=256",
   ],
   "bk.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/85/Burger_King_logo_%282021%29.svg",
     "https://cdn.simpleicons.org/burgerking",
-    "https://cdn.brandfetch.io/bk.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=bk.com&sz=256",
   ],
   "upwork.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cd/Upwork-logo.svg",
     "https://cdn.simpleicons.org/upwork",
-    "https://cdn.brandfetch.io/upwork.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=upwork.com&sz=256",
   ],
   "fiverr.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/18/Fiverr_Logo_09.2020.svg",
     "https://cdn.simpleicons.org/fiverr",
-    "https://cdn.brandfetch.io/fiverr.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=fiverr.com&sz=256",
   ],
   "razorpay.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg",
     "https://cdn.simpleicons.org/razorpay",
-    "https://cdn.brandfetch.io/razorpay.com/w/512/h/512/theme/dark/icon",
+    "https://www.google.com/s2/favicons?domain=razorpay.com&sz=256",
   ],
 };
 
-/**
- * Get prioritized ultra-high-resolution online logo CDN URLs for a company domain
- */
 export function getCompanyLogoUrls(domain: string): string[] {
   if (!domain) return [];
   const clean = domain.trim().toLowerCase();
-  const list: string[] = [];
-  if (HD_COMPANY_LOGOS[clean]) {
-    list.push(...HD_COMPANY_LOGOS[clean]);
-  }
+  const curated = HD_COMPANY_LOGOS[clean] || [];
   const defaults = getFastLogoCandidateUrls(clean);
-  return Array.from(new Set([...list, ...defaults]));
+  return Array.from(new Set([...curated, ...defaults]));
 }
 
 /**

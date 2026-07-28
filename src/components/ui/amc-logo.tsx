@@ -14,7 +14,7 @@ interface AMCLogoProps {
 export const AMCLogo = memo(function AMCLogo({
   amcName,
   fundName,
-  size = 72,
+  size = 80,
   className = "",
 }: AMCLogoProps) {
   const domain = getAMCDomain(amcName, fundName);
@@ -106,8 +106,8 @@ export const AMCLogo = memo(function AMCLogo({
         alt={amcName || fundName || "AMC Logo"}
         onLoad={handleImageLoad}
         onError={handleImageError}
-        style={{ imageRendering: "-webkit-optimize-contrast", opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", zIndex: 3 }}
-        className="w-full h-full object-contain p-1"
+        style={{ opacity: loaded ? 1 : 0, transition: "opacity 0.3s ease", zIndex: 3 }}
+        className="w-full h-full object-contain p-0.5"
         loading="eager"
         decoding="async"
       />

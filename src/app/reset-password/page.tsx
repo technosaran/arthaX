@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { resetPassword } from "./actions";
 import "../login/login.css";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -36,11 +37,7 @@ export default function ResetPasswordPage() {
         
         <div className="login-brand-content">
           <div className="login-brand-header">
-            <div className="login-logo-icon">
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
+            <Image src="/icon.svg" alt="arthaX Logo" width={48} height={48} className="rounded-xl shadow-lg shadow-sky-500/20 object-contain shrink-0" />
             <div className="login-logo-text">
               <span className="login-logo-name !text-white">arthaX</span>
               <span className="login-logo-sub text-white/50">Personal Wealth Terminal</span>
@@ -86,11 +83,7 @@ export default function ResetPasswordPage() {
         <div className="login-form-container">
           
           <div className="login-logo-group mobile-only">
-            <div className="login-logo-icon">
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
+            <Image src="/icon.svg" alt="arthaX Logo" width={40} height={40} className="rounded-xl shadow-lg shadow-sky-500/20 object-contain shrink-0" />
             <div className="login-logo-text">
               <span className="login-logo-name !text-white text-lg">arthaX</span>
               <span className="login-logo-sub text-white/50 text-[0.5625rem] tracking-wider">Console</span>

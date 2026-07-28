@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, memo } from "react";
-import Image from "next/image";
+import React, { useState, useMemo, memo } from "react";
 import { getCompanyDomain, getCompanyLogoUrls } from "@/lib/companies";
+import { saveResolvedLogoUrl } from "@/lib/logo-cache";
 
 type CompanyLogoProps = {
   name?: string | null;
@@ -10,6 +10,13 @@ type CompanyLogoProps = {
   category?: string | null;
   size?: number;
   className?: string;
+};
+
+type LogoLoadState = {
+  key: string;
+  imgLoaded: boolean;
+  srcIndex: number;
+  allFailed: boolean;
 };
 
 const CATEGORIES: Record<string, string> = {
@@ -22,37 +29,36 @@ const CATEGORIES: Record<string, string> = {
   others: "📦",
 };
 
-function getLogoSources(companyName: string): string[] {
-  const domain = getCompanyDomain(companyName);
-  if (!domain) return [];
-  return getCompanyLogoUrls(domain);
-}
-
 export const CompanyLogo = memo(function CompanyLogo({
   name,
   companyName,
   category,
-  size = 44,
+  size = 52,
   className = "",
 }: CompanyLogoProps) {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [srcIndex, setSrcIndex] = useState(0);
-  const [allFailed, setAllFailed] = useState(false);
-
   const queryName = useMemo(() => {
     return (name ? name.trim() : "") || (companyName ? companyName.trim() : "");
   }, [name, companyName]);
 
-  const sources = useMemo(() => {
-    return queryName ? getLogoSources(queryName) : [];
+  const domain = useMemo(() => {
+    return queryName ? getCompanyDomain(queryName) : null;
   }, [queryName]);
 
-  // Reset image state when queryName changes to prevent stale logos
-  useEffect(() => {
-    setImgLoaded(false);
-    setSrcIndex(0);
-    setAllFailed(false);
-  }, [queryName]);
+  const sources = useMemo(() => {
+    return domain ? getCompanyLogoUrls(domain) : [];
+  }, [domain]);
+
+  const logoKey = `${domain || "fallback"}:${queryName}`;
+  const [loadState, setLoadState] = useState<LogoLoadState>(() => ({
+    key: logoKey,
+    imgLoaded: false,
+    srcIndex: 0,
+    allFailed: false,
+  }));
+  const activeLoadState = loadState.key === logoKey
+    ? loadState
+    : { key: logoKey, imgLoaded: false, srcIndex: 0, allFailed: false };
+  const { imgLoaded, srcIndex, allFailed } = activeLoadState;
 
   const fallbackIcon = useMemo(() => {
     const cat = (category || "").toLowerCase().trim();
@@ -111,14 +117,17 @@ export const CompanyLogo = memo(function CompanyLogo({
 
   const handleImgError = () => {
     if (srcIndex < sources.length - 1) {
-      setSrcIndex((prev) => prev + 1);
+      setLoadState({ key: logoKey, imgLoaded: false, srcIndex: srcIndex + 1, allFailed: false });
     } else {
-      setAllFailed(true);
+      setLoadState({ key: logoKey, imgLoaded: false, srcIndex, allFailed: true });
     }
   };
 
   const handleImgLoad = () => {
-    setImgLoaded(true);
+    setLoadState({ key: logoKey, imgLoaded: true, srcIndex, allFailed: false });
+    if (domain && sources[srcIndex]) {
+      saveResolvedLogoUrl(domain, sources[srcIndex]);
+    }
   };
 
   const showImage = queryName && !allFailed && sources.length > 0;
@@ -149,29 +158,22 @@ export const CompanyLogo = memo(function CompanyLogo({
       </span>
 
       {showImage && (
-        <Image
+        /* eslint-disable-next-line @next/next/no-img-element -- Logo sources include SVG and favicon endpoints. */
+        <img
           key={sources[srcIndex]}
           src={sources[srcIndex]}
           alt={queryName || "Company logo"}
           width={size}
           height={size}
-          unoptimized
-          className={`object-contain bg-white transition-opacity duration-300 ${
-            imgLoaded ? "opacity-100" : "opacity-0"
-          }`}
+          className="absolute inset-0 w-full h-full object-contain p-1.5 rounded-xl z-10 bg-white shadow-sm"
           style={{
-            position: "absolute",
-            inset: "0",
-            width: `${size}px`,
-            height: `${size}px`,
-            objectFit: "contain",
-            padding: `${Math.max(size * 0.1, 4)}px`,
-            borderRadius: "var(--radius-md, 14px)",
-            zIndex: 3,
-            imageRendering: "-webkit-optimize-contrast",
+            opacity: imgLoaded ? 1 : 0,
+            transition: "opacity 0.2s ease",
           }}
           onError={handleImgError}
           onLoad={handleImgLoad}
+          loading="eager"
+          decoding="async"
         />
       )}
     </div>

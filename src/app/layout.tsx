@@ -83,11 +83,17 @@ export default async function RootLayout({
     >
       <head>
         <link rel="preconnect" href="https://www.google.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://logo.clearbit.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://upload.wikimedia.org" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://cdn.simpleicons.org" crossOrigin="anonymous" />
+
         <link rel="preconnect" href="https://unavatar.io" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://icon.horse" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://www.google.com" />
-        <link rel="dns-prefetch" href="https://logo.clearbit.com" />
+        <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
+        <link rel="dns-prefetch" href="https://cdn.simpleicons.org" />
+
         <link rel="dns-prefetch" href="https://unavatar.io" />
+        <link rel="dns-prefetch" href="https://icon.horse" />
       </head>
       <body className="min-h-full flex flex-col overflow-x-hidden bg-[--bg-base] text-[--text-primary] font-sans relative">
         <SkipNavLink />

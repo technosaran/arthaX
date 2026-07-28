@@ -33,7 +33,7 @@ function createSecurityHeaders(nonce: string) {
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://va.vercel-scripts.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://* https://upload.wikimedia.org https://*.wikimedia.org https://companyenrich.com https://logo.clearbit.com https://*.clearbit.com https://cdn.brandfetch.io https://*.brandfetch.io https://www.google.com https://icons.duckduckgo.com https://*.yahoo.com https://*.yahooapis.com https://assets.groww.in https://unavatar.io https://icon.horse https://cdn.jsdelivr.net https://api.statvoo.com https://raw.githubusercontent.com",
+    "img-src 'self' data: blob: https://* https://upload.wikimedia.org https://*.wikimedia.org https://companyenrich.com https://cdn.brandfetch.io https://*.brandfetch.io https://cdn.simpleicons.org https://www.google.com https://icons.duckduckgo.com https://*.yahoo.com https://*.yahooapis.com https://assets.groww.in https://unavatar.io https://icon.horse https://cdn.jsdelivr.net https://api.statvoo.com https://raw.githubusercontent.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.yahoo.com https://*.yahooapis.com https://api.mfapi.in https://www.alphavantage.co https://va.vercel-scripts.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
@@ -134,6 +134,8 @@ export async function proxy(request: NextRequest) {
   // 2. CSRF Protection Check
   if (
     pathname.startsWith("/api/") &&
+    !pathname.startsWith("/api/accounts/") &&
+    !pathname.startsWith("/api/bots/") &&
     !pathname.startsWith("/api/mcp") &&
     !pathname.startsWith("/api/bank-parser") &&
     !pathname.startsWith("/api/cas-parser") &&

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -337,9 +338,12 @@ export default function Sidebar() {
       <aside className={`hidden md:flex shrink-0 flex-col h-screen sticky top-0 transition-all duration-300 ${isCollapsed ? "w-20" : "w-44"}`} style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)", backdropFilter: "blur(20px) saturate(1.2)", WebkitBackdropFilter: "blur(20px) saturate(1.2)" }}>
         <div className={`px-4 pt-6 pb-2 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
           {!isCollapsed ? (
-            <h2 className="text-lg font-black text-[--text-primary] tracking-tighter">Dashboard</h2>
+            <div className="flex items-center gap-3">
+              <Image src="/icon.svg" alt="arthaX Logo" width={44} height={44} className="rounded-xl shadow-lg shadow-sky-500/25 object-contain shrink-0" />
+              <span className="text-2xl font-black text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
+            </div>
           ) : (
-            <h2 className="text-xl font-black text-[--accent-primary] tracking-tighter">D</h2>
+            <Image src="/icon.svg" alt="arthaX Logo" width={46} height={46} className="rounded-xl shadow-lg shadow-sky-500/25 object-contain shrink-0" title="arthaX" />
           )}
           <button 
             type="button" 
