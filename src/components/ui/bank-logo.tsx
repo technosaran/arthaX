@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, memo } from "react";
-import Image from "next/image";
+import React, { useState, useMemo, memo } from "react";
 import { getBankDomain, getBankLogoUrls } from "@/lib/banks";
 import { saveResolvedLogoUrl } from "@/lib/logo-cache";
 
@@ -12,6 +11,13 @@ interface BankLogoProps {
   size?: number;
   className?: string;
 }
+
+type LogoLoadState = {
+  key: string;
+  imgLoaded: boolean;
+  srcIndex: number;
+  allFailed: boolean;
+};
 
 /**
  * Brand-accurate colors for major Indian & Global banks & fintechs.
@@ -176,57 +182,44 @@ function resolveBankBrand(queryName: string, domain?: string | null): { abbr: st
 /**
  * Build a list of real logo image URLs from fast, high-reliability logo CDNs.
  */
-function getLogoSources(queryName: string): string[] {
-  const domain = getBankDomain(queryName);
-  if (!domain) return [];
-
-  const hdCandidateUrls = getBankLogoUrls(domain);
-  const fallbacks = [
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
-    `https://cdn.brandfetch.io/${domain}/w/512/h/512/theme/dark/icon`,
-    `https://unavatar.io/${domain}?fallback=false`,
-    `https://logo.clearbit.com/${domain}?size=512`,
-  ];
-
-  return Array.from(new Set([...hdCandidateUrls, ...fallbacks]));
-}
-
 export const BankLogo = memo(function BankLogo({
   bankName,
   accountName,
-  size = 40,
+  type,
+  size = 48,
   className = "",
 }: BankLogoProps) {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [srcIndex, setSrcIndex] = useState(0);
-  const [allFailed, setAllFailed] = useState(false);
-
   const queryName = useMemo(() => {
-    const bDomain = bankName ? getBankDomain(bankName) : null;
-    if (bDomain) return bankName!;
-    const aDomain = accountName ? getBankDomain(accountName) : null;
-    if (aDomain) return accountName!;
-    return bankName || accountName || "";
-  }, [accountName, bankName]);
+    return (
+      (bankName ? bankName.trim() : "") ||
+      (accountName ? accountName.trim() : "") ||
+      (type ? type.trim() : "")
+    );
+  }, [accountName, bankName, type]);
 
   const domain = useMemo(() => {
     return queryName ? getBankDomain(queryName) : null;
   }, [queryName]);
 
-  // Reset image state on queryName or prop change
-  useEffect(() => {
-    setImgLoaded(false);
-    setSrcIndex(0);
-    setAllFailed(false);
-  }, [queryName, bankName, accountName]);
-
   const sources = useMemo(() => {
-    return queryName ? getLogoSources(queryName) : [];
-  }, [queryName]);
+    return domain ? getBankLogoUrls(domain) : [];
+  }, [domain]);
+
+  const logoKey = `${domain || "fallback"}:${queryName}`;
+  const [loadState, setLoadState] = useState<LogoLoadState>(() => ({
+    key: logoKey,
+    imgLoaded: false,
+    srcIndex: 0,
+    allFailed: false,
+  }));
+  const activeLoadState = loadState.key === logoKey
+    ? loadState
+    : { key: logoKey, imgLoaded: false, srcIndex: 0, allFailed: false };
+  const { imgLoaded, srcIndex, allFailed } = activeLoadState;
 
   const brand = useMemo(() => {
     return resolveBankBrand(queryName, domain);
-  }, [queryName, domain]);
+  }, [domain, queryName]);
 
   const fallbackStyle = useMemo(() => {
     const getInitialsInternal = (name: string) => {
@@ -274,18 +267,21 @@ export const BankLogo = memo(function BankLogo({
     };
   }, [brand, queryName, size]);
 
-  const handleImgError = () => {
-    if (srcIndex < sources.length - 1) {
-      setSrcIndex((prev) => prev + 1);
-    } else {
-      setAllFailed(true);
+  const currentSource = sources[srcIndex];
+  const showImage = Boolean(currentSource) && !allFailed;
+
+  const handleImgLoad = () => {
+    setLoadState({ key: logoKey, imgLoaded: true, srcIndex, allFailed: false });
+    if (domain && currentSource) {
+      saveResolvedLogoUrl(domain, currentSource);
     }
   };
 
-  const handleImgLoad = () => {
-    setImgLoaded(true);
-    if (domain && sources[srcIndex]) {
-      saveResolvedLogoUrl(domain, sources[srcIndex]);
+  const handleImgError = () => {
+    if (srcIndex < sources.length - 1) {
+      setLoadState({ key: logoKey, imgLoaded: false, srcIndex: srcIndex + 1, allFailed: false });
+    } else {
+      setLoadState({ key: logoKey, imgLoaded: false, srcIndex, allFailed: true });
     }
   };
 
@@ -310,7 +306,7 @@ export const BankLogo = memo(function BankLogo({
           viewBox="0 0 24 24"
           style={{ color: "var(--text-muted)" }}
         >
-          <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 v5m-4 0h4" />
         </svg>
       </div>
     );
@@ -318,63 +314,50 @@ export const BankLogo = memo(function BankLogo({
 
   return (
     <div
-      className={`relative overflow-hidden flex items-center justify-center select-none ${className}`}
+      className={`relative overflow-hidden flex items-center justify-center select-none font-black rounded-xl shadow-md border border-white/15 ${className}`}
       style={{
         width: size,
         height: size,
         minWidth: size,
-        borderRadius: "var(--radius-md, 14px)",
+        minHeight: size,
         background: imgLoaded ? "#ffffff" : fallbackStyle.background,
-        boxShadow: imgLoaded ? "0 2px 8px rgba(0,0,0,0.12)" : fallbackStyle.boxShadow,
-        border: imgLoaded ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.15)",
-        transition: "all 0.3s ease",
+        color: fallbackStyle.color,
+        fontSize: fallbackStyle.fontSize,
+        boxShadow: fallbackStyle.boxShadow,
       }}
       title={queryName}
     >
       <span
         aria-hidden={imgLoaded}
+        className="font-black select-none text-center"
         style={{
           color: fallbackStyle.color,
           fontSize: fallbackStyle.fontSize,
           opacity: imgLoaded ? 0 : 1,
-          transition: "opacity 0.3s ease",
-          letterSpacing: "0.3px",
-          fontWeight: 900,
+          transition: "opacity 0.2s ease",
           zIndex: 1,
         }}
       >
         {fallbackStyle.abbr}
       </span>
 
-      {/* Shimmer pulse during image loading */}
-      {sources.length > 0 && !allFailed && !imgLoaded && (
-        <div className="absolute inset-0 animate-pulse bg-white/10" style={{ zIndex: 2 }} />
-      )}
-
-      {sources.length > 0 && !allFailed && (
-        <Image
-          key={sources[srcIndex]}
-          src={sources[srcIndex]}
+      {showImage && (
+        /* eslint-disable-next-line @next/next/no-img-element -- Logo sources include SVG and favicon endpoints. */
+        <img
+          key={currentSource}
+          src={currentSource}
           alt={`${queryName} logo`}
           width={size}
           height={size}
-          unoptimized
-          sizes={`${size}px`}
-          onLoad={handleImgLoad}
-          onError={handleImgError}
+          className="absolute inset-0 z-10 h-full w-full rounded-xl bg-white object-contain p-1.5 shadow-sm"
           style={{
-            position: "absolute",
-            inset: "0",
-            width: `${size}px`,
-            height: `${size}px`,
-            objectFit: "contain",
-            padding: `${Math.max(size * 0.1, 4)}px`,
-            borderRadius: "var(--radius-md, 14px)",
             opacity: imgLoaded ? 1 : 0,
-            transition: "opacity 0.3s ease",
-            zIndex: 3,
-            imageRendering: "-webkit-optimize-contrast",
+            transition: "opacity 0.2s ease",
           }}
+          onError={handleImgError}
+          onLoad={handleImgLoad}
+          loading="eager"
+          decoding="async"
         />
       )}
     </div>
@@ -383,4 +366,3 @@ export const BankLogo = memo(function BankLogo({
 
 BankLogo.displayName = "BankLogo";
 export default BankLogo;
-

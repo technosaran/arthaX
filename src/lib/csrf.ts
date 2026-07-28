@@ -88,13 +88,16 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
   const pathname = request.nextUrl.pathname;
   if (
     pathname.startsWith("/api/sync") ||
+    pathname.startsWith("/api/accounts/") ||
+    pathname.startsWith("/api/bots/") ||
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/transactions/") ||
     pathname.startsWith("/api/ai/") ||
     pathname.startsWith("/api/mcp") ||
     pathname.startsWith("/api/bank-parser") ||
     pathname.startsWith("/api/cas-parser")
   ) {
-    // Sync, transaction, AI, MCP, and statement parser endpoints use session/auth tokens or standalone uploads
+    // Sync, accounts, bots, cron, transactions, AI, MCP, and statement parser endpoints use session/auth tokens or standalone webhooks
     return null;
   }
 

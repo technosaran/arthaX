@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Asset Management Company (AMC) Registry & Domain Resolver
  * Used for fetching real high-resolution official AMC / Fund House logos for Mutual Funds
  */
@@ -56,56 +56,45 @@ import { getFastLogoCandidateUrls } from "./logo-cache";
 const HD_AMC_LOGOS: Record<string, string[]> = {
   "sbimf.com": [
     "https://upload.wikimedia.org/wikipedia/commons/c/cc/SBI-Logo.svg",
-    "https://cdn.brandfetch.io/sbimf.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=sbimf.com&sz=256",
   ],
   "hdfcfund.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/hdfcfund.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=hdfcfund.com&sz=256",
   ],
   "icicipruamc.com": [
     "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/icicipruamc.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=icicipruamc.com&sz=256",
   ],
   "axismf.com": [
     "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
-    "https://cdn.brandfetch.io/axismf.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=axismf.com&sz=256",
   ],
   "kotakmf.com": [
     "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
-    "https://cdn.brandfetch.io/kotakmf.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=kotakmf.com&sz=256",
   ],
   "tatamutual.com": [
     "https://upload.wikimedia.org/wikipedia/commons/8/8e/Tata_logo.svg",
-    "https://cdn.brandfetch.io/tatamutual.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=tatamutual.com&sz=256",
   ],
   "groww.in": [
     "https://upload.wikimedia.org/wikipedia/commons/b/b8/Groww_Logo.svg",
-    "https://cdn.brandfetch.io/groww.in/w/512/h/512/theme/dark/icon",
   ],
   "zerodha.com": [
     "https://upload.wikimedia.org/wikipedia/commons/3/30/Zerodha_logo.svg",
-    "https://cdn.brandfetch.io/zerodha.com/w/512/h/512/theme/dark/icon",
   ],
   "vanguard.com": [
     "https://upload.wikimedia.org/wikipedia/commons/5/58/Vanguard_logo.svg",
     "https://cdn.simpleicons.org/vanguard",
-    "https://cdn.brandfetch.io/vanguard.com/w/512/h/512/theme/dark/icon",
   ],
   "blackrock.com": [
     "https://upload.wikimedia.org/wikipedia/commons/9/91/BlackRock_logo.svg",
     "https://cdn.simpleicons.org/blackrock",
-    "https://cdn.brandfetch.io/blackrock.com/w/512/h/512/theme/dark/icon",
   ],
   "fidelity.com": [
     "https://upload.wikimedia.org/wikipedia/commons/a/a2/Fidelity_Investments_logo.svg",
     "https://cdn.simpleicons.org/fidelity",
-    "https://cdn.brandfetch.io/fidelity.com/w/512/h/512/theme/dark/icon",
   ],
 };
 

@@ -357,7 +357,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </div>
           <div className={`status-dot scale-90 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400 opacity-50'}`} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => { setTransferFromId(null); setShowTransferModal(true); }} className="btn-secondary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
             <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
             <span>Transfer</span>
@@ -484,7 +484,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
                         <div className="relative flex-shrink-0">
-                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={42} />
+                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={56} />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -606,7 +606,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                     >
                       <div className="relative flex-shrink-0">
-                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={36} />
+                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={50} />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1 text-left">
                         <p className="font-bold text-xs md:text-xs text-[--text-secondary] truncate">{a.name}</p>
@@ -683,7 +683,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                          {isCashReserve ? "In-built Cash Reserve" : a.type}
                        </span>
                        <div className="flex items-center gap-3 mt-4">
-                         <BankLogo bankName={a.bank_name || a.name} accountName={a.name} type={a.type} size={48} />
+                         <BankLogo bankName={a.bank_name || a.name} accountName={a.name} type={a.type} size={64} />
                          <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
                        </div>
                      </div>
@@ -928,7 +928,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                             </td>
                             <td className="p-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <BankLogo bankName={account?.bank_name} accountName={account?.name || log.account_name || undefined} type={account?.type} size={24} />
+                                <BankLogo bankName={account?.bank_name} accountName={account?.name || log.account_name || undefined} type={account?.type} size={28} />
                                 <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
                                   {account?.name || log.account_name || "System"}
                                 </span>
@@ -1014,7 +1014,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
             <div className="relative flex items-center">
               {bankSearch.trim().length > 0 && (
                 <div className="absolute left-3 flex items-center pointer-events-none z-10">
-                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={22} />
+                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={26} />
                 </div>
               )}
               <input 
@@ -1043,7 +1043,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     onClick={() => selectBank(b)}
                     className="w-full p-2.5 flex items-center gap-2.5 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
                   >
-                    <BankLogo bankName={b.name} accountName={b.name} size={26} />
+                    <BankLogo bankName={b.name} accountName={b.name} size={30} />
                     <div>
                       <p className="font-bold text-xs text-white">{b.name}</p>
                       <p className="text-[10px] text-[--text-muted]">{b.domain}</p>

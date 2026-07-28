@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updatePassword } from "../actions";
 import "../../login/login.css";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 export default function UpdatePasswordPage() {
@@ -36,12 +37,7 @@ export default function UpdatePasswordPage() {
 
       <div className="login-content">
         <div className="login-logo-group">
-          <div className="login-logo-icon">
-            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
-              <rect x="3" y="11" width="18" height="11" rx="3" />
-              <path d="M7 11V7a5 5 0 0110 0v4" />
-            </svg>
-          </div>
+          <Image src="/icon.svg" alt="arthaX Logo" width={44} height={44} className="rounded-xl shadow-lg shadow-sky-500/20 object-contain shrink-0" />
           <div className="login-logo-text">
             <span className="login-logo-name">Dashboard</span>
             <span className="login-logo-sub">Security</span>

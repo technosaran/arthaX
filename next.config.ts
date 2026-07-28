@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "raw.githubusercontent.com" },
       { protocol: "https", hostname: "upload.wikimedia.org" },
       { protocol: "https", hostname: "cdn.brandfetch.io" },
+      { protocol: "https", hostname: "cdn.simpleicons.org" },
       { protocol: "https", hostname: "logo.uplead.com" },
       { protocol: "https", hostname: "api.statvoo.com" },
     ],

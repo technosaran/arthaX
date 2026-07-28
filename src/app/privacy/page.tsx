@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -13,11 +14,9 @@ export default function PrivacyPolicyPage() {
         {/* Navigation Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-10">
           <Link href="/login" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-              A
-            </div>
+            <Image src="/icon.svg" alt="arthaX Logo" width={38} height={38} className="rounded-xl shadow-lg shadow-sky-500/20 object-contain group-hover:scale-105 transition-transform" />
             <div>
-              <span className="text-lg font-black text-white tracking-tight">arthaX</span>
+              <span className="text-lg font-black text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
               <span className="block text-xs font-bold text-gray-400 uppercase tracking-widest -mt-0.5">Privacy & Security</span>
             </div>
           </Link>

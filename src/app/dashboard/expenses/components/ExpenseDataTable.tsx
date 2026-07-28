@@ -86,7 +86,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const cat = info.row.original.category;
           return (
             <div className="flex items-center gap-3">
-              <CompanyLogo name={info.getValue()} category={cat} size={38} />
+              <CompanyLogo name={info.getValue()} category={cat} size={52} />
               <div className="flex flex-col min-w-0">
                 <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
                   {info.getValue()}
@@ -118,7 +118,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const payMode = !account ? "Cash Reserve" : account.type === "cash" ? "Cash Reserve" : account.type === "credit" ? "Credit Line" : "Bank Transfer / UPI";
           return (
             <div className="flex items-center gap-2.5">
-              <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={32} />
+              <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={44} />
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[--text-primary] truncate">{account?.name || "Cash Reserve"}</span>
                 <span className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider">{payMode}</span>
@@ -292,7 +292,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
               <div key={row.id} className="p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CompanyLogo name={exp.description} category={exp.category} size={40} />
+                    <CompanyLogo name={exp.description} category={exp.category} size={54} />
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-bold text-white truncate">{exp.description}</span>
                       <span className="text-xs text-[--text-muted]">{exp.date ? format(parseISO(exp.date), "MMM d, yyyy") : "—"}</span>
@@ -305,7 +305,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                 </div>
                 <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                   <div className="flex items-center gap-2">
-                    <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={28} />
+                    <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={40} />
                     <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Cash Reserve"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">

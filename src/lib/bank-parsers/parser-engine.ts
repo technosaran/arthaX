@@ -44,7 +44,7 @@ function cleanAmount(raw: string): number {
 export function cleanDescription(raw: string, defaultBankName: string = "Bank"): string {
   if (!raw) return `${defaultBankName.toUpperCase()} Transaction`;
 
-  let cleaned = raw
+  const cleaned = raw
     .replace(/<<.*?>>/g, "")
     .replace(/<[^>]*>/g, "")
     .replace(/\/(Subtype|Form|Filter|FlateDecode|Type|XObject|Matrix|Resources|BBox|Length|Contents|Group|Transparency|DeviceRGB|ColorSpace|Font|ProcSet|Page)\b[^/]*\b/gi, "")
@@ -156,7 +156,7 @@ export function parseBankStatementText(text: string, forceBank?: BankType): Bank
           }
 
           // Clean narration description
-          let rawDesc = lineWithoutDate
+          const rawDesc = lineWithoutDate
             .replace(/([\d,]+(?:\.\d{1,2})?)/g, "")
             .replace(/cr|dr|c|d/gi, "")
             .replace(/\s+/g, " ")
@@ -197,7 +197,7 @@ export function parseBankStatementText(text: string, forceBank?: BankType): Bank
         if (amt > 0) {
           const isCr = /cr|credit|\+/i.test(snippet);
           const type: "expense" | "income" = isCr ? "income" : "expense";
-          let rawDesc = snippet
+          const rawDesc = snippet
             .replace(UNIVERSAL_DATE_REGEX, "")
             .replace(/[\d,]+\.\d{2}/g, "")
             .trim()

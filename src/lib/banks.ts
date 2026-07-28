@@ -1,4 +1,4 @@
-export type Bank = { name: string; domain: string };
+﻿export type Bank = { name: string; domain: string };
 
 // Bank registry mapping names to their official domains
 // Used for logo resolution via multiple logo APIs
@@ -93,7 +93,57 @@ const BANKS: Bank[] = [
   { name: "Paytm Money",               domain: "paytmmoney.com" },
   { name: "Coin by Zerodha",            domain: "zerodha.com" },
   
-  // Custom / International / Financial Platforms
+  // Cooperative & Regional Urban Banks
+  { name: "Saraswat Bank",              domain: "saraswatbank.com" },
+  { name: "Cosmos Bank",                domain: "cosmosbank.com" },
+  { name: "TJSB Sahakari Bank",         domain: "tjsb.co.in" },
+  { name: "SVC Cooperative Bank",       domain: "svcbank.com" },
+  { name: "Abhyudaya Bank",             domain: "abhyudayabank.co.in" },
+  { name: "NKGSB Bank",                 domain: "nkgsb.co.in" },
+  { name: "Kalupur Bank",               domain: "kalupurbank.com" },
+  { name: "Shamrao Vithal Bank",        domain: "svcbank.com" },
+
+  // Credit Cards & BNPL
+  { name: "LazyPay",                    domain: "lazypay.in" },
+  { name: "Simpl",                      domain: "getsimpl.com" },
+  { name: "Cashfree Payments",          domain: "cashfree.com" },
+  { name: "Instamojo",                  domain: "instamojo.com" },
+  { name: "Pine Labs",                  domain: "pinelabs.com" },
+  { name: "PayU India",                 domain: "payu.in" },
+
+  // Additional Investment & Trading Platforms
+  { name: "Dhan",                       domain: "dhan.co" },
+  { name: "5Paisa",                     domain: "5paisa.com" },
+  { name: "Motilal Oswal",              domain: "motilaloswal.com" },
+  { name: "Sharekhan",                  domain: "sharekhan.com" },
+  { name: "ICICI Direct",               domain: "icicidirect.com" },
+  { name: "HDFC Securities",            domain: "hdfcsec.com" },
+  { name: "Kotak Securities",           domain: "kotaksecurities.com" },
+  { name: "SBI Securities",             domain: "sbisecurities.in" },
+  { name: "Axis Direct",                domain: "axisdirect.in" },
+  { name: "IIFL Securities",            domain: "iifl.com" },
+  { name: "Geojit Financial Services",  domain: "geojit.com" },
+  { name: "Edelweiss Wealth",           domain: "edelweiss.in" },
+  { name: "Scripbox",                   domain: "scripbox.com" },
+  { name: "Vested Finance",             domain: "vestedfinance.com" },
+
+  // Global Financial Institutions & Neo-Banks
+  { name: "Barclays",                   domain: "barclays.com" },
+  { name: "UBS",                        domain: "ubs.com" },
+  { name: "Credit Suisse",              domain: "credit-suisse.com" },
+  { name: "BNP Paribas",                domain: "bnpparibas.com" },
+  { name: "Societe Generale",           domain: "societegenerale.com" },
+  { name: "Fidelity Investments",       domain: "fidelity.com" },
+  { name: "Vanguard",                   domain: "vanguard.com" },
+  { name: "Charles Schwab",             domain: "schwab.com" },
+  { name: "E*TRADE",                    domain: "etrade.com" },
+  { name: "Webull",                     domain: "webull.com" },
+  { name: "Interactive Brokers",        domain: "interactivebrokers.com" },
+  { name: "N26",                        domain: "n26.com" },
+  { name: "Monzo",                      domain: "monzo.com" },
+  { name: "Starling Bank",              domain: "starlingbank.com" },
+  { name: "Remitly",                    domain: "remitly.com" },
+
   { name: "Chase Bank",                 domain: "chase.com" },
   { name: "Bank of America",            domain: "bankofamerica.com" },
   { name: "Wells Fargo",                domain: "wellsfargo.com" },
@@ -226,260 +276,223 @@ const HD_BANK_LOGOS: Record<string, string[]> = {
   "sbi.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/c/cc/SBI-Logo.svg",
     "https://cdn.simpleicons.org/statebankofindia",
-    "https://cdn.brandfetch.io/sbi.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=sbi.co.in&sz=256",
   ],
   "indianbank.in": [
     "https://upload.wikimedia.org/wikipedia/commons/0/02/Indian_Bank_logo.svg",
-    "https://cdn.brandfetch.io/indianbank.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=indianbank.in&sz=256",
   ],
   "bankofindia.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/6/68/Bank_of_India_logo.svg",
-    "https://cdn.brandfetch.io/bankofindia.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=256",
   ],
   "rblbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/0/07/RBL_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/rblbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=rblbank.com&sz=256",
   ],
   "centralbankofindia.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/5/53/Central_Bank_of_India_logo.svg",
-    "https://cdn.brandfetch.io/centralbankofindia.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=centralbankofindia.co.in&sz=256",
   ],
   "iob.in": [
     "https://upload.wikimedia.org/wikipedia/commons/3/36/Indian_Overseas_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/iob.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=iob.in&sz=256",
   ],
   "iob.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/3/36/Indian_Overseas_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/iob.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=iob.co.in&sz=256",
   ],
   "ucobank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/d/df/UCO_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/ucobank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=ucobank.com&sz=256",
   ],
   "bankofmaharashtra.in": [
     "https://upload.wikimedia.org/wikipedia/commons/d/d4/Bank_of_Maharashtra_logo.svg",
-    "https://cdn.brandfetch.io/bankofmaharashtra.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=bankofmaharashtra.in&sz=256",
   ],
   "punjabandsindbank.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/3/3a/Punjab_%26_Sind_Bank_logo.svg",
-    "https://cdn.brandfetch.io/punjabandsindbank.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=punjabandsindbank.co.in&sz=256",
   ],
   "southindianbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/7/7b/South_Indian_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/southindianbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=southindianbank.com&sz=256",
   ],
   "karnatakabank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/b/b8/Karnataka_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/karnatakabank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=karnatakabank.com&sz=256",
   ],
   "kvb.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/7/7e/Karur_Vysya_Bank_logo.svg",
-    "https://cdn.brandfetch.io/kvb.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=kvb.co.in&sz=256",
   ],
   "bandhanbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/8/87/Bandhan_Bank_logo.svg",
-    "https://cdn.brandfetch.io/bandhanbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=bandhanbank.com&sz=256",
   ],
   "idbibank.in": [
     "https://upload.wikimedia.org/wikipedia/commons/a/a2/IDBI_Bank_logo.svg",
-    "https://cdn.brandfetch.io/idbibank.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=idbibank.in&sz=256",
   ],
   "cityunionbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/3/30/City_Union_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/cityunionbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=cityunionbank.com&sz=256",
   ],
   "dcbbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/0/07/DCB_Bank_logo.svg",
-    "https://cdn.brandfetch.io/dcbbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=dcbbank.com&sz=256",
   ],
   "aubank.in": [
     "https://upload.wikimedia.org/wikipedia/commons/8/80/AU_Small_Finance_Bank_logo.svg",
-    "https://cdn.brandfetch.io/aubank.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=aubank.in&sz=256",
   ],
   "equitasbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/c/c5/Equitas_Small_Finance_Bank_logo.svg",
-    "https://cdn.brandfetch.io/equitasbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=equitasbank.com&sz=256",
   ],
   "ujjivansfb.in": [
     "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ujjivan_Small_Finance_Bank_logo.svg",
-    "https://cdn.brandfetch.io/ujjivansfb.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=ujjivansfb.in&sz=256",
   ],
   "ippbonline.com": [
     "https://upload.wikimedia.org/wikipedia/commons/e/e0/India_Post_Payments_Bank_logo.svg",
-    "https://cdn.brandfetch.io/ippbonline.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=ippbonline.com&sz=256",
   ],
   "hdfcbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/hdfcbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=hdfcbank.com&sz=256",
   ],
   "icicibank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/icicibank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=icicibank.com&sz=256",
   ],
   "axisbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
-    "https://cdn.brandfetch.io/axisbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=axisbank.com&sz=256",
   ],
   "kotak.com": [
     "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
-    "https://cdn.brandfetch.io/kotak.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=kotak.com&sz=256",
   ],
   "pnbindia.in": [
     "https://upload.wikimedia.org/wikipedia/commons/4/4b/Punjab_National_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/pnbindia.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=pnbindia.in&sz=256",
   ],
   "bankofbaroda.in": [
     "https://upload.wikimedia.org/wikipedia/commons/7/7b/Bank_of_Baroda_logo.svg",
-    "https://cdn.brandfetch.io/bankofbaroda.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=256",
   ],
   "canarabank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/2a/Canara_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/canarabank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=canarabank.com&sz=256",
   ],
   "unionbankofindia.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/0/05/Union_Bank_of_India_Logo.svg",
-    "https://cdn.brandfetch.io/unionbankofindia.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=256",
   ],
   "idfcfirstbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/29/IDFC_First_Bank_logo.svg",
-    "https://cdn.brandfetch.io/idfcfirstbank.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=idfcfirstbank.com&sz=256",
   ],
   "indusind.com": [
     "https://upload.wikimedia.org/wikipedia/commons/8/82/IndusInd_Bank_logo.svg",
-    "https://cdn.brandfetch.io/indusind.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=indusind.com&sz=256",
   ],
   "yesbank.in": [
     "https://upload.wikimedia.org/wikipedia/commons/4/49/Yes_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/yesbank.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=yesbank.in&sz=256",
   ],
   "federalbank.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/2/27/Federal_Bank_Logo.svg",
-    "https://cdn.brandfetch.io/federalbank.co.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=federalbank.co.in&sz=256",
   ],
   "paytmbank.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
     "https://cdn.simpleicons.org/paytm",
-    "https://cdn.brandfetch.io/paytm.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=paytm.com&sz=256",
   ],
   "paytm.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
     "https://cdn.simpleicons.org/paytm",
-    "https://cdn.brandfetch.io/paytm.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=paytm.com&sz=256",
   ],
   "phonepe.com": [
     "https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg",
     "https://cdn.simpleicons.org/phonepe",
-    "https://cdn.brandfetch.io/phonepe.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=phonepe.com&sz=256",
   ],
   "cred.club": [
     "https://upload.wikimedia.org/wikipedia/commons/8/87/CRED_logo.svg",
-    "https://cdn.brandfetch.io/cred.club/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=cred.club&sz=256",
   ],
   "zerodha.com": [
     "https://upload.wikimedia.org/wikipedia/commons/3/30/Zerodha_logo.svg",
-    "https://cdn.brandfetch.io/zerodha.com/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=zerodha.com&sz=256",
   ],
   "groww.in": [
     "https://upload.wikimedia.org/wikipedia/commons/b/b8/Groww_Logo.svg",
-    "https://cdn.brandfetch.io/groww.in/w/512/h/512/theme/dark/icon",
     "https://www.google.com/s2/favicons?domain=groww.in&sz=256",
   ],
   "hsbc.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/a/aa/HSBC_logo_%282018%29.svg",
     "https://cdn.simpleicons.org/hsbc",
-    "https://cdn.brandfetch.io/hsbc.co.in/w/512/h/512/theme/dark/icon",
   ],
   "sc.com": [
     "https://upload.wikimedia.org/wikipedia/commons/a/a0/Standard_Chartered_logo.svg",
     "https://cdn.simpleicons.org/standardchartered",
-    "https://cdn.brandfetch.io/sc.com/w/512/h/512/theme/dark/icon",
   ],
   "citibank.co.in": [
     "https://upload.wikimedia.org/wikipedia/commons/1/1b/Citibank.svg",
     "https://cdn.simpleicons.org/citibank",
-    "https://cdn.brandfetch.io/citibank.com/w/512/h/512/theme/dark/icon",
   ],
   "dbs.com": [
     "https://upload.wikimedia.org/wikipedia/commons/a/a4/DBS_Bank_logo.svg",
-    "https://cdn.brandfetch.io/dbs.com/w/512/h/512/theme/dark/icon",
   ],
   "chase.com": [
     "https://upload.wikimedia.org/wikipedia/commons/a/a4/Chase_logo.svg",
     "https://cdn.simpleicons.org/chase",
-    "https://cdn.brandfetch.io/chase.com/w/512/h/512/theme/dark/icon",
   ],
   "bankofamerica.com": [
     "https://upload.wikimedia.org/wikipedia/commons/2/20/Bank_of_America_logo.svg",
     "https://cdn.simpleicons.org/bankofamerica",
-    "https://cdn.brandfetch.io/bankofamerica.com/w/512/h/512/theme/dark/icon",
   ],
   "wise.com": [
     "https://upload.wikimedia.org/wikipedia/commons/9/94/Wise_Logo.svg",
     "https://cdn.simpleicons.org/wise",
-    "https://cdn.brandfetch.io/wise.com/w/512/h/512/theme/dark/icon",
   ],
   "revolut.com": [
     "https://upload.wikimedia.org/wikipedia/commons/c/c5/Revolut_logo.svg",
     "https://cdn.simpleicons.org/revolut",
-    "https://cdn.brandfetch.io/revolut.com/w/512/h/512/theme/dark/icon",
   ],
   "paypal.com": [
     "https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg",
     "https://cdn.simpleicons.org/paypal",
-    "https://cdn.brandfetch.io/paypal.com/w/512/h/512/theme/dark/icon",
+  ],
+  "pay.google.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg",
+    "https://cdn.simpleicons.org/googlepay",
+    "https://www.google.com/s2/favicons?domain=pay.google.com&sz=256",
+  ],
+  "jupiter.money": [
+    "https://www.google.com/s2/favicons?domain=jupiter.money&sz=256",
+  ],
+  "fi.money": [
+    "https://www.google.com/s2/favicons?domain=fi.money&sz=256",
+  ],
+  "upstox.com": [
+    "https://www.google.com/s2/favicons?domain=upstox.com&sz=256",
+  ],
+  "angelone.in": [
+    "https://www.google.com/s2/favicons?domain=angelone.in&sz=256",
   ],
 };
 
-/**
- * Get prioritized ultra-high-resolution online logo CDN URLs for a bank domain
- */
 export function getBankLogoUrls(domain: string): string[] {
   if (!domain) return [];
   const clean = domain.trim().toLowerCase();
-  const list: string[] = [];
-  if (HD_BANK_LOGOS[clean]) {
-    list.push(...HD_BANK_LOGOS[clean]);
-  }
+  const curated = HD_BANK_LOGOS[clean] || [];
   const defaults = getFastLogoCandidateUrls(clean);
-  return Array.from(new Set([...list, ...defaults]));
+  return Array.from(new Set([...curated, ...defaults]));
 }
 
 /**
@@ -576,18 +589,38 @@ export function getBankDomain(bankName: string): string | null {
 export function searchBanks(query: string): Bank[] {
   if (!query.trim()) return BANKS.slice(0, 15); // Show popular banks by default
   const q = query.toLowerCase();
+  const cleanBankName = (name: string) => name.replace(/\s*\([^)]*\)/g, "").toLowerCase().trim();
+  const acronymFor = (name: string) => name.match(/\(([^)]+)\)/)?.[1]?.toLowerCase() || "";
+  const scoreBank = (bank: Bank) => {
+    const name = bank.name.toLowerCase();
+    const clean = cleanBankName(bank.name);
+    const acronym = acronymFor(bank.name);
+
+    if (name === q || clean === q || acronym === q) return 0;
+    if (SHORTHAND_DOMAINS[q] === bank.domain) return 1;
+    if (name.startsWith(q) || clean.startsWith(q)) return 2;
+    if (acronym.startsWith(q)) return 3;
+    if (name.includes(q) || clean.includes(q)) return 4;
+    return 5;
+  };
   
   // Sort by priority and match quality
   return BANKS.filter((b) => {
     const name = b.name.toLowerCase();
-    return name.includes(q) || q.includes(name.split(' ')[0]);
+    const clean = cleanBankName(b.name);
+    const acronym = acronymFor(b.name);
+    return (
+      name.includes(q) ||
+      clean.includes(q) ||
+      acronym.includes(q) ||
+      SHORTHAND_DOMAINS[q] === b.domain ||
+      q.includes(clean.split(" ")[0])
+    );
   })
   .sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
-    if (aName.startsWith(q) && !bName.startsWith(q)) return -1;
-    if (!aName.startsWith(q) && bName.startsWith(q)) return 1;
-    return 0;
+    const scoreDiff = scoreBank(a) - scoreBank(b);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.name.localeCompare(b.name);
   })
   .slice(0, 12);
 }
