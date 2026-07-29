@@ -75,6 +75,39 @@ const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   fiver: "fiverr.com",
 };
 
+// Maps company domain -> local SVG logo file name in /public/logos/companies/.
+const COMPANY_LOCAL_LOGOS: Record<string, string> = {
+  "accenture.com": "accenture",
+  "adobe.com": "adobe",
+  "amazon.com": "amazon",
+  "apple.com": "apple",
+  "atlassian.com": "atlassian",
+  "cognizant.com": "cognizant",
+  "facebook.com": "facebook",
+  "fiverr.com": "fiverr",
+  "github.com": "github",
+  "gitlab.com": "gitlab",
+  "google.com": "google",
+  "ibm.com": "ibm",
+  "infosys.com": "infosys",
+  "linkedin.com": "linkedin",
+  "meta.com": "meta",
+  "microsoft.com": "microsoft",
+  "netflix.com": "netflix",
+  "oracle.com": "oracle",
+  "razorpay.com": "razorpay",
+  "salesforce.com": "salesforce",
+  "stripe.com": "stripe",
+  "swiggy.in": "swiggy",
+  "tata.com": "tata",
+  "tcs.com": "tcs",
+  "uber.com": "uber",
+  "upwork.com": "upwork",
+  "wipro.com": "wipro",
+  "zomato.com": "zomato",
+  "zoom.us": "zoom",
+};
+
 function getBrandMonogram(name: string): string {
   const cleaned = name
     .replace(/^(dividend|salary|interest|bonus|freelance|payout|credit|payment|refund|from|to|transfer):\s*/i, "")
@@ -134,11 +167,18 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 
   const sources = useMemo(() => {
     if (!domain) return [];
-    return [
-      `https://icon.horse/icon/${domain}`,
-      `https://unavatar.io/${domain}`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    ];
+    const result: string[] = [];
+    // 1. Local SVG (highest quality, crisp at any size)
+    const localBase = COMPANY_LOCAL_LOGOS[domain];
+    if (localBase) {
+      result.push(`/logos/companies/${localBase}.svg`);
+    }
+    // 2. High-quality remote fallbacks
+    result.push(`https://img.logo.dev/${domain}?token=public&size=256`);
+    result.push(`https://icon.horse/icon/${domain}`);
+    result.push(`https://unavatar.io/${domain}`);
+    result.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=256`);
+    return result;
   }, [domain]);
 
   const [srcIndex, setSrcIndex] = useState(0);
