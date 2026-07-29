@@ -358,9 +358,45 @@ export function getBankDomain(bankName: string): string | null {
   return null;
 }
 
+// Maps bank domain -> local logo file name (without extension).
+// SVG is preferred over PNG for crisp rendering at any size.
+const BANK_LOCAL_LOGOS: Record<string, string> = {
+  "axisbank.com": "axis",
+  "bankofbaroda.in": "bob",
+  "bankofindia.co.in": "bankofindia",
+  "canarabank.com": "canara",
+  "chase.com": "chase",
+  "bankofamerica.com": "bofa",
+  "wellsfargo.com": "wellsfargo",
+  "hdfcbank.com": "hdfc",
+  "hsbc.co.in": "hsbc",
+  "icicibank.com": "icici",
+  "idbibank.in": "idbi",
+  "idfcfirstbank.com": "idfcfirst",
+  "indusind.com": "indusind",
+  "iob.in": "iob",
+  "kotak.com": "kotak",
+  "paytm.com": "paytm",
+  "phonepe.com": "phonepe",
+  "rblbank.com": "rbl",
+  "revolut.com": "revolut",
+  "wise.com": "wise",
+  "yesbank.in": "yesbank",
+  "aubank.in": "aubank",
+  "ucobank.com": "uco",
+};
+
+function getLocalBankLogoPath(domain: string): string | null {
+  const base = BANK_LOCAL_LOGOS[domain];
+  if (!base) return null;
+  // Prefer SVG (crisp at any size), fall back to PNG.
+  // We return both as separate entries so the <img> onError chain can try them.
+  return base;
+}
+
 /**
  * Get ordered fallback logo URLs for a bank.
- * Strategy: IconHorse → Unavatar → Google Favicon 128px
+ * Strategy: Local SVG → Local PNG → logo.dev (256px) → IconHorse → Google Favicon 256px
  */
 export function getBankLogoSources(bankNameOrDomain: string): string[] {
   if (!bankNameOrDomain) return [];
@@ -376,17 +412,25 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  return [
-    `https://icon.horse/icon/${domain}`,
-    `https://unavatar.io/${domain}`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-  ];
+  const sources: string[] = [];
+  const localBase = getLocalBankLogoPath(domain);
+  if (localBase) {
+    sources.push(`/logos/banks/${localBase}.svg`);
+    sources.push(`/logos/banks/${localBase}.png`);
+  }
+  // High-quality remote fallbacks
+  sources.push(`https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/${domain.split(".")[0]}.svg`);
+  sources.push(`https://img.logo.dev/${domain}?token=public&size=256`);
+  sources.push(`https://icon.horse/icon/${domain}`);
+  sources.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=256`);
+
+  return sources;
 }
 
 /**
  * Get a high-quality logo URL for a bank.
  */
-export function getBankLogoUrl(bankNameOrDomain: string, size: number = 128): string | null {
+export function getBankLogoUrl(bankNameOrDomain: string, size: number = 256): string | null {
   const sources = getBankLogoSources(bankNameOrDomain);
   return sources.length > 0 ? sources[0] : null;
 }
