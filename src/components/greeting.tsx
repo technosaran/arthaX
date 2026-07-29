@@ -8,7 +8,7 @@ type GreetingProps = {
   budgetLimit?: number;
 };
 
-export default function Greeting({ monthlySpend = 0, monthlyIncome = 0, budgetLimit = 0 }: GreetingProps) {
+export default function Greeting({ monthlySpend: _monthlySpend = 0, monthlyIncome: _monthlyIncome = 0, budgetLimit: _budgetLimit = 0 }: GreetingProps) {
   const { username, loading } = useUser();
 
   const now = new Date();

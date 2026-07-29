@@ -22,7 +22,17 @@ import { triggerMarketAndDividendSync } from "@/app/dashboard/investments/sync-a
 type Stock = Tables<"investments"> & { day_change?: number; day_change_percent?: number };
 
 export default function StocksClient({ initialData, showUSD = false }: { initialData?: FinanceData; showUSD?: boolean }) {
-  const { data: { investments, accounts, profile, stockTrades }, mutate } = useFinanceData(initialData);
+  const { data: { investments, accounts, profile, stockTrades, incomes }, mutate } = useFinanceData(initialData);
+
+  const dividendSummary = useMemo(() => {
+    if (!incomes) return { total: 0, count: 0 };
+    const divList = incomes.filter(i => 
+      i.category?.toLowerCase() === "dividend" || 
+      i.description?.toLowerCase().includes("dividend")
+    );
+    const total = divList.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    return { total, count: divList.length };
+  }, [incomes]);
   const searchParams = useSearchParams();
   const [showAddModal, setShowAddModal] = useState(searchParams?.get("action") === "new");
   const [submitting, withLock] = useSubmitLock();
@@ -588,6 +598,28 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                       </div>
                     </>
                   )}
+
+                  <div className="h-px w-full bg-[#333]" />
+                  
+                  <div className="bg-[#191919] p-4 rounded-xl border border-[#333] flex items-center justify-between">
+                    <div>
+                      <p className="text-[0.65rem] text-emerald-400 font-bold uppercase tracking-widest mb-0.5 flex items-center gap-1.5">
+                        <span>💎</span> Dividends Earned
+                      </p>
+                      <p className="text-lg font-black text-emerald-400">
+                        +₹{dividendSummary.total.toLocaleString()}
+                      </p>
+                      <p className="text-[0.65rem] text-[#848E9C]">
+                        {dividendSummary.count} payout{dividendSummary.count === 1 ? "" : "s"} auto-detected
+                      </p>
+                    </div>
+                    <a
+                      href="/dashboard/income"
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-bold underline transition-colors"
+                    >
+                      View Logs &rarr;
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>

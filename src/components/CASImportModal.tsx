@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { X, Upload, FileCheck, Layers, TrendingUp } from "lucide-react";
+import { X, Upload, FileCheck } from "lucide-react";
 import { CASParsedItem } from "@/lib/cas-parser/types";
 import { importCASPortfolio } from "@/app/dashboard/mutual-funds/actions";
 

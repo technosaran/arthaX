@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { X, Upload, FileText, CheckCircle2, AlertCircle, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { X, Upload, FileText, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { BankType, ParsedTransaction } from "@/lib/bank-parsers/types";
 import { importParsedTransactions } from "@/app/dashboard/accounts/actions";
 

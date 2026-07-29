@@ -2522,7 +2522,7 @@ export async function POST(req: NextRequest) {
         }
 
         const rpcName = "record_expense";
-        const { data: rpcData, error: rpcError } = await supabase.rpc(rpcName, {
+        const { error: rpcError } = await supabase.rpc(rpcName, {
           p_user_id: profile.id,
           p_description: "[Telegram] Uncategorized Expense",
           p_amount: primaryAmount,

@@ -11,7 +11,6 @@ import { createGoal, updateGoalAmount, deleteGoal, updateGoal } from "./actions"
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { getColorByLabel } from "@/lib/chart-colours";
-import dynamic from "next/dynamic";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from "@/components/ui/recharts";
 

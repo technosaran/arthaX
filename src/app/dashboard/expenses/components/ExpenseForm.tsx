@@ -183,29 +183,23 @@ export default function ExpenseForm({
         </div>
       </div>
 
-      {/* Category Chips */}
+      {/* Category Dropdown */}
       <div className="space-y-1">
-        <label className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Category</label>
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
-          {categories.map((c) => {
-            const isActive = formData.category === c.label;
-            return (
-              <button
-                key={c.label}
-                type="button"
-                onClick={() => setFormData({ ...formData, category: c.label })}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
-                  isActive
-                    ? "bg-rose-500/15 border-rose-500/40 text-rose-400 font-extrabold shadow-[0_2px_10px_rgba(244,63,94,0.2)]"
-                    : "bg-white/[0.03] border-white/10 text-[--text-muted] hover:text-white hover:bg-white/10 hover:border-white/20"
-                }`}
-              >
-                {c.icon && <span className="text-xs">{c.icon}</span>}
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
+        <label htmlFor="expense-category" className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Category</label>
+        <select
+          id="expense-category"
+          name="category"
+          aria-label="Select Expense Category"
+          className="input-premium !h-9.5 text-xs font-semibold w-full cursor-pointer"
+          value={formData.category}
+          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+        >
+          {categories.map((c) => (
+            <option key={c.label} value={c.label} className="bg-[#151922] text-white py-1">
+              {c.icon} {c.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Group 2: Date & Account */}

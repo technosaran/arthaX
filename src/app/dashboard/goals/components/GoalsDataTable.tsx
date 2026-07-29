@@ -174,28 +174,6 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
     });
   }, [goals, globalFilter, goalFilter]);
 
-  const summary = useMemo(() => {
-    const now = new Date();
-    return goals.reduce(
-      (acc, goal) => {
-        const current = Number(goal.current_amount);
-        const target = Number(goal.target_amount);
-        const complete = target > 0 && current >= target;
-        if (complete) acc.completed += 1;
-        else acc.active += 1;
-        if (goal.deadline) {
-          const date = parseISO(goal.deadline);
-          if (isValid(date)) {
-            const days = differenceInDays(date, now);
-            if (days >= 0 && days <= 30 && !complete) acc.dueSoon += 1;
-          }
-        }
-        return acc;
-      },
-      { active: 0, completed: 0, dueSoon: 0 }
-    );
-  }, [goals]);
-
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: filteredGoals,

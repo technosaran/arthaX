@@ -10,7 +10,6 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
 import { getColorByLabel } from "@/lib/chart-colours";
-import dynamic from "next/dynamic";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from "@/components/ui/recharts";
 
@@ -170,22 +169,6 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
       };
     }).sort((a, b) => b.Remaining - a.Remaining).slice(0, 10);
   }, [liabilities]);
-
-  const safetyIndex = useMemo(() => {
-    const liquidAssets = accounts
-      .filter(a => a.type === "checking" || a.type === "savings")
-      .reduce((sum, a) => sum + Number(a.balance), 0);
-    const totalDebt = liabilities.reduce((s, l) => s + Number(l.remaining_amount), 0);
-    if (totalDebt === 0) return { ratio: 999, status: "Safe", text: "Debt-free", color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5" };
-    const ratio = liquidAssets / totalDebt;
-    if (ratio >= 1.5) {
-      return { ratio, status: "Safe", text: "Liquid assets fully cover debt", color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5" };
-    } else if (ratio >= 0.6) {
-      return { ratio, status: "Caution", text: "Moderate leverage exposure", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" };
-    } else {
-      return { ratio, status: "Critical", text: "High debt exposure relative to cash", color: "text-rose-400 border-rose-500/20 bg-rose-500/5" };
-    }
-  }, [accounts, liabilities]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -6,9 +6,7 @@ import { useHasMounted } from "@/hooks/use-has-mounted";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useNetWorth } from "@/hooks/use-net-worth";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { getChartColour } from "@/lib/chart-colours";
-import DashboardMobile from "./components/DashboardMobile";
 import DashboardDesktop from "./components/DashboardDesktop";
 import OnboardingWizard from "@/components/onboarding-wizard";
 import { useUser } from "@/context/user-context";
@@ -31,7 +29,7 @@ type TrendEntry = {
 
 export default function DashboardClient() {
   const { user_id } = useUser();
-  const { data: financeData, isLoading, isValidating } = useFinanceData();
+  const { data: financeData, isLoading } = useFinanceData();
   
   const { 
     accounts = [], 
@@ -44,7 +42,6 @@ export default function DashboardClient() {
     goals = []
   } = financeData || {};
 
-  const isMobile = useMediaQuery('(max-width: 767.98px)');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Check if onboarding should be shown

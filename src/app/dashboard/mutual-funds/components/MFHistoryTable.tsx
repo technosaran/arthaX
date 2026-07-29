@@ -47,11 +47,8 @@ export default function MFHistoryTable({ trades }: MFHistoryTableProps) {
       columnHelper.accessor("fund_name", {
         header: "Scheme Name",
         cell: (info) => (
-          <div className="flex items-center gap-2.5">
-            <AMCAvatar amcName="" fundName={info.getValue() || ""} />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-[--text-primary] max-w-[300px] truncate" title={info.getValue()}>{info.getValue()}</span>
-            </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-[--text-primary] max-w-[300px] truncate" title={info.getValue()}>{info.getValue()}</span>
           </div>
         ),
       }),

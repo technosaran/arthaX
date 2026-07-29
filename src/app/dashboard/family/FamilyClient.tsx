@@ -189,7 +189,7 @@ export default function FamilyClient() {
         if (monthsMap[key] !== undefined) {
           monthsMap[key] += Number(t.amount || 0);
         }
-      } catch (e) {
+      } catch {
         // ignore parse error
       }
     });

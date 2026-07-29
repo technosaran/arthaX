@@ -35,29 +35,6 @@ export default function SettingsPage() {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const prevIsSyncingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const [isGmailSyncing, setIsGmailSyncing] = useState(false);
-
-  const handleGmailSync = async () => {
-    setIsGmailSyncing(true);
-    try {
-      const res = await fetch("/api/transactions/gmail-sync", { method: "POST" });
-      const resData = await res.json();
-      if (!res.ok) {
-        toast.error(resData.error || "Gmail sync failed");
-      } else {
-        if (resData.count > 0) {
-          toast.success(`Sync successful! Processed ${resData.count} new transaction alerts.`);
-          mutate();
-        } else {
-          toast.success("Sync completed. No new transaction alerts found.");
-        }
-      }
-    } catch {
-      toast.error("An error occurred during Gmail synchronization");
-    } finally {
-      setIsGmailSyncing(false);
-    }
-  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
