@@ -57,6 +57,15 @@ export default function BudgetOverviewWidget({ items = [], showUSD = false }: Bu
                   <span className="text-white flex items-center gap-2">
                     <span>{cat.icon || "📦"}</span>
                     {cat.name}
+                    {isExceeded ? (
+                      <span className="text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded font-black tracking-wider">
+                        🚨 EXCEEDED CAP
+                      </span>
+                    ) : pct >= 80 ? (
+                      <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-black tracking-wider">
+                        ⚠️ 80%+ CAP ALERT
+                      </span>
+                    ) : null}
                   </span>
                   <span className={`font-extrabold ${barColor.split(" ").pop()}`}>
                     {hasLimit ? `${pct}%` : "No Cap"}

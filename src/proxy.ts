@@ -33,7 +33,7 @@ function createSecurityHeaders(nonce: string) {
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://va.vercel-scripts.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://* https://upload.wikimedia.org https://*.wikimedia.org https://companyenrich.com https://cdn.brandfetch.io https://*.brandfetch.io https://cdn.simpleicons.org https://www.google.com https://icons.duckduckgo.com https://*.yahoo.com https://*.yahooapis.com https://assets.groww.in https://unavatar.io https://icon.horse https://cdn.jsdelivr.net https://api.statvoo.com https://raw.githubusercontent.com",
+    "img-src 'self' data: blob: https://* https://assets.groww.in https://cdn.jsdelivr.net https://raw.githubusercontent.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.yahoo.com https://*.yahooapis.com https://api.mfapi.in https://www.alphavantage.co https://va.vercel-scripts.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
@@ -181,14 +181,15 @@ export async function proxy(request: NextRequest) {
 
           supabaseResponse = createPassThroughResponse(requestHeaders);
           
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const isDeleting = value === "" || options?.maxAge === 0;
             supabaseResponse.cookies.set(name, value, {
               ...options,
-              maxAge: options?.maxAge ?? THIRTY_DAYS_IN_SECONDS,
+              maxAge: isDeleting ? 0 : (options?.maxAge ?? THIRTY_DAYS_IN_SECONDS),
               sameSite: options?.sameSite ?? "lax",
               path: options?.path ?? "/",
-            })
-          );
+            });
+          });
         },
       },
     }
@@ -212,9 +213,10 @@ export async function proxy(request: NextRequest) {
 
   if (finalResponse !== supabaseResponse) {
     supabaseResponse.cookies.getAll().forEach((cookie: { name: string; value: string; maxAge?: number }) => {
+      const isDeleting = cookie.value === "" || cookie.maxAge === 0;
       finalResponse.cookies.set(cookie.name, cookie.value, {
         ...cookie,
-        maxAge: cookie.maxAge ?? THIRTY_DAYS_IN_SECONDS,
+        maxAge: isDeleting ? 0 : (cookie.maxAge ?? THIRTY_DAYS_IN_SECONDS),
         sameSite: "lax",
         path: "/",
       });

@@ -38,7 +38,6 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between w-full">
         <div className="flex items-center gap-3">
-          <Image src="/icon.svg" alt="arthaX Logo" width={52} height={52} className="rounded-xl shadow-lg shadow-sky-500/25 object-contain" />
           <div>
             <span className="text-2xl font-black text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
             <span className="block text-[0.5625rem] font-bold text-gray-500 uppercase tracking-[0.2em] -mt-0.5">Wealth Terminal</span>

@@ -7,7 +7,7 @@ process.env.CRON_SECRET = "mock_secret";
 
 // Mock drizzle and db
 vi.mock("@/lib/db", () => {
-  const mockDb = {
+  const mockDb: any = {
     selectDistinct: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -16,6 +16,8 @@ vi.mock("@/lib/db", () => {
     set: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     values: vi.fn().mockReturnThis(),
+    then: (onfulfilled: any) => Promise.resolve([]).then(onfulfilled),
+    [Symbol.iterator]: [][Symbol.iterator],
     transaction: vi.fn().mockImplementation(async (callback) => {
       const tx = {
         select: vi.fn().mockReturnThis(),

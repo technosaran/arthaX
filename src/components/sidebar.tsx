@@ -339,11 +339,10 @@ export default function Sidebar() {
         <div className={`px-4 pt-6 pb-2 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
           {!isCollapsed ? (
             <div className="flex items-center gap-3">
-              <Image src="/icon.svg" alt="arthaX Logo" width={44} height={44} className="rounded-xl shadow-lg shadow-sky-500/25 object-contain shrink-0" />
               <span className="text-2xl font-black text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
             </div>
           ) : (
-            <Image src="/icon.svg" alt="arthaX Logo" width={46} height={46} className="rounded-xl shadow-lg shadow-sky-500/25 object-contain shrink-0" title="arthaX" />
+            <span className="text-xl font-black text-white tracking-tight" title="arthaX">a<span className="text-sky-400">X</span></span>
           )}
           <button 
             type="button" 

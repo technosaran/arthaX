@@ -123,12 +123,12 @@ export default function ExpenseForm({
     ) : null;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
       {/* Group 1: Merchant & Amount */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Description */}
-        <div className="space-y-1.5">
-          <label htmlFor="expense-description" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">
+        <div className="space-y-1">
+          <label htmlFor="expense-description" className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">
             {["Food", "Shopping", "Entertainment"].includes(formData.category) ? "Merchant / Store" : "Description"}
           </label>
           <input
@@ -137,7 +137,7 @@ export default function ExpenseForm({
             required
             id="expense-description"
             name="description"
-            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
+            className={`w-full h-9.5 px-3 rounded-xl bg-white/[0.03] border text-xs font-semibold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
               touched.description && errors.description 
                 ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
                 : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
@@ -154,15 +154,15 @@ export default function ExpenseForm({
         </div>
 
         {/* Amount */}
-        <div className="space-y-1.5">
-          <label htmlFor="expense-amount" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Amount</label>
+        <div className="space-y-1">
+          <label htmlFor="expense-amount" className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Amount</label>
           <div className="relative">
             <input
               type="number"
               required
               id="expense-amount"
               name="amount"
-              className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-bold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
+              className={`w-full h-9.5 px-3 rounded-xl bg-white/[0.03] border text-xs font-bold text-white placeholder-[--text-muted] focus:outline-none focus:ring-1 transition-all ${
                 touched.amount && errors.amount 
                   ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
                   : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
@@ -184,9 +184,9 @@ export default function ExpenseForm({
       </div>
 
       {/* Category Chips */}
-      <div className="space-y-2">
-        <label className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Category</label>
-        <div className="flex flex-wrap gap-2 pt-0.5">
+      <div className="space-y-1">
+        <label className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Category</label>
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
           {categories.map((c) => {
             const isActive = formData.category === c.label;
             return (
@@ -194,13 +194,13 @@ export default function ExpenseForm({
                 key={c.label}
                 type="button"
                 onClick={() => setFormData({ ...formData, category: c.label })}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
                   isActive
-                    ? "bg-rose-500/15 border-rose-500/40 text-rose-400 font-extrabold shadow-[0_4px_15px_rgba(244,63,94,0.2)] scale-[1.02]"
+                    ? "bg-rose-500/15 border-rose-500/40 text-rose-400 font-extrabold shadow-[0_2px_10px_rgba(244,63,94,0.2)]"
                     : "bg-white/[0.03] border-white/10 text-[--text-muted] hover:text-white hover:bg-white/10 hover:border-white/20"
                 }`}
               >
-                {c.icon && <span className="text-sm">{c.icon}</span>}
+                {c.icon && <span className="text-xs">{c.icon}</span>}
                 {c.label}
               </button>
             );
@@ -209,16 +209,16 @@ export default function ExpenseForm({
       </div>
 
       {/* Group 2: Date & Account */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Date */}
-        <div className="space-y-1.5">
-          <label htmlFor="expense-date" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Date</label>
+        <div className="space-y-1">
+          <label htmlFor="expense-date" className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Date</label>
           <input
             type="date"
             required
             id="expense-date"
             name="date"
-            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
+            className={`w-full h-9.5 px-3 rounded-xl bg-white/[0.03] border text-xs font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
               touched.date && errors.date 
                 ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
                 : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
@@ -234,12 +234,12 @@ export default function ExpenseForm({
         </div>
 
         {/* Account */}
-        <div className="space-y-1.5">
-          <label htmlFor="expense-account" className="block text-xs font-black uppercase tracking-widest text-[--text-muted]">Debit Account</label>
+        <div className="space-y-1">
+          <label htmlFor="expense-account" className="block text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Debit Account</label>
           <select
             id="expense-account"
             name="account_id"
-            className={`w-full h-11 px-4 rounded-xl bg-white/[0.03] border text-sm font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
+            className={`w-full h-9.5 px-3 rounded-xl bg-white/[0.03] border text-xs font-semibold text-white focus:outline-none focus:ring-1 transition-all ${
               touched.account_id && errors.account_id 
                 ? "border-rose-500/80 focus:border-rose-500 focus:ring-rose-500" 
                 : "border-white/10 hover:border-white/20 focus:border-rose-500 focus:ring-rose-500"
@@ -265,25 +265,25 @@ export default function ExpenseForm({
       {formData.account_id && (() => {
         const sel = accounts.find((a) => a.id === formData.account_id);
         return sel ? (
-          <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-between text-xs text-[--text-secondary] animate-fade-in">
-            <span className="font-semibold">Selected Account Balance</span>
-            <span className="font-black text-rose-400 text-sm">{sel.currency === "USD" ? "$" : "₹"}{sel.balance.toLocaleString()}</span>
+          <div className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-between text-xs text-[--text-secondary] animate-fade-in">
+            <span className="font-semibold text-[11px]">Selected Account Balance</span>
+            <span className="font-black text-rose-400 text-xs">{sel.currency === "USD" ? "$" : "₹"}{sel.balance.toLocaleString()}</span>
           </div>
         ) : null;
       })()}
 
-      <div className="pt-4 flex items-center gap-3">
+      <div className="pt-2 flex items-center gap-2.5">
         <button
           type="button"
           onClick={_onClose}
-          className="h-12 px-6 rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10 transition-all active:scale-95"
+          className="h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white hover:bg-white/10 transition-all active:scale-95"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 h-12 rounded-xl bg-gradient-to-r from-rose-500 via-rose-600 to-pink-600 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-rose-500/25 hover:shadow-rose-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 h-10 rounded-xl bg-gradient-to-r from-rose-500 via-rose-600 to-pink-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? "Processing…" : editingExpense ? "Save Changes" : "Confirm Record"}
         </button>

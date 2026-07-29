@@ -26,14 +26,15 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const isDeleting = value === "" || options?.maxAge === 0;
               cookieStore.set(name, value, {
                 ...options,
-                maxAge: options?.maxAge ?? THIRTY_DAYS_IN_SECONDS,
+                maxAge: isDeleting ? 0 : (options?.maxAge ?? THIRTY_DAYS_IN_SECONDS),
                 sameSite: options?.sameSite ?? "lax",
                 path: options?.path ?? "/",
-              })
-            );
+              });
+            });
           } catch {}
         },
       },

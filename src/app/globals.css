@@ -171,6 +171,7 @@
 html, body {
   overflow-x: hidden;
   max-width: 100vw;
+  width: 100%;
   min-height: 100dvh;
   background: var(--bg-base);
   color: var(--text-primary);
@@ -184,6 +185,18 @@ html, body {
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+/* Fluid responsive media & canvases */
+img, svg, canvas, video {
+  max-width: 100%;
+  height: auto;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 a:focus-visible,
@@ -219,34 +232,27 @@ input, textarea, [contenteditable="true"] {
 /* Premium Glass Cards - Financial Dashboard Style */
 .glass-card,
 .glass-card-static {
-  background: var(--glass-bg);
+  background: rgba(17, 24, 39, 0.95);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   padding: 1.5rem;
-  /* Removed heavy backdrop-filter to fix massive frame scroll lag */
   position: relative;
   overflow: hidden;
-  /* Hardware acceleration */
+  will-change: transform;
   transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.glass-card::before,
-.glass-card-static::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
-  pointer-events: none;
-}
-
-@media (max-width: 767.98px) {
-  .glass-card,
-  .glass-card-static {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgba(21, 25, 34, 0.95);
-  }
+/* Smooth 60FPS Performance: Light-touch hardware accelerated backdrop filters */
+.backdrop-blur-2xl,
+.backdrop-blur-xl,
+.backdrop-blur-lg,
+.backdrop-blur-md,
+.backdrop-blur-sm,
+.backdrop-blur {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .glass-card {
@@ -626,29 +632,13 @@ body {
   border-radius: inherit;
 }
 
-/* Custom Scrollbar - Premium Financial Dashboard Style */
+/* Clean Window Scroll: Hide custom website inner scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none;
 }
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(14, 165, 233, 0.2);
-  border-radius: 10px;
-  transition: background 0.2s;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(14, 165, 233, 0.4);
-}
-
 .custom-scrollbar {
-  scrollbar-color: rgba(14, 165, 233, 0.2) rgba(255, 255, 255, 0.02);
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 

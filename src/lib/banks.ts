@@ -1,163 +1,159 @@
-﻿export type Bank = { name: string; domain: string };
+export type Bank = { name: string; domain: string; isBank?: boolean };
 
 // Bank registry mapping names to their official domains
-// Used for logo resolution via multiple logo APIs
 const BANKS: Bank[] = [
   // Major Public Sector Banks
-  { name: "State Bank of India (SBI)",  domain: "sbi.co.in" },
-  { name: "Punjab National Bank (PNB)", domain: "pnbindia.in" },
-  { name: "Bank of Baroda (BOB)",       domain: "bankofbaroda.in" },
-  { name: "Canara Bank",                domain: "canarabank.com" },
-  { name: "Union Bank of India",        domain: "unionbankofindia.co.in" },
-  { name: "Bank of India (BOI)",        domain: "bankofindia.co.in" },
-  { name: "Indian Bank",                domain: "indianbank.in" },
-  { name: "Central Bank of India",      domain: "centralbankofindia.co.in" },
-  { name: "Indian Overseas Bank",       domain: "iob.in" },
-  { name: "UCO Bank",                   domain: "ucobank.com" },
-  { name: "Bank of Maharashtra",        domain: "bankofmaharashtra.in" },
-  { name: "Punjab & Sind Bank",         domain: "punjabandsindbank.co.in" },
+  { name: "State Bank of India (SBI)",  domain: "sbi.co.in", isBank: true },
+  { name: "Punjab National Bank (PNB)", domain: "pnbindia.in", isBank: true },
+  { name: "Bank of Baroda (BOB)",       domain: "bankofbaroda.in", isBank: true },
+  { name: "Canara Bank",                domain: "canarabank.com", isBank: true },
+  { name: "Union Bank of India",        domain: "unionbankofindia.co.in", isBank: true },
+  { name: "Bank of India (BOI)",        domain: "bankofindia.co.in", isBank: true },
+  { name: "Indian Bank",                domain: "indianbank.in", isBank: true },
+  { name: "Central Bank of India",      domain: "centralbankofindia.co.in", isBank: true },
+  { name: "Indian Overseas Bank",       domain: "iob.in", isBank: true },
+  { name: "UCO Bank",                   domain: "ucobank.com", isBank: true },
+  { name: "Bank of Maharashtra",        domain: "bankofmaharashtra.in", isBank: true },
+  { name: "Punjab & Sind Bank",         domain: "punjabandsindbank.co.in", isBank: true },
 
   // Major Private Sector Banks
-  { name: "HDFC Bank",                  domain: "hdfcbank.com" },
-  { name: "ICICI Bank",                 domain: "icicibank.com" },
-  { name: "Axis Bank",                  domain: "axisbank.com" },
-  { name: "Kotak Mahindra Bank",        domain: "kotak.com" },
-  { name: "IndusInd Bank",              domain: "indusind.com" },
-  { name: "Yes Bank",                   domain: "yesbank.in" },
-  { name: "IDFC First Bank",            domain: "idfcfirstbank.com" },
-  { name: "Federal Bank",               domain: "federalbank.co.in" },
-  { name: "South Indian Bank",          domain: "southindianbank.com" },
-  { name: "Karnataka Bank",             domain: "karnatakabank.com" },
-  { name: "RBL Bank",                   domain: "rblbank.com" },
-  { name: "Karur Vysya Bank",           domain: "kvb.co.in" },
-  { name: "Bandhan Bank",               domain: "bandhanbank.com" },
-  { name: "IDBI Bank",                  domain: "idbibank.in" },
-  { name: "City Union Bank",            domain: "cityunionbank.com" },
-  { name: "DCB Bank",                   domain: "dcbbank.com" },
-  { name: "Tamilnad Mercantile Bank",   domain: "tmb.in" },
-  { name: "J&K Bank",                   domain: "jkbank.com" },
-  { name: "CSB Bank",                   domain: "csb.co.in" },
-  { name: "Dhanlaxmi Bank",             domain: "dhanbank.com" },
+  { name: "HDFC Bank",                  domain: "hdfcbank.com", isBank: true },
+  { name: "ICICI Bank",                 domain: "icicibank.com", isBank: true },
+  { name: "Axis Bank",                  domain: "axisbank.com", isBank: true },
+  { name: "Kotak Mahindra Bank",        domain: "kotak.com", isBank: true },
+  { name: "IndusInd Bank",              domain: "indusind.com", isBank: true },
+  { name: "Yes Bank",                   domain: "yesbank.in", isBank: true },
+  { name: "IDFC First Bank",            domain: "idfcfirstbank.com", isBank: true },
+  { name: "Federal Bank",               domain: "federalbank.co.in", isBank: true },
+  { name: "South Indian Bank",          domain: "southindianbank.com", isBank: true },
+  { name: "Karnataka Bank",             domain: "karnatakabank.com", isBank: true },
+  { name: "RBL Bank",                   domain: "rblbank.com", isBank: true },
+  { name: "Karur Vysya Bank",           domain: "kvb.co.in", isBank: true },
+  { name: "Bandhan Bank",               domain: "bandhanbank.com", isBank: true },
+  { name: "IDBI Bank",                  domain: "idbibank.in", isBank: true },
+  { name: "City Union Bank",            domain: "cityunionbank.com", isBank: true },
+  { name: "DCB Bank",                   domain: "dcbbank.com", isBank: true },
+  { name: "Tamilnad Mercantile Bank",   domain: "tmb.in", isBank: true },
+  { name: "J&K Bank",                   domain: "jkbank.com", isBank: true },
+  { name: "CSB Bank",                   domain: "csb.co.in", isBank: true },
+  { name: "Dhanlaxmi Bank",             domain: "dhanbank.com", isBank: true },
 
   // International Banks (India Operations)
-  { name: "HSBC India",                 domain: "hsbc.co.in" },
-  { name: "Standard Chartered",         domain: "sc.com" },
-  { name: "Citibank India",             domain: "citibank.co.in" },
-  { name: "DBS Bank India",             domain: "dbs.com" },
-  { name: "Deutsche Bank India",        domain: "db.com" },
-  { name: "Barclays India",             domain: "barclays.com" },
-  { name: "J.P. Morgan India",          domain: "jpmorgan.com" },
+  { name: "HSBC India",                 domain: "hsbc.co.in", isBank: true },
+  { name: "Standard Chartered",         domain: "sc.com", isBank: true },
+  { name: "Citibank India",             domain: "citibank.co.in", isBank: true },
+  { name: "DBS Bank India",             domain: "dbs.com", isBank: true },
+  { name: "Deutsche Bank India",        domain: "db.com", isBank: true },
+  { name: "Barclays India",             domain: "barclays.com", isBank: true },
+  { name: "J.P. Morgan India",          domain: "jpmorgan.com", isBank: true },
 
   // Small Finance & Payments Banks
-  { name: "AU Small Finance Bank",      domain: "aubank.in" },
-  { name: "Equitas Small Finance Bank", domain: "equitasbank.com" },
-  { name: "Ujjivan Small Finance Bank", domain: "ujjivansfb.in" },
-  { name: "ESAF Small Finance Bank",    domain: "esafbank.com" },
-  { name: "Suryoday Small Finance Bank",domain: "suryodaybank.com" },
-  { name: "Jana Small Finance Bank",    domain: "janabank.com" },
-  { name: "Utkarsh Small Finance Bank", domain: "utkarshbank.in" },
-  { name: "Capital Small Finance Bank", domain: "capitalbank.co.in" },
-  { name: "Paytm Payments Bank",        domain: "paytm.com" },
-  { name: "Airtel Payments Bank",       domain: "airtel.in" },
-  { name: "Jio Payments Bank",          domain: "jio.com" },
-  { name: "India Post Payments Bank",   domain: "ippbonline.com" },
-  { name: "Fino Payments Bank",         domain: "finobank.com" },
-  { name: "NSDL Payments Bank",         domain: "nsdlbank.com" },
+  { name: "AU Small Finance Bank",      domain: "aubank.in", isBank: true },
+  { name: "Equitas Small Finance Bank", domain: "equitasbank.com", isBank: true },
+  { name: "Ujjivan Small Finance Bank", domain: "ujjivansfb.in", isBank: true },
+  { name: "ESAF Small Finance Bank",    domain: "esafbank.com", isBank: true },
+  { name: "Suryoday Small Finance Bank",domain: "suryodaybank.com", isBank: true },
+  { name: "Jana Small Finance Bank",    domain: "janabank.com", isBank: true },
+  { name: "Utkarsh Small Finance Bank", domain: "utkarshbank.in", isBank: true },
+  { name: "Capital Small Finance Bank", domain: "capitalbank.co.in", isBank: true },
+  { name: "Paytm Payments Bank",        domain: "paytm.com", isBank: true },
+  { name: "Airtel Payments Bank",       domain: "airtel.in", isBank: true },
+  { name: "Jio Payments Bank",          domain: "jio.com", isBank: true },
+  { name: "India Post Payments Bank",   domain: "ippbonline.com", isBank: true },
+  { name: "Fino Payments Bank",         domain: "finobank.com", isBank: true },
+  { name: "NSDL Payments Bank",         domain: "nsdlbank.com", isBank: true },
 
-  // Neo-Banks & Fintech
-  { name: "Jupiter",                    domain: "jupiter.money" },
-  { name: "Fi Money",                   domain: "fi.money" },
-  { name: "Niyo",                       domain: "goniyo.com" },
-  { name: "Slice",                      domain: "sliceit.com" },
-  { name: "Uni Cards",                  domain: "uni.cards" },
-  { name: "OneCard",                    domain: "getonecard.com" },
-  { name: "FamPay",                     domain: "fampay.in" },
-  { name: "Mobikwik",                   domain: "mobikwik.com" },
-  { name: "PhonePe",                    domain: "phonepe.com" },
-  { name: "Google Pay",                 domain: "pay.google.com" },
-  { name: "Amazon Pay",                 domain: "amazon.in" },
-  { name: "CRED",                       domain: "cred.club" },
-  { name: "BharatPe",                   domain: "bharatpe.com" },
-  { name: "Navi",                       domain: "navi.com" },
+  // Neo-Banks & Fintech (Banking Services)
+  { name: "Jupiter",                    domain: "jupiter.money", isBank: true },
+  { name: "Fi Money",                   domain: "fi.money", isBank: true },
+  { name: "Niyo",                       domain: "goniyo.com", isBank: true },
+  { name: "Slice",                      domain: "sliceit.com", isBank: true },
+  { name: "Uni Cards",                  domain: "uni.cards", isBank: false },
+  { name: "OneCard",                    domain: "getonecard.com", isBank: false },
+  { name: "FamPay",                     domain: "fampay.in", isBank: false },
+  { name: "Mobikwik",                   domain: "mobikwik.com", isBank: false },
+  { name: "PhonePe",                    domain: "phonepe.com", isBank: false },
+  { name: "Google Pay",                 domain: "pay.google.com", isBank: false },
+  { name: "Amazon Pay",                 domain: "amazon.in", isBank: false },
+  { name: "CRED",                       domain: "cred.club", isBank: false },
+  { name: "BharatPe",                   domain: "bharatpe.com", isBank: false },
+  { name: "Navi",                       domain: "navi.com", isBank: false },
 
-  // Investment Platforms
-  { name: "Zerodha",                    domain: "zerodha.com" },
-  { name: "Upstox",                     domain: "upstox.com" },
-  { name: "Groww",                      domain: "groww.in" },
-  { name: "Angel One",                  domain: "angelone.in" },
-  { name: "Kuvera",                     domain: "kuvera.in" },
-  { name: "Indmoney",                   domain: "indmoney.com" },
-  { name: "ET Money",                   domain: "etmoney.com" },
-  { name: "Smallcase",                  domain: "smallcase.com" },
-  { name: "Wealthy",                    domain: "wealthy.in" },
-  { name: "Paytm Money",               domain: "paytmmoney.com" },
-  { name: "Coin by Zerodha",            domain: "zerodha.com" },
+  // Investment Platforms (Non-Bank Brokers)
+  { name: "Zerodha",                    domain: "zerodha.com", isBank: false },
+  { name: "Upstox",                     domain: "upstox.com", isBank: false },
+  { name: "Groww",                      domain: "groww.in", isBank: false },
+  { name: "Angel One",                  domain: "angelone.in", isBank: false },
+  { name: "Kuvera",                     domain: "kuvera.in", isBank: false },
+  { name: "Indmoney",                   domain: "indmoney.com", isBank: false },
+  { name: "ET Money",                   domain: "etmoney.com", isBank: false },
+  { name: "Smallcase",                  domain: "smallcase.com", isBank: false },
+  { name: "Wealthy",                    domain: "wealthy.in", isBank: false },
+  { name: "Paytm Money",               domain: "paytmmoney.com", isBank: false },
+  { name: "Coin by Zerodha",            domain: "zerodha.com", isBank: false },
   
   // Cooperative & Regional Urban Banks
-  { name: "Saraswat Bank",              domain: "saraswatbank.com" },
-  { name: "Cosmos Bank",                domain: "cosmosbank.com" },
-  { name: "TJSB Sahakari Bank",         domain: "tjsb.co.in" },
-  { name: "SVC Cooperative Bank",       domain: "svcbank.com" },
-  { name: "Abhyudaya Bank",             domain: "abhyudayabank.co.in" },
-  { name: "NKGSB Bank",                 domain: "nkgsb.co.in" },
-  { name: "Kalupur Bank",               domain: "kalupurbank.com" },
-  { name: "Shamrao Vithal Bank",        domain: "svcbank.com" },
+  { name: "Saraswat Bank",              domain: "saraswatbank.com", isBank: true },
+  { name: "Cosmos Bank",                domain: "cosmosbank.com", isBank: true },
+  { name: "TJSB Sahakari Bank",         domain: "tjsb.co.in", isBank: true },
+  { name: "SVC Cooperative Bank",       domain: "svcbank.com", isBank: true },
+  { name: "Abhyudaya Bank",             domain: "abhyudayabank.co.in", isBank: true },
+  { name: "NKGSB Bank",                 domain: "nkgsb.co.in", isBank: true },
+  { name: "Kalupur Bank",               domain: "kalupurbank.com", isBank: true },
+  { name: "Shamrao Vithal Bank",        domain: "svcbank.com", isBank: true },
 
-  // Credit Cards & BNPL
-  { name: "LazyPay",                    domain: "lazypay.in" },
-  { name: "Simpl",                      domain: "getsimpl.com" },
-  { name: "Cashfree Payments",          domain: "cashfree.com" },
-  { name: "Instamojo",                  domain: "instamojo.com" },
-  { name: "Pine Labs",                  domain: "pinelabs.com" },
-  { name: "PayU India",                 domain: "payu.in" },
+  // Credit Cards & BNPL (Non-Bank)
+  { name: "LazyPay",                    domain: "lazypay.in", isBank: false },
+  { name: "Simpl",                      domain: "getsimpl.com", isBank: false },
+  { name: "Cashfree Payments",          domain: "cashfree.com", isBank: false },
+  { name: "Instamojo",                  domain: "instamojo.com", isBank: false },
+  { name: "Pine Labs",                  domain: "pinelabs.com", isBank: false },
+  { name: "PayU India",                 domain: "payu.in", isBank: false },
 
-  // Additional Investment & Trading Platforms
-  { name: "Dhan",                       domain: "dhan.co" },
-  { name: "5Paisa",                     domain: "5paisa.com" },
-  { name: "Motilal Oswal",              domain: "motilaloswal.com" },
-  { name: "Sharekhan",                  domain: "sharekhan.com" },
-  { name: "ICICI Direct",               domain: "icicidirect.com" },
-  { name: "HDFC Securities",            domain: "hdfcsec.com" },
-  { name: "Kotak Securities",           domain: "kotaksecurities.com" },
-  { name: "SBI Securities",             domain: "sbisecurities.in" },
-  { name: "Axis Direct",                domain: "axisdirect.in" },
-  { name: "IIFL Securities",            domain: "iifl.com" },
-  { name: "Geojit Financial Services",  domain: "geojit.com" },
-  { name: "Edelweiss Wealth",           domain: "edelweiss.in" },
-  { name: "Scripbox",                   domain: "scripbox.com" },
-  { name: "Vested Finance",             domain: "vestedfinance.com" },
+  // Additional Investment & Trading Platforms (Non-Bank)
+  { name: "Dhan",                       domain: "dhan.co", isBank: false },
+  { name: "5Paisa",                     domain: "5paisa.com", isBank: false },
+  { name: "Motilal Oswal",              domain: "motilaloswal.com", isBank: false },
+  { name: "Sharekhan",                  domain: "sharekhan.com", isBank: false },
+  { name: "ICICI Direct",               domain: "icicidirect.com", isBank: false },
+  { name: "HDFC Securities",            domain: "hdfcsec.com", isBank: false },
+  { name: "Kotak Securities",           domain: "kotaksecurities.com", isBank: false },
+  { name: "SBI Securities",             domain: "sbisecurities.in", isBank: false },
+  { name: "Axis Direct",                domain: "axisdirect.in", isBank: false },
+  { name: "IIFL Securities",            domain: "iifl.com", isBank: false },
+  { name: "Geojit Financial Services",  domain: "geojit.com", isBank: false },
+  { name: "Edelweiss Wealth",           domain: "edelweiss.in", isBank: false },
+  { name: "Scripbox",                   domain: "scripbox.com", isBank: false },
+  { name: "Vested Finance",             domain: "vestedfinance.com", isBank: false },
 
   // Global Financial Institutions & Neo-Banks
-  { name: "Barclays",                   domain: "barclays.com" },
-  { name: "UBS",                        domain: "ubs.com" },
-  { name: "Credit Suisse",              domain: "credit-suisse.com" },
-  { name: "BNP Paribas",                domain: "bnpparibas.com" },
-  { name: "Societe Generale",           domain: "societegenerale.com" },
-  { name: "Fidelity Investments",       domain: "fidelity.com" },
-  { name: "Vanguard",                   domain: "vanguard.com" },
-  { name: "Charles Schwab",             domain: "schwab.com" },
-  { name: "E*TRADE",                    domain: "etrade.com" },
-  { name: "Webull",                     domain: "webull.com" },
-  { name: "Interactive Brokers",        domain: "interactivebrokers.com" },
-  { name: "N26",                        domain: "n26.com" },
-  { name: "Monzo",                      domain: "monzo.com" },
-  { name: "Starling Bank",              domain: "starlingbank.com" },
-  { name: "Remitly",                    domain: "remitly.com" },
+  { name: "Barclays",                   domain: "barclays.com", isBank: true },
+  { name: "UBS",                        domain: "ubs.com", isBank: true },
+  { name: "Credit Suisse",              domain: "credit-suisse.com", isBank: true },
+  { name: "BNP Paribas",                domain: "bnpparibas.com", isBank: true },
+  { name: "Societe Generale",           domain: "societegenerale.com", isBank: true },
+  { name: "Fidelity Investments",       domain: "fidelity.com", isBank: false },
+  { name: "Vanguard",                   domain: "vanguard.com", isBank: false },
+  { name: "Charles Schwab",             domain: "schwab.com", isBank: true },
+  { name: "E*TRADE",                    domain: "etrade.com", isBank: false },
+  { name: "Webull",                     domain: "webull.com", isBank: false },
+  { name: "Interactive Brokers",        domain: "interactivebrokers.com", isBank: false },
+  { name: "N26",                        domain: "n26.com", isBank: true },
+  { name: "Monzo",                      domain: "monzo.com", isBank: true },
+  { name: "Starling Bank",              domain: "starlingbank.com", isBank: true },
+  { name: "Remitly",                    domain: "remitly.com", isBank: false },
 
-  { name: "Chase Bank",                 domain: "chase.com" },
-  { name: "Bank of America",            domain: "bankofamerica.com" },
-  { name: "Wells Fargo",                domain: "wellsfargo.com" },
-  { name: "Capital One",                domain: "capitalone.com" },
-  { name: "Morgan Stanley",             domain: "morganstanley.com" },
-  { name: "Revolut",                    domain: "revolut.com" },
-  { name: "Wise",                       domain: "wise.com" },
-  { name: "PayPal",                     domain: "paypal.com" },
-  { name: "Robinhood",                  domain: "robinhood.com" },
-  { name: "Coinbase",                   domain: "coinbase.com" },
-  { name: "Binance",                    domain: "binance.com" },
-  { name: "SBI",                        domain: "sbi.co.in" },
-  { name: "HDFC",                       domain: "hdfcbank.com" },
-  { name: "ICICI",                      domain: "icicibank.com" },
+  { name: "Chase Bank",                 domain: "chase.com", isBank: true },
+  { name: "Bank of America",            domain: "bankofamerica.com", isBank: true },
+  { name: "Wells Fargo",                domain: "wellsfargo.com", isBank: true },
+  { name: "Capital One",                domain: "capitalone.com", isBank: true },
+  { name: "Morgan Stanley",             domain: "morganstanley.com", isBank: true },
+  { name: "Revolut",                    domain: "revolut.com", isBank: true },
+  { name: "Wise",                       domain: "wise.com", isBank: true },
+  { name: "PayPal",                     domain: "paypal.com", isBank: false },
+  { name: "Robinhood",                  domain: "robinhood.com", isBank: false },
+  { name: "Coinbase",                   domain: "coinbase.com", isBank: false },
+  { name: "Binance",                    domain: "binance.com", isBank: false },
 ];
 
 const SHORTHAND_DOMAINS: Record<string, string> = {
@@ -270,230 +266,6 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   coinbase: "coinbase.com",
 };
 
-import { getFastLogoCandidateUrls } from "./logo-cache";
-
-const HD_BANK_LOGOS: Record<string, string[]> = {
-  "sbi.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cc/SBI-Logo.svg",
-    "https://cdn.simpleicons.org/statebankofindia",
-    "https://www.google.com/s2/favicons?domain=sbi.co.in&sz=256",
-  ],
-  "indianbank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/02/Indian_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=indianbank.in&sz=256",
-  ],
-  "bankofindia.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/6/68/Bank_of_India_logo.svg",
-    "https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=256",
-  ],
-  "rblbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/07/RBL_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=rblbank.com&sz=256",
-  ],
-  "centralbankofindia.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/5/53/Central_Bank_of_India_logo.svg",
-    "https://www.google.com/s2/favicons?domain=centralbankofindia.co.in&sz=256",
-  ],
-  "iob.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/36/Indian_Overseas_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=iob.in&sz=256",
-  ],
-  "iob.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/36/Indian_Overseas_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=iob.co.in&sz=256",
-  ],
-  "ucobank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/d/df/UCO_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=ucobank.com&sz=256",
-  ],
-  "bankofmaharashtra.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/d/d4/Bank_of_Maharashtra_logo.svg",
-    "https://www.google.com/s2/favicons?domain=bankofmaharashtra.in&sz=256",
-  ],
-  "punjabandsindbank.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/3a/Punjab_%26_Sind_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=punjabandsindbank.co.in&sz=256",
-  ],
-  "southindianbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7b/South_Indian_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=southindianbank.com&sz=256",
-  ],
-  "karnatakabank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b8/Karnataka_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=karnatakabank.com&sz=256",
-  ],
-  "kvb.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7e/Karur_Vysya_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=kvb.co.in&sz=256",
-  ],
-  "bandhanbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/87/Bandhan_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=bandhanbank.com&sz=256",
-  ],
-  "idbibank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a2/IDBI_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=idbibank.in&sz=256",
-  ],
-  "cityunionbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/30/City_Union_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=cityunionbank.com&sz=256",
-  ],
-  "dcbbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/07/DCB_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=dcbbank.com&sz=256",
-  ],
-  "aubank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/80/AU_Small_Finance_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=aubank.in&sz=256",
-  ],
-  "equitasbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/c5/Equitas_Small_Finance_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=equitasbank.com&sz=256",
-  ],
-  "ujjivansfb.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ujjivan_Small_Finance_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=ujjivansfb.in&sz=256",
-  ],
-  "ippbonline.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/e/e0/India_Post_Payments_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=ippbonline.com&sz=256",
-  ],
-  "hdfcbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=hdfcbank.com&sz=256",
-  ],
-  "icicibank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=icicibank.com&sz=256",
-  ],
-  "axisbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=axisbank.com&sz=256",
-  ],
-  "kotak.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=kotak.com&sz=256",
-  ],
-  "pnbindia.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/4/4b/Punjab_National_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=pnbindia.in&sz=256",
-  ],
-  "bankofbaroda.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Bank_of_Baroda_logo.svg",
-    "https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=256",
-  ],
-  "canarabank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/2a/Canara_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=canarabank.com&sz=256",
-  ],
-  "unionbankofindia.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/0/05/Union_Bank_of_India_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=256",
-  ],
-  "idfcfirstbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/29/IDFC_First_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=idfcfirstbank.com&sz=256",
-  ],
-  "indusind.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/82/IndusInd_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=indusind.com&sz=256",
-  ],
-  "yesbank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/4/49/Yes_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=yesbank.in&sz=256",
-  ],
-  "federalbank.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/27/Federal_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=federalbank.co.in&sz=256",
-  ],
-  "paytmbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
-    "https://cdn.simpleicons.org/paytm",
-    "https://www.google.com/s2/favicons?domain=paytm.com&sz=256",
-  ],
-  "paytm.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
-    "https://cdn.simpleicons.org/paytm",
-    "https://www.google.com/s2/favicons?domain=paytm.com&sz=256",
-  ],
-  "phonepe.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg",
-    "https://cdn.simpleicons.org/phonepe",
-    "https://www.google.com/s2/favicons?domain=phonepe.com&sz=256",
-  ],
-  "cred.club": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/87/CRED_logo.svg",
-    "https://www.google.com/s2/favicons?domain=cred.club&sz=256",
-  ],
-  "zerodha.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/30/Zerodha_logo.svg",
-    "https://www.google.com/s2/favicons?domain=zerodha.com&sz=256",
-  ],
-  "groww.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b8/Groww_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=groww.in&sz=256",
-  ],
-  "hsbc.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/aa/HSBC_logo_%282018%29.svg",
-    "https://cdn.simpleicons.org/hsbc",
-  ],
-  "sc.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a0/Standard_Chartered_logo.svg",
-    "https://cdn.simpleicons.org/standardchartered",
-  ],
-  "citibank.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/1b/Citibank.svg",
-    "https://cdn.simpleicons.org/citibank",
-  ],
-  "dbs.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a4/DBS_Bank_logo.svg",
-  ],
-  "chase.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a4/Chase_logo.svg",
-    "https://cdn.simpleicons.org/chase",
-  ],
-  "bankofamerica.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/20/Bank_of_America_logo.svg",
-    "https://cdn.simpleicons.org/bankofamerica",
-  ],
-  "wise.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/9/94/Wise_Logo.svg",
-    "https://cdn.simpleicons.org/wise",
-  ],
-  "revolut.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/c5/Revolut_logo.svg",
-    "https://cdn.simpleicons.org/revolut",
-  ],
-  "paypal.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg",
-    "https://cdn.simpleicons.org/paypal",
-  ],
-  "pay.google.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg",
-    "https://cdn.simpleicons.org/googlepay",
-    "https://www.google.com/s2/favicons?domain=pay.google.com&sz=256",
-  ],
-  "jupiter.money": [
-    "https://www.google.com/s2/favicons?domain=jupiter.money&sz=256",
-  ],
-  "fi.money": [
-    "https://www.google.com/s2/favicons?domain=fi.money&sz=256",
-  ],
-  "upstox.com": [
-    "https://www.google.com/s2/favicons?domain=upstox.com&sz=256",
-  ],
-  "angelone.in": [
-    "https://www.google.com/s2/favicons?domain=angelone.in&sz=256",
-  ],
-};
-
-export function getBankLogoUrls(domain: string): string[] {
-  if (!domain) return [];
-  const clean = domain.trim().toLowerCase();
-  const curated = HD_BANK_LOGOS[clean] || [];
-  const defaults = getFastLogoCandidateUrls(clean);
-  return Array.from(new Set([...curated, ...defaults]));
-}
 
 /**
  * Get the domain registered for a bank name or account title
@@ -586,9 +358,43 @@ export function getBankDomain(bankName: string): string | null {
   return null;
 }
 
-export function searchBanks(query: string): Bank[] {
-  if (!query.trim()) return BANKS.slice(0, 15); // Show popular banks by default
-  const q = query.toLowerCase();
+/**
+ * Get ordered fallback logo URLs for a bank.
+ * Strategy: IconHorse → Unavatar → Google Favicon 128px
+ */
+export function getBankLogoSources(bankNameOrDomain: string): string[] {
+  if (!bankNameOrDomain) return [];
+  const raw = bankNameOrDomain.trim();
+  const domainRegex = /^[a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money)$/i;
+  let domain: string | null = null;
+
+  if (domainRegex.test(raw)) {
+    domain = raw.toLowerCase();
+  } else {
+    domain = getBankDomain(raw);
+  }
+
+  if (!domain) return [];
+
+  return [
+    `https://icon.horse/icon/${domain}`,
+    `https://unavatar.io/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+  ];
+}
+
+/**
+ * Get a high-quality logo URL for a bank.
+ */
+export function getBankLogoUrl(bankNameOrDomain: string, size: number = 128): string | null {
+  const sources = getBankLogoSources(bankNameOrDomain);
+  return sources.length > 0 ? sources[0] : null;
+}
+
+export function searchBanks(query: string, includeNonBanks: boolean = false): Bank[] {
+  const bankPool = includeNonBanks ? BANKS : BANKS.filter((b) => b.isBank !== false);
+  if (!query.trim()) return bankPool.slice(0, 15); // Show popular banks by default
+  const q = query.toLowerCase().trim();
   const cleanBankName = (name: string) => name.replace(/\s*\([^)]*\)/g, "").toLowerCase().trim();
   const acronymFor = (name: string) => name.match(/\(([^)]+)\)/)?.[1]?.toLowerCase() || "";
   const scoreBank = (bank: Bank) => {
@@ -605,7 +411,7 @@ export function searchBanks(query: string): Bank[] {
   };
   
   // Sort by priority and match quality
-  return BANKS.filter((b) => {
+  return bankPool.filter((b) => {
     const name = b.name.toLowerCase();
     const clean = cleanBankName(b.name);
     const acronym = acronymFor(b.name);

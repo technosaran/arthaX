@@ -42,10 +42,6 @@ interface ExpenseDataTableProps {
   onAdd: () => void;
   categories: { label: string; icon: string; color: string }[];
 }
-
-import BankLogo from "@/components/ui/bank-logo";
-import CompanyLogo from "@/components/ui/company-logo";
-
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 const columnHelper = createColumnHelper<Expense>();
@@ -86,7 +82,9 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const cat = info.row.original.category;
           return (
             <div className="flex items-center gap-3">
-              <CompanyLogo name={info.getValue()} category={cat} size={52} />
+              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 font-bold text-sm shrink-0">
+                {info.getValue() ? info.getValue().charAt(0).toUpperCase() : "E"}
+              </div>
               <div className="flex flex-col min-w-0">
                 <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
                   {info.getValue()}
@@ -118,7 +116,9 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const payMode = !account ? "Cash Reserve" : account.type === "cash" ? "Cash Reserve" : account.type === "credit" ? "Credit Line" : "Bank Transfer / UPI";
           return (
             <div className="flex items-center gap-2.5">
-              <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={44} />
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-xs shrink-0">
+                {(account?.name || "Cash").charAt(0).toUpperCase()}
+              </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[--text-primary] truncate">{account?.name || "Cash Reserve"}</span>
                 <span className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider">{payMode}</span>
@@ -208,6 +208,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
             className="input-premium pl-9 py-2 text-sm w-full !bg-black/20"
           />
         </div>
+
         {/* #8 — page size selector */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-[--text-muted]">Rows</span>
@@ -292,7 +293,9 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
               <div key={row.id} className="p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CompanyLogo name={exp.description} category={exp.category} size={54} />
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 font-bold text-sm shrink-0">
+                      {exp.description ? exp.description.charAt(0).toUpperCase() : "E"}
+                    </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-bold text-white truncate">{exp.description}</span>
                       <span className="text-xs text-[--text-muted]">{exp.date ? format(parseISO(exp.date), "MMM d, yyyy") : "—"}</span>
@@ -305,7 +308,9 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                 </div>
                 <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                   <div className="flex items-center gap-2">
-                    <BankLogo bankName={account?.bank_name} accountName={account?.name} type={account?.type} size={40} />
+                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-xs shrink-0">
+                      {(account?.name || "Cash").charAt(0).toUpperCase()}
+                    </div>
                     <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Cash Reserve"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">

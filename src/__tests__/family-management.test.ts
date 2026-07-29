@@ -10,7 +10,9 @@ vi.mock('next/cache', () => ({
 // -------------------------------------------------------------------
 // Mock Supabase client factory
 // -------------------------------------------------------------------
-const mockInsert = vi.fn().mockResolvedValue({ error: null });
+const mockSingle = vi.fn().mockResolvedValue({ data: { id: 'test-id' }, error: null });
+const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
 const mockDelete = vi.fn().mockReturnValue({
   eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
 });
@@ -59,7 +61,9 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   mockUser = { id: 'test-user-id' };
-  mockInsert.mockResolvedValue({ error: null });
+  mockSingle.mockResolvedValue({ data: { id: 'test-id' }, error: null });
+  mockSelect.mockReturnValue({ single: mockSingle });
+  mockInsert.mockReturnValue({ select: mockSelect });
   mockFrom.mockReturnValue({
     insert: mockInsert,
     delete: mockDelete,

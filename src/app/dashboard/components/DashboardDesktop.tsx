@@ -237,7 +237,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
   };
 
   return (
-    <div className="hidden md:flex flex-col gap-8 animate-fade-in relative z-20 pb-10">
+    <div className="flex flex-col gap-6 md:gap-8 animate-fade-in relative z-20 pb-10">
       
       {/* Dynamic Header */}
       <div className="flex flex-col gap-4">
@@ -351,7 +351,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     {stats.totalDayPnL >= 0 ? "⚡" : "📉"}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-[--text-muted]">Today's Return</span>
+                    <span className="text-xs font-semibold text-[--text-muted]">Today&apos;s Return</span>
                     <span className={`text-sm sm:text-base font-black ${stats.totalDayPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {stats.totalDayPnL >= 0 ? "+" : "-"}
                       {showUSD 

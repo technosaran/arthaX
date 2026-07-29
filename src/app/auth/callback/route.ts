@@ -37,13 +37,18 @@ export async function GET(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
+              const isDeleting = value === "" || options?.maxAge === 0;
               const opts = {
                 ...options,
-                maxAge: options?.maxAge ?? THIRTY_DAYS_IN_SECONDS,
-                sameSite: options?.sameSite ?? "lax" as const,
+                maxAge: isDeleting ? 0 : (options?.maxAge ?? THIRTY_DAYS_IN_SECONDS),
+                sameSite: options?.sameSite ?? ("lax" as const),
                 path: options?.path ?? "/",
               };
-              cookieStore.set(name, value, opts);
+              try {
+                cookieStore.set(name, value, opts);
+              } catch {
+                // Ignore if called in immutable context
+              }
               response.cookies.set(name, value, opts);
             });
           },

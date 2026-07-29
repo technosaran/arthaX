@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
@@ -13,8 +13,8 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { Drawer } from "@/components/ui/drawer";
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
-import CompanyLogo from "@/components/ui/company-logo";
-import BankLogo from "@/components/ui/bank-logo";
+
+import { getBankLogoSources } from "@/lib/banks";
 
 import { CHART_COLOURS, CHART_SERIES_COLOURS } from "@/lib/chart-colours";
 function getColorByLabel(label: string | null | undefined) {
@@ -27,9 +27,192 @@ function getColorByLabel(label: string | null | undefined) {
 }
 
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "@/components/ui/recharts";
+// Direct HQ logo URLs for known companies (Clearbit full-color logos — NOT monochrome icons)
+const COMPANY_LOGO_DOMAINS: Record<string, string> = {
+  google: "google.com",
+  microsoft: "microsoft.com",
+  apple: "apple.com",
+  amazon: "amazon.com",
+  meta: "meta.com",
+  facebook: "facebook.com",
+  netflix: "netflix.com",
+  tcs: "tata.com",
+  tata: "tata.com",
+  infosys: "infosys.com",
+  wipro: "wipro.com",
+  accenture: "accenture.com",
+  cognizant: "cognizant.com",
+  hcl: "hcltech.com",
+  techmahindra: "techmahindra.com",
+  capgemini: "capgemini.com",
+  ibm: "ibm.com",
+  oracle: "oracle.com",
+  salesforce: "salesforce.com",
+  adobe: "adobe.com",
+  uber: "uber.com",
+  swiggy: "swiggy.in",
+  zomato: "zomato.com",
+  flipkart: "flipkart.com",
+  razorpay: "razorpay.com",
+  stripe: "stripe.com",
+  upwork: "upwork.com",
+  fiverr: "fiverr.com",
+  toptal: "toptal.com",
+  linkedin: "linkedin.com",
+  atlassian: "atlassian.com",
+  github: "github.com",
+  gitlab: "gitlab.com",
+  zoom: "zoom.us",
+  slack: "slack.com",
+  shopify: "shopify.com",
+  twitter: "x.com",
+  snap: "snap.com",
+  spotify: "spotify.com",
+  airbnb: "airbnb.com",
+  paypal: "paypal.com",
+  paytm: "paytm.com",
+  phonepe: "phonepe.com",
+  fiver: "fiverr.com",
+};
+
+function getBrandMonogram(name: string): string {
+  const cleaned = name
+    .replace(/^(dividend|salary|interest|bonus|freelance|payout|credit|payment|refund|from|to|transfer):\s*/i, "")
+    .replace(/\b(ltd|limited|corp|corporation|inc|incorporated|serv|services|lt|co)\b/gi, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[—–\-]\s*₹.*$/i, "")
+    .trim();
+  
+  if (cleaned.length === 0) return "IN";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
+const MONOGRAM_GRADIENTS = [
+  "from-blue-500 via-indigo-600 to-purple-600",
+  "from-emerald-500 via-teal-600 to-cyan-600",
+  "from-orange-500 via-red-500 to-pink-600",
+  "from-violet-500 via-purple-600 to-fuchsia-600",
+  "from-cyan-500 via-blue-600 to-indigo-600",
+  "from-rose-500 via-pink-500 to-fuchsia-600",
+];
+
+function getGradientForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  return MONOGRAM_GRADIENTS[Math.abs(hash) % MONOGRAM_GRADIENTS.length];
+}
+
+const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }: { name?: string; fallbackText?: string; className?: string }) => {
+  const domain = useMemo(() => {
+    if (!name) return null;
+    const clean = name.trim().toLowerCase();
+    
+    // Check known company domains first
+    for (const [key, dom] of Object.entries(COMPANY_LOGO_DOMAINS)) {
+      if (clean.includes(key)) return dom;
+    }
+
+    // Try to extract domain from text
+    const domainMatch = clean.match(/\b([a-z0-9\-]+\.(?:com|in|co|org|io|dev|ai|app|net|tech|money|club|us))\b/i);
+    if (domainMatch) return domainMatch[1].toLowerCase();
+
+    // Smart cleanup for income descriptions like "Dividend: TATA CONSULTANCY SERV LT (TCS)"
+    const stripped = clean
+      .replace(/^(dividend|salary|interest|bonus|freelance|payout|credit|payment|refund|from|to|transfer):\s*/i, "")
+      .replace(/\b(ltd|limited|corp|corporation|inc|incorporated|serv|services|lt|co)\b/gi, "")
+      .replace(/\([^)]*\)/g, "")
+      .replace(/[—–\-]\s*₹.*$/i, "")
+      .trim();
+    const firstWord = stripped.split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+    if (firstWord.length >= 3) return `${firstWord}.com`;
+    return null;
+  }, [name]);
+
+  const sources = useMemo(() => {
+    if (!domain) return [];
+    return [
+      `https://icon.horse/icon/${domain}`,
+      `https://unavatar.io/${domain}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    ];
+  }, [domain]);
+
+  const [srcIndex, setSrcIndex] = useState(0);
+
+  useEffect(() => {
+    setSrcIndex(0);
+  }, [name]);
+
+  const initials = getBrandMonogram(name || fallbackText);
+  const gradient = getGradientForName(name || "");
+
+  if (!sources.length || srcIndex >= sources.length) {
+    return (
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-lg shrink-0`}>
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
+      <img
+        key={sources[srcIndex]}
+        src={sources[srcIndex]}
+        alt={name || "Company"}
+        className="w-full h-full object-contain rounded-xl"
+        loading="eager"
+        onError={() => setSrcIndex((prev) => prev + 1)}
+      />
+    </div>
+  );
+});
+CompanyLogo.displayName = "CompanyLogo";
+
+const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: { bankName?: string | null; accountName?: string; className?: string }) => {
+  const sources = useMemo(() => {
+    const query = bankName || accountName || "";
+    return getBankLogoSources(query);
+  }, [bankName, accountName]);
+
+  const [srcIndex, setSrcIndex] = useState(0);
+
+  useEffect(() => {
+    setSrcIndex(0);
+  }, [bankName, accountName]);
+
+  if (!sources || sources.length === 0 || srcIndex >= sources.length) {
+    return (
+      <div className={`${className} rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-[10px] shrink-0`}>
+        {(accountName || "D").charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
+  const currentSrc = sources[srcIndex];
+
+  return (
+    <div className={`${className} rounded-lg overflow-hidden bg-white border border-white/20 flex items-center justify-center p-0.5 shadow-sm shrink-0`}>
+      <img
+        key={currentSrc}
+        src={currentSrc}
+        alt={bankName || accountName || "Bank"}
+        className="w-full h-full object-contain rounded"
+        loading="lazy"
+        onError={() => setSrcIndex(prev => prev + 1)}
+      />
+    </div>
+  );
+});
+AccountBankLogo.displayName = "AccountBankLogo";
 
 const INCOME_CATEGORIES = [
   { label: "Salary", icon: "🏢", color: CHART_COLOURS[0] },
+  { label: "Dividend", icon: "💎", color: "#10b981" },
   { label: "Work", icon: "💻", color: CHART_COLOURS[1] },
   { label: "Freelance", icon: "🚀", color: CHART_COLOURS[2] },
   { label: "Gift", icon: "💝", color: CHART_COLOURS[3] },
@@ -229,7 +412,13 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
     });
     const trendData = Object.entries(trendMap).map(([name, value]) => ({ name, value }));
 
-    return { totalIncome, monthlyTotal, pieData, trendData, yoyChange, yoyAbsolute, lastYearTotal };
+    const dividendIncomes = incomes.filter(i => 
+      i.category?.toLowerCase() === "dividend" || 
+      i.description?.toLowerCase().includes("dividend")
+    );
+    const totalDividends = dividendIncomes.reduce((s, i) => s + Number(i.amount), 0);
+
+    return { totalIncome, monthlyTotal, pieData, trendData, yoyChange, yoyAbsolute, lastYearTotal, totalDividends };
   }, [incomes, selectedMonth, selectedYear]);
 
   const filteredIncomes = useMemo(() => {
@@ -297,71 +486,6 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         toast.error(result.error);
       }
     });
-  }
-
-  if (isMobile) {
-    return (
-      <div className="flex flex-col gap-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-[--text-primary]">Record Income</h1>
-            <div className={`status-dot scale-70 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400'}`} />
-          </div>
-          <Link href="/dashboard" className="text-xs font-black uppercase text-[--text-muted] no-underline bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
-            Back
-          </Link>
-        </div>
-        
-        <div className="glass-card-static p-5 border border-white/5 bg-white/[0.01]">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Description / Source</label>
-              <input type="text" required className="input-premium" placeholder="e.g. Monthly Salary" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} autoComplete="off" id="income-description" name="description" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Credit Amount</label>
-              <input type="number" required className="input-premium" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} autoComplete="off" inputMode="decimal" id="income-amount" name="amount" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Income Stream</label>
-              <select className="input-premium" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} aria-label="Select income category" id="income-category" name="category">
-                {INCOME_CATEGORIES.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Transaction Date</label>
-              <input type="date" required className="input-premium" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} autoComplete="off" id="income-date" name="date" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Deposit into Account</label>
-              <select className="input-premium" value={formData.account_id} onChange={e => setFormData({ ...formData, account_id: e.target.value })} aria-label="Select credit account" id="income-account" name="account_id">
-                <option value="" disabled>Select Deposit Account</option>
-                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-              </select>
-              {formData.account_id && (() => {
-                const selectedAcc = accounts.find(a => a.id === formData.account_id);
-                return selectedAcc ? (
-                  <div className="mt-2 p-2 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs text-[--text-secondary]">
-                    <span>Selected Balance</span>
-                    <span className="font-bold text-white">
-                      {selectedAcc.currency === 'USD' ? '$' : '₹'}{selectedAcc.balance.toLocaleString()}
-                    </span>
-                  </div>
-                ) : null;
-              })()}
-            </div>
-
-            <button type="submit" disabled={submitting} className="btn-primary w-full h-12 shadow-md mt-6">
-              {submitting ? "Processing..." : "Confirm Record"}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -446,7 +570,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between group">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Net Throughput</p>
           <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
@@ -480,6 +604,24 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
               +₹{(incomes.length ? stats.totalIncome / incomes.length : 0).toLocaleString(undefined, {maximumFractionDigits: 0})}
             </h3>
             <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-white/5 text-[--text-muted]">{incomes.length} pts</span>
+          </div>
+        </div>
+        <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 shadow-[0_4px_20px_rgba(16,185,129,0.1)]">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400">Dividend Earnings 💎</p>
+            <span className="text-xs">📈</span>
+          </div>
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <h3 className="text-xl md:text-2xl font-black truncate text-emerald-300">
+              +₹{stats.totalDividends.toLocaleString()}
+            </h3>
+            <button 
+              type="button" 
+              onClick={() => setCategoryFilter("Dividend")} 
+              className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold hover:bg-emerald-500/30 transition-all cursor-pointer"
+            >
+              Filter Dividends
+            </button>
           </div>
         </div>
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between bg-gradient-to-br from-sky-500/10 to-transparent">
@@ -526,7 +668,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           </div>
         </div>
 
-        <div className="hidden table-responsive-wrapper md:block max-h-[500px] overflow-y-auto custom-scrollbar relative">
+        <div className="hidden table-responsive-wrapper md:block relative">
           {incomes.length === 0 ? (
             <EmptyState
               title="Track Your Wealth Inflow"
@@ -571,7 +713,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3">
                           <div className="flex items-center gap-2.5">
-                            <CompanyLogo name={inc.description} category={inc.category} size={58} />
+                            <CompanyLogo name={inc.description} fallbackText="I" className="w-10 h-10" />
                             <p className="text-xs font-semibold group-hover:text-success transition-colors truncate max-w-[140px] md:max-w-none">{inc.description}</p>
                           </div>
                         </td>
@@ -580,7 +722,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2.5">
-                            <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={58} />
+                            <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
                             <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
@@ -608,7 +750,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         </div>
 
         {/* Mobile card list feed for incomes */}
-        <div className="divide-y divide-white/10 md:hidden max-h-[500px] overflow-y-auto custom-scrollbar">
+        <div className="divide-y divide-white/10 md:hidden">
           {filteredIncomes.length === 0 ? (
             <div className="p-8 text-center text-[--text-muted] text-xs italic">
               No transactions found matching your criteria.
@@ -621,7 +763,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                 <div key={inc.id} className="p-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <CompanyLogo name={inc.description} category={inc.category} size={58} />
+                      <CompanyLogo name={inc.description} fallbackText="I" className="w-10 h-10" />
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-[--text-primary] truncate">{inc.description}</span>
                         <span className="text-[0.5625rem] text-[--text-muted] uppercase font-bold">{inc.date ? format(parseISO(inc.date), "MMM d, yyyy") : "—"}</span>
@@ -634,7 +776,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                     <div className="flex items-center gap-2">
-                      <BankLogo bankName={account?.bank_name || account?.name} accountName={account?.name} type={account?.type} size={58} />
+                      <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <button type="button" 
@@ -726,38 +868,30 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           onClose={() => setShowAddModal(false)}
           title="Add Income"
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
-                {formData.category === "Salary" ? "Company / Employer" : "Description / Source"}
-              </label>
-              <input autoFocus type="text" required className="input-premium py-2 text-xs" placeholder={formData.category === "Salary" ? "e.g. Google" : "e.g. Freelance Web Design"} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} autoComplete="new-password" id="income-description" name="description" />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Amount</label>
-                <input type="number" required className="input-premium py-2 text-xs" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} autoComplete="new-password" inputMode="decimal" id="income-amount" name="amount" />
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <label className="text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">
+                  {formData.category === "Salary" ? "Company / Employer" : "Description / Source"}
+                </label>
+                <input autoFocus type="text" required className="input-premium !h-9 text-xs" placeholder={formData.category === "Salary" ? "e.g. Google" : "e.g. Freelance Web Design"} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} autoComplete="new-password" id="income-description" name="description" />
               </div>
               
-              <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Stream</label>
-                <select className="input-premium py-2 text-xs" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} aria-label="Select income stream" id="income-category" name="category">
-                  {INCOME_CATEGORIES.map(c => <option key={c.label} value={c.label} className="bg-[--bg-surface]">{c.label}</option>)}
-                </select>
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <label className="text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Amount</label>
+                <input type="number" required className="input-premium !h-9 text-xs" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} autoComplete="new-password" inputMode="decimal" id="income-amount" name="amount" />
               </div>
             </div>
 
-            {/* Category Quick Presets */}
-            <div className="space-y-1.5">
-              <label className="text-[0.5625rem] font-black uppercase tracking-[0.2em] text-[--text-muted]">Category Quick Presets</label>
-              <div className="flex flex-wrap gap-2 pt-1">
+            <div className="space-y-1">
+              <label className="text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Stream / Category</label>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {INCOME_CATEGORIES.map((c) => (
                   <button
                     key={c.label}
                     type="button"
                     onClick={() => setFormData({ ...formData, category: c.label })}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       formData.category === c.label
                         ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-black shadow-[0_2px_10px_rgba(16,185,129,0.15)]"
                         : "bg-white/5 border-white/10 text-[--text-muted] hover:text-white"

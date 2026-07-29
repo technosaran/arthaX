@@ -11,9 +11,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { Drawer } from "@/components/ui/drawer";
 import Link from "next/link";
 
-import dynamic from "next/dynamic";
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from "@/components/ui/recharts";
 import { CHART_SERIES_COLOURS, getCategoryColour } from "@/lib/chart-colours";
 import ExpenseDataTable from "./components/ExpenseDataTable";
 import ExpenseForm from "./components/ExpenseForm";
@@ -188,36 +186,6 @@ export default function ExpensesClient({ initialData }: { initialData?: FinanceD
         toast.error(result.error);
       }
     });
-  }
-
-  if (isMobile) {
-    return (
-      <div className="flex flex-col gap-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-[--text-primary]">Record Expense</h1>
-            <div className={`status-dot scale-70 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400'}`} />
-          </div>
-          <Link href="/dashboard" className="text-xs font-black uppercase text-[--text-muted] no-underline bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
-            Back
-          </Link>
-        </div>
-        
-        <div className="glass-card-static p-5 border border-white/5 bg-white/[0.01]">
-          <ExpenseForm
-            key={`mobile-${defaultDate}-${defaultAccountId}`}
-            isOpen={true}
-            onClose={() => {}}
-            onSubmit={handleSubmitForm}
-            submitting={submitting}
-            accounts={accounts}
-            categories={CATEGORIES}
-            defaultDate={defaultDate}
-            defaultAccountId={defaultAccountId}
-          />
-        </div>
-      </div>
-    );
   }
 
   return (

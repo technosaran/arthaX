@@ -332,7 +332,7 @@ export default function CryptoClient() {
         <div className="absolute top-1/2 -left-32 w-[550px] h-[550px] bg-[#0ECB81]/5 rounded-full blur-[160px]" />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         
         {/* Binance Pro Top Header Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-[#2B313A] bg-[#181A20] gap-4 shadow-xl">
@@ -426,7 +426,7 @@ export default function CryptoClient() {
                 </h3>
                 {mounted && pieChartData.length > 0 ? (
                   <div className="w-[300px] h-[300px] relative mt-8">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                       <PieChart>
                         <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={85} outerRadius={115} paddingAngle={3} dataKey="value" stroke="none">
                           {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}

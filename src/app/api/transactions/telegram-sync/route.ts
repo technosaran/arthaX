@@ -993,8 +993,8 @@ export async function POST(req: NextRequest) {
     let lowerText = text.toLowerCase();
     // Clean emojis from button taps so "💳 Balances" -> "balances"
     const cleanedText = lowerText.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, "").trim();
-    let rawCommand = cleanedText.replace(/^\//, "").trim();
-    let commandText = COMMAND_ALIASES[rawCommand] || rawCommand;
+    const rawCommand = cleanedText.replace(/^\//, "").trim();
+    const commandText = COMMAND_ALIASES[rawCommand] || rawCommand;
 
     // 3. Handle System & Inquiry Commands (/menu, /ai, /family, /ledger, /calc, /help, /balance, /summary, /recent, /undo, /goals, /budget, /unlink)
     if (commandText === "menu") {

@@ -96,7 +96,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
   }, [enabledModules]);
 
   return (
-    <div className="relative z-20 flex min-h-screen flex-col gap-5 md:hidden animate-fade-in pb-16">
+    <div className="relative z-20 flex flex-col gap-5 animate-fade-in pb-16">
       
       {/* Console Header */}
       <div className="flex items-center justify-between pt-2 px-1">

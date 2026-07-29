@@ -92,39 +92,39 @@ export function Drawer({
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
-      <div
-        className={`w-full ${width || "max-w-lg md:max-w-xl"} bg-[var(--bg-surface)] border border-white/10 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-scale-in max-h-[90vh] relative z-10`}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        {/* Top Accent Gradient */}
-        <div className="h-[3px] w-full bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 shrink-0" />
-        
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
-          <div>
-            <h2 className="text-xl font-black text-white tracking-tight">{title}</h2>
-            <p className="text-[0.625rem] font-bold uppercase tracking-[0.2em] text-[--text-muted] mt-0.5">
-              Enter Details & Sync Wealth Ledger
-            </p>
+        <div
+          className={`w-full ${width || "max-w-xl md:max-w-2xl"} bg-[var(--bg-surface)] border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-scale-in max-h-[92vh] relative z-10`}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+        >
+          {/* Top Accent Gradient */}
+          <div className="h-[3px] w-full bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 shrink-0" />
+          
+          {/* Header */}
+          <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
+            <div>
+              <h2 className="text-base font-black text-white tracking-tight">{title}</h2>
+              <p className="text-[0.5625rem] font-bold uppercase tracking-[0.15em] text-[--text-muted]">
+                Enter Details & Sync Wealth Ledger
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-[--text-muted] hover:text-white transition-all active:scale-95"
+              title="Close modal"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-[--text-muted] hover:text-white transition-all active:scale-95"
-            title="Close modal"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Content Area */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-8 space-y-6">
-          {children}
+          {/* Content Area */}
+          <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4">
+            {children}
+          </div>
         </div>
-      </div>
     </div>
   );
 }

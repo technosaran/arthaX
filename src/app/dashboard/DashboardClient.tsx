@@ -313,16 +313,6 @@ export default function DashboardClient() {
     return <LoadingSkeleton />;
   }
 
-  // Conditionally render only one view based on screen size
-  if (isMobile) {
-    return (
-      <>
-        {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
-        <DashboardMobile stats={stats} recentLogs={recentLogs} accounts={accounts} isLoading={isLoading} isValidating={isValidating} />
-      </>
-    );
-  }
-
   return (
     <>
       {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}

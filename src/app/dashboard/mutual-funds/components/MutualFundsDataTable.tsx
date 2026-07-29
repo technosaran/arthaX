@@ -15,10 +15,16 @@ interface MutualFundsDataTableProps {
   onAdd: () => void;
 }
 
-import AMCLogo from "@/components/ui/amc-logo";
-
 export function AMCAvatar({ amcName, fundName, size = 56 }: { amcName: string; fundName: string; size?: number }) {
-  return <AMCLogo amcName={amcName} fundName={fundName} size={size} />;
+  const initial = (amcName || fundName || "F").charAt(0).toUpperCase();
+  return (
+    <div 
+      className="rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 font-black shrink-0 shadow-inner"
+      style={{ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(12, Math.floor(size * 0.4))}px` }}
+    >
+      {initial}
+    </div>
+  );
 }
 
 export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onAdd }: MutualFundsDataTableProps) {

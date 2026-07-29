@@ -473,7 +473,7 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                   </div>
                   <div className="flex-1 min-h-[250px] w-full mt-4 -ml-4">
                     {mounted && (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <BarChart data={barChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="rgba(255,255,255,0.05)" />
                           <XAxis type="number" tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "#848E9C", fontSize: 12 }} />
@@ -497,7 +497,7 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                   <h3 className="text-xs font-bold uppercase tracking-widest text-[#848E9C] absolute top-6 left-6">Credit Breakdown</h3>
                   <div className="w-full h-[250px] mt-8">
                     {mounted && pieChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <PieChart>
                           <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={4} dataKey="value">
                             {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="#111827" strokeWidth={2} />)}
