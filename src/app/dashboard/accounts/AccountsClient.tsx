@@ -98,16 +98,14 @@ const BankLogo = memo(({ bankName, accountName, accountType, className = "w-8 h-
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
-      <img
-        key={currentSrc}
-        src={currentSrc}
-        alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain rounded-xl"
-        loading="eager"
-        onError={() => setSrcIndex((prev) => prev + 1)}
-      />
-    </div>
+    <img
+      key={currentSrc}
+      src={currentSrc}
+      alt={bankName || accountName || "Bank"}
+      className={`${className} object-contain shrink-0`}
+      loading="eager"
+      onError={() => setSrcIndex((prev) => prev + 1)}
+    />
   );
 });
 BankLogo.displayName = "BankLogo";

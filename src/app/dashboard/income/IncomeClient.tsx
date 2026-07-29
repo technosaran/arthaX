@@ -192,23 +192,21 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 
   if (!sources.length || srcIndex >= sources.length) {
     return (
-      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-lg shrink-0`}>
+      <div className={`${className} rounded-full bg-white/5 flex items-center justify-center text-slate-400 font-semibold text-[0.65rem] tracking-wider shrink-0`}>
         {initials}
       </div>
     );
   }
 
   return (
-    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
-      <img
-        key={sources[srcIndex]}
-        src={sources[srcIndex]}
-        alt={name || "Company"}
-        className="w-full h-full object-contain rounded-xl"
-        loading="eager"
-        onError={() => setSrcIndex((prev) => prev + 1)}
-      />
-    </div>
+    <img
+      key={sources[srcIndex]}
+      src={sources[srcIndex]}
+      alt={name || "Company"}
+      className={`${className} object-contain shrink-0`}
+      loading="lazy"
+      onError={() => setSrcIndex((prev) => prev + 1)}
+    />
   );
 });
 CompanyLogo.displayName = "CompanyLogo";
@@ -236,16 +234,14 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} rounded-lg overflow-hidden bg-white border border-white/20 flex items-center justify-center p-0.5 shadow-sm shrink-0`}>
-      <img
-        key={currentSrc}
-        src={currentSrc}
-        alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain rounded"
-        loading="lazy"
-        onError={() => setSrcIndex(prev => prev + 1)}
-      />
-    </div>
+    <img
+      key={currentSrc}
+      src={currentSrc}
+      alt={bankName || accountName || "Bank"}
+      className={`${className} object-contain shrink-0`}
+      loading="lazy"
+      onError={() => setSrcIndex(prev => prev + 1)}
+    />
   );
 });
 AccountBankLogo.displayName = "AccountBankLogo";
