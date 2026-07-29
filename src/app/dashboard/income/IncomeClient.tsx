@@ -72,6 +72,39 @@ const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   fiver: "fiverr.com",
 };
 
+// Maps company domain -> local SVG logo file name in /public/logos/companies/.
+const COMPANY_LOCAL_LOGOS: Record<string, string> = {
+  "accenture.com": "accenture",
+  "adobe.com": "adobe",
+  "amazon.com": "amazon",
+  "apple.com": "apple",
+  "atlassian.com": "atlassian",
+  "cognizant.com": "cognizant",
+  "facebook.com": "facebook",
+  "fiverr.com": "fiverr",
+  "github.com": "github",
+  "gitlab.com": "gitlab",
+  "google.com": "google",
+  "ibm.com": "ibm",
+  "infosys.com": "infosys",
+  "linkedin.com": "linkedin",
+  "meta.com": "meta",
+  "microsoft.com": "microsoft",
+  "netflix.com": "netflix",
+  "oracle.com": "oracle",
+  "razorpay.com": "razorpay",
+  "salesforce.com": "salesforce",
+  "stripe.com": "stripe",
+  "swiggy.in": "swiggy",
+  "tata.com": "tata",
+  "tcs.com": "tcs",
+  "uber.com": "uber",
+  "upwork.com": "upwork",
+  "wipro.com": "wipro",
+  "zomato.com": "zomato",
+  "zoom.us": "zoom",
+};
+
 function getBrandMonogram(name: string): string {
   const cleaned = name
     .replace(/^(dividend|salary|interest|bonus|freelance|payout|credit|payment|refund|from|to|transfer):\s*/i, "")
