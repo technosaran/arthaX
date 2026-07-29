@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { login, signup } from "./actions";
 import { createClient } from "@/lib/supabase-browser";
-import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import zxcvbn from "zxcvbn";

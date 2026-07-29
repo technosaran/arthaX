@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { getColorByLabel } from "@/lib/chart-colours";
-import dynamic from "next/dynamic";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
 

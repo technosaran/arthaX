@@ -24,8 +24,6 @@ import type { Tables } from "@/lib/database.types";
 
 import { getChartColour } from "@/lib/chart-colours";
 
-import BudgetOverviewWidget from "@/components/dashboard/budget-overview-widget";
-
 
 type PieEntry = {
   name: string;
@@ -90,7 +88,7 @@ type Props = {
   isLoading: boolean;
 };
 
-const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goals, accounts, isLoading }: Props) {
+const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goals: _goals, accounts, isLoading }: Props) {
   const { data: { profile } = {} } = useFinanceData();
   const [activeChartMetric, setActiveChartMetric] = useState<"cashflow" | "assets" | "investments">("cashflow");
   const [timeframe, setTimeframe] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("6M");
@@ -303,7 +301,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
                     <span>
                       {showUSD 
-                        ? `$${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        ? `$${Math.abs(stats.totalDayPnL / 85).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                         : `₹${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
                     </span>

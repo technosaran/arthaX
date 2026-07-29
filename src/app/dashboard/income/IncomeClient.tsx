@@ -1,17 +1,14 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useMemo, useState, useEffect, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addIncome, updateIncome, deleteIncome } from "./actions";
+import { addIncome, deleteIncome } from "./actions";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { Drawer } from "@/components/ui/drawer";
-import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 
 import { getBankLogoSources } from "@/lib/banks";
@@ -132,39 +129,55 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
     return null;
   }, [name]);
 
+  const companySlug = useMemo(() => {
+    if (!name) return null;
+    const clean = name.trim().toLowerCase();
+    for (const key of Object.keys(COMPANY_LOGO_DOMAINS)) {
+      if (clean.includes(key)) return key;
+    }
+    return null;
+  }, [name]);
+
   const sources = useMemo(() => {
-    if (!domain) return [];
-    return [
-      `https://icon.horse/icon/${domain}`,
-      `https://unavatar.io/${domain}`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    ];
-  }, [domain]);
+    const list: string[] = [];
+    if (domain) {
+      list.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+      list.push(`https://logo.clearbit.com/${domain}`);
+      list.push(`https://unavatar.io/${domain}`);
+    }
+    if (companySlug) {
+      list.push(`/logos/companies/${companySlug}.svg`);
+    }
+    return list;
+  }, [companySlug, domain]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
-  useEffect(() => {
+  const [prevName, setPrevName] = useState(name);
+  if (prevName !== name) {
+    setPrevName(name);
     setSrcIndex(0);
-  }, [name]);
+  }
 
   const initials = getBrandMonogram(name || fallbackText);
   const gradient = getGradientForName(name || "");
 
   if (!sources.length || srcIndex >= sources.length) {
     return (
-      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-lg shrink-0`}>
+      <div className={`${className} rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-md shrink-0`}>
         {initials}
       </div>
     );
   }
 
   return (
-    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={sources[srcIndex]}
         src={sources[srcIndex]}
         alt={name || "Company"}
-        className="w-full h-full object-contain rounded-xl"
+        className="w-full h-full object-contain filter drop-shadow-sm"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -181,13 +194,15 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
 
   const [srcIndex, setSrcIndex] = useState(0);
 
-  useEffect(() => {
+  const [prevKey, setPrevKey] = useState(`${bankName}-${accountName}`);
+  if (prevKey !== `${bankName}-${accountName}`) {
+    setPrevKey(`${bankName}-${accountName}`);
     setSrcIndex(0);
-  }, [bankName, accountName]);
+  }
 
   if (!sources || sources.length === 0 || srcIndex >= sources.length) {
     return (
-      <div className={`${className} rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-[10px] shrink-0`}>
+      <div className={`${className} rounded-lg bg-white/10 flex items-center justify-center text-slate-300 font-bold text-[10px] shrink-0`}>
         {(accountName || "D").charAt(0).toUpperCase()}
       </div>
     );
@@ -196,12 +211,13 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} rounded-lg overflow-hidden bg-white border border-white/20 flex items-center justify-center p-0.5 shadow-sm shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain rounded"
+        className="w-full h-full object-contain filter drop-shadow-sm"
         loading="lazy"
         onError={() => setSrcIndex(prev => prev + 1)}
       />
@@ -224,7 +240,6 @@ const INCOME_CATEGORIES = [
 export default function IncomeClient({ initialData }: { initialData?: FinanceData }) {
 
   const { data: { incomes, accounts, profile }, isValidating, mutate } = useFinanceData(initialData);
-  const isMobile = useMediaQuery('(max-width: 767.98px)');
   const getAccountCurrency = (accountId: string | null) => {
     if (!accountId) return "INR";
     const acc = accounts.find(a => a.id === accountId);
@@ -884,24 +899,21 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             </div>
 
             <div className="space-y-1">
-              <label className="text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Stream / Category</label>
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
+              <label htmlFor="income-category" className="text-[0.625rem] font-black uppercase tracking-wider text-[--text-muted]">Stream / Category</label>
+              <select
+                id="income-category"
+                name="category"
+                aria-label="Select Income Stream / Category"
+                className="input-premium !h-9.5 text-xs font-semibold w-full cursor-pointer"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              >
                 {INCOME_CATEGORIES.map((c) => (
-                  <button
-                    key={c.label}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, category: c.label })}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                      formData.category === c.label
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-black shadow-[0_2px_10px_rgba(16,185,129,0.15)]"
-                        : "bg-white/5 border-white/10 text-[--text-muted] hover:text-white"
-                    }`}
-                  >
-                    <span className="mr-1">{c.icon}</span>
-                    {c.label}
-                  </button>
+                  <option key={c.label} value={c.label} className="bg-[#151922] text-white py-1">
+                    {c.icon} {c.label}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
             
             <div className="grid grid-cols-2 gap-4">

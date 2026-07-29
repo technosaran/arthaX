@@ -1,7 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import type { Tables } from "@/lib/database.types";
 
@@ -15,16 +13,10 @@ interface MutualFundsDataTableProps {
   onAdd: () => void;
 }
 
-export function AMCAvatar({ amcName, fundName, size = 56 }: { amcName: string; fundName: string; size?: number }) {
-  const initial = (amcName || fundName || "F").charAt(0).toUpperCase();
-  return (
-    <div 
-      className="rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 font-black shrink-0 shadow-inner"
-      style={{ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(12, Math.floor(size * 0.4))}px` }}
-    >
-      {initial}
-    </div>
-  );
+import { BrandLogo } from "@/components/brand-logo";
+
+export function AMCAvatar({ amcName, fundName, size = 40 }: { amcName?: string; fundName?: string; size?: number }) {
+  return null;
 }
 
 export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onAdd }: MutualFundsDataTableProps) {
@@ -85,16 +77,13 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
                 <tr key={fund.id} className="hover:bg-white/[0.02] transition-colors">
                   {/* Fund Name */}
                   <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <AMCAvatar amcName={amc} fundName={fund.fund_name} />
-                      <div className="min-w-0">
-                        <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[300px]" title={fund.fund_name}>
-                          {fund.fund_name}
-                        </span>
-                        <span className="text-[0.5625rem] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
-                          {fund.category || "Equity"}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[300px]" title={fund.fund_name}>
+                        {fund.fund_name}
+                      </span>
+                      <span className="text-[0.5625rem] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
+                        {fund.category || "Equity"}
+                      </span>
                     </div>
                   </td>
 

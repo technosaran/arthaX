@@ -14,6 +14,7 @@ import {
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
 import { ArrowUpDown, ArrowUp, ArrowDown, Trash2, Pencil } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
 
 type Expense = {
@@ -82,9 +83,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const cat = info.row.original.category;
           return (
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 font-bold text-sm shrink-0">
-                {info.getValue() ? info.getValue().charAt(0).toUpperCase() : "E"}
-              </div>
+              <BrandLogo name={info.getValue()} className="w-8 h-8" />
               <div className="flex flex-col min-w-0">
                 <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
                   {info.getValue()}

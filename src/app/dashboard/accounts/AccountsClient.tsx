@@ -2,13 +2,11 @@
 
 import { useMemo, useState, useEffect, useRef, memo } from "react";
 import { useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
 import { toast } from "react-hot-toast";
 import { format } from "date-fns";
 import type { Tables } from "@/lib/database.types";
-import { searchBanks, getBankLogoUrl, getBankLogoSources, getBankDomain, type Bank } from "@/lib/banks";
+import { searchBanks, getBankLogoSources, type Bank } from "@/lib/banks";
 import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance, ensureCashReserveAccount } from "./actions";
-import { Drawer } from "@/components/ui/drawer";
 import { X } from "lucide-react";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 
@@ -70,7 +68,7 @@ const getBankGradient = (name: string) => {
   return BANK_MONOGRAM_GRADIENTS[Math.abs(h) % BANK_MONOGRAM_GRADIENTS.length];
 };
 
-const BankLogo = memo(({ bankName, accountName, accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType: string; className?: string }) => {
+const BankLogo = memo(({ bankName, accountName, accountType: _accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType?: string; className?: string }) => {
   const sources = useMemo(() => {
     const query = bankName || accountName || "";
     return getBankLogoSources(query);
@@ -79,17 +77,19 @@ const BankLogo = memo(({ bankName, accountName, accountType, className = "w-8 h-
   const [srcIndex, setSrcIndex] = useState(0);
   const [showFallback, setShowFallback] = useState(false);
 
-  useEffect(() => {
+  const [prevKey, setPrevKey] = useState(`${bankName}-${accountName}`);
+  if (prevKey !== `${bankName}-${accountName}`) {
+    setPrevKey(`${bankName}-${accountName}`);
     setSrcIndex(0);
     setShowFallback(false);
-  }, [bankName, accountName]);
+  }
 
   const monogram = getBankMonogram(bankName, accountName);
   const gradient = getBankGradient(bankName || accountName || "");
 
   if (!sources.length || srcIndex >= sources.length || showFallback) {
     return (
-      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.6rem] tracking-wider shadow-md shrink-0`}>
+      <div className={`${className} rounded-xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-md shrink-0 select-none`}>
         {monogram}
       </div>
     );
@@ -98,12 +98,13 @@ const BankLogo = memo(({ bankName, accountName, accountType, className = "w-8 h-
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain rounded-xl"
+        className="w-full h-full object-contain filter drop-shadow-md rounded-xl"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -171,7 +172,6 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
     return amt * rate;
   }, [transferData.amount, conversionRate]);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [showParserModal, setShowParserModal] = useState(false);
   const [adjustingAccountId, setAdjustingAccountId] = useState<string | null>(null);
   const [adjustData, setAdjustData] = useState({ amount: "", note: "", type: "add" as "add" | "subtract" });
   const [formData, setFormData] = useState({ name: "", type: "checking", balance: "0", currency: "INR", bank_name: "" });
@@ -555,7 +555,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-all"
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
-                        <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-9 h-9" />
+                        <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-12 h-12" />
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
                           <p className="font-black text-sm" style={{ color: color }}>{getCurrencySymbol(a.currency)}{a.balance.toLocaleString()}</p>
@@ -751,7 +751,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                          {isCashReserve ? "In-built Cash Reserve" : a.type}
                        </span>
                        <div className="flex items-center gap-3 mt-4">
-                         <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-12 h-12" />
+                         <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-16 h-16" />
                          <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
                        </div>
                      </div>
@@ -996,7 +996,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                             </td>
                             <td className="p-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <BankLogo bankName={account?.bank_name} accountName={account?.name} accountType={account?.type || "checking"} className="w-8 h-8" />
+                                <BankLogo bankName={account?.bank_name} accountName={account?.name} accountType={account?.type || "checking"} className="w-10 h-10" />
                                 <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
                                   {account?.name || log.account_name || "System"}
                                 </span>
@@ -1092,7 +1092,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       onClick={() => selectBank(b)}
                       className="w-full p-2 flex items-center gap-2.5 hover:bg-white/5 text-left border-b border-white/5 last:border-0 transition-colors"
                     >
-                      <BankLogo bankName={b.name} accountType="checking" className="w-9 h-9 !rounded-lg !p-1" />
+                      <BankLogo bankName={b.name} accountType="checking" className="w-11 h-11" />
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-xs text-white truncate">{b.name}</p>
                         <p className="text-[9px] text-[--text-muted] font-mono">{b.domain}</p>

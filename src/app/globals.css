@@ -974,7 +974,7 @@ select:focus {
   border-color: var(--border-default);
 }
 
-/* White Grids and Border Layout Overrides, Scoped to Exclude the Sidebar Aside */
+/* Refined Border Layout Overrides - Sleek & Premium Dark Mode */
 .theme-google :not(aside):not(aside *).border:not([class*="border-"]),
 .theme-google :not(aside):not(aside *).border-t:not([class*="border-"]),
 .theme-google :not(aside):not(aside *).border-b:not([class*="border-"]),
@@ -992,14 +992,14 @@ select:focus {
 .theme-google :not(aside):not(aside *) table,
 .theme-google :not(aside):not(aside *) thead,
 .theme-google :not(aside):not(aside *) tbody {
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .theme-google :not(aside):not(aside *) input,
 .theme-google :not(aside):not(aside *) select,
 .theme-google :not(aside):not(aside *) textarea,
 .theme-google :not(aside):not(aside *).input-premium {
-  border-color: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .theme-google :not(aside):not(aside *) select.btn-secondary {
@@ -1012,8 +1012,6 @@ select:focus {
 .theme-google :not(aside):not(aside *) select.btn-danger {
   border-color: rgba(239, 68, 68, 0.2) !important;
 }
-
-
 
 /* Ensure success, danger, and active tabs are preserved */
 .theme-google .border-success,
@@ -1039,7 +1037,6 @@ select:focus {
   inset: 0;
   z-index: 99999;
   background: rgba(11, 14, 20, 0.85);
-  /* Removed heavy backdrop-filter */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1053,7 +1050,7 @@ select:focus {
   pointer-events: auto;
 }
 
-/* Fix for modal bleed-through: Force opaque background on modal panels to prevent underlying text from rendering through backdrop-blur */
+/* Fix for modal bleed-through */
 .mobile-dialog-panel.glass-card-static {
   background: var(--bg-surface) !important;
 }
@@ -1064,19 +1061,29 @@ select:focus {
 .theme-google :not(aside):not(aside *) textarea:focus,
 .theme-google :not(aside):not(aside *).input-premium:focus {
   border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), var(--shadow-glow) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), var(--shadow-glow) !important;
   outline: none !important;
 }
 
-/* Global table row static layout */
+/* Table Row Smooth Micro-Interactions */
 .theme-google :not(aside):not(aside *) tbody tr {
-  transition: none !important;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Prevent layout-shifting hover transforms on cards and rows */
-.glass-card:hover,
-.glass-card-static:hover,
-tr:hover {
-  transform: none !important;
+.theme-google :not(aside):not(aside *) tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Glass Card Premium Glow & Elevation */
+.glass-card,
+.glass-card-static {
+  background: linear-gradient(145deg, rgba(20, 26, 40, 0.95), rgba(12, 16, 26, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 20px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 

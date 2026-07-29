@@ -6,20 +6,16 @@ import { toast } from "react-hot-toast";
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches);
 
   useEffect(() => {
     // Register Service Worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
+        // eslint-disable-next-line no-console
         .then((reg) => console.log("Service Worker registered:", reg.scope))
         .catch((err) => console.error("Service Worker registration failed:", err));
-    }
-
-    // Check if app is running as standalone PWA
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true);
     }
 
     const handleBeforeInstall = (e: Event) => {

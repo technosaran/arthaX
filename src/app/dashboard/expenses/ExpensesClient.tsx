@@ -3,13 +3,11 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addExpense, updateExpense, deleteExpense, cleanupCorruptedPDFDescriptions } from "./actions";
+import { addExpense, deleteExpense } from "./actions";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { Drawer } from "@/components/ui/drawer";
-import Link from "next/link";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from "@/components/ui/recharts";
 import { CHART_SERIES_COLOURS, getCategoryColour } from "@/lib/chart-colours";
@@ -31,7 +29,6 @@ const CATEGORIES = [
 
 export default function ExpensesClient({ initialData }: { initialData?: FinanceData }) {
   const { data: { expenses, accounts, profile }, isValidating, mutate } = useFinanceData(initialData);
-  const isMobile = useMediaQuery('(max-width: 767.98px)');
   const searchParams = useSearchParams();
   const [showAddModal, setShowAddModal] = useState(searchParams.get("action") === "new");
   const [editingExpense, setEditingExpense] = useState<{ id: string; description: string; amount: string | number; category: string; date: string | null; account_id: string | null } | null>(null);
