@@ -232,7 +232,7 @@ export default function FamilyClient() {
   }, [members]);
 
   const filteredTransfers = useMemo(() => {
-    let baseList = monthTransfers;
+    const baseList = monthTransfers;
     if (!historySearch.trim()) return baseList;
     const q = historySearch.toLowerCase();
     return baseList.filter(t => {

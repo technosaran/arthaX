@@ -234,7 +234,7 @@ export default function LedgerDataTable({
 
   return (
     <div className="glass-card-static p-0 min-h-[400px] rounded-[24px] border border-white/10 overflow-hidden bg-white/[0.01] shadow-lg shadow-black/25 flex flex-col">
-      <div className="w-full overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar hidden md:block">
+      <div className="w-full overflow-x-auto relative hidden md:block">
         <table className="min-w-full divide-y divide-white/10">
           <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
             {table.getHeaderGroups().map((headerGroup) => (

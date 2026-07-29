@@ -25,6 +25,7 @@ export async function POST(request: Request) {
 
       if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const pdfParse = require("pdf-parse");
           const options: Record<string, any> = {};
           if (password) {

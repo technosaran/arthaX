@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     marginBottom: 15,
   },
-  logoSection: {
+  brandSection: {
     flexDirection: "column",
   },
   title: {
@@ -223,7 +223,7 @@ export default function FinancialStatementPDF({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoSection}>
+          <View style={styles.brandSection}>
             <Text style={styles.title}>FINANCE OS STATEMENT</Text>
             <Text style={styles.subtitle}>Executive Wealth & Ledger Audit Report</Text>
           </View>
@@ -328,7 +328,7 @@ export default function FinancialStatementPDF({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoSection}>
+          <View style={styles.brandSection}>
             <Text style={styles.title}>FINANCE OS STATEMENT</Text>
             <Text style={styles.subtitle}>Securities & Asset Holding Breakdown</Text>
           </View>
@@ -456,7 +456,7 @@ export default function FinancialStatementPDF({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoSection}>
+          <View style={styles.brandSection}>
             <Text style={styles.title}>FINANCE OS STATEMENT</Text>
             <Text style={styles.subtitle}>Bonds, Liabilities & Ledger Audit</Text>
           </View>

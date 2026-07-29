@@ -295,7 +295,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
         <div className="absolute top-1/2 -left-32 w-[550px] h-[550px] bg-[#FF5722]/5 rounded-full blur-[160px]" />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         
         {/* Zerodha Kite FnO Header Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-3.5 border-b border-[#2B313A] bg-[#121212] gap-4 shadow-xl">
@@ -468,7 +468,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
               <div className="flex items-center">
                 <div className="w-[150px] h-[150px]">
                   {mounted && pieChartData.length > 0 && (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                       <PieChart>
                         <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={45} outerRadius={60} paddingAngle={2} dataKey="value" stroke="none">
                           {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}

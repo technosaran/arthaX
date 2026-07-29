@@ -279,7 +279,7 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
         </div>
       </div>
 
-      <div className="overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
+      <div className="overflow-x-auto relative">
         <table className="w-full text-left border-collapse min-w-[800px]">
           <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
             {table.getHeaderGroups().map((headerGroup) => (

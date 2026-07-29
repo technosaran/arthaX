@@ -41,16 +41,6 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "arthaX",
   },
-  icons: {
-    icon: [
-      { url: "/favicon.png?v=2.1", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192.png?v=2.1", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png?v=2.1", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [
-      { url: "/icon-192.png?v=2.1", sizes: "192x192", type: "image/png" },
-    ],
-  },
   other: {
     "mobile-web-app-capable": "yes",
   },
@@ -83,17 +73,7 @@ export default async function RootLayout({
     >
       <head>
         <link rel="preconnect" href="https://www.google.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://upload.wikimedia.org" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://cdn.simpleicons.org" crossOrigin="anonymous" />
-
-        <link rel="preconnect" href="https://unavatar.io" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://icon.horse" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://www.google.com" />
-        <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
-        <link rel="dns-prefetch" href="https://cdn.simpleicons.org" />
-
-        <link rel="dns-prefetch" href="https://unavatar.io" />
-        <link rel="dns-prefetch" href="https://icon.horse" />
       </head>
       <body className="min-h-full flex flex-col overflow-x-hidden bg-[--bg-base] text-[--text-primary] font-sans relative">
         <SkipNavLink />

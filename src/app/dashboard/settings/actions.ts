@@ -164,7 +164,7 @@ export async function updateSettings(settings: ProfileSettings) {
 
     if (Object.keys(payload).length === 0) return { success: true, message: "Settings updated successfully" };
 
-    let { error } = await supabase
+    const { error } = await supabase
       .from("profiles")
       .update(payload as any)
       .eq("id", user.id);

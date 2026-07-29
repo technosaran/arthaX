@@ -340,7 +340,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 </div>
                 <div className="flex-1 min-h-[250px] w-full mt-4 -ml-4">
                   {mounted && (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                       <AreaChart data={barChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                         <defs>
                           <linearGradient id="goalSavedGrad" x1="0" y1="0" x2="0" y2="1">

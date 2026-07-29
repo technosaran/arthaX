@@ -1,6 +1,5 @@
-﻿/**
+/**
  * Asset Management Company (AMC) Registry & Domain Resolver
- * Used for fetching real high-resolution official AMC / Fund House logos for Mutual Funds
  */
 
 export type AMC = {
@@ -51,66 +50,7 @@ const AMCS: AMC[] = [
   { name: "Fidelity", keywords: ["fidelity"], domain: "fidelity.com" },
 ];
 
-import { getFastLogoCandidateUrls } from "./logo-cache";
 
-const HD_AMC_LOGOS: Record<string, string[]> = {
-  "sbimf.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cc/SBI-Logo.svg",
-    "https://www.google.com/s2/favicons?domain=sbimf.com&sz=256",
-  ],
-  "hdfcfund.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=hdfcfund.com&sz=256",
-  ],
-  "icicipruamc.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
-    "https://www.google.com/s2/favicons?domain=icicipruamc.com&sz=256",
-  ],
-  "axismf.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=axismf.com&sz=256",
-  ],
-  "kotakmf.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/6/6b/Kotak_Mahindra_Bank_logo.svg",
-    "https://www.google.com/s2/favicons?domain=kotakmf.com&sz=256",
-  ],
-  "tatamutual.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/8e/Tata_logo.svg",
-    "https://www.google.com/s2/favicons?domain=tatamutual.com&sz=256",
-  ],
-  "groww.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b8/Groww_Logo.svg",
-  ],
-  "zerodha.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/3/30/Zerodha_logo.svg",
-  ],
-  "vanguard.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/5/58/Vanguard_logo.svg",
-    "https://cdn.simpleicons.org/vanguard",
-  ],
-  "blackrock.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/9/91/BlackRock_logo.svg",
-    "https://cdn.simpleicons.org/blackrock",
-  ],
-  "fidelity.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a2/Fidelity_Investments_logo.svg",
-    "https://cdn.simpleicons.org/fidelity",
-  ],
-};
-
-/**
- * Get prioritized ultra-high-resolution online logo CDN URLs for an AMC domain
- */
-export function getAMCLogoUrls(domain: string): string[] {
-  if (!domain) return [];
-  const clean = domain.trim().toLowerCase();
-  const list: string[] = [];
-  if (HD_AMC_LOGOS[clean]) {
-    list.push(...HD_AMC_LOGOS[clean]);
-  }
-  const defaults = getFastLogoCandidateUrls(clean);
-  return Array.from(new Set([...list, ...defaults]));
-}
 
 /**
  * Smart resolution of AMC web domain from AMC name or Mutual Fund Scheme title

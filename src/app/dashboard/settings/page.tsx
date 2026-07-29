@@ -8,20 +8,18 @@ import { toast } from "react-hot-toast";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import type { FinanceData } from "@/hooks/use-finance-data";
 import { MODULE_KEYS } from "@/lib/modules";
-import dynamic from "next/dynamic";
+
 
 import ProfileTab from "./components/ProfileTab";
 import ModulesTab from "./components/ModulesTab";
 import DefaultsTab from "./components/DefaultsTab";
 import ImportsTab from "./components/ImportsTab";
+import ExportsTab from "./components/ExportsTab";
 import IntegrationsTab from "./components/IntegrationsTab";
 import SystemStatusTab from "./components/SystemStatusTab";
 import DangerZoneTab from "./components/DangerZoneTab";
 
-const ReportDownloadButton = dynamic(
-  () => import("../components/ReportDownloadButton"),
-  { ssr: false }
-);
+
 
 type TabKey = "profile" | "modules" | "defaults" | "imports" | "integrations" | "exports" | "status" | "danger";
 
@@ -357,9 +355,6 @@ export default function SettingsPage() {
             Manage your account preferences, modules, and database defaults.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <ReportDownloadButton />
-        </div>
       </div>
 
       {/* Premium Segmented Toggle Bar */}
@@ -369,6 +364,7 @@ export default function SettingsPage() {
           { key: "modules", label: "Modules" },
           { key: "defaults", label: "Defaults" },
           { key: "imports", label: "Data Imports" },
+          { key: "exports", label: "Data Exports" },
           { key: "integrations", label: "Integrations" },
           { key: "status", label: "System Status" },
           { key: "danger", label: "Danger Zone" },
@@ -377,6 +373,7 @@ export default function SettingsPage() {
 
           let activeStyles = "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]";
           if (tab.key === "imports") activeStyles = "bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]";
+          if (tab.key === "exports") activeStyles = "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]";
           if (tab.key === "danger") activeStyles = "bg-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.3)]";
 
           return (
@@ -424,6 +421,10 @@ export default function SettingsPage() {
 
       {activeTab === "imports" && (
         <ImportsTab accounts={accounts} mutate={mutate} />
+      )}
+
+      {activeTab === "exports" && (
+        <ExportsTab />
       )}
 
       {activeTab === "integrations" && (

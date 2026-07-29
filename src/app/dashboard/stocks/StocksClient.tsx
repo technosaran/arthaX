@@ -17,6 +17,7 @@ import StocksDataTable from "./components/StocksDataTable";
 import StocksHistoryTable from "./components/StocksHistoryTable";
 import { calculateEquityDeliveryCharges } from "@/lib/zerodha-charges";
 import { getIndianMarketStatus, type MarketStatusInfo } from "@/lib/market-hours";
+import { triggerMarketAndDividendSync } from "@/app/dashboard/investments/sync-actions";
 
 type Stock = Tables<"investments"> & { day_change?: number; day_change_percent?: number };
 
@@ -229,26 +230,16 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
 
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
-    let updated = 0;
     try {
-      for (const stock of activeStocks) {
-        if (!stock.symbol) continue;
-        const liveData = await fetchLiveStockPrice(stock.symbol);
-        if (liveData && (liveData.price !== stock.current_price || liveData.previousClose !== stock.previous_close)) {
-          const updatePayload: { current_price: number; previous_close?: number } = { current_price: liveData.price };
-          if (liveData.previousClose) updatePayload.previous_close = liveData.previousClose;
-          await updateInvestment(stock.id, updatePayload);
-          updated++;
-        }
-      }
-      if (updated > 0) {
-        mutate();
-        toast.success(`Refreshed live prices for ${updated} stocks!`);
+      const result = await triggerMarketAndDividendSync();
+      if (result?.error) {
+        toast.error(result.error);
       } else {
-        toast.success("Prices are already up to date.");
+        mutate();
+        toast.success(result.message || "Market prices refreshed & dividend detection completed!");
       }
     } catch {
-      toast.error("Failed to refresh some prices");
+      toast.error("Failed to sync market prices and dividends.");
     } finally {
       setIsRefreshing(false);
     }
@@ -380,7 +371,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
         <div className="absolute top-1/2 -left-32 w-[550px] h-[550px] bg-[#41B883]/5 rounded-full blur-[160px]" />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         
         {/* Zerodha Kite Header Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-3.5 border-b border-[#2B313A] bg-[#121212] gap-4 shadow-xl">

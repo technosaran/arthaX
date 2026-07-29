@@ -103,19 +103,20 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: "select_account",
+          },
         },
       });
       if (error) {
         setError(error.message || "Failed to sign in with Google.");
         setLoading(false);
-      } else {
-        setTimeout(() => {
-          setLoading(false);
-        }, 5000);
+      } else if (data?.url) {
+        window.location.href = data.url;
       }
     } catch {
       setError("An unexpected error occurred during Google sign-in.");
@@ -188,7 +189,6 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10">
-          <Image src="/icon.svg" alt="arthaX Logo" width={82} height={82} className="rounded-2xl shadow-2xl shadow-sky-500/30 mb-6 object-contain" />
           <h1 className="text-[clamp(2.5rem,4vw,3.5rem)] font-black text-white tracking-tight mb-4">
             artha<span className="text-sky-400">X</span>
           </h1>
@@ -226,7 +226,6 @@ export default function LoginPage() {
         >
           {/* Mobile Logo */}
           <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-8">
-            <Image src="/icon.svg" alt="arthaX Logo" width={68} height={68} className="rounded-2xl shadow-xl shadow-sky-500/30 mb-4 object-contain" />
             <h1 className="text-3xl font-black text-white tracking-tight">
               artha<span className="text-sky-400">X</span>
             </h1>

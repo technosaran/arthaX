@@ -493,7 +493,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </div>
             ) : (
               <div className="glass-card-static rounded-2xl overflow-hidden border border-white/5">
-                <div className="overflow-x-auto max-h-[550px] overflow-y-auto relative custom-scrollbar">
+                <div className="overflow-x-auto relative">
                   <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead className="sticky top-0 z-10 bg-[#151515] border-b border-white/10 shadow-md">
                       <tr className="border-b border-white/10 bg-[#151515]">

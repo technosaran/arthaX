@@ -4,29 +4,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "logos.hunter.io" },
-      { protocol: "https", hostname: "companyenrich.com" },
-      { protocol: "https", hostname: "www.google.com", pathname: "/s2/favicons/**" },
-      { protocol: "https", hostname: "icons.duckduckgo.com" },
-      { protocol: "https", hostname: "logo.clearbit.com" },
-      { protocol: "https", hostname: "unavatar.io" },
-      { protocol: "https", hostname: "icon.horse" },
       { protocol: "https", hostname: "assets.groww.in" },
       { protocol: "https", hostname: "cdn.jsdelivr.net" },
       { protocol: "https", hostname: "raw.githubusercontent.com" },
-      { protocol: "https", hostname: "upload.wikimedia.org" },
-      { protocol: "https", hostname: "cdn.brandfetch.io" },
-      { protocol: "https", hostname: "cdn.simpleicons.org" },
-      { protocol: "https", hostname: "logo.uplead.com" },
-      { protocol: "https", hostname: "api.statvoo.com" },
+      { protocol: "https", hostname: "www.google.com" },
     ],
   },
-  turbopack: {
-    root: process.cwd(),
-  },
-  poweredByHeader: false,
-  
-  // Build optimizations
   productionBrowserSourceMaps: false,
 
   serverExternalPackages: ["@react-pdf/renderer"],

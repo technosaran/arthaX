@@ -507,26 +507,26 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
           onClose={() => { setShowAddModal(false); setEditingId(null); setSearchQuery(""); setShowSearchDropdown(false); }}
           title={editingId ? `Update ${formData.fund_name}` : "Investment Ticket"}
         >
-          <div className="space-y-5 animate-fade-in pt-1">
+          <div className="space-y-3 animate-fade-in pt-0.5">
             {/* Header Banner */}
-            <div className={`p-4 rounded-2xl flex items-center justify-between shadow-lg border border-white/10 ${
+            <div className={`p-3 rounded-xl flex items-center justify-between shadow-lg border border-white/10 ${
               formData.trade_type === "buy" 
                 ? "bg-gradient-to-r from-emerald-600/30 via-teal-600/20 to-transparent border-emerald-500/30" 
                 : "bg-gradient-to-r from-rose-600/30 via-red-600/20 to-transparent border-rose-500/30"
             }`}>
-              <div className="flex items-center gap-3">
-                <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name || "Fund"} />
+              <div className="flex items-center gap-2.5">
+                <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name || "Fund"} size={42} />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-white uppercase tracking-wider">{editingId ? "Modify" : formData.trade_type === "buy" ? "Invest" : "Redeem"} {formData.fund_name || "Fund"}</span>
-                    <span className="text-[0.625rem] bg-white/10 text-white px-2 py-0.5 rounded-full font-black tracking-widest border border-white/10">COIN</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white uppercase tracking-wider">{editingId ? "Modify" : formData.trade_type === "buy" ? "Invest" : "Redeem"} {formData.fund_name || "Fund"}</span>
+                    <span className="text-[0.5625rem] bg-white/10 text-white px-1.5 py-0.5 rounded-full font-black tracking-wider border border-white/10">COIN</span>
                   </div>
-                  <p className="text-[0.6875rem] text-[--text-muted] mt-0.5">Direct Mutual Funds Zero Commission Platform</p>
+                  <p className="text-[0.625rem] text-[--text-muted]">Direct Mutual Funds Zero Commission</p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-[0.625rem] uppercase font-bold text-[--text-muted] block">LTP NAV</span>
-                <span className="text-sm font-black text-emerald-400">₹{parseFloat(formData.current_nav || "0").toFixed(4)}</span>
+                <span className="text-[0.5625rem] uppercase font-bold text-[--text-muted] block">LTP NAV</span>
+                <span className="text-xs font-black text-emerald-400">₹{parseFloat(formData.current_nav || "0").toFixed(4)}</span>
               </div>
             </div>
 
@@ -536,7 +536,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                 <button 
                   type="button"
                   onClick={() => setFormData({ ...formData, investment_type: "SIP" })}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                     formData.investment_type === "SIP" ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -545,7 +545,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                 <button 
                   type="button"
                   onClick={() => setFormData({ ...formData, investment_type: "LUMPSUM" })}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                     formData.investment_type === "LUMPSUM" ? "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -554,7 +554,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
               </div>
             )}
 
-            <form onSubmit={handleAddMF} className="space-y-4">
+            <form onSubmit={handleAddMF} className="space-y-3">
               {/* Search / Manual Fund Selection */}
               {!formData.scheme_code ? (
                 <div ref={searchDropdownRef} className="space-y-1.5 relative">
@@ -633,7 +633,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                   )}
                 </div>
               ) : (
-                /* Selected Fund Card with AMC Logo */
+                /* Selected Fund Card */
                 <div className="bg-white/[0.03] border border-emerald-500/30 p-3.5 rounded-xl flex items-center justify-between shadow-md">
                   <div className="flex items-center gap-3">
                     <AMCAvatar amcName={formData.amc_name} fundName={formData.fund_name} />

@@ -6,8 +6,7 @@ import dynamic from "next/dynamic";
 import { toast } from "react-hot-toast";
 import { format } from "date-fns";
 import type { Tables } from "@/lib/database.types";
-import BankLogo from "@/components/ui/bank-logo";
-import { searchBanks, type Bank } from "@/lib/banks";
+import { searchBanks, getBankLogoUrl, getBankLogoSources, getBankDomain, type Bank } from "@/lib/banks";
 import { createAccount, updateAccount, deleteAccount, createTransfer, adjustBalance, ensureCashReserveAccount } from "./actions";
 import { Drawer } from "@/components/ui/drawer";
 import { X } from "lucide-react";
@@ -39,6 +38,79 @@ const CategoryIcon = memo(({ type, className = "w-6 h-6" }: { type: string; clas
   );
 });
 CategoryIcon.displayName = "CategoryIcon";
+
+const BANK_MONOGRAM_GRADIENTS = [
+  "from-blue-600 via-indigo-600 to-purple-700",
+  "from-emerald-600 via-teal-600 to-cyan-700",
+  "from-amber-600 via-orange-600 to-red-700",
+  "from-violet-600 via-purple-600 to-fuchsia-700",
+  "from-sky-600 via-blue-600 to-indigo-700",
+];
+
+const getBankMonogram = (bankName?: string | null, accountName?: string) => {
+  const text = (bankName || accountName || "Bank").trim();
+  const parenMatch = text.match(/\(([^)]+)\)/);
+  if (parenMatch && parenMatch[1].trim().length >= 2) {
+    return parenMatch[1].trim().toUpperCase();
+  }
+  const clean = text.replace(/\([^)]*\)/g, "").replace(/\b(checking|savings|account)\b/gi, "").trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 3) {
+    return (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+  }
+  if (words.length === 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return clean.slice(0, 3).toUpperCase();
+};
+
+const getBankGradient = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  return BANK_MONOGRAM_GRADIENTS[Math.abs(h) % BANK_MONOGRAM_GRADIENTS.length];
+};
+
+const BankLogo = memo(({ bankName, accountName, accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType: string; className?: string }) => {
+  const sources = useMemo(() => {
+    const query = bankName || accountName || "";
+    return getBankLogoSources(query);
+  }, [bankName, accountName]);
+
+  const [srcIndex, setSrcIndex] = useState(0);
+  const [showFallback, setShowFallback] = useState(false);
+
+  useEffect(() => {
+    setSrcIndex(0);
+    setShowFallback(false);
+  }, [bankName, accountName]);
+
+  const monogram = getBankMonogram(bankName, accountName);
+  const gradient = getBankGradient(bankName || accountName || "");
+
+  if (!sources.length || srcIndex >= sources.length || showFallback) {
+    return (
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.6rem] tracking-wider shadow-md shrink-0`}>
+        {monogram}
+      </div>
+    );
+  }
+
+  const currentSrc = sources[srcIndex];
+
+  return (
+    <div className={`${className} rounded-2xl overflow-hidden bg-white/95 border border-white/20 flex items-center justify-center p-[3px] shadow-md shrink-0`}>
+      <img
+        key={currentSrc}
+        src={currentSrc}
+        alt={bankName || accountName || "Bank"}
+        className="w-full h-full object-contain rounded-xl"
+        loading="eager"
+        onError={() => setSrcIndex((prev) => prev + 1)}
+      />
+    </div>
+  );
+});
+BankLogo.displayName = "BankLogo";
 
 const TYPE_STYLES: Record<string, { gradient: string; badge: string; badgeBorder: string; color: string; iconBg: string }> = {
   checking: { gradient: "linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)", badge: "rgba(14, 165, 233, 0.05)", badgeBorder: "rgba(14, 165, 233, 0.1)", color: "var(--accent-primary)", iconBg: "rgba(14, 165, 233, 0.05)" },
@@ -480,12 +552,10 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                     return (
                       <div
                         key={a.id}
-                        className="flex items-center gap-3 rounded-xl px-4 py-3 transition-all"
+                        className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-all"
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
-                        <div className="relative flex-shrink-0">
-                          <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={56} />
-                        </div>
+                        <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-9 h-9" />
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
                           <p className="font-black text-sm" style={{ color: color }}>{getCurrencySymbol(a.currency)}{a.balance.toLocaleString()}</p>
@@ -498,7 +568,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
 
               {/* Right: Chart - Takes 1/3 of space */}
               <div className="relative w-full h-[280px]">
-                <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <Pie 
                       data={chartData} 
@@ -561,7 +631,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
 
               {/* Chart below balance on mobile */}
               <div className="relative w-full h-[280px] md:h-[350px] mb-6">
-                <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <Pie 
                       data={chartData} 
@@ -605,9 +675,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       className="flex items-center gap-3 rounded-2xl px-4 py-3 h-[64px] md:h-[72px] transition-all"
                       style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                     >
-                      <div className="relative flex-shrink-0">
-                        <BankLogo bankName={a.bank_name} accountName={a.name} type={a.type} size={50} />
-                      </div>
+                      <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-9 h-9" />
                       <div className="flex flex-col min-w-0 flex-1 text-left">
                         <p className="font-bold text-xs md:text-xs text-[--text-secondary] truncate">{a.name}</p>
                         <p className="font-black text-sm md:text-sm" style={{ color: color }}>{getCurrencySymbol(a.currency)}{a.balance.toLocaleString()}</p>
@@ -683,7 +751,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                          {isCashReserve ? "In-built Cash Reserve" : a.type}
                        </span>
                        <div className="flex items-center gap-3 mt-4">
-                         <BankLogo bankName={a.bank_name || a.name} accountName={a.name} type={a.type} size={64} />
+                         <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-12 h-12" />
                          <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
                        </div>
                      </div>
@@ -772,7 +840,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                   </div>
                 </div>
                 <div className="w-full h-[220px] mt-2">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <AreaChart data={historyTrendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                       <defs>
                         <linearGradient id="histInflowGrad" x1="0" y1="0" x2="0" y2="1">
@@ -894,7 +962,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                   <p className="text-xs text-[--text-muted] mt-1">Try switching account filter, date range, or clear your search term</p>
                 </div>
               ) : (
-                <div className="w-full overflow-x-auto max-h-[600px] overflow-y-auto relative custom-scrollbar">
+                <div className="w-full overflow-x-auto relative">
                   <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md border-b border-white/10 shadow-lg">
                       <tr>
@@ -928,7 +996,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                             </td>
                             <td className="p-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <BankLogo bankName={account?.bank_name} accountName={account?.name || log.account_name || undefined} type={account?.type} size={28} />
+                                <BankLogo bankName={account?.bank_name} accountName={account?.name} accountType={account?.type || "checking"} className="w-8 h-8" />
                                 <span className="text-xs font-bold text-indigo-200 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
                                   {account?.name || log.account_name || "System"}
                                 </span>
@@ -983,78 +1051,83 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
         onClose={resetForm}
         title={editingId ? "Update Account" : "Open New Account"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Account Label</label>
-            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium !h-11 text-xs font-semibold" placeholder="e.g. Primary Savings" autoComplete="new-password" />
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Asset Category</label>
-              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
+            <div className="space-y-1">
+              <label className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-wider">Account Label</label>
+              <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-premium !h-9.5 text-xs font-semibold" placeholder="e.g. Primary Savings" autoComplete="new-password" />
+            </div>
+
+            <div ref={searchContainerRef} className="relative space-y-1">
+              <label className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-wider">Bank Institution</label>
+              <div className="relative flex items-center">
+                {bankSearch.trim().length > 0 && (
+                  <div className="absolute left-2.5 flex items-center pointer-events-none z-10">
+                    <svg className="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  </div>
+                )}
+                <input 
+                  value={bankSearch} 
+                  onChange={e => handleBankSearch(e.target.value)} 
+                  onFocus={() => {
+                    if (bankSearch) {
+                      const results = searchBanks(bankSearch);
+                      setBankResults(results);
+                    }
+                  }}
+                  className={`input-premium !h-9.5 text-xs font-semibold w-full ${bankSearch.trim().length > 0 ? "!pl-8" : ""}`} 
+                  placeholder="Search Banks..." 
+                  autoComplete="off" 
+                />
+              </div>
+              {bankResults.length > 0 && (
+                <div 
+                  className="absolute top-full left-0 right-0 mt-1.5 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-40 custom-scrollbar"
+                  style={{ backgroundColor: "rgba(21, 27, 38, 0.98)", backdropFilter: "blur(12px)" }}
+                >
+                  {bankResults.slice(0, 8).map(b => (
+                    <button
+                      key={b.name}
+                      type="button"
+                      onClick={() => selectBank(b)}
+                      className="w-full p-2 flex items-center gap-2.5 hover:bg-white/5 text-left border-b border-white/5 last:border-0 transition-colors"
+                    >
+                      <BankLogo bankName={b.name} accountType="checking" className="w-9 h-9 !rounded-lg !p-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-xs text-white truncate">{b.name}</p>
+                        <p className="text-[9px] text-[--text-muted] font-mono">{b.domain}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-wider">Asset Category</label>
+              <select aria-label="Select asset category" id="account-type" name="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="input-premium !h-9.5 text-xs font-semibold">
                 {Object.keys(TYPE_STYLES).map(t => <option key={t} value={t} className="bg-[#151922] text-white font-medium">{t.toUpperCase()}</option>)}
               </select>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Currency</label>
-              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
+            <div className="space-y-1">
+              <label className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-wider">Currency</label>
+              <select aria-label="Select currency" id="account-currency" name="currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})} className="input-premium !h-9.5 text-xs font-semibold">
                 <option value="INR" className="bg-[#151922] text-white font-medium">INR (₹)</option>
                 <option value="USD" className="bg-[#151922] text-white font-medium">USD ($)</option>
               </select>
             </div>
-          </div>
-          {!editingId && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Opening Balance</label>
-              <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium !h-11 text-xs font-semibold" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
-            </div>
-          )}
-          <div ref={searchContainerRef} className="relative space-y-2">
-            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">Bank Institution</label>
-            <div className="relative flex items-center">
-              {bankSearch.trim().length > 0 && (
-                <div className="absolute left-3 flex items-center pointer-events-none z-10">
-                  <BankLogo bankName={bankSearch} accountName={bankSearch} size={26} />
-                </div>
-              )}
-              <input 
-                value={bankSearch} 
-                onChange={e => handleBankSearch(e.target.value)} 
-                onFocus={() => {
-                  if (bankSearch) {
-                    const results = searchBanks(bankSearch);
-                    setBankResults(results);
-                  }
-                }}
-                className={`input-premium !h-11 text-xs font-semibold w-full ${bankSearch.trim().length > 0 ? "!pl-10" : ""}`} 
-                placeholder="Search Banks (e.g. SBI, HDFC, ICICI, Chase)..." 
-                autoComplete="off" 
-              />
-            </div>
-            {bankResults.length > 0 && (
-              <div 
-                className="absolute top-full left-0 right-0 mt-1.5 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-40 custom-scrollbar"
-                style={{ backgroundColor: "rgba(21, 27, 38, 0.98)", backdropFilter: "blur(12px)" }}
-              >
-                {bankResults.slice(0, 8).map(b => (
-                  <button
-                    key={b.name}
-                    type="button"
-                    onClick={() => selectBank(b)}
-                    className="w-full p-2.5 flex items-center gap-2.5 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
-                  >
-                    <BankLogo bankName={b.name} accountName={b.name} size={30} />
-                    <div>
-                      <p className="font-bold text-xs text-white">{b.name}</p>
-                      <p className="text-[10px] text-[--text-muted]">{b.domain}</p>
-                    </div>
-                  </button>
-                ))}
+            {!editingId && (
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <label className="text-[0.625rem] font-bold text-gray-300 uppercase tracking-wider">Opening Balance</label>
+                <input type="number" value={formData.balance} onChange={e => setFormData({...formData, balance: e.target.value})} className="input-premium !h-9.5 text-xs font-semibold" placeholder="0.00" autoComplete="new-password" inputMode="decimal" />
               </div>
             )}
           </div>
-          <div className="pt-2">
-            <button type="submit" disabled={submitting} className="btn-primary w-full !h-11 text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-40">
+
+          <div className="pt-1">
+            <button type="submit" disabled={submitting} className="btn-primary w-full !h-10 text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-40">
               {submitting ? "Saving..." : (editingId ? "Update Account" : "Add Account")}
             </button>
           </div>

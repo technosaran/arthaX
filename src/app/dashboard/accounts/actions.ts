@@ -233,7 +233,7 @@ export async function createTransfer(data: TransferData) {
         rpcPayload.p_note = data.note.trim();
       }
 
-      let { data: rpcData, error } = await supabase.rpc("process_transfer", rpcPayload as any);
+      const { data: rpcData, error } = await supabase.rpc("process_transfer", rpcPayload as any);
 
       if (!error && rpcData) {
         const result = rpcData as { success: boolean; error?: string };
