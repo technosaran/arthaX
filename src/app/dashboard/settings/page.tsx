@@ -335,39 +335,42 @@ export default function SettingsPage() {
       </div>
 
       {/* Premium Segmented Toggle Bar */}
-      <div className="flex flex-wrap gap-1.5 rounded-2xl bg-white/[0.02] border border-white/5 p-1.5 max-w-fit shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
-        {[
-          { key: "profile", label: "Profile" },
-          { key: "modules", label: "Modules" },
-          { key: "defaults", label: "Defaults" },
-          { key: "imports", label: "Data Imports" },
-          { key: "exports", label: "Data Exports" },
-          { key: "integrations", label: "Integrations" },
-          { key: "status", label: "System Status" },
-          { key: "danger", label: "Danger Zone" },
-        ].map((tab) => {
-          const isActive = activeTab === tab.key;
+      <div className="w-full overflow-x-auto no-scrollbar scroll-smooth py-1">
+        <div className="flex items-center gap-1.5 rounded-2xl bg-white/[0.02] border border-white/10 p-1.5 w-max min-w-full md:w-auto shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          {[
+            { key: "profile", label: "Profile", icon: "👤" },
+            { key: "modules", label: "Modules", icon: "🧩" },
+            { key: "defaults", label: "Defaults", icon: "⚙️" },
+            { key: "imports", label: "Data Imports", icon: "📥" },
+            { key: "exports", label: "Data Exports", icon: "📤" },
+            { key: "integrations", label: "Integrations", icon: "⚡" },
+            { key: "status", label: "System Status", icon: "🟢" },
+            { key: "danger", label: "Danger Zone", icon: "⚠️" },
+          ].map((tab) => {
+            const isActive = activeTab === tab.key;
 
-          let activeStyles = "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]";
-          if (tab.key === "imports") activeStyles = "bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]";
-          if (tab.key === "exports") activeStyles = "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]";
-          if (tab.key === "danger") activeStyles = "bg-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.3)]";
+            let activeStyles = "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_4px_20px_rgba(6,182,212,0.35)]";
+            if (tab.key === "imports") activeStyles = "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-[0_4px_20px_rgba(168,85,247,0.35)]";
+            if (tab.key === "exports") activeStyles = "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_4px_20px_rgba(16,185,129,0.35)]";
+            if (tab.key === "danger") activeStyles = "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-[0_4px_20px_rgba(244,63,94,0.35)]";
 
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key as TabKey)}
-              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer ${
-                isActive
-                  ? `${activeStyles} border border-transparent`
-                  : "text-[--text-muted] hover:text-white hover:bg-white/5 border border-transparent"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key as TabKey)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer shrink-0 ${
+                  isActive
+                    ? `${activeStyles} border border-white/20`
+                    : "text-[--text-muted] hover:text-white hover:bg-white/5 border border-transparent"
+                }`}
+              >
+                <span className="text-sm select-none">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab Contents */}

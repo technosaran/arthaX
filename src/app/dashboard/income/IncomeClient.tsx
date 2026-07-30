@@ -173,15 +173,18 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 
   const sources = useMemo(() => {
     const list: string[] = [];
-    if (domain) {
-      list.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
-      list.push(`https://logo.clearbit.com/${domain}`);
-      list.push(`https://unavatar.io/${domain}`);
-    }
     if (companySlug) {
       list.push(`/logos/companies/${companySlug}.svg`);
     }
-    return list;
+    if (domain && COMPANY_LOCAL_LOGOS[domain]) {
+      list.push(`/logos/companies/${COMPANY_LOCAL_LOGOS[domain]}.svg`);
+    }
+    if (domain) {
+      list.push(`https://logo.clearbit.com/${domain}`);
+      list.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+      list.push(`https://unavatar.io/${domain}`);
+    }
+    return Array.from(new Set(list));
   }, [companySlug, domain]);
 
   const [srcIndex, setSrcIndex] = useState(0);
