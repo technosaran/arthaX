@@ -263,6 +263,7 @@ const BANK_SLUGS: Record<string, string> = {
   "phonepe.com": "phonepe",
   "jupiter.money": "jupiter",
   "fi.money": "fi",
+  "cred.club": "cred",
   "zerodha.com": "zerodha",
   "groww.in": "groww",
   "upstox.com": "upstox",
@@ -271,7 +272,7 @@ const BANK_SLUGS: Record<string, string> = {
 
 /**
  * Get ordered logo URLs for a bank.
- * Only returns valid local SVGs/PNGs or domain favicons.
+ * Returns valid local SVGs/PNGs, high-res Clearbit logo, or domain favicons.
  */
 export function getBankLogoSources(bankNameOrDomain: string): string[] {
   if (!bankNameOrDomain) return [];
@@ -304,6 +305,7 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
   }
 
   if (domain) {
+    sources.push(`https://logo.clearbit.com/${domain}`);
     sources.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
   }
 

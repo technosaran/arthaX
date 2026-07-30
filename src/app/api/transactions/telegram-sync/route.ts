@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
-import { sendTelegramMessage, answerCallbackQuery } from "@/lib/telegram";
+import { sendTelegramMessage, answerCallbackQuery, setTelegramBotCommands, getBrandEmoji } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
 import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent } from "@/lib/gemini";
@@ -318,6 +318,9 @@ export async function POST(req: NextRequest) {
       }
       await redisSet(updateIdKey, "1", 300); // 5-minute TTL
     }
+
+    // Register bot auto-complete command menu with Telegram
+    setTelegramBotCommands().catch(() => {});
 
     let chatId = "";
     let rawText = "";
@@ -882,13 +885,17 @@ export async function POST(req: NextRequest) {
 
               const symbol = txType === "expense" ? "💸" : "💰";
               const accObj = accounts?.find((a: any) => a.id === targetAccount);
+              const brandEmoji = getBrandEmoji(description);
+              const bankEmoji = getBrandEmoji(accObj?.bank_name || accObj?.name || "");
               await sendTelegramMessage(
                 chatId,
-                `${symbol} *Confirmed & Logged ${txType === "expense" ? "Expense" : "Income"}*:\n` +
-                `• *Amount*: ₹${pendingData.amount}\n` +
+                `${symbol} *Logged ${txType === "expense" ? "Expense Outflow" : "Revenue Inflow"}*\n\n` +
+                `• *Amount*: ₹${pendingData.amount.toLocaleString("en-IN")}\n` +
+                `• *Merchant / Desc*: ${brandEmoji} ${description}\n` +
                 `• *Category*: ${category}\n` +
-                `• *Account*: ${accObj?.name || "Default"}\n` +
-                `• *Desc*: ${description}`
+                `• *Account*: ${bankEmoji} ${accObj?.name || "Default Account"}\n\n` +
+                `⚡ *Status*: Synced with web dashboard.`,
+                TX_CONFIRM_KEYBOARD
               );
               return NextResponse.json({ success: true });
             }

@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { Tables } from "@/lib/database.types";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
-import { AMCAvatar } from "./MutualFundsDataTable";
+import { BrandLogo } from "@/components/brand-logo";
 
 type MFTrade = Tables<"mutual_fund_trades">;
 
@@ -47,8 +47,9 @@ export default function MFHistoryTable({ trades }: MFHistoryTableProps) {
       columnHelper.accessor("fund_name", {
         header: "Scheme Name",
         cell: (info) => (
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-[--text-primary] max-w-[300px] truncate" title={info.getValue()}>{info.getValue()}</span>
+          <div className="flex items-center gap-2.5">
+            <BrandLogo name={info.getValue()} className="w-7 h-7 rounded-lg shrink-0" />
+            <span className="text-sm font-medium text-[--text-primary] max-w-[280px] truncate" title={info.getValue()}>{info.getValue()}</span>
           </div>
         ),
       }),

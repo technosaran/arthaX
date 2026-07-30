@@ -115,9 +115,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
           const payMode = !account ? "Cash Reserve" : account.type === "cash" ? "Cash Reserve" : account.type === "credit" ? "Credit Line" : "Bank Transfer / UPI";
           return (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-xs shrink-0">
-                {(account?.name || "Cash").charAt(0).toUpperCase()}
-              </div>
+              <BrandLogo name={account?.bank_name || account?.name || "Cash"} className="w-8 h-8 rounded-lg shrink-0" />
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[--text-primary] truncate">{account?.name || "Cash Reserve"}</span>
                 <span className="text-[0.5625rem] font-bold text-[--text-muted] uppercase tracking-wider">{payMode}</span>
@@ -292,9 +290,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
               <div key={row.id} className="p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 font-bold text-sm shrink-0">
-                      {exp.description ? exp.description.charAt(0).toUpperCase() : "E"}
-                    </div>
+                    <BrandLogo name={exp.description} className="w-9 h-9 shrink-0" />
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-bold text-white truncate">{exp.description}</span>
                       <span className="text-xs text-[--text-muted]">{exp.date ? format(parseISO(exp.date), "MMM d, yyyy") : "—"}</span>
@@ -307,9 +303,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                 </div>
                 <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 font-bold text-xs shrink-0">
-                      {(account?.name || "Cash").charAt(0).toUpperCase()}
-                    </div>
+                    <BrandLogo name={account?.bank_name || account?.name || "Cash"} className="w-7 h-7 rounded-lg shrink-0" />
                     <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Cash Reserve"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">

@@ -131,21 +131,27 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
       list.push(`/logos/companies/${firstWord}.svg`);
     }
 
-    // 2. Try bank logo sources (local SVGs/PNGs + bank domains)
+    // 2. Try bank logo sources (local SVGs/PNGs + bank domain Clearbit/favicons)
     const bankSources = getBankLogoSources(query);
     list.push(...bankSources);
 
     // 3. Check known domain mapping
+    let mappedDomain: string | null = null;
     for (const [key, dom] of Object.entries(KNOWN_DOMAINS)) {
       if (clean.includes(key)) {
-        list.push(`https://www.google.com/s2/favicons?domain=${dom}&sz=128`);
-        list.push(`https://logo.clearbit.com/${dom}`);
+        mappedDomain = dom;
         break;
       }
     }
 
+    if (mappedDomain) {
+      list.push(`https://logo.clearbit.com/${mappedDomain}`);
+      list.push(`https://www.google.com/s2/favicons?domain=${mappedDomain}&sz=128`);
+    }
+
     // 4. Try clean word domain fallback
-    if (firstWord.length >= 3) {
+    if (firstWord.length >= 3 && (!mappedDomain || !mappedDomain.includes(firstWord))) {
+      list.push(`https://logo.clearbit.com/${firstWord}.com`);
       list.push(`https://www.google.com/s2/favicons?domain=${firstWord}.com&sz=128`);
     }
 

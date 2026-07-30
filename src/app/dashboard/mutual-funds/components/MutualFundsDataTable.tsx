@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { EmptyState } from "@/components/empty-state";
 import type { Tables } from "@/lib/database.types";
 
@@ -15,16 +16,15 @@ interface MutualFundsDataTableProps {
 
 import { BrandLogo } from "@/components/brand-logo";
 
-export function AMCAvatar({ amcName, fundName, size = 40 }: { amcName?: string; fundName?: string; size?: number }) {
-  return null;
-}
+export const AMCAvatar = memo(({ amcName, fundName, className = "w-8 h-8" }: { amcName?: string; fundName?: string; size?: number; className?: string }) => {
+  return <BrandLogo name={amcName || fundName} className={`${className} rounded-lg shrink-0`} />;
+});
+AMCAvatar.displayName = "AMCAvatar";
 
 export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onAdd }: MutualFundsDataTableProps) {
 
 
   const formatMoney = (val: number) => val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-
 
   if (funds.length === 0) {
     return (
@@ -71,19 +71,20 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
               const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
               const isPositive = pnl >= 0;
 
-              const amc = fund.amc_name || "";
-
               return (
                 <tr key={fund.id} className="hover:bg-white/[0.02] transition-colors">
                   {/* Fund Name */}
                   <td className="px-4 py-3.5">
-                    <div className="min-w-0">
-                      <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[300px]" title={fund.fund_name}>
-                        {fund.fund_name}
-                      </span>
-                      <span className="text-[0.5625rem] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
-                        {fund.category || "Equity"}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <BrandLogo name={fund.amc_name || fund.fund_name} symbol={fund.fund_symbol} className="w-8 h-8 rounded-lg shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[280px]" title={fund.fund_name}>
+                          {fund.fund_name}
+                        </span>
+                        <span className="text-[0.5625rem] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider mt-1 inline-block">
+                          {fund.category || "Equity"}
+                        </span>
+                      </div>
                     </div>
                   </td>
 
