@@ -548,6 +548,17 @@ export async function POST(req: NextRequest) {
 
         const decision = await parseAutonomousTelegramIntent(rawText, userContext, geminiApiKey);
 
+        const findAccountByName = (accName?: string | null) => {
+          if (!accounts || accounts.length === 0) return null;
+          if (!accName) return accounts[0];
+          const target = accName.toLowerCase().trim();
+          return accounts.find((a: any) => {
+            const name = (a.name || "").toLowerCase().trim();
+            const bank = (a.bank_name || "").toLowerCase().trim();
+            return name === target || bank === target || name.includes(target) || target.includes(name) || bank.includes(target) || target.includes(bank);
+          }) || accounts[0];
+        };
+
         if (decision && decision.action !== "UNKNOWN") {
           // 1. Autonomous CREATE_ACCOUNT
           if (decision.action === "CREATE_ACCOUNT") {
@@ -580,17 +591,294 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // 2. Autonomous FINANCIAL_QUERY
+          // 2. Autonomous LOG_EXPENSE
+          if (decision.action === "LOG_EXPENSE") {
+            const amount = decision.amount || 0;
+            if (amount > 0) {
+              const matchedAcc = findAccountByName(decision.accountName);
+              if (!matchedAcc) {
+                await sendTelegramMessage(chatId, NO_ACCOUNT_MSG);
+                return NextResponse.json({ success: true });
+              }
+              const cat = decision.category || "Other";
+              const desc = decision.description || rawText;
+              const newBal = (parseFloat(matchedAcc.balance) || 0) - amount;
+
+              const { data: txData, error: txErr } = await supabase
+                .from("transactions")
+                .insert({
+                  user_id: profile.id,
+                  amount,
+                  type: "expense",
+                  category: cat,
+                  description: desc,
+                  account_id: matchedAcc.id,
+                  date: new Date().toISOString().split("T")[0],
+                  source_type: "expense"
+                })
+                .select("id")
+                .single();
+
+              if (!txErr) {
+                await supabase
+                  .from("accounts")
+                  .update({ balance: newBal })
+                  .eq("id", matchedAcc.id)
+                  .eq("user_id", profile.id);
+
+                await checkAndNotifyBudget(supabase, profile.id, chatId, cat, amount);
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Expense Logged!\n\n` +
+                  `💸 *Amount*: ₹${amount.toLocaleString("en-IN")}\n` +
+                  `🏷️ *Category*: ${cat}\n` +
+                  `📝 *Description*: ${desc}\n` +
+                  `💳 *Account*: ${matchedAcc.name} (Remaining: ₹${newBal.toLocaleString("en-IN")})\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously logged expense."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`,
+                  CATEGORY_KEYBOARD(txData?.id || "")
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 3. Autonomous LOG_INCOME
+          if (decision.action === "LOG_INCOME") {
+            const amount = decision.amount || 0;
+            if (amount > 0) {
+              const matchedAcc = findAccountByName(decision.accountName);
+              if (!matchedAcc) {
+                await sendTelegramMessage(chatId, NO_ACCOUNT_MSG);
+                return NextResponse.json({ success: true });
+              }
+              const cat = decision.category || "Income";
+              const desc = decision.description || rawText;
+              const newBal = (parseFloat(matchedAcc.balance) || 0) + amount;
+
+              const { error: txErr } = await supabase
+                .from("transactions")
+                .insert({
+                  user_id: profile.id,
+                  amount,
+                  type: "income",
+                  category: cat,
+                  description: desc,
+                  account_id: matchedAcc.id,
+                  date: new Date().toISOString().split("T")[0],
+                  source_type: "income"
+                });
+
+              if (!txErr) {
+                await supabase
+                  .from("accounts")
+                  .update({ balance: newBal })
+                  .eq("id", matchedAcc.id)
+                  .eq("user_id", profile.id);
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Income Logged!\n\n` +
+                  `💵 *Amount*: +₹${amount.toLocaleString("en-IN")}\n` +
+                  `🏷️ *Category*: ${cat}\n` +
+                  `📝 *Description*: ${desc}\n` +
+                  `💳 *Account*: ${matchedAcc.name} (New Balance: ₹${newBal.toLocaleString("en-IN")})\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously logged income."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 4. Autonomous BUY_STOCK
+          if (decision.action === "BUY_STOCK") {
+            const symbol = (decision.symbol || decision.description || "STOCK").toUpperCase();
+            const quantity = decision.quantity || 1;
+            const price = decision.price || decision.amount || 0;
+            const totalCost = quantity * price;
+
+            if (price > 0 && quantity > 0) {
+              const matchedAcc = findAccountByName(decision.accountName);
+              const { error: invErr } = await supabase.from("investments").insert({
+                user_id: profile.id,
+                name: symbol,
+                symbol: symbol,
+                quantity: quantity,
+                buy_price: price,
+                current_price: price,
+                currency: profile.base_currency || "INR",
+                type: "stock",
+                bought_at: new Date().toISOString().split("T")[0]
+              });
+
+              if (!invErr) {
+                let accMsg = "";
+                if (matchedAcc && totalCost > 0) {
+                  const newBal = (parseFloat(matchedAcc.balance) || 0) - totalCost;
+                  await supabase.from("accounts").update({ balance: newBal }).eq("id", matchedAcc.id).eq("user_id", profile.id);
+                  accMsg = ` (Deducted ₹${totalCost.toLocaleString("en-IN")} from ${matchedAcc.name})`;
+                }
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Stock Investment Recorded!\n\n` +
+                  `📈 *Stock Symbol*: ${symbol}\n` +
+                  `🔢 *Quantity*: ${quantity} @ ₹${price.toLocaleString("en-IN")}\n` +
+                  `💰 *Total Cost*: ₹${totalCost.toLocaleString("en-IN")}${accMsg}\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously logged stock purchase."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 5. Autonomous BUY_MUTUAL_FUND
+          if (decision.action === "BUY_MUTUAL_FUND") {
+            const fundName = decision.fundName || decision.description || "Mutual Fund";
+            const amount = decision.amount || (decision.quantity && decision.price ? decision.quantity * decision.price : 0);
+
+            if (amount > 0) {
+              const matchedAcc = findAccountByName(decision.accountName);
+              const units = parseFloat((amount / 100).toFixed(4));
+              const nav = 100;
+
+              const { error: mfErr } = await supabase.from("mutual_funds").insert({
+                user_id: profile.id,
+                fund_name: fundName,
+                units: units,
+                avg_nav: nav,
+                current_nav: nav,
+                category: "Equity",
+                amc_name: fundName.split(" ")[0] || "AMC",
+                investment_type: "SIP"
+              });
+
+              if (!mfErr) {
+                let accMsg = "";
+                if (matchedAcc) {
+                  const newBal = (parseFloat(matchedAcc.balance) || 0) - amount;
+                  await supabase.from("accounts").update({ balance: newBal }).eq("id", matchedAcc.id).eq("user_id", profile.id);
+                  accMsg = ` (Deducted ₹${amount.toLocaleString("en-IN")} from ${matchedAcc.name})`;
+                }
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Mutual Fund Investment Recorded!\n\n` +
+                  `📊 *Fund Name*: ${fundName}\n` +
+                  `💰 *Invested Amount*: ₹${amount.toLocaleString("en-IN")}${accMsg}\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously logged mutual fund investment."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 6. Autonomous TRANSFER_BETWEEN_ACCOUNTS
+          if (decision.action === "TRANSFER_BETWEEN_ACCOUNTS") {
+            const amount = decision.amount || 0;
+            const fromName = decision.fromAccountName;
+            const toName = decision.toAccountName;
+
+            if (amount > 0 && fromName && toName) {
+              const fromAcc = findAccountByName(fromName);
+              const toAcc = findAccountByName(toName);
+
+              if (fromAcc && toAcc && fromAcc.id !== toAcc.id) {
+                const fromBal = (parseFloat(fromAcc.balance) || 0) - amount;
+                const toBal = (parseFloat(toAcc.balance) || 0) + amount;
+
+                await supabase.from("accounts").update({ balance: fromBal }).eq("id", fromAcc.id).eq("user_id", profile.id);
+                await supabase.from("accounts").update({ balance: toBal }).eq("id", toAcc.id).eq("user_id", profile.id);
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Account Transfer Completed!\n\n` +
+                  `🔄 *Transferred*: ₹${amount.toLocaleString("en-IN")}\n` +
+                  `📤 *From*: ${fromAcc.name} (New Bal: ₹${fromBal.toLocaleString("en-IN")})\n` +
+                  `📥 *To*: ${toAcc.name} (New Bal: ₹${toBal.toLocaleString("en-IN")})\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously executed account transfer."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 7. Autonomous FAMILY_TRANSFER
+          if (decision.action === "FAMILY_TRANSFER") {
+            const amount = decision.amount || 0;
+            const memberName = (decision.familyMemberName || "").toLowerCase().trim();
+
+            if (amount > 0 && memberName && familyMembers && familyMembers.length > 0) {
+              const matchedMember = familyMembers.find((f: any) => {
+                const fName = (f.name || "").toLowerCase().trim();
+                const fRel = (f.relationship || "").toLowerCase().trim();
+                return fName.includes(memberName) || memberName.includes(fName) || fRel.includes(memberName);
+              });
+
+              if (matchedMember) {
+                const newFamBal = (parseFloat(matchedMember.balance) || 0) + amount;
+                await supabase.from("family_members").update({ balance: newFamBal }).eq("id", matchedMember.id).eq("user_id", profile.id);
+
+                let accMsg = "";
+                const matchedAcc = findAccountByName(decision.fromAccountName || decision.accountName);
+                if (matchedAcc) {
+                  const newAccBal = (parseFloat(matchedAcc.balance) || 0) - amount;
+                  await supabase.from("accounts").update({ balance: newAccBal }).eq("id", matchedAcc.id).eq("user_id", profile.id);
+                  accMsg = ` from ${matchedAcc.name}`;
+                }
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Family Transfer Logged!\n\n` +
+                  `👨‍👩‍👧 *Sent To*: ${matchedMember.name} (${matchedMember.relationship || "Family"})\n` +
+                  `💰 *Amount*: ₹${amount.toLocaleString("en-IN")}${accMsg}\n` +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously logged family transfer."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 8. Autonomous UPDATE_ACCOUNT
+          if (decision.action === "UPDATE_ACCOUNT") {
+            const targetAcc = findAccountByName(decision.accountName);
+            if (targetAcc) {
+              const updateData: any = {};
+              if (decision.newAccountName) updateData.name = decision.newAccountName;
+              if (typeof decision.initialBalance === "number") updateData.balance = decision.initialBalance;
+
+              if (Object.keys(updateData).length > 0) {
+                await supabase.from("accounts").update(updateData).eq("id", targetAcc.id).eq("user_id", profile.id);
+
+                await sendTelegramMessage(
+                  chatId,
+                  `🤖 *AI Decision*: Account Updated!\n\n` +
+                  `💳 *Account*: ${updateData.name || targetAcc.name}\n` +
+                  (updateData.balance !== undefined ? `💰 *New Balance*: ₹${updateData.balance.toLocaleString("en-IN")}\n` : "") +
+                  `🧠 *Reasoning*: ${decision.reasoning || "Autonomously updated account."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`
+                );
+                return NextResponse.json({ success: true });
+              }
+            }
+          }
+
+          // 9. Autonomous FINANCIAL_QUERY
           if (decision.action === "FINANCIAL_QUERY" && decision.replyMessage) {
             await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`);
             return NextResponse.json({ success: true });
           }
 
-          // 3. Autonomous DELETE_ACCOUNT
+          // 10. Autonomous DELETE_ACCOUNT
           if (decision.action === "DELETE_ACCOUNT") {
             const targetName = (decision.accountName || "").toLowerCase().trim();
             if (targetName && accounts.length > 0) {
-              // Fuzzy match against existing accounts
               const matchedAccount = accounts.find((a: any) => {
                 const aName = (a.name || "").toLowerCase().trim();
                 const aBankName = (a.bank_name || "").toLowerCase().trim();
@@ -608,17 +896,6 @@ export async function POST(req: NextRequest) {
                   .eq("user_id", profile.id);
 
                 if (!delErr) {
-                  // Log to audit trail
-                  await supabase.from("audit_logs").insert({
-                    user_id: profile.id,
-                    action: "DELETE",
-                    entity_type: "account",
-                    entity_id: matchedAccount.id,
-                    entity_name: matchedAccount.name,
-                    amount: balance,
-                    details: `Deleted account: ${matchedAccount.name}`,
-                  }).then(() => {});
-
                   await sendTelegramMessage(
                     chatId,
                     `🤖 *AI Decision*: Account Deleted!\n\n` +
@@ -639,7 +916,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // 4. Autonomous ADD_FAMILY_MEMBER
+          // 11. Autonomous ADD_FAMILY_MEMBER
           if (decision.action === "ADD_FAMILY_MEMBER") {
             const memberName = (decision.familyMemberName || "").trim();
             if (memberName) {
@@ -667,7 +944,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // 5. Autonomous GREETING — AI-powered welcome
+          // 12. Autonomous GREETING — AI-powered welcome
           if (decision.action === "GREETING") {
             const userName = profile.username || profile.full_name || "there";
             const aiGreeting = decision.replyMessage || `Hey ${userName}! 👋`;

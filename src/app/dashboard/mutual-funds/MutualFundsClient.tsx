@@ -16,7 +16,6 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } 
 import MutualFundsDataTable, { AMCAvatar } from "./components/MutualFundsDataTable";
 import MFHistoryTable from "./components/MFHistoryTable";
 import { calculateMutualFundCharges } from "@/lib/zerodha-charges";
-import CASImportModal from "@/components/CASImportModal";
 
 type MF = Tables<"mutual_funds"> & { scheme_code?: string | null; fund_symbol?: string | null; pnlPercent?: number; day_change?: number; day_change_percent?: number };
 
@@ -24,7 +23,6 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   const { data: { mutualFunds: rawMfs, accounts, profile, mutualFundTrades }, mutate } = useFinanceData(initialData);
   const searchParams = useSearchParams();
   const [showAddModal, setShowAddModal] = useState(searchParams?.get("action") === "new");
-  const [showCASModal, setShowCASModal] = useState(false);
   const [submitting, withLock] = useSubmitLock();
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -342,13 +340,6 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-          <button 
-            onClick={() => setShowCASModal(true)} 
-            className="bg-white/5 hover:bg-white/10 border border-purple-500/30 text-purple-300 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            Import CAS
-          </button>
           <button 
             onClick={handleRefreshNAV} 
             disabled={isRefreshing || rawMfs.length === 0}
@@ -861,12 +852,6 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
           </div>
         </Drawer>
       )}
-
-      <CASImportModal
-        isOpen={showCASModal}
-        onClose={() => setShowCASModal(false)}
-        onSuccess={() => mutate()}
-      />
     </div>
   );
 }

@@ -54,15 +54,18 @@ export default function InvestmentsClient() {
       if (hasForex) list.push({ key: "forex", label: "Forex" });
       list.push({ key: "crypto", label: "Crypto" });
     } else {
-      // INR mode: everything except Forex & Crypto
-      if (hasStocks) list.push({ key: "stocks", label: "Stocks" });
+      // INR mode: show sub-tabs for active/enabled investments
+      const hasActiveStocks = (investments || []).some(i => i.type === "stock" && Number(i.quantity) > 0);
+      if (hasStocks && (hasActiveStocks || (profile?.enabled_modules && profile.enabled_modules.includes("Stocks")))) {
+        list.push({ key: "stocks", label: "Stocks" });
+      }
       if (hasMF) list.push({ key: "mutual-funds", label: "Mutual Funds" });
       if (hasBonds) list.push({ key: "bonds", label: "Bonds" });
       if (hasFnO) list.push({ key: "fno", label: "FnO Trading" });
       if (hasAltAssets) list.push({ key: "alt-assets", label: "Alternative Assets" });
     }
     return list;
-  }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets, currencyMode]);
+  }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets, currencyMode, investments, profile]);
 
   const tabParam = searchParams.get("tab");
   const validTabParam = useMemo(() => {
