@@ -223,15 +223,26 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   }, [budgets, expenses, selectedMonth, selectedYear]);
 
   const pieData = useMemo(() => {
-    return currentBudgets.map(b => {
-      const color = getCategoryColour(b.category);
+    if (currentBudgets.length > 0) {
+      return currentBudgets.map(b => {
+        const color = getCategoryColour(b.category);
+        return {
+          name: b.category,
+          value: Number(b.amount),
+          fill: (color && color !== "undefined") ? color : getColorByLabel(b.category)
+        };
+      }).sort((a, b) => b.value - a.value);
+    }
+
+    return Object.entries(actualSpending).map(([cat, amt]) => {
+      const color = getCategoryColour(cat);
       return {
-        name: b.category,
-        value: Number(b.amount),
-        fill: (color && color !== "undefined") ? color : getColorByLabel(b.category)
+        name: cat,
+        value: amt,
+        fill: (color && color !== "undefined") ? color : getColorByLabel(cat)
       };
-    }).sort((a, b) => b.value - a.value);
-  }, [currentBudgets]);
+    }).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+  }, [currentBudgets, actualSpending]);
 
   async function handleBudgetChange(category: string, amount: string) {
     if (activeSubmissionsRef.current[category]) return;
@@ -631,30 +642,30 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
                     <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
                   </div>
                 </div>
-                <div className="flex-1 min-h-[240px] w-full mt-2 -ml-4">
+                <div className="w-full h-[260px] mt-2 -ml-2">
                   {mounted && (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.2}/>
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
                             <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
                           </linearGradient>
                           <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
+                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
                             <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dy={10} />
-                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} dx={-10} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} dy={5} />
+                        <YAxis tickFormatter={formatCurrency} axisLine={false} tickLine={false} tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} dx={-5} />
                         <RechartsTooltip 
-                          contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", boxShadow: "var(--shadow-lg)" }}
-                          itemStyle={{ color: "var(--text-primary)", fontWeight: "bold", fontSize: 12 }}
-                          formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, ""]}
+                          contentStyle={{ background: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}
+                          itemStyle={{ color: "#fff", fontWeight: "bold", fontSize: 12 }}
+                          formatter={(value: any, name?: any) => [`₹${Number(value).toLocaleString()}`, name === "Budget" ? "Target Cap" : "Actual Spent"]}
                         />
-                        <Area type="monotone" dataKey="Budget" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorBudget)" />
-                        <Area type="monotone" dataKey="Spent" stroke="#EF4444" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSpent)" />
+                        <Area type="monotone" dataKey="Budget" name="Budget" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorBudget)" />
+                        <Area type="monotone" dataKey="Spent" name="Spent" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpent)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
@@ -662,35 +673,50 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
               </div>
 
               {/* Target Allocation Pie Chart */}
-              <div className="glass-card-static p-5 flex flex-col items-center justify-center relative min-h-[300px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] absolute top-5 left-5">Target Allocation</h3>
-                <div className="w-full h-[180px] mt-4">
+              <div className="glass-card-static p-5 flex flex-col justify-between min-h-[340px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent relative">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+                      {currentBudgets.length > 0 ? "Target Budget Allocation" : "Actual Spending Split"}
+                    </h3>
+                    <p className="text-xs text-[--text-secondary] mt-0.5">
+                      {currentBudgets.length > 0 ? "Category allocation breakdown" : "Current month expenditure distribution"}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                    {currentBudgets.length > 0 ? "Planned Caps" : "Actual Spend"}
+                  </span>
+                </div>
+
+                <div className="w-full h-[210px] my-auto">
                   {mounted && pieData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value">
                           {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.05)" strokeWidth={2} />)}
                         </Pie>
                         <RechartsTooltip 
-                          contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px", fontSize: 11 }}
-                          itemStyle={{ color: "var(--text-primary)", fontWeight: "bold" }}
-                          formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, "Budget"]}
+                          contentStyle={{ background: "rgba(10,10,10,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: 11 }}
+                          itemStyle={{ color: "#fff", fontWeight: "bold" }}
+                          formatter={(value: unknown) => [`₹${Number(value).toLocaleString()}`, currentBudgets.length > 0 ? "Budget Cap" : "Spent"]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
                        <span className="text-xl mb-1">📊</span>
-                       <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget Limits</span>
+                       <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget or Expense Data</span>
                     </div>
                   )}
                 </div>
+
                 {pieData.length > 0 && (
                   <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
                     {pieData.slice(0, 6).map((entry, index) => (
-                      <div key={index} className="flex items-center gap-1.5 text-[0.5625rem]">
+                      <div key={index} className="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.fill }} />
-                        <span className="text-[--text-secondary] font-medium">{entry.name}</span>
+                        <span className="text-white font-bold">{entry.name}</span>
+                        <span className="text-[10px] text-[--text-muted]">₹{entry.value.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>

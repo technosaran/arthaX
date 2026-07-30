@@ -208,12 +208,12 @@ Action Selection Rules:
 2. "DELETE_ACCOUNT": If user asks to delete, remove, or close an account (e.g. "delete sbi", "remove hdfc account", "close my icici"). Match accountName against existing accounts from context.
 3. "UPDATE_ACCOUNT": If user asks to rename, change, or update an account (e.g. "rename SBI to SBI Salary"). Use accountName for current name and newAccountName for new name.
 4. "LOG_EXPENSE": If user spent money (e.g. "500 Swiggy", "paid 1200 rent").
-5. "LOG_INCOME": If user received money (e.g. "50000 salary credited", "got 2000 refund").
+5. "LOG_INCOME": If user received money, income, salary, dividend, or credited funds into a bank (e.g. "income from Samsung 2 cr to ICICI", "50000 salary credited", "got 2000 refund"). NEVER classify income/credit into a bank as TRANSFER_BETWEEN_ACCOUNTS.
 6. "ADD_FAMILY_MEMBER": If user wants to add a family member (e.g. "add family member Sri", "add mom"). Extract familyMemberName and familyRelationship.
 7. "FAMILY_TRANSFER": If user transferred money to family (e.g. "sent 1000 to Mom").
 8. "BUY_STOCK": If user bought stocks (e.g. "bought 10 shares of SBI at 800").
 9. "BUY_MUTUAL_FUND": If user invested in mutual fund (e.g. "invested 5000 in Parag Parikh Flexi Cap").
-10. "TRANSFER_BETWEEN_ACCOUNTS": If user transferred between own accounts (e.g. "moved 5000 from HDFC to SBI").
+10. "TRANSFER_BETWEEN_ACCOUNTS": ONLY if user explicitly moves funds between two existing accounts owned by user (e.g. "moved 5000 from HDFC to SBI", "transfer 1000 from SBI to ICICI").
 11. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, or summary. Provide friendly concise markdown in "replyMessage".
 12. "GREETING": If user sends a greeting like hi, hello, hey, good morning, etc. Set replyMessage to a friendly short greeting.
 

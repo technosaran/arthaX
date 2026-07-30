@@ -32,6 +32,7 @@ export default function DashboardClient() {
   const { data: financeData, isLoading } = useFinanceData();
   
   const { 
+    profile,
     accounts = [], 
     transactions = [], 
     ledgerLogs: recentLogs = [], 
@@ -146,14 +147,26 @@ export default function DashboardClient() {
       forexBalanceINR,
       forexBalanceUSD,
       mfBalance,
+      mfBalanceINR,
+      mfBalanceUSD,
       bondBalance,
+      bondBalanceINR,
+      bondBalanceUSD,
       altBalance,
+      altBalanceINR,
+      altBalanceUSD,
       debtBalance,
+      debtBalanceINR,
+      debtBalanceUSD,
       liquidBalance,
+      liquidBalanceINR,
+      liquidBalanceUSD,
       totalAssets,
       totalAssetsINR,
       totalAssetsUSD,
-      cryptoBalance
+      cryptoBalance,
+      cryptoBalanceINR,
+      cryptoBalanceUSD,
     } = netWorthData;
 
     const stockCount = investments.filter((inv) => Number(inv.quantity) > 0).length;
@@ -246,24 +259,37 @@ export default function DashboardClient() {
       return { name, value, fill: resolvedColor, color: resolvedColor, percentage: "0" };
     }).sort((a,b) => b.value - a.value);
 
-    const totalDayPnL = (investments.reduce((sum, inv) => {
+    let totalDayPnLINR = 0;
+    let totalDayPnLUSD = 0;
+
+    investments.forEach((inv) => {
       const quantity = Number(inv.quantity || 0);
       const currentPrice = Number(inv.current_price || inv.buy_price || 0);
       const prevClose = Number(inv.previous_close || 0);
       const dayChangePerUnit = inv.day_change !== null && inv.day_change !== undefined
         ? Number(inv.day_change)
         : (prevClose > 0 ? currentPrice - prevClose : currentPrice - Number(inv.buy_price || 0));
-      return sum + (dayChangePerUnit * quantity);
-    }, 0)) +
-    (mutualFunds.reduce((sum, mf) => {
+      const rawPnL = dayChangePerUnit * quantity;
+      const isUSD = inv.currency === "USD";
+      totalDayPnLINR += isUSD ? rawPnL * 85.0 : rawPnL;
+      totalDayPnLUSD += isUSD ? rawPnL : rawPnL / 85.0;
+    });
+
+    mutualFunds.forEach((mf) => {
       const units = Number(mf.units || 0);
       const currentNav = Number(mf.current_nav || mf.avg_nav || 0);
       const prevNav = Number(mf.previous_nav || 0);
       const dayChangePerUnit = mf.day_change !== null && mf.day_change !== undefined
         ? Number(mf.day_change)
         : (prevNav > 0 ? currentNav - prevNav : currentNav - Number(mf.avg_nav || 0));
-      return sum + (dayChangePerUnit * units);
-    }, 0));
+      const rawPnL = dayChangePerUnit * units;
+      const isUSD = (mf as any).currency === "USD";
+      totalDayPnLINR += isUSD ? rawPnL * 85.0 : rawPnL;
+      totalDayPnLUSD += isUSD ? rawPnL : rawPnL / 85.0;
+    });
+
+    const isBaseUSD = profile?.base_currency === "USD";
+    const totalDayPnL = isBaseUSD ? totalDayPnLUSD : totalDayPnLINR;
     const prevDayNetWorth = netWorth - totalDayPnL;
     const totalDayPnLPercent = prevDayNetWorth > 0 ? (totalDayPnL / prevDayNetWorth) * 100 : 0;
 
@@ -273,11 +299,21 @@ export default function DashboardClient() {
       netWorthINR,
       netWorthUSD,
       totalDayPnL,
+      totalDayPnLINR,
+      totalDayPnLUSD,
       totalDayPnLPercent,
       liquidBalance,
+      liquidBalanceINR,
+      liquidBalanceUSD,
       altBalance,
+      altBalanceINR,
+      altBalanceUSD,
       bondBalance,
+      bondBalanceINR,
+      bondBalanceUSD,
       debtBalance,
+      debtBalanceINR,
+      debtBalanceUSD,
       totalAssets,
       totalAssetsINR,
       totalAssetsUSD,
@@ -291,13 +327,17 @@ export default function DashboardClient() {
       forexBalanceINR,
       forexBalanceUSD,
       cryptoBalance,
+      cryptoBalanceINR,
+      cryptoBalanceUSD,
       monthlySpend, 
       monthlyIncome, 
       expenseTrend: expenseTrend.reverse(), 
       pieData, 
       stockCount, 
       mfCount, 
-      mfBalance, 
+      mfBalance,
+      mfBalanceINR,
+      mfBalanceUSD,
       trendData: Object.values(trendMap) 
     };
   }, [transactions, netWorthData, investments, mutualFunds]);

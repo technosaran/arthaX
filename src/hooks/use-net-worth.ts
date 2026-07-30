@@ -65,15 +65,32 @@ export function useNetWorth() {
       cashBalanceUSD += usd;
     });
 
-    // Stocks
+    // Investments (Stocks & Crypto)
     let stockBalanceINR = 0;
     let stockBalanceUSD = 0;
+    let cryptoBalanceINR = 0;
+    let cryptoBalanceUSD = 0;
+
+    const isCryptoAsset = (inv: any) => {
+      if (inv.type === "crypto") return true;
+      const s = (inv.symbol || "").toUpperCase();
+      const n = (inv.name || "").toLowerCase();
+      const cryptoKeywords = /^(btc|eth|sol|usdt|bnb|xrp|ada|doge|shib|dot|link|matic|avax|uni|ltc|crypto|bitcoin|ethereum|tether|cardano|solana|pepe|wif|bonk|sui|arb|op|ord|rndr|inj|near|atom|ftm)$/i;
+      return cryptoKeywords.test(s) || /crypto|bitcoin|ethereum|tether|cardano|solana/i.test(n);
+    };
+
     if (hasStocks) {
-      investments.filter(i => i.type === "stock").forEach(inv => {
+      investments.forEach(inv => {
         const val = Number(inv.quantity || 0) * Number(inv.current_price || 0);
         const { inr, usd } = getConvertedValues(val, inv.currency);
-        stockBalanceINR += inr;
-        stockBalanceUSD += usd;
+
+        if (isCryptoAsset(inv)) {
+          cryptoBalanceINR += inr;
+          cryptoBalanceUSD += usd;
+        } else {
+          stockBalanceINR += inr;
+          stockBalanceUSD += usd;
+        }
       });
     }
 
@@ -87,16 +104,6 @@ export function useNetWorth() {
         forexBalanceUSD += usd;
       });
     }
-
-    // Crypto
-    let cryptoBalanceINR = 0;
-    let cryptoBalanceUSD = 0;
-    investments.filter(i => i.type === "crypto").forEach(inv => {
-      const val = Number(inv.quantity || 0) * Number(inv.current_price || 0);
-      const { inr, usd } = getConvertedValues(val, inv.currency);
-      cryptoBalanceINR += inr;
-      cryptoBalanceUSD += usd;
-    });
 
     // Mutual Funds
     let mfBalanceINR = 0;
@@ -179,11 +186,23 @@ export function useNetWorth() {
       forexBalanceINR,
       forexBalanceUSD,
       cryptoBalance,
+      cryptoBalanceINR,
+      cryptoBalanceUSD,
       mfBalance,
+      mfBalanceINR,
+      mfBalanceUSD,
       bondBalance,
+      bondBalanceINR,
+      bondBalanceUSD,
       altBalance,
+      altBalanceINR,
+      altBalanceUSD,
       debtBalance,
+      debtBalanceINR,
+      debtBalanceUSD,
       liquidBalance,
+      liquidBalanceINR,
+      liquidBalanceUSD,
       totalAssets,
       totalAssetsINR,
       totalAssetsUSD

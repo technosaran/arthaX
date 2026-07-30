@@ -340,3 +340,61 @@ export async function payAllowance(data: { allowance_id: string; account_id: str
     return { error: getFriendlyErrorMessage(err) };
   }
 }
+
+export async function deleteFamilyTransfer(transferId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    if (!transferId) return { error: "Transfer ID is required" };
+
+    const { data: transfer, error: fetchErr } = await supabase
+      .from("family_transfers")
+      .select("*")
+      .eq("id", transferId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchErr || !transfer) return { error: "Transfer record not found" };
+
+    const { error: delErr } = await supabase
+      .from("family_transfers")
+      .delete()
+      .eq("id", transferId)
+      .eq("user_id", user.id);
+
+    if (delErr) return { error: getFriendlyErrorMessage(delErr) };
+
+    const { data: member } = await supabase
+      .from("family_members")
+      .select("balance")
+      .eq("id", transfer.family_member_id)
+      .single();
+
+    if (member) {
+      const newBal = Math.max(0, Number(member.balance || 0) - Number(transfer.amount || 0));
+      await supabase
+        .from("family_members")
+        .update({ balance: newBal })
+        .eq("id", transfer.family_member_id);
+    }
+
+    await logLedgerEntry(supabase, {
+      user_id: user.id,
+      action_type: "FAMILY_TRANSFER_DELETE",
+      amount: transfer.amount,
+      details: `Removed family transfer record of ₹${Number(transfer.amount).toLocaleString()}`,
+      source_type: "family_transfer",
+      source_id: transferId
+    });
+
+    revalidatePath("/dashboard/family");
+    revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/ledger");
+    return { success: true, message: "Transfer deleted successfully" };
+  } catch (err) {
+    console.error("Error in deleteFamilyTransfer:", err);
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
