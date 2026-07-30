@@ -137,9 +137,14 @@ function getGradientForName(name: string): string {
 }
 
 const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }: { name?: string; fallbackText?: string; className?: string }) => {
+  const cleanName = useMemo(() => {
+    if (!name) return "";
+    return name.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+  }, [name]);
+
   const domain = useMemo(() => {
-    if (!name) return null;
-    const clean = name.trim().toLowerCase();
+    if (!cleanName) return null;
+    const clean = cleanName.toLowerCase();
     
     // Check known company domains first
     for (const [key, dom] of Object.entries(COMPANY_LOGO_DOMAINS)) {
@@ -160,16 +165,16 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
     const firstWord = stripped.split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
     if (firstWord.length >= 3) return `${firstWord}.com`;
     return null;
-  }, [name]);
+  }, [cleanName]);
 
   const companySlug = useMemo(() => {
-    if (!name) return null;
-    const clean = name.trim().toLowerCase();
+    if (!cleanName) return null;
+    const clean = cleanName.toLowerCase();
     for (const key of Object.keys(COMPANY_LOGO_DOMAINS)) {
       if (clean.includes(key)) return key;
     }
     return null;
-  }, [name]);
+  }, [cleanName]);
 
   const sources = useMemo(() => {
     const list: string[] = [];
@@ -189,14 +194,14 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 
   const [srcIndex, setSrcIndex] = useState(0);
 
-  const [prevName, setPrevName] = useState(name);
-  if (prevName !== name) {
-    setPrevName(name);
+  const [prevName, setPrevName] = useState(cleanName);
+  if (prevName !== cleanName) {
+    setPrevName(cleanName);
     setSrcIndex(0);
   }
 
-  const initials = getBrandMonogram(name || fallbackText);
-  const gradient = getGradientForName(name || "");
+  const initials = getBrandMonogram(cleanName || fallbackText);
+  const gradient = getGradientForName(cleanName || "");
 
   if (!sources.length || srcIndex >= sources.length) {
     return (
@@ -207,13 +212,13 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
   }
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={sources[srcIndex]}
         src={sources[srcIndex]}
-        alt={name || "Company"}
-        className="w-full h-full object-contain filter drop-shadow-sm"
+        alt={cleanName || "Company"}
+        className="w-full h-full object-contain"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -621,23 +626,23 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between group">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Net Throughput</p>
           <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-black truncate text-success">
+            <h3 className="text-xl md:text-2xl font-black text-success">
               +₹{stats.totalIncome.toLocaleString()}
             </h3>
-            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-bold">Lifetime</span>
+            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-bold shrink-0">Lifetime</span>
           </div>
         </div>
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Monthly Flow</p>
           <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-black truncate text-success">
+            <h3 className="text-xl md:text-2xl font-black text-success">
               +₹{stats.monthlyTotal.toLocaleString()}
             </h3>
-            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-[--accent-primary]/10 text-[--accent-primary] border border-[--accent-primary]/20 font-bold">{format(new Date(), "MMM")}</span>
+            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-[--accent-primary]/10 text-[--accent-primary] border border-[--accent-primary]/20 font-bold shrink-0">{format(new Date(), "MMM")}</span>
           </div>
           {stats.lastYearTotal > 0 && (
             <div className="mt-2 flex items-center gap-2">
@@ -649,37 +654,12 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           )}
         </div>
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Average</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Average Inflow</p>
           <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-black truncate text-success">
+            <h3 className="text-xl md:text-2xl font-black text-success">
               +₹{(incomes.length ? stats.totalIncome / incomes.length : 0).toLocaleString(undefined, {maximumFractionDigits: 0})}
             </h3>
-            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-white/5 text-[--text-muted]">{incomes.length} pts</span>
-          </div>
-        </div>
-        <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 shadow-[0_4px_20px_rgba(16,185,129,0.1)]">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400">Dividend Earnings 💎</p>
-            <span className="text-xs">📈</span>
-          </div>
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-black truncate text-emerald-300">
-              +₹{stats.totalDividends.toLocaleString()}
-            </h3>
-            <button 
-              type="button" 
-              onClick={() => setCategoryFilter("Dividend")} 
-              className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold hover:bg-emerald-500/30 transition-all cursor-pointer"
-            >
-              Filter Dividends
-            </button>
-          </div>
-        </div>
-        <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between bg-gradient-to-br from-sky-500/10 to-transparent">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Primary Source</p>
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-black truncate">{stats.pieData[0]?.name || "None"}</h3>
-            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-white/5 text-[--text-muted]">Top</span>
+            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-white/5 text-[--text-muted] shrink-0">{incomes.length} entries</span>
           </div>
         </div>
       </div>
@@ -754,7 +734,11 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </tr>
                 ) : (
                   filteredIncomes.map((inc) => {
-                    const theme = INCOME_CATEGORIES.find(c => c.label === inc.category) || INCOME_CATEGORIES[6];
+                    const isAiLogged = /^\[(gemini ai|telegram|ai|bot)\]/i.test(inc.description);
+                    const cleanDesc = inc.description.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+                    const isDividend = /dividend/i.test(inc.description);
+                    const categoryLabel = isDividend ? "DIVIDEND" : inc.category;
+                    const theme = INCOME_CATEGORIES.find(c => c.label === categoryLabel) || INCOME_CATEGORIES[6];
                     const account = accounts.find(a => a.id === inc.account_id);
                     return (
                       <tr key={inc.id} className="text-[--text-primary] hover:bg-white/[0.02] transition-colors">
@@ -765,11 +749,20 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         <td className="px-4 md:px-6 py-3">
                           <div className="flex items-center gap-2.5">
                             <CompanyLogo name={inc.description} fallbackText="I" className="w-10 h-10" />
-                            <p className="text-xs font-semibold group-hover:text-success transition-colors truncate max-w-[140px] md:max-w-none">{inc.description}</p>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-semibold group-hover:text-success transition-colors truncate max-w-[140px] md:max-w-none">{cleanDesc}</p>
+                                {isAiLogged && (
+                                  <span className="text-[8px] font-black uppercase tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded shrink-0">
+                                    AI Log
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full text-[0.5625rem] font-black uppercase tracking-[0.1em] bg-success/5 border border-success/10 text-success" style={{color: theme.color}}>{inc.category}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[0.5625rem] font-black uppercase tracking-[0.1em] bg-success/5 border border-success/10 text-success" style={{color: theme.color}}>{categoryLabel}</span>
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2.5">
@@ -808,7 +801,11 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             </div>
           ) : (
             filteredIncomes.map((inc) => {
-              const theme = INCOME_CATEGORIES.find(c => c.label === inc.category) || INCOME_CATEGORIES[6];
+              const isAiLogged = /^\[(gemini ai|telegram|ai|bot)\]/i.test(inc.description);
+              const cleanDesc = inc.description.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+              const isDividend = /dividend/i.test(inc.description);
+              const categoryLabel = isDividend ? "DIVIDEND" : inc.category;
+              const theme = INCOME_CATEGORIES.find(c => c.label === categoryLabel) || INCOME_CATEGORIES[6];
               const account = accounts.find(a => a.id === inc.account_id);
               return (
                 <div key={inc.id} className="p-3 flex flex-col gap-2">
@@ -816,13 +813,20 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                     <div className="flex items-center gap-2.5">
                       <CompanyLogo name={inc.description} fallbackText="I" className="w-10 h-10" />
                       <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-bold text-[--text-primary] truncate">{inc.description}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-bold text-[--text-primary] truncate">{cleanDesc}</span>
+                          {isAiLogged && (
+                            <span className="text-[8px] font-black uppercase tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1 py-0.5 rounded shrink-0">
+                              AI
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[0.5625rem] text-[--text-muted] uppercase font-bold">{inc.date ? format(parseISO(inc.date), "MMM d, yyyy") : "—"}</span>
                       </div>
                     </div>
                     <div className="text-right flex flex-col items-end gap-1">
                       <span className="text-[15px] font-black text-success">+{getAccountCurrency(inc.account_id) === 'USD' ? '$' : '₹'}{Number(inc.amount).toLocaleString()}</span>
-                      <span className="px-2 py-0.5 rounded-full text-[0.5rem] font-black uppercase tracking-[0.1em] bg-success/5 border border-success/10 text-success" style={{color: theme.color}}>{inc.category}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[0.5rem] font-black uppercase tracking-[0.1em] bg-success/5 border border-success/10 text-success" style={{color: theme.color}}>{categoryLabel}</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">

@@ -80,14 +80,24 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
       columnHelper.accessor("description", {
         header: "Merchant & Details",
         cell: (info) => {
+          const raw = info.getValue() || "";
+          const isAiLogged = /^\[(gemini ai|telegram|ai|bot)\]/i.test(raw);
+          const cleanDesc = raw.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
           const cat = info.row.original.category;
           return (
             <div className="flex items-center gap-3">
-              <BrandLogo name={info.getValue()} className="w-8 h-8" />
+              <BrandLogo name={raw} className="w-8 h-8" />
               <div className="flex flex-col min-w-0">
-                <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
-                  {info.getValue()}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-[--text-primary] group-hover:text-danger transition-colors truncate max-w-[140px] md:max-w-none">
+                    {cleanDesc}
+                  </p>
+                  {isAiLogged && (
+                    <span className="text-[8px] font-black uppercase tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded shrink-0">
+                      AI Log
+                    </span>
+                  )}
+                </div>
                 <span className="text-[0.625rem] font-semibold text-[--text-muted] truncate">
                   {cat} Outflow
                 </span>

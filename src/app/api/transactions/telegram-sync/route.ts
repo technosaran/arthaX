@@ -8,20 +8,7 @@ import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveFo
 
 // Persistent Telegram Reply Keyboard (docked cleanly at the bottom drawer of Telegram text input)
 const MAIN_REPLY_KEYBOARD = {
-  keyboard: [
-    [
-      { text: "💳 Balances" },
-      { text: "📊 Summary" },
-      { text: "🤖 AI Score" }
-    ],
-    [
-      { text: "📜 Recent Logs" },
-      { text: "🎯 Goals" },
-      { text: "💡 Commands & Help" }
-    ]
-  ],
-  resize_keyboard: true,
-  is_persistent: true
+  remove_keyboard: true
 };
 
 const MAIN_MENU_KEYBOARD = MAIN_REPLY_KEYBOARD;
@@ -30,9 +17,7 @@ const MAIN_MENU_KEYBOARD = MAIN_REPLY_KEYBOARD;
 const TX_CONFIRM_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: "↩️ Undo", callback_data: "cmd_undo" },
-      { text: "📊 Summary", callback_data: "cmd_summary" },
-      { text: "💳 Balances", callback_data: "cmd_balance" }
+      { text: "↩️ Undo", callback_data: "cmd_undo" }
     ]
   ]
 };
@@ -50,8 +35,7 @@ const CATEGORY_KEYBOARD = (txId: string) => ({
       { text: "🏥 Health", callback_data: `cat_${txId}_Health` }
     ],
     [
-      { text: "↩️ Undo", callback_data: "cmd_undo" },
-      { text: "📊 Summary", callback_data: "cmd_summary" }
+      { text: "↩️ Undo", callback_data: "cmd_undo" }
     ]
   ]
 });
@@ -2474,14 +2458,22 @@ export async function POST(req: NextRequest) {
                   const txId = latestTx?.id;
                   const keyboard = txId && txType === "expense" ? CATEGORY_KEYBOARD(txId) : TX_CONFIRM_KEYBOARD;
 
+                  const symbol = txType === "expense" ? "💸" : "💰";
+                  const actionHeader = txType === "expense" ? "Expense Outflow Logged" : "Revenue Inflow Recorded";
+                  const bankEmoji = getBrandEmoji(accObj?.bank_name || accObj?.name || "");
+                  const brandEmoji = getBrandEmoji(description);
+                  const currentAccBal = parseFloat(accObj?.balance || 0);
+                  const updatedBal = txType === "expense" ? currentAccBal - aiResult.amount : currentAccBal + aiResult.amount;
+
                   await sendTelegramMessage(
                     chatId,
-                    `🤖 *Gemini AI Logged ${txType === "expense" ? "Expense" : "Income"}*:\n` +
+                    `${symbol} *${actionHeader}*\n\n` +
                     `• *Amount*: ₹${aiResult.amount.toLocaleString("en-IN")}\n` +
                     `• *Category*: ${category}\n` +
-                    `• *Account*: ${accObj?.name || "Default"}\n` +
-                    `• *Desc*: ${description}\n` +
-                    `• *Dashboard*: ✅ Updated`,
+                    `• *Account*: ${bankEmoji} ${accObj?.name || "Default Account"}\n` +
+                    `• *Details*: ${brandEmoji} ${description}\n` +
+                    `• *New Balance*: ₹${updatedBal.toLocaleString("en-IN")}\n\n` +
+                    `⚡ *Dashboard*: ✅ Updated Live`,
                     keyboard
                   );
                   return NextResponse.json({ success: true });

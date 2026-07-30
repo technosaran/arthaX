@@ -9,28 +9,7 @@ import { MODULE_KEYS } from "@/lib/modules";
 
 
 
-type DashboardStats = {
-  totalBalance: number;
-  netWorth: number;
-  netWorthINR: number;
-  netWorthUSD: number;
-  totalDayPnL: number;
-  totalDayPnLPercent: number;
-  monthlySpend: number;
-  monthlyIncome: number;
-  expenseTrend: unknown[];
-  pieData: unknown[];
-  stockCount: number;
-  mfCount: number;
-  stockBalance: number;
-  mfBalance: number;
-  totalAssets: number;
-  totalAssetsINR?: number;
-  totalAssetsUSD?: number;
-  forexBalance?: number;
-  cryptoBalance?: number;
-  debtBalance: number;
-};
+import { type DashboardStats } from "./DashboardDesktop";
 
 type Props = {
   stats: DashboardStats;
@@ -143,8 +122,8 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
               <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
               <span>
                 {showUSD 
-                  ? `$${Math.abs(stats.totalDayPnL / 85).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                  : `₹${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  ? `$${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                 }
               </span>
               <span className="opacity-75">
@@ -163,8 +142,8 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                 className="absolute left-0 text-3xl font-[900] tracking-tight text-white whitespace-nowrap"
               >
                 {showUSD 
-                  ? `$${stats.netWorthUSD.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
-                  : `₹${stats.netWorthINR.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
+                  ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  : `₹${stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                 }
               </motion.h1>
             </AnimatePresence>
@@ -176,13 +155,19 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
           <div>
             <span className="text-xs font-semibold text-[--text-muted] block mb-0.5">Month inflow</span>
             <span className="text-sm font-extrabold text-emerald-400">
-              +₹{stats.monthlyIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {showUSD 
+                ? `+$${(stats.monthlyIncome / 85).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                : `+₹${stats.monthlyIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+              }
             </span>
           </div>
           <div>
             <span className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] block mb-0.5">Month Outflow</span>
             <span className="text-sm font-extrabold text-rose-400">
-              -₹{stats.monthlySpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {showUSD
+                ? `-$${(stats.monthlySpend / 85).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                : `-₹${stats.monthlySpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+              }
             </span>
           </div>
         </div>

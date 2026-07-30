@@ -83,6 +83,9 @@ const KNOWN_DOMAINS: Record<string, string> = {
   broadcom: "broadcom.com",
 
   // Merchants & Services
+  kfc: "kfc.com",
+  raymond: "raymond.in",
+  otto: "otto.de",
   uber: "uber.com",
   ola: "olacabs.com",
   rapido: "rapido.bike",
@@ -113,9 +116,14 @@ const KNOWN_DOMAINS: Record<string, string> = {
 export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: { name?: string | null; symbol?: string | null; className?: string; style?: React.CSSProperties }) => {
   const query = (symbol || name || "").trim();
 
+  const cleanQuery = useMemo(() => {
+    if (!query) return "";
+    return query.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+  }, [query]);
+
   const sources = useMemo(() => {
-    if (!query) return [];
-    const clean = query.toLowerCase().trim();
+    if (!cleanQuery) return [];
+    const clean = cleanQuery.toLowerCase().trim();
     const list: string[] = [];
 
     const firstWord = clean
@@ -132,7 +140,7 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     }
 
     // 2. Try bank logo sources (local SVGs/PNGs + bank domain Clearbit/favicons)
-    const bankSources = getBankLogoSources(query);
+    const bankSources = getBankLogoSources(cleanQuery);
     list.push(...bankSources);
 
     // 3. Check known domain mapping
@@ -156,22 +164,22 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     }
 
     return Array.from(new Set(list));
-  }, [query]);
+  }, [cleanQuery]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
-  const [prevQuery, setPrevQuery] = useState(query);
-  if (prevQuery !== query) {
-    setPrevQuery(query);
+  const [prevQuery, setPrevQuery] = useState(cleanQuery);
+  if (prevQuery !== cleanQuery) {
+    setPrevQuery(cleanQuery);
     setSrcIndex(0);
   }
 
   if (!sources.length || srcIndex >= sources.length) {
-    const letter = (query || "B").charAt(0).toUpperCase();
+    const letter = (cleanQuery || "B").charAt(0).toUpperCase();
     return (
       <div
         style={style}
-        className={`${className} flex items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/60 text-sky-400 font-bold text-xs shrink-0 shadow-sm select-none`}
+        className={`${className} flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-700/60 text-sky-400 font-bold text-xs shrink-0 shadow-sm select-none`}
       >
         {letter}
       </div>
@@ -181,13 +189,13 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
   const currentSrc = sources[srcIndex];
 
   return (
-    <div style={style} className={`${className} flex items-center justify-center shrink-0`}>
+    <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
-        alt={query || "Logo"}
-        className="w-full h-full object-contain filter drop-shadow-sm"
+        alt={cleanQuery || "Logo"}
+        className="w-full h-full object-contain"
         loading="lazy"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />

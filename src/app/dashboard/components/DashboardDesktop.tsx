@@ -52,6 +52,8 @@ export type DashboardStats = {
   netWorthINR: number;
   netWorthUSD: number;
   totalDayPnL: number;
+  totalDayPnLINR: number;
+  totalDayPnLUSD: number;
   totalDayPnLPercent: number;
   monthlySpend: number;
   monthlyIncome: number;
@@ -61,11 +63,21 @@ export type DashboardStats = {
   mfCount: number;
   stockBalance: number;
   mfBalance: number;
+  mfBalanceINR: number;
+  mfBalanceUSD: number;
   trendData: TrendDataEntry[];
   liquidBalance: number;
+  liquidBalanceINR: number;
+  liquidBalanceUSD: number;
   altBalance: number;
+  altBalanceINR: number;
+  altBalanceUSD: number;
   bondBalance: number;
+  bondBalanceINR: number;
+  bondBalanceUSD: number;
   debtBalance: number;
+  debtBalanceINR: number;
+  debtBalanceUSD: number;
   totalAssets: number;
   totalAssetsINR: number;
   totalAssetsUSD: number;
@@ -78,6 +90,8 @@ export type DashboardStats = {
   forexBalanceINR: number;
   forexBalanceUSD: number;
   cryptoBalance: number;
+  cryptoBalanceINR: number;
+  cryptoBalanceUSD: number;
 };
 
 type Props = {
@@ -141,15 +155,19 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
     const rawData = showUSD ? [
         { name: 'Cash', value: stats.cashBalanceUSD, fill: getChartColour(0), color: getChartColour(0) },
         { name: 'Stocks', value: stats.stockBalanceUSD, fill: getChartColour(1), color: getChartColour(1) },
-        { name: 'Forex', value: stats.forexBalanceUSD, fill: getChartColour(3), color: getChartColour(3) },
-        { name: 'Crypto', value: stats.cryptoBalance, fill: getChartColour(4), color: getChartColour(4) }
+        { name: 'Mutual Funds', value: stats.mfBalanceUSD, fill: getChartColour(2), color: getChartColour(2) },
+        { name: 'Assets', value: stats.altBalanceUSD, fill: getChartColour(3), color: getChartColour(3) },
+        { name: 'Bonds', value: stats.bondBalanceUSD, fill: getChartColour(4), color: getChartColour(4) },
+        { name: 'Forex', value: stats.forexBalanceUSD, fill: getChartColour(5), color: getChartColour(5) },
+        { name: 'Crypto', value: stats.cryptoBalanceUSD, fill: getChartColour(6), color: getChartColour(6) }
     ] : [
         { name: 'Cash', value: stats.cashBalanceINR, fill: getChartColour(0), color: getChartColour(0) },
         { name: 'Stocks', value: stats.stockBalanceINR, fill: getChartColour(1), color: getChartColour(1) },
-        { name: 'Mutual Funds', value: stats.mfBalance, fill: getChartColour(2), color: getChartColour(2) },
-        { name: 'Assets', value: stats.altBalance, fill: getChartColour(3), color: getChartColour(3) },
-        { name: 'Bonds', value: stats.bondBalance, fill: getChartColour(4), color: getChartColour(4) },
-        { name: 'Forex', value: stats.forexBalanceINR, fill: getChartColour(5), color: getChartColour(5) }
+        { name: 'Mutual Funds', value: stats.mfBalanceINR, fill: getChartColour(2), color: getChartColour(2) },
+        { name: 'Assets', value: stats.altBalanceINR, fill: getChartColour(3), color: getChartColour(3) },
+        { name: 'Bonds', value: stats.bondBalanceINR, fill: getChartColour(4), color: getChartColour(4) },
+        { name: 'Forex', value: stats.forexBalanceINR, fill: getChartColour(5), color: getChartColour(5) },
+        { name: 'Crypto', value: stats.cryptoBalanceINR, fill: getChartColour(6), color: getChartColour(6) }
     ];
 
     return rawData
@@ -164,14 +182,18 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
     stats.totalAssetsINR,
     stats.cashBalanceUSD,
     stats.stockBalanceUSD,
+    stats.mfBalanceUSD,
+    stats.altBalanceUSD,
+    stats.bondBalanceUSD,
     stats.forexBalanceUSD,
-    stats.cryptoBalance,
+    stats.cryptoBalanceUSD,
     stats.cashBalanceINR,
     stats.stockBalanceINR,
+    stats.mfBalanceINR,
+    stats.altBalanceINR,
+    stats.bondBalanceINR,
     stats.forexBalanceINR,
-    stats.mfBalance,
-    stats.altBalance,
-    stats.bondBalance,
+    stats.cryptoBalanceINR,
   ]);
 
   const chartData = useMemo(() => {
@@ -301,8 +323,8 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
                     <span>
                       {showUSD 
-                        ? `$${Math.abs(stats.totalDayPnL / 85).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                        : `₹${Math.abs(stats.totalDayPnL).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        ? `$${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
                     </span>
                     <span className="opacity-75">
@@ -325,8 +347,8 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                       }`}
                     >
                     {showUSD 
-                      ? `$${stats.netWorthUSD.toLocaleString(undefined, { minimumFractionDigits: 0 })}` 
-                      : `₹${stats.netWorthINR.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
+                      ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
+                      : `₹${stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                     }
                   </motion.h2>
                   </AnimatePresence>
@@ -353,8 +375,8 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <span className={`text-sm sm:text-base font-black ${stats.totalDayPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {stats.totalDayPnL >= 0 ? "+" : "-"}
                       {showUSD 
-                        ? `$${Math.abs(stats.totalDayPnL).toLocaleString()}` 
-                        : `₹${Math.abs(stats.totalDayPnL).toLocaleString()}`
+                        ? `$${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
+                        : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
                       <span className="text-xs font-bold ml-1.5 opacity-80">
                         ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(2)}%)
@@ -372,13 +394,13 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <span className="text-xs font-semibold text-[--text-muted]">Liquid assets</span>
                     <span className="text-sm sm:text-base font-black text-emerald-400">
                       {showUSD 
-                        ? `+$${stats.totalAssetsUSD.toLocaleString()}` 
-                        : `+₹${stats.totalAssetsINR.toLocaleString()}`
+                        ? `+$${stats.liquidBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
+                        : `+₹${stats.liquidBalanceINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
                     </span>
                   </div>
                 </motion.div>
-                {!showUSD && stats.debtBalance > 0 && (
+                {(showUSD ? stats.debtBalanceUSD > 0 : stats.debtBalanceINR > 0) && (
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -388,7 +410,10 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <div className="flex flex-col">
                       <span className="text-xs font-semibold text-[--text-muted]">Outstanding debt</span>
                       <span className="text-sm sm:text-base font-black text-rose-500">
-                        -₹{stats.debtBalance.toLocaleString()}
+                        {showUSD
+                          ? `-$${stats.debtBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                          : `-₹${stats.debtBalanceINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        }
                       </span>
                     </div>
                   </motion.div>
@@ -413,7 +438,9 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                           <div className="flex items-center gap-2 flex-shrink-0 text-right">
                             <span className="text-[0.5625rem] font-bold text-[--text-muted]">{item.percentage}%</span>
                             <span className="text-xs font-black tabular-nums whitespace-nowrap" style={{ color: item.color }}>
-                              {showUSD ? '$' : '₹'}{item.value > 10000000 ? Intl.NumberFormat(showUSD ? 'en-US' : 'en-IN', { notation: 'compact', maximumFractionDigits: 2 }).format(item.value) : item.value.toLocaleString()}
+                              {showUSD ? '$' : '₹'}{item.value > 10000000 
+                                ? Intl.NumberFormat(showUSD ? 'en-US' : 'en-IN', { notation: 'compact', maximumFractionDigits: 2 }).format(item.value) 
+                                : item.value.toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: showUSD && item.value % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>

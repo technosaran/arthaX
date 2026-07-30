@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { format, subMonths, parseISO } from "date-fns";
-import { Edit2, Trash2, Send, Plus, Users, History, TrendingUp, PieChart as PieIcon } from "lucide-react";
+import { Edit2, Trash2, Send, Plus, Users, History, TrendingUp, PieChart as PieIcon, Download } from "lucide-react";
 
 import {
   XAxis,
@@ -32,6 +32,7 @@ import {
   updateFamilyMember,
   deleteFamilyMember,
   processFamilyTransfer,
+  deleteFamilyTransfer,
 } from "./actions";
 
 /* ── Types ── */
@@ -297,6 +298,41 @@ export default function FamilyClient() {
       mutate();
       mutateFinance();
     });
+  }
+
+  async function handleDeleteTransfer(transferId: string) {
+    if (!confirm("Delete this transfer record?")) return;
+    await withLock(async () => {
+      const res = await deleteFamilyTransfer(transferId);
+      if (res.error) { toast.error(res.error); return; }
+      toast.success("Transfer record deleted successfully");
+      mutate();
+      mutateFinance();
+    });
+  }
+
+  function exportTransferCSV() {
+    if (!filteredTransfers.length) {
+      toast.error("No transfer records to export");
+      return;
+    }
+    const headers = ["Date", "Recipient", "From Account", "Amount (INR)", "Note"];
+    const rows = filteredTransfers.map(tr => [
+      formatTransferDate(tr.transfer_date),
+      `"${getMemberName(tr.family_member_id).replace(/"/g, '""')}"`,
+      `"${(accounts.find(a => a.id === tr.account_id)?.name || "Unknown Account").replace(/"/g, '""')}"`,
+      tr.amount,
+      `"${(tr.note || "").replace(/"/g, '""')}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `family_transfers_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Family transfer statement exported to CSV");
   }
 
 
@@ -601,6 +637,10 @@ export default function FamilyClient() {
                 const balance = Number(member.balance || 0);
                 const initials = member.name.trim().charAt(0).toUpperCase() || "?";
                 const avatar = getMemberAvatar(member.name, member.relationship);
+                const memberTransfers = transfers.filter(t => t.family_member_id === member.id);
+                const lastTransfer = memberTransfers[0];
+                const monthSent = monthTransfers.filter(t => t.family_member_id === member.id).reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
                 return (
                   <div key={member.id} className="glass-card flex flex-col justify-between gap-4 border-white/5 hover:border-pink-500/30 hover:shadow-[0_0_25px_rgba(236,72,153,0.12)] transition-all duration-300 relative group overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -624,17 +664,27 @@ export default function FamilyClient() {
                             {member.relationship ?? "Other"}
                           </span>
                         </div>
-                        <div className="text-xs text-[--text-muted] mt-1.5 flex items-center justify-between gap-2">
-                          <span>Total Sent: <span className="font-mono font-bold text-white">{fmt.format(balance)}</span></span>
-                          {member.relationship === "Child" && (
-                            <button
-                               type="button"
-                               onClick={(e) => { e.stopPropagation(); openSendAllowance(member.id, "500", "Allowance Support"); }}
-                               className="text-[9.5px] font-black uppercase text-pink-400 hover:text-pink-300 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded cursor-pointer transition-all active:scale-95 shrink-0"
-                            >
-                              👶 Allowance
-                            </button>
-                          )}
+                        <div className="text-xs text-[--text-muted] mt-1.5 flex flex-col gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Total Sent: <span className="font-mono font-bold text-white">{fmt.format(balance)}</span></span>
+                            {member.relationship === "Child" && (
+                              <button
+                                 type="button"
+                                 onClick={(e) => { e.stopPropagation(); openSendAllowance(member.id, "500", "Allowance Support"); }}
+                                 className="text-[9.5px] font-black uppercase text-pink-400 hover:text-pink-300 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded cursor-pointer transition-all active:scale-95 shrink-0"
+                              >
+                                👶 Allowance
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-[11px] text-[--text-secondary]">
+                            <span>This Month: <span className="font-bold text-pink-400">{fmt.format(monthSent)}</span></span>
+                            {lastTransfer && (
+                              <span className="text-[10px] opacity-75">
+                                Last: {fmt.format(Number(lastTransfer.amount))} ({formatTransferDate(lastTransfer.transfer_date)})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -683,7 +733,7 @@ export default function FamilyClient() {
                   className="input-premium pl-9 py-2 text-sm w-full sm:w-64 !bg-black/20"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold text-[--text-muted]">
                   Period: <span className="text-pink-400 font-extrabold">{showAllTime ? "All Time" : format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy")}</span>
                 </span>
@@ -696,6 +746,15 @@ export default function FamilyClient() {
                     View All Time
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={exportTransferCSV}
+                  className="text-[10px] font-black uppercase text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-lg cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 ml-1"
+                  title="Export Statement to CSV"
+                >
+                  <Download className="w-3 h-3 text-pink-400" />
+                  CSV
+                </button>
               </div>
             </div>
 
@@ -708,6 +767,7 @@ export default function FamilyClient() {
                     <th className="py-4 px-6">From Account</th>
                     <th className="py-4 px-6">Note</th>
                     <th className="py-4 px-6 text-right">Amount</th>
+                    <th className="py-4 px-6 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -716,7 +776,7 @@ export default function FamilyClient() {
                     const accountName = accounts.find(a => a.id === tr.account_id)?.name || "Unknown Account";
 
                     return (
-                      <tr key={tr.id}>
+                      <tr key={tr.id} className="hover:bg-white/[0.01] transition-colors group">
                         <td className="py-4 px-6 text-[12px] font-bold text-white/80">
                           {formatTransferDate(tr.transfer_date)}
                         </td>
@@ -733,6 +793,16 @@ export default function FamilyClient() {
                           <span className="text-sm font-black text-rose-400">
                             -{fmt.format(Number(tr.amount))}
                           </span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTransfer(tr.id)}
+                            className="p-1.5 text-[--text-muted] hover:text-rose-400 opacity-60 group-hover:opacity-100 transition-all cursor-pointer rounded-lg hover:bg-rose-500/10"
+                            title="Delete transfer record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -856,6 +926,18 @@ export default function FamilyClient() {
                 onChange={e => setTransferForm(prev => ({ ...prev, amount: e.target.value }))}
                 style={{ width: "100%" }}
               />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[500, 1000, 2500, 5000, 10000].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTransferForm(prev => ({ ...prev, amount: amt.toString() }))}
+                    className="text-[10px] font-black uppercase text-pink-400 hover:text-white bg-pink-500/10 hover:bg-pink-500/30 border border-pink-500/20 px-2.5 py-1 rounded-lg cursor-pointer transition-all active:scale-95"
+                  >
+                    +₹{amt.toLocaleString('en-IN')}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Note <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
@@ -866,6 +948,25 @@ export default function FamilyClient() {
                 onChange={e => setTransferForm(prev => ({ ...prev, note: e.target.value }))}
                 style={{ width: "100%" }}
               />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[
+                  "🎁 Pocket Money / Gift",
+                  "🛒 Groceries & Household",
+                  "💊 Medical & Health",
+                  "📚 Fees & Education",
+                  "🎉 Birthday / Festival",
+                  "💸 Monthly Allowance"
+                ].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setTransferForm(prev => ({ ...prev, note: preset }))}
+                    className="text-[10px] font-bold text-[--text-secondary] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded-lg cursor-pointer transition-all active:scale-95"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
               <button
