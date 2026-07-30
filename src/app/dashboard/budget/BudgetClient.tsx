@@ -529,8 +529,8 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
                         <div className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
                           {limit > 0 ? (
                             <>
-                              <svg className="w-full h-full transform -rotate-90 absolute">
-                                <circle cx="22" cy="22" r="18" className="stroke-white/10" strokeWidth="2.5" fill="transparent" />
+                              <svg viewBox="0 0 44 44" className="w-full h-full absolute inset-0 -rotate-90 origin-center pointer-events-none">
+                                <circle cx="22" cy="22" r="18" className="stroke-white/10" strokeWidth="3" fill="none" />
                                 <circle
                                   cx="22"
                                   cy="22"
@@ -538,8 +538,9 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
                                   className={`transition-all duration-1000 ${
                                     percent > 90 ? "stroke-rose-500" : percent > 75 ? "stroke-amber-400" : "stroke-emerald-400"
                                   }`}
-                                  strokeWidth="2.5"
-                                  fill="transparent"
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                  fill="none"
                                   strokeDasharray={113}
                                   strokeDashoffset={113 * (1 - Math.min(percent, 100) / 100)}
                                 />

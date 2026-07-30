@@ -26,6 +26,8 @@ function getColorByLabel(label: string | null | undefined) {
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "@/components/ui/recharts";
 // Direct HQ logo URLs for known companies (Clearbit full-color logos — NOT monochrome icons)
 const COMPANY_LOGO_DOMAINS: Record<string, string> = {
+  samsung: "samsung.com",
+  tvs: "tvsmotor.com",
   google: "google.com",
   microsoft: "microsoft.com",
   apple: "apple.com",
@@ -33,7 +35,7 @@ const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   meta: "meta.com",
   facebook: "facebook.com",
   netflix: "netflix.com",
-  tcs: "tata.com",
+  tcs: "tcs.com",
   tata: "tata.com",
   infosys: "infosys.com",
   wipro: "wipro.com",
@@ -72,37 +74,57 @@ const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   fiver: "fiverr.com",
 };
 
-// Maps company domain -> local SVG logo file name in /public/logos/companies/.
-const COMPANY_LOCAL_LOGOS: Record<string, string> = {
-  "accenture.com": "accenture",
-  "adobe.com": "adobe",
-  "amazon.com": "amazon",
-  "apple.com": "apple",
-  "atlassian.com": "atlassian",
-  "cognizant.com": "cognizant",
-  "facebook.com": "facebook",
-  "fiverr.com": "fiverr",
-  "github.com": "github",
-  "gitlab.com": "gitlab",
-  "google.com": "google",
-  "ibm.com": "ibm",
-  "infosys.com": "infosys",
-  "linkedin.com": "linkedin",
-  "meta.com": "meta",
-  "microsoft.com": "microsoft",
-  "netflix.com": "netflix",
-  "oracle.com": "oracle",
-  "razorpay.com": "razorpay",
-  "salesforce.com": "salesforce",
-  "stripe.com": "stripe",
-  "swiggy.in": "swiggy",
-  "tata.com": "tata",
-  "tcs.com": "tcs",
-  "uber.com": "uber",
-  "upwork.com": "upwork",
-  "wipro.com": "wipro",
-  "zomato.com": "zomato",
-  "zoom.us": "zoom",
+const COMPANY_INTERNET_LOGOS: Record<string, string[]> = {
+  "samsung.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg",
+    "https://logo.clearbit.com/samsung.com",
+    "https://www.google.com/s2/favicons?domain=samsung.com&sz=128",
+  ],
+  "apple.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
+    "https://logo.clearbit.com/apple.com",
+    "https://www.google.com/s2/favicons?domain=apple.com&sz=128",
+  ],
+  "tvsmotor.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/c/c2/TVS_Motor_Company_logo.svg",
+    "https://logo.clearbit.com/tvsmotor.com",
+    "https://www.google.com/s2/favicons?domain=tvsmotor.com&sz=128",
+  ],
+  "salesforce.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg",
+    "https://logo.clearbit.com/salesforce.com",
+    "https://www.google.com/s2/favicons?domain=salesforce.com&sz=128",
+  ],
+  "infosys.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
+    "https://logo.clearbit.com/infosys.com",
+    "https://www.google.com/s2/favicons?domain=infosys.com&sz=128",
+  ],
+  "fiverr.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/1/18/Fiverr_Logo_09.2020.svg",
+    "https://logo.clearbit.com/fiverr.com",
+    "https://www.google.com/s2/favicons?domain=fiverr.com&sz=128",
+  ],
+  "google.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg",
+    "https://logo.clearbit.com/google.com",
+    "https://www.google.com/s2/favicons?domain=google.com&sz=128",
+  ],
+  "zoom.us": [
+    "https://upload.wikimedia.org/wikipedia/commons/7/7b/Zoom_Communications_Logo.svg",
+    "https://logo.clearbit.com/zoom.us",
+    "https://www.google.com/s2/favicons?domain=zoom.us&sz=128",
+  ],
+  "tcs.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg",
+    "https://logo.clearbit.com/tcs.com",
+    "https://www.google.com/s2/favicons?domain=tcs.com&sz=128",
+  ],
+  "tata.com": [
+    "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg",
+    "https://logo.clearbit.com/tata.com",
+    "https://www.google.com/s2/favicons?domain=tata.com&sz=128",
+  ],
 };
 
 function getBrandMonogram(name: string): string {
@@ -167,22 +189,10 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
     return null;
   }, [cleanName]);
 
-  const companySlug = useMemo(() => {
-    if (!cleanName) return null;
-    const clean = cleanName.toLowerCase();
-    for (const key of Object.keys(COMPANY_LOGO_DOMAINS)) {
-      if (clean.includes(key)) return key;
-    }
-    return null;
-  }, [cleanName]);
-
   const sources = useMemo(() => {
     const list: string[] = [];
-    if (companySlug) {
-      list.push(`/logos/companies/${companySlug}.svg`);
-    }
-    if (domain && COMPANY_LOCAL_LOGOS[domain]) {
-      list.push(`/logos/companies/${COMPANY_LOCAL_LOGOS[domain]}.svg`);
+    if (domain && COMPANY_INTERNET_LOGOS[domain]) {
+      list.push(...COMPANY_INTERNET_LOGOS[domain]);
     }
     if (domain) {
       list.push(`https://logo.clearbit.com/${domain}`);
@@ -190,7 +200,7 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
       list.push(`https://unavatar.io/${domain}`);
     }
     return Array.from(new Set(list));
-  }, [companySlug, domain]);
+  }, [domain]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
