@@ -5,21 +5,17 @@
 
 export const CHART_COLOURS = [
   "#3B82F6", // 1. Electric Blue
-  "#10B981", // 2. Emerald Green
+  "#10B981", // 2. Emerald Green (ONLY green in the palette)
   "#F59E0B", // 3. Amber Gold
   "#EF4444", // 4. Crimson Red
-  "#8B5CF6", // 5. Vivid Violet
-  "#06B6D4", // 6. Cyan Teal
+  "#8B5CF6", // 5. Vivid Purple
+  "#06B6D4", // 6. Cyan Sky
   "#EC4899", // 7. Hot Pink
   "#F97316", // 8. Coral Orange
   "#6366F1", // 9. Deep Indigo
-  "#84CC16", // 10. Lime Green
-  "#14B8A6", // 11. Mint Teal
-  "#D946EF", // 12. Bright Magenta
-  "#FACC15", // 13. Bright Yellow
-  "#0284C7", // 14. Deep Sky Blue
-  "#FB7185", // 15. Salmon Pink
-  "#A855F7", // 16. Bright Purple
+  "#D946EF", // 10. Bright Magenta
+  "#FACC15", // 11. Bright Yellow
+  "#94A3B8", // 12. Slate Silver
 ] as const;
 
 export const CHART_SERIES_COLOURS = {
@@ -37,13 +33,13 @@ const CATEGORY_COLOURS = {
   Entertainment: "#8B5CF6", // Vivid Violet
   "Bills & Utilities": "#EF4444", // Bright Red
   Rent: "#F97316", // Coral Orange
-  Utilities: "#06B6D4", // Cyan Teal
+  Utilities: "#06B6D4", // Cyan Sky
   Healthcare: "#10B981", // Emerald Green
   Education: "#6366F1", // Deep Indigo
   Travel: "#D946EF", // Bright Magenta
-  Groceries: "#84CC16", // Lime Green
+  Groceries: "#FACC15", // Bright Yellow
   "Personal Care": "#FB7185", // Salmon Pink
-  Investment: "#14B8A6", // Mint Teal
+  Investment: "#7C3AED", // Violet
   Subscription: "#E11D48", // Crimson
   Salary: "#10B981", // Emerald
   Freelance: "#06B6D4", // Cyan

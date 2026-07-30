@@ -686,9 +686,17 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                           <label className="text-xs font-bold text-[#848E9C] uppercase tracking-wide">Channeling Account</label>
                           <select className="w-full bg-[#0A0F1D] border border-[#1F293D] rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#00D09C]" value={formData.account_id} onChange={e => setFormData({...formData, account_id: e.target.value})}>
                             <option value="" disabled>Select Account</option>
-                            {accounts.map(acc => (
-                              <option key={acc.id} value={acc.id}>{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                            ))}
+                            {accounts.map(acc => {
+                              const symbol = acc.currency === "USD" ? "$" : "₹";
+                              const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                                ? `${acc.bank_name} (${acc.name})`
+                                : acc.name;
+                              return (
+                                <option key={acc.id} value={acc.id}>
+                                  {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
                       )}

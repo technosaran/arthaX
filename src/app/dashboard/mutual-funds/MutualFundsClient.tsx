@@ -720,9 +720,17 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                       onChange={e => setFormData({...formData, account_id: e.target.value})}
                     >
                       <option value="" disabled className="bg-[#181A20] text-white font-medium">Select Account</option>
-                      {accounts.map(acc => (
-                        <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                      ))}
+                      {accounts.map(acc => {
+                        const symbol = acc.currency === "USD" ? "$" : "₹";
+                        const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                          ? `${acc.bank_name} (${acc.name})`
+                          : acc.name;
+                        return (
+                          <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">
+                            {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>

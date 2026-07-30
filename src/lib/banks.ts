@@ -90,6 +90,7 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   "bank of india": "bankofindia.co.in",
   indianbank: "indianbank.in",
   "indian bank": "indianbank.in",
+  indian: "indianbank.in",
   cbi: "centralbankofindia.co.in",
   "central bank": "centralbankofindia.co.in",
   "central bank of india": "centralbankofindia.co.in",
@@ -287,12 +288,11 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Dedicated Bank Logo APIs (prioritizing high-resolution 128px sources over 16px favicons)
+  // Dedicated Bank Logo APIs (Google 128px favicon CDN -> unavatar -> faviconkit -> duckduckgo)
   return [
-    `https://logo.clearbit.com/${domain}`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    `https://api.faviconkit.com/${domain}/128`,
     `https://unavatar.io/${domain}`,
+    `https://api.faviconkit.com/${domain}/128`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
   ];
 }

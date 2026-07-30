@@ -19,6 +19,13 @@ export default function IntegrationsTab({
   const [geminiKeyInput, setGeminiKeyInput] = useState((profile as any)?.gemini_api_key || "");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingGemini, setIsSavingGemini] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+
+  const handleDisconnectTelegram = async () => {
+    const res = await updateSettings({ telegram_chat_id: null });
+    if (res.error) toast.error(res.error);
+    else { toast.success("Telegram disconnected."); setShowDisconnectModal(false); mutate(); }
+  };
 
   const telegramActive = !!profile?.telegram_chat_id;
   const geminiEnabled = (profile as any)?.gemini_enabled !== false;
@@ -276,12 +283,7 @@ export default function IntegrationsTab({
             {telegramActive ? (
               <button
                 type="button"
-                onClick={async () => {
-                  if (!confirm("Disconnect Telegram bot sync?")) return;
-                  const res = await updateSettings({ telegram_chat_id: null });
-                  if (res.error) toast.error(res.error);
-                  else { toast.success("Telegram disconnected."); mutate(); }
-                }}
+                onClick={() => setShowDisconnectModal(true)}
                 className="px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs font-bold text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer"
               >
                 Disconnect
@@ -302,6 +304,27 @@ export default function IntegrationsTab({
           </div>
         </div>
       </div>
+
+      {/* Disconnect Telegram Custom Modal */}
+      {showDisconnectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
+          <div className="glass-card rich-border p-6 rounded-2xl max-w-sm w-full space-y-4 animate-scale-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <span>⚠️</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Disconnect Telegram?</h3>
+                <p className="text-xs text-[--text-muted]">Are you sure you want to disconnect Telegram bot sync?</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setShowDisconnectModal(false)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={handleDisconnectTelegram} className="btn-danger flex-1">Disconnect</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

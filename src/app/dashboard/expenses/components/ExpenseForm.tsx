@@ -246,11 +246,17 @@ export default function ExpenseForm({
             aria-describedby={errors.account_id ? "err-account_id" : undefined}
           >
             <option value="" disabled className="bg-[#12141c] text-white">Select Account</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id} className="bg-[#12141c] text-white">
-                {acc.name} ({acc.currency === "USD" ? "$" : "₹"}{acc.balance.toLocaleString()})
-              </option>
-            ))}
+            {accounts.map((acc) => {
+              const bankName = (acc as any).bank_name;
+              const nameLabel = bankName && bankName.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                ? `${bankName} (${acc.name})`
+                : acc.name;
+              return (
+                <option key={acc.id} value={acc.id} className="bg-[#12141c] text-white">
+                  {nameLabel} — {acc.currency === "USD" ? "$" : "₹"}{acc.balance.toLocaleString()}
+                </option>
+              );
+            })}
           </select>
           <span id="err-account_id">{fieldError("account_id")}</span>
         </div>

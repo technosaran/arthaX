@@ -735,6 +735,14 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                 cash: "245, 158, 11"
               }[a.type] || "148, 163, 184";
               
+              const hasDistinctBankName = Boolean(
+                a.bank_name && 
+                a.bank_name.trim() && 
+                a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+              );
+              const cardTitle = isCashReserve ? a.name : (hasDistinctBankName ? a.bank_name : a.name);
+              const cardSubtitle = (!isCashReserve && hasDistinctBankName) ? a.name : null;
+              
               return (
                 <div 
                   key={a.id} 
@@ -752,15 +760,15 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                        </span>
                        <div className="flex items-center gap-3 mt-4">
                          <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-14 h-14" />
-                         {a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase() && (
-                            <span className="text-base font-bold text-[--text-secondary]">{a.bank_name}</span>
-                         )}
                        </div>
                      </div>
                      <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
                   </div>
                   <div className="mt-auto">
-                    <h3 className="text-lg font-bold truncate">{a.name}</h3>
+                    <h3 className="text-lg font-bold truncate">{cardTitle}</h3>
+                    {cardSubtitle && (
+                      <p className="text-xs font-semibold text-[--text-muted] truncate mt-0.5">{cardSubtitle}</p>
+                    )}
                     <p className="text-2xl font-black mt-1" style={{ color: style.color }}>{getCurrencySymbol(a.currency)} {a.balance.toLocaleString()}</p>
                     <div className="flex gap-2 mt-6">
                       <button type="button" onClick={() => { setAdjustingAccountId(a.id); setAdjustData({ amount: "", note: "", type: "add" }); setShowAdjustModal(true); }} className="flex-1 h-11 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2" style={{ background: style.iconBg, color: style.color, border: `1px solid ${style.badgeBorder}` }}>
@@ -1194,14 +1202,35 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SOURCE ACCOUNT</label>
               <select aria-label="Select source account" id="transfer-source" name="from_account" required value={transferFromId || ""} onChange={e => setTransferFromId(e.target.value)} className="input-premium !h-11 text-xs font-semibold">
                 <option value="" className="bg-[#151922] text-white font-medium">Select source</option>
-                {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
+                {accounts.map(a => {
+                  const symbol = getCurrencySymbol(a.currency);
+                  const nameLabel = a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+                    ? `${a.bank_name} (${a.name})`
+                    : a.name;
+                  return (
+                    <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">
+                      {nameLabel} — {symbol}{a.balance.toLocaleString()}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">DESTINATION ACCOUNT</label>
               <select aria-label="Select destination account" id="transfer-destination" name="to_account" required value={transferData.to_account_id} onChange={e => setTransferData({...transferData, to_account_id: e.target.value})} className="input-premium !h-11 text-xs font-semibold">
                 <option value="" className="bg-[#151922] text-white font-medium">Select target</option>
-                {accounts.map(a => a.id !== transferFromId && <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">{a.name} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})</option>)}
+                {accounts.map(a => {
+                  if (a.id === transferFromId) return null;
+                  const symbol = getCurrencySymbol(a.currency);
+                  const nameLabel = a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+                    ? `${a.bank_name} (${a.name})`
+                    : a.name;
+                  return (
+                    <option key={a.id} value={a.id} className="bg-[#151922] text-white font-medium">
+                      {nameLabel} — {symbol}{a.balance.toLocaleString()}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

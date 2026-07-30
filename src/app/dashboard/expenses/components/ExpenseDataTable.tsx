@@ -43,8 +43,6 @@ interface ExpenseDataTableProps {
   onAdd: () => void;
   categories: { label: string; icon: string; color: string }[];
 }
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
-
 const columnHelper = createColumnHelper<Expense>();
 
 export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit, onAdd, categories }: ExpenseDataTableProps) {
@@ -168,14 +166,6 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => onDelete(info.row.original.id)}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-rose-400 hover:bg-rose-500/10 transition-all"
-              title="Delete Transaction"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
           </div>
         ),
       }),
@@ -214,23 +204,6 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="input-premium pl-9 py-2 text-sm w-full !bg-black/20"
           />
-        </div>
-
-        {/* #8 — page size selector */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-[--text-muted]">Rows</span>
-          <div className="flex gap-1 rounded-xl bg-white/5 border border-white/10 p-0.5">
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPageSize(n)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${pageSize === n ? "bg-[--accent-primary] text-white" : "text-[--text-muted] hover:text-white"}`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -325,12 +298,6 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
                         Edit
                       </button>
                     )}
-                    <button type="button"
-                      onClick={() => onDelete(exp.id)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-[--text-secondary] active:bg-danger/10 active:text-danger"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
               </div>

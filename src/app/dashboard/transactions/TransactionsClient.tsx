@@ -467,13 +467,13 @@ export default function TransactionsClient() {
                 <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Category</th>
                 <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Channel</th>
                 <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Value</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Action</th>
+                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {paginatedTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[--text-muted] text-sm italic">
+                  <td colSpan={5} className="px-5 py-12 text-center text-[--text-muted] text-sm italic">
                     No transactions match your filters.
                   </td>
                 </tr>
@@ -524,16 +524,6 @@ export default function TransactionsClient() {
                           {isIncome ? "+" : "-"}{currency === "USD" ? "$" : "₹"}
                           {Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-middle text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(t.source_id || t.id, t.type as any)}
-                          className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-rose-400 hover:bg-rose-500/10 transition-all ml-auto flex items-center justify-center cursor-pointer opacity-80 group-hover:opacity-100"
-                          title="Delete Transaction"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </td>
                     </tr>
                   );
@@ -720,7 +710,17 @@ export default function TransactionsClient() {
                     aria-label="Select associated transaction account"
                   >
                     <option value="" disabled>Select Account</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                    {accounts.map(acc => {
+                      const symbol = acc.currency === "USD" ? "$" : "₹";
+                      const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                        ? `${acc.bank_name} (${acc.name})`
+                        : acc.name;
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>

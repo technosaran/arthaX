@@ -72,6 +72,7 @@ const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   paytm: "paytm.com",
   phonepe: "phonepe.com",
   fiver: "fiverr.com",
+  mrf: "mrftyres.com",
 };
 
 function getBrandMonogram(name: string): string {
@@ -139,10 +140,9 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
   const sources = useMemo(() => {
     if (!domain) return [];
     return [
-      `https://logo.clearbit.com/${domain}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       `https://unavatar.io/${domain}`,
       `https://api.faviconkit.com/${domain}/128`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     ];
   }, [domain]);
@@ -679,13 +679,12 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Segment</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] hidden sm:table-cell">Destination</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Credit</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {filteredIncomes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">No income transactions logged for this period.</td>
+                    <td colSpan={5} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">No income transactions logged for this period.</td>
                   </tr>
                 ) : (
                   filteredIncomes.map((inc) => {
@@ -727,17 +726,6 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap text-right">
                           <p className="text-xs md:text-sm font-black text-success">+{getAccountCurrency(inc.account_id) === 'USD' ? '$' : '₹'}{Number(inc.amount).toLocaleString()}</p>
-                        </td>
-                        <td className="px-4 md:px-6 py-3 whitespace-nowrap text-right">
-                          <button type="button" 
-                            onClick={() => handleDeleteIncome(inc.id)} 
-                            className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[--text-muted] hover:text-rose-400 hover:bg-rose-500/10 transition-all ml-auto flex items-center justify-center"
-                            title="Delete Transaction"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
                         </td>
                       </tr>
                     );
@@ -789,12 +777,6 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                       <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
-                    <button type="button" 
-                      onClick={() => handleDeleteIncome(inc.id)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[0.5625rem] font-bold text-[--text-secondary] active:bg-danger/10 active:text-danger"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
               );
@@ -921,7 +903,17 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                 <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Account</label>
                 <select className="input-premium py-2 text-xs" value={formData.account_id} onChange={e => setFormData({...formData, account_id: e.target.value})} aria-label="Select deposit account" id="income-account" name="account_id">
                   <option value="" disabled className="bg-[--bg-surface]">Select Deposit Account</option>
-                  {accounts.map(acc => <option key={acc.id} value={acc.id} className="bg-[--bg-surface]">{acc.name}</option>)}
+                  {accounts.map(acc => {
+                    const symbol = acc.currency === "USD" ? "$" : "₹";
+                    const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                      ? `${acc.bank_name} (${acc.name})`
+                      : acc.name;
+                    return (
+                      <option key={acc.id} value={acc.id} className="bg-[--bg-surface]">
+                        {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>

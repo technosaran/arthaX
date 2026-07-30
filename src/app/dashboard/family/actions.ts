@@ -11,7 +11,7 @@ type RpcResult = {
 
 /* ── Family Members (family_members table) ── */
 
-export async function addFamilyMember(data: { name: string; relationship: string }) {
+export async function addFamilyMember(data: { name: string; relationship: string; avatar_url?: string | null }) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -24,21 +24,32 @@ export async function addFamilyMember(data: { name: string; relationship: string
       return { error: "Relationship is required" };
     }
 
-    const { data: insertData, error } = await supabase.from("family_members").insert({
+    let insertRes = await supabase.from("family_members").insert({
       user_id: user.id,
       name: data.name.trim(),
       relationship: data.relationship.trim(),
+      avatar_url: data.avatar_url?.trim() || null,
       balance: 0,
     }).select("id").single();
 
-    if (error) return { error: getFriendlyErrorMessage(error) };
+    if (insertRes.error && insertRes.error.message?.includes("avatar_url")) {
+      // Fallback if avatar_url column is not yet present in Supabase table
+      insertRes = await supabase.from("family_members").insert({
+        user_id: user.id,
+        name: data.name.trim(),
+        relationship: data.relationship.trim(),
+        balance: 0,
+      }).select("id").single();
+    }
+
+    if (insertRes.error) return { error: getFriendlyErrorMessage(insertRes.error) };
 
     await logLedgerEntry(supabase, {
       user_id: user.id,
       action_type: "FAMILY_MEMBER_ADD",
       details: `Added family member: ${data.name.trim()} (${data.relationship.trim()})`,
       source_type: "family_member",
-      source_id: insertData?.id || null,
+      source_id: insertRes.data?.id || null,
       metadata: data
     });
 
@@ -51,7 +62,7 @@ export async function addFamilyMember(data: { name: string; relationship: string
   }
 }
 
-export async function updateFamilyMember(id: string, data: { name: string; relationship: string }) {
+export async function updateFamilyMember(id: string, data: { name: string; relationship: string; avatar_url?: string | null }) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -65,16 +76,29 @@ export async function updateFamilyMember(id: string, data: { name: string; relat
       return { error: "Relationship is required" };
     }
 
-    const { error } = await supabase
+    let updateRes = await supabase
       .from("family_members")
       .update({
         name: data.name.trim(),
         relationship: data.relationship.trim(),
+        avatar_url: data.avatar_url?.trim() || null,
       })
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (error) return { error: getFriendlyErrorMessage(error) };
+    if (updateRes.error && updateRes.error.message?.includes("avatar_url")) {
+      // Fallback if avatar_url column is not yet present in Supabase table
+      updateRes = await supabase
+        .from("family_members")
+        .update({
+          name: data.name.trim(),
+          relationship: data.relationship.trim(),
+        })
+        .eq("id", id)
+        .eq("user_id", user.id);
+    }
+
+    if (updateRes.error) return { error: getFriendlyErrorMessage(updateRes.error) };
 
     await logLedgerEntry(supabase, {
       user_id: user.id,
