@@ -98,13 +98,13 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain filter drop-shadow-md rounded-xl"
+        className="w-full h-full object-contain"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -751,8 +751,10 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                          {isCashReserve ? "In-built Cash Reserve" : a.type}
                        </span>
                        <div className="flex items-center gap-3 mt-4">
-                         <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-16 h-16" />
-                         <span className="text-base font-bold text-[--text-secondary]">{a.bank_name || a.name}</span>
+                         <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-14 h-14" />
+                         {a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase() && (
+                            <span className="text-base font-bold text-[--text-secondary]">{a.bank_name}</span>
+                         )}
                        </div>
                      </div>
                      <button type="button" onClick={() => startEdit(a)} className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>

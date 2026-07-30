@@ -56,6 +56,15 @@ export function useNetWorth() {
       return { inr, usd };
     };
 
+    // For investment categories, USD allocation only sums actual USD investments
+    const getInvestmentValues = (val: number, currency?: string) => {
+      const amount = Number(val || 0);
+      const isUSD = currency === "USD";
+      const inr = isUSD ? amount * USD_EXCHANGE_RATE : amount;
+      const usd = isUSD ? amount : 0;
+      return { inr, usd };
+    };
+
     // Accounts / Cash
     let cashBalanceINR = 0;
     let cashBalanceUSD = 0;
@@ -82,7 +91,7 @@ export function useNetWorth() {
     if (hasStocks) {
       investments.forEach(inv => {
         const val = Number(inv.quantity || 0) * Number(inv.current_price || 0);
-        const { inr, usd } = getConvertedValues(val, inv.currency);
+        const { inr, usd } = getInvestmentValues(val, inv.currency);
 
         if (isCryptoAsset(inv)) {
           cryptoBalanceINR += inr;
@@ -111,7 +120,7 @@ export function useNetWorth() {
     if (hasMF) {
       mutualFunds.forEach(mf => {
         const val = Number(mf.units || 0) * Number(mf.current_nav || 0);
-        const { inr, usd } = getConvertedValues(val, (mf as any).currency);
+        const { inr, usd } = getInvestmentValues(val, (mf as any).currency);
         mfBalanceINR += inr;
         mfBalanceUSD += usd;
       });
@@ -122,7 +131,7 @@ export function useNetWorth() {
     let bondBalanceUSD = 0;
     if (hasBonds) {
       (bonds || []).filter(b => b.status === "Active").forEach(b => {
-        const { inr, usd } = getConvertedValues(b.current_value, (b as any).currency);
+        const { inr, usd } = getInvestmentValues(b.current_value, (b as any).currency);
         bondBalanceINR += inr;
         bondBalanceUSD += usd;
       });
@@ -133,7 +142,7 @@ export function useNetWorth() {
     let altBalanceUSD = 0;
     if (hasAlt) {
       (alternativeAssets || []).forEach(asset => {
-        const { inr, usd } = getConvertedValues(asset.current_value, (asset as any).currency);
+        const { inr, usd } = getInvestmentValues(asset.current_value, (asset as any).currency);
         altBalanceINR += inr;
         altBalanceUSD += usd;
       });

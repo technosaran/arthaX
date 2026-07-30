@@ -3,67 +3,6 @@
 import { useMemo, useState, memo } from "react";
 import { getBankLogoSources } from "@/lib/banks";
 
-const DIRECT_MERCHANT_LOGOS: Record<string, string[]> = {
-  amazon: [
-    "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
-    "https://logo.clearbit.com/amazon.com",
-    "https://www.google.com/s2/favicons?domain=amazon.com&sz=128",
-  ],
-  kfc: [
-    "https://upload.wikimedia.org/wikipedia/commons/b/bf/KFC_logo.svg",
-    "https://logo.clearbit.com/kfc.com",
-    "https://www.google.com/s2/favicons?domain=kfc.com&sz=128",
-  ],
-  otto: [
-    "https://upload.wikimedia.org/wikipedia/commons/f/fe/Otto-group-logo.svg",
-    "https://logo.clearbit.com/otto.de",
-    "https://www.google.com/s2/favicons?domain=otto.de&sz=128",
-  ],
-  raymond: [
-    "https://logo.clearbit.com/raymond.in",
-    "https://www.google.com/s2/favicons?domain=raymond.in&sz=128",
-  ],
-  swiggy: [
-    "https://upload.wikimedia.org/wikipedia/commons/1/13/Swiggy_logo.svg",
-    "https://logo.clearbit.com/swiggy.in",
-  ],
-  zomato: [
-    "https://upload.wikimedia.org/wikipedia/commons/7/75/Zomato_logo.png",
-    "https://logo.clearbit.com/zomato.com",
-  ],
-  flipkart: [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7a/Flipkart_logo.svg",
-    "https://logo.clearbit.com/flipkart.com",
-  ],
-  myntra: [
-    "https://logo.clearbit.com/myntra.com",
-  ],
-  uber: [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.svg",
-    "https://logo.clearbit.com/uber.com",
-  ],
-  spotify: [
-    "https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg",
-    "https://logo.clearbit.com/spotify.com",
-  ],
-  netflix: [
-    "https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_N_logo.svg",
-    "https://logo.clearbit.com/netflix.com",
-  ],
-  google: [
-    "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg",
-    "https://logo.clearbit.com/google.com",
-  ],
-  apple: [
-    "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
-    "https://logo.clearbit.com/apple.com",
-  ],
-  samsung: [
-    "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg",
-    "https://logo.clearbit.com/samsung.com",
-  ],
-};
-
 const GENERIC_NON_MERCHANT_WORDS = new Set([
   "home", "rent", "dress", "clothes", "clothing", "food", "dinner", "lunch", "breakfast",
   "tea", "coffee", "milk", "groceries", "grocery", "vegetables", "fruits",
@@ -220,53 +159,69 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     return query.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
   }, [query]);
 
-  const logoUrl = useMemo(() => {
-    if (!cleanQuery) return null;
+  const sources = useMemo(() => {
+    if (!cleanQuery) return [];
     const clean = cleanQuery.toLowerCase().trim();
 
-    const firstWord = clean
-      .replace(/^(dividend|salary|expense|purchase|paid to|payment to|ref):\s*/i, "")
-      .replace(/\b(ltd|limited|corp|inc|co|serv|services|fund|direct|regular|plan|growth|option|mutual)\b/gi, "")
-      .replace(/\([^)]*\)/g, "")
-      .trim()
-      .split(/\s+/)[0]
-      .replace(/[^a-z0-9]/g, "");
-
-    // 1. Direct merchant logo
-    if (DIRECT_MERCHANT_LOGOS[firstWord]) {
-      return DIRECT_MERCHANT_LOGOS[firstWord][0];
+    // 1. Check if query is a bank -> use separate bank API chain
+    const bankSources = getBankLogoSources(cleanQuery);
+    if (bankSources.length > 0) {
+      return bankSources;
     }
 
-    // 2. Known domain mapping -> Clearbit Logo API
+    // 2. Resolve domain for general brand
+    let domain: string | null = null;
     for (const [key, dom] of Object.entries(KNOWN_DOMAINS)) {
       if (clean.includes(key)) {
-        return `https://logo.clearbit.com/${dom}`;
+        domain = dom;
+        break;
       }
     }
 
-    // 3. Bank logo -> Clearbit Logo API or Wikimedia
-    const bankSources = getBankLogoSources(cleanQuery);
-    if (bankSources.length > 0) {
-      return bankSources[0];
+    if (!domain) {
+      const domainMatch = clean.match(/\b([a-z0-9\-]+\.(?:com|in|co|org|io|dev|ai|app|net|tech|money|club|de))\b/i);
+      if (domainMatch) {
+        domain = domainMatch[1].toLowerCase();
+      }
     }
 
-    // 4. Domain fallback for clean merchant words -> Clearbit Logo API
-    if (firstWord.length >= 3 && !GENERIC_NON_MERCHANT_WORDS.has(firstWord)) {
-      return `https://logo.clearbit.com/${firstWord}.com`;
+    if (!domain) {
+      const firstWord = clean
+        .replace(/^(dividend|salary|expense|purchase|paid to|payment to|ref):\s*/i, "")
+        .replace(/\b(ltd|limited|corp|inc|co|serv|services|fund|direct|regular|plan|growth|option|mutual)\b/gi, "")
+        .replace(/\([^)]*\)/g, "")
+        .trim()
+        .split(/\s+/)[0]
+        .replace(/[^a-z0-9]/g, "");
+
+      if (firstWord.length >= 3 && !GENERIC_NON_MERCHANT_WORDS.has(firstWord)) {
+        domain = `${firstWord}.com`;
+      }
     }
 
-    return null;
+    if (!domain) return [];
+
+    // General Brand Logo API sequence (separate from Bank logo APIs)
+    return [
+      `https://logo.clearbit.com/${domain}`,
+      `https://unavatar.io/${domain}`,
+      `https://api.faviconkit.com/${domain}/128`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    ];
   }, [cleanQuery]);
 
-  const [hasError, setHasError] = useState(false);
+  const [srcIndex, setSrcIndex] = useState(0);
 
   const [prevQuery, setPrevQuery] = useState(cleanQuery);
   if (prevQuery !== cleanQuery) {
     setPrevQuery(cleanQuery);
-    setHasError(false);
+    setSrcIndex(0);
   }
 
-  if (!logoUrl || hasError) {
+  const currentSrc = sources[srcIndex];
+
+  if (!currentSrc || srcIndex >= sources.length) {
     const cleanLower = (cleanQuery || "").toLowerCase();
     let categoryIcon: string | null = null;
     for (const [key, icon] of Object.entries(GENERIC_CATEGORY_ICONS)) {
@@ -302,15 +257,16 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        key={logoUrl}
-        src={logoUrl}
+        key={currentSrc}
+        src={currentSrc}
         alt={cleanQuery || "Logo"}
         className="w-full h-full object-contain"
         loading="lazy"
-        onError={() => setHasError(true)}
+        onError={() => setSrcIndex((prev) => prev + 1)}
       />
     </div>
   );
 });
 BrandLogo.displayName = "BrandLogo";
+
 
