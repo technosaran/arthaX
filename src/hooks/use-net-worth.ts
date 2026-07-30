@@ -181,10 +181,55 @@ export function useNetWorth() {
     const liquidBalance = isUSD ? liquidBalanceUSD : liquidBalanceINR;
     const totalAssets = isUSD ? totalAssetsUSD : totalAssetsINR;
 
+    // Calculate total all-time unrealized investment growth
+    let totalInvestedINR = 0;
+    let totalInvestedUSD = 0;
+    let totalGrowthINR = 0;
+    let totalGrowthUSD = 0;
+
+    investments.forEach(inv => {
+      const buyPrice = Number(inv.buy_price || 0);
+      const currPrice = Number(inv.current_price || 0);
+      const qty = Number(inv.quantity || 0);
+      const cost = qty * buyPrice;
+      const currentVal = qty * currPrice;
+      const gain = currentVal - cost;
+
+      const { inr: costINR, usd: costUSD } = getInvestmentValues(cost, inv.currency);
+      const { inr: gainINR, usd: gainUSD } = getInvestmentValues(gain, inv.currency);
+      totalInvestedINR += costINR;
+      totalInvestedUSD += costUSD;
+      totalGrowthINR += gainINR;
+      totalGrowthUSD += gainUSD;
+    });
+
+    mutualFunds.forEach(mf => {
+      const avgNav = Number(mf.avg_nav || 0);
+      const currNav = Number(mf.current_nav || 0);
+      const units = Number(mf.units || 0);
+      const cost = units * avgNav;
+      const currentVal = units * currNav;
+      const gain = currentVal - cost;
+
+      const { inr: costINR, usd: costUSD } = getInvestmentValues(cost, (mf as any).currency);
+      const { inr: gainINR, usd: gainUSD } = getInvestmentValues(gain, (mf as any).currency);
+      totalInvestedINR += costINR;
+      totalInvestedUSD += costUSD;
+      totalGrowthINR += gainINR;
+      totalGrowthUSD += gainUSD;
+    });
+
+    const totalGrowthPercent = totalInvestedINR > 0 ? (totalGrowthINR / totalInvestedINR) * 100 : 0;
+    const totalGrowth = isUSD ? totalGrowthUSD : totalGrowthINR;
+
     return {
       netWorth,
       netWorthINR,
       netWorthUSD,
+      totalGrowth,
+      totalGrowthINR,
+      totalGrowthUSD,
+      totalGrowthPercent,
       cashBalance,
       cashBalanceINR,
       cashBalanceUSD,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { Drawer } from "@/components/ui/drawer";
 
@@ -63,7 +64,7 @@ export default function ReportDownloadButton() {
 
   const handleExport = () => {
     if (selectedModules.size === 0) {
-      alert("Please select at least one particular or section to export.");
+      toast.error("Please select at least one section to export.");
       return;
     }
 

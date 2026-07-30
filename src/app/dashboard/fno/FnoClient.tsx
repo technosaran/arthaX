@@ -10,6 +10,7 @@ import { logFnoTrade, closeFnoTrade, deleteFnoTrade } from "./actions";
 import { useFinanceData, type FinanceData, type FnoTrade } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
+import { Trash2 } from "lucide-react";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
 
@@ -270,13 +271,20 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
     });
   }
 
-  async function handleDeleteTrade(id: string) {
-    if (!confirm("Are you sure you want to delete this trade log? Reverting this log will restore linked bank/broker accounts to their pre-trade balances.")) return;
+  const [deletingFnoTradeId, setDeletingFnoTradeId] = useState<string | null>(null);
+
+  function handleDeleteTrade(id: string) {
+    setDeletingFnoTradeId(id);
+  }
+
+  async function confirmDeleteFnoTrade() {
+    if (!deletingFnoTradeId) return;
     await withLock(async () => {
       try {
-        const res = await deleteFnoTrade(id);
+        const res = await deleteFnoTrade(deletingFnoTradeId);
         if (!res.error) {
           toast.success("F&O trade deleted successfully");
+          setDeletingFnoTradeId(null);
           mutate();
         } else toast.error(res.error);
       } catch (err) {
@@ -622,9 +630,17 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Select Account</label>
                     <select required className="input-premium font-semibold" value={logFormData.account_id} onChange={e => setLogFormData({...logFormData, account_id: e.target.value})}>
                       <option value="" disabled>Select Margin Account</option>
-                      {accounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                      ))}
+                      {accounts.map(acc => {
+                        const symbol = acc.currency === "USD" ? "$" : "₹";
+                        const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                          ? `${acc.bank_name} (${acc.name})`
+                          : acc.name;
+                        return (
+                          <option key={acc.id} value={acc.id}>
+                            {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -980,6 +996,29 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </Drawer>
+      )}
+
+      {/* Delete FNO Trade Custom Modal */}
+      {deletingFnoTradeId && (
+        <Drawer isOpen={!!deletingFnoTradeId} onClose={() => setDeletingFnoTradeId(null)} title="Delete F&O Trade?" variant="center">
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Delete F&O Trade Log</h3>
+                <p className="text-xs text-[--text-muted]">Are you sure you want to delete this trade log? Reverting will restore linked broker accounts to their pre-trade balances.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setDeletingFnoTradeId(null)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={confirmDeleteFnoTrade} className="btn-danger flex-1" disabled={submitting}>
+                {submitting ? "Deleting..." : "Delete Trade"}
+              </button>
             </div>
           </div>
         </Drawer>

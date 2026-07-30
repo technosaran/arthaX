@@ -55,6 +55,9 @@ export type DashboardStats = {
   totalDayPnLINR: number;
   totalDayPnLUSD: number;
   totalDayPnLPercent: number;
+  totalGrowthINR?: number;
+  totalGrowthUSD?: number;
+  totalGrowthPercent?: number;
   monthlySpend: number;
   monthlyIncome: number;
   expenseTrend: TrendEntry[];
@@ -301,52 +304,18 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
           <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500 animate-pulse-glow" />
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
             <div className="relative z-10 w-full lg:w-auto">
-              <div className="flex flex-col select-none">
+              <div 
+                className="flex flex-col select-none cursor-pointer group/nw"
+                onClick={() => setShowUSD(prev => !prev)}
+                title="Click to toggle currency (INR / USD)"
+              >
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-[--text-muted]">
-                    Portfolio Net Worth
+                  <span className="text-xs font-black uppercase tracking-wider text-[--text-muted] group-hover/nw:text-white transition-colors flex items-center gap-1.5">
+                    Portfolio Net Worth ({showUSD ? 'USD' : 'INR'})
+                    <svg className="w-3 h-3 text-[--text-muted] opacity-50 group-hover/nw:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
                   </span>
-
-                  {/* Interactive Currency Switcher Pill */}
-                  <div className="flex items-center rounded-full bg-white/[0.04] border border-white/10 p-0.5 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setShowUSD(false)}
-                      className={`px-3 py-0.5 rounded-full text-[0.65rem] font-black transition-all cursor-pointer ${
-                        !showUSD ? "bg-[--accent-primary] text-white shadow-[0_0_14px_rgba(14,165,233,0.5)] border border-sky-400/30" : "text-[--text-muted] hover:text-white"
-                      }`}
-                    >
-                      ₹ INR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowUSD(true)}
-                      className={`px-3 py-0.5 rounded-full text-[0.65rem] font-black transition-all cursor-pointer ${
-                        showUSD ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)] border border-indigo-400/30" : "text-[--text-muted] hover:text-white"
-                      }`}
-                    >
-                      $ USD
-                    </button>
-                  </div>
-
-                  {/* Solvency / Health Status Badge */}
-                  {(() => {
-                    const assets = showUSD ? stats.totalAssetsUSD : stats.totalAssetsINR;
-                    const debt = showUSD ? stats.debtBalanceUSD : stats.debtBalanceINR;
-                    if (debt === 0) {
-                      return (
-                        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[0.6875rem] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]">
-                          🛡️ 100% Debt-Free
-                        </span>
-                      );
-                    }
-                    const solvencyRatio = assets > 0 ? (((assets - debt) / assets) * 100).toFixed(1) : "0";
-                    return (
-                      <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[0.6875rem] font-black bg-sky-500/10 text-sky-400 border border-sky-500/20 shadow-[0_0_12px_rgba(14,165,233,0.15)]">
-                        🛡️ {solvencyRatio}% Solvency Ratio
-                      </span>
-                    );
-                  })()}
 
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
                     stats.totalDayPnL >= 0 
@@ -433,46 +402,44 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     </span>
                   </div>
                 </motion.div>
+
+                {/* Total All-Time Growth Badge */}
                 <motion.div 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 bg-indigo-500/5 border border-indigo-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-indigo-500/10 cursor-default"
+                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all cursor-default ${
+                    (stats.totalGrowthINR || 0) >= 0 
+                      ? 'bg-purple-500/5 border-purple-500/10 hover:bg-purple-500/10' 
+                      : 'bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10'
+                  }`}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 text-base shadow-inner">💎</div>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-inner ${
+                    (stats.totalGrowthINR || 0) >= 0 ? 'bg-purple-500/10 text-purple-400' : 'bg-rose-500/10 text-rose-400'
+                  }`}>
+                    🏆
+                  </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-[--text-muted]">Financial Health</span>
-                    <span className="text-sm sm:text-base font-black text-indigo-300">
-                      {(showUSD ? stats.debtBalanceUSD > 0 : stats.debtBalanceINR > 0)
-                        ? `${(showUSD ? ((stats.netWorthUSD / stats.totalAssetsUSD) * 100) : ((stats.netWorthINR / stats.totalAssetsINR) * 100)).toFixed(0)}% Solvent`
-                        : '100% Debt-Free'}
+                    <span className="text-xs font-semibold text-[--text-muted]">Total Growth</span>
+                    <span className={`text-sm sm:text-base font-black ${(stats.totalGrowthINR || 0) >= 0 ? 'text-purple-400' : 'text-rose-400'}`}>
+                      {(stats.totalGrowthINR || 0) >= 0 ? "+" : "-"}
+                      {showUSD 
+                        ? `$${Math.abs(stats.totalGrowthUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
+                        : `₹${Math.abs(stats.totalGrowthINR || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                      }
+                      <span className="text-xs font-bold ml-1.5 opacity-80">
+                        ({(stats.totalGrowthPercent || 0) >= 0 ? "+" : ""}{(stats.totalGrowthPercent || 0).toFixed(2)}%)
+                      </span>
                     </span>
                   </div>
                 </motion.div>
-                {(showUSD ? stats.debtBalanceUSD > 0 : stats.debtBalanceINR > 0) && (
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center gap-3 bg-rose-500/5 border border-rose-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-rose-500/10 cursor-default"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 text-base shadow-inner">📉</div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-[--text-muted]">Outstanding debt</span>
-                      <span className="text-sm sm:text-base font-black text-rose-500">
-                        {showUSD
-                          ? `-$${stats.debtBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                          : `-₹${stats.debtBalanceINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                        }
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
+
               </div>
             </div>
 
-            <div className="flex-1 max-w-md w-full bg-white/[0.01] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
+            <div className="flex-1 max-w-md w-full">
               <div className="flex flex-col sm:flex-row items-center gap-6 h-full justify-between">
                 {portfolioData.length === 0 ? (
-                  <div className="w-full flex h-[200px] items-center justify-center italic text-[--text-muted] text-sm rounded-3xl">No portfolio data available.</div>
+                  <div className="w-full flex h-[200px] items-center justify-center italic text-[--text-muted] text-sm">No portfolio data available.</div>
                 ) : (
                   <>
                     <div className="flex-1 min-w-0 space-y-2.5 w-full">

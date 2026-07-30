@@ -9,6 +9,7 @@ import { addLiability, updateLiability, deleteLiability } from "./actions";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
+import { Trash2 } from "lucide-react";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from "@/components/ui/recharts";
@@ -224,12 +225,19 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
     });
   }
 
-  async function handleDeleteLiability(id: string) {
-    if (!confirm("Permanently purge this debt record?")) return;
+  const [deletingLiabilityId, setDeletingLiabilityId] = useState<string | null>(null);
+
+  function handleDeleteLiability(id: string) {
+    setDeletingLiabilityId(id);
+  }
+
+  async function confirmDeleteLiability() {
+    if (!deletingLiabilityId) return;
     await withLock(async () => {
-      const res = await deleteLiability(id);
+      const res = await deleteLiability(deletingLiabilityId);
       if (!res.error) {
         toast.success("Liability deleted successfully");
+        setDeletingLiabilityId(null);
         mutate();
       } else {
         toast.error(res.error);
@@ -289,19 +297,19 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
           <div className="glass-card-static p-6 border-white/5">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Weighted Interest</p>
             <p className="text-2xl md:text-3xl font-black text-white">{stats.weightedInterest.toFixed(2)}%</p>
-            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Max: {stats.highestInterest.toFixed(1)}% APR</p>
+            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Avg APR across debts (Max: {stats.highestInterest.toFixed(1)}%)</p>
           </div>
           <div className="glass-card-static p-6 border-white/5">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Paid</p>
             <p className="text-2xl md:text-3xl font-black text-white">₹{stats.totalPaid.toLocaleString()}</p>
-            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Cleared Debt</p>
+            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Cumulative Repayments</p>
           </div>
           <div className="glass-card-static p-6 border-white/5 bg-gradient-to-br from-rose-500/10 to-transparent">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Payoff Est</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Payoff Progress</p>
             <p className={`text-2xl md:text-3xl font-black text-white`}>
               {stats.payoffPct.toFixed(1)}%
             </p>
-            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Global Progress</p>
+            <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">% Of Principal Cleared</p>
           </div>
         </div>
 
@@ -586,9 +594,17 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
                   <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Destination Account (Optional)</label>
                   <select aria-label="Select account" id="liability-account" name="account_id" className="input-premium !h-10 text-xs text-white" value={formData.account_id} onChange={e => setFormData({...formData, account_id: e.target.value})}>
                     <option value="">No Transaction</option>
-                    {accounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                    ))}
+                    {accounts.map(acc => {
+                      const symbol = acc.currency === "USD" ? "$" : "₹";
+                      const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                        ? `${acc.bank_name} (${acc.name})`
+                        : acc.name;
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               ) : (
@@ -623,6 +639,29 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
               </button>
             </div>
           </form>
+        </Drawer>
+      )}
+
+      {/* Delete Liability Custom Modal */}
+      {deletingLiabilityId && (
+        <Drawer isOpen={!!deletingLiabilityId} onClose={() => setDeletingLiabilityId(null)} title="Delete Debt Record?" variant="center">
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Delete Debt Record</h3>
+                <p className="text-xs text-[--text-muted]">Are you sure you want to permanently purge this debt record?</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setDeletingLiabilityId(null)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={confirmDeleteLiability} className="btn-danger flex-1" disabled={submitting}>
+                {submitting ? "Deleting..." : "Delete Liability"}
+              </button>
+            </div>
+          </div>
         </Drawer>
       )}
     </div>

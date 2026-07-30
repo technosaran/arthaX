@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
+import { Trash2 } from "lucide-react";
 import { getColorByLabel } from "@/lib/chart-colours";
 import {
   createCryptoHolding,
@@ -216,14 +217,21 @@ export default function CryptoClient() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this crypto holding?")) return;
+  const [deletingCryptoId, setDeletingCryptoId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setDeletingCryptoId(id);
+  };
+
+  const confirmDeleteCrypto = async () => {
+    if (!deletingCryptoId) return;
     await withLock(async () => {
-      const res = await deleteCryptoHolding(id);
+      const res = await deleteCryptoHolding(deletingCryptoId);
       if (res.error) {
         toast.error(res.error);
       } else {
         toast.success("Holding deleted");
+        setDeletingCryptoId(null);
         mutate();
       }
     });
@@ -858,6 +866,29 @@ export default function CryptoClient() {
             </div>
           </Drawer>
         )}
+
+      {/* Delete Crypto Custom Modal */}
+      {deletingCryptoId && (
+        <Drawer isOpen={!!deletingCryptoId} onClose={() => setDeletingCryptoId(null)} title="Delete Crypto Holding?" variant="center">
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Delete Holding</h3>
+                <p className="text-xs text-[--text-muted]">Are you sure you want to delete this crypto holding?</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setDeletingCryptoId(null)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={confirmDeleteCrypto} className="btn-danger flex-1" disabled={submitting}>
+                {submitting ? "Deleting..." : "Delete Holding"}
+              </button>
+            </div>
+          </div>
+        </Drawer>
+      )}
       </div>
     </div>
   );

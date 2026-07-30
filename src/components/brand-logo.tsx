@@ -149,6 +149,20 @@ const KNOWN_DOMAINS: Record<string, string> = {
   tvsmotor: "tvsmotor.com",
   slice: "sliceit.com",
   onecard: "getonecard.app",
+  salesforce: "salesforce.com",
+  fiver: "fiverr.com",
+  fiverr: "fiverr.com",
+  mrf: "mrftyres.com",
+  zoom: "zoom.us",
+  slack: "slack.com",
+  github: "github.com",
+  gitlab: "gitlab.com",
+  notion: "notion.so",
+  figma: "figma.com",
+  atlassian: "atlassian.com",
+  jira: "atlassian.com",
+  linkedin: "linkedin.com",
+  twitter: "x.com",
 };
 
 export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: { name?: string | null; symbol?: string | null; className?: string; style?: React.CSSProperties }) => {
@@ -156,7 +170,10 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
   const cleanQuery = useMemo(() => {
     if (!query) return "";
-    return query.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+    let cleaned = query.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
+    cleaned = cleaned.replace(/^(income from|payout from|salary from|dividend:?|payment from|paid to|payment to|ref:?)\s*/i, "").trim();
+    cleaned = cleaned.replace(/\s*(income|salary|payout|dividend)$/i, "").trim();
+    return cleaned || query;
   }, [query]);
 
   const sources = useMemo(() => {
@@ -201,12 +218,11 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
     if (!domain) return [];
 
-    // General Brand Logo API sequence (separate from Bank logo APIs)
+    // General Brand Logo API sequence (Google 128px favicon CDN -> unavatar -> faviconkit -> duckduckgo)
     return [
-      `https://logo.clearbit.com/${domain}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       `https://unavatar.io/${domain}`,
       `https://api.faviconkit.com/${domain}/128`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     ];
   }, [cleanQuery]);

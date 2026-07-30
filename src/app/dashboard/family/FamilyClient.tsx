@@ -41,6 +41,7 @@ type Member = {
   name: string;
   relationship: string;
   balance: number | string;
+  avatar_url?: string | null;
   created_at: string;
   user_id: string;
 };
@@ -60,7 +61,8 @@ const RELATIONSHIPS = ["Parent", "Spouse", "Child", "Sibling", "Other"];
 const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 const supabase = createClient();
 
-function getMemberAvatar(name: string | null | undefined, relationship: string | null | undefined): string | null {
+function getMemberAvatar(name: string | null | undefined, relationship: string | null | undefined, avatarUrl?: string | null | undefined): string | null {
+  if (avatarUrl && avatarUrl.trim().length > 0) return avatarUrl.trim();
   if (!name || !relationship) return null;
   const rel = relationship.toLowerCase();
   const nm = name.toLowerCase();
@@ -207,7 +209,7 @@ export default function FamilyClient() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   /* ── Form state ── */
-  const [memberForm, setMemberForm] = useState({ name: "", relationship: "Other" });
+  const [memberForm, setMemberForm] = useState<{ name: string; relationship: string; avatar_url: string }>({ name: "", relationship: "Other", avatar_url: "" });
   const [transferForm, setTransferForm] = useState({ family_member_id: "", account_id: "", amount: "", note: "" });
 
   /* ── Auto-open from URL ── */
@@ -244,8 +246,14 @@ export default function FamilyClient() {
   }, [monthTransfers, historySearch, getMemberName]);
 
   const resetMemberForm = () => {
-    setMemberForm({ name: "", relationship: "Other" });
+    setMemberForm({ name: "", relationship: "Other", avatar_url: "" });
     setEditingMember(null);
+  };
+
+  const openEditMember = (m: Member) => {
+    setEditingMember(m);
+    setMemberForm({ name: m.name, relationship: m.relationship, avatar_url: m.avatar_url || "" });
+    setShowMemberModal(true);
   };
 
   const resetTransferForm = () => {
@@ -271,12 +279,16 @@ export default function FamilyClient() {
     });
   }
 
-  async function handleDeleteMember(id: string) {
-    if (!confirm("Delete this family member? This will also remove their transfer history.")) return;
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+  const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
+
+  async function confirmDeleteMember() {
+    if (!deletingMemberId) return;
     await withLock(async () => {
-      const res = await deleteFamilyMember(id);
+      const res = await deleteFamilyMember(deletingMemberId);
       if (res.error) { toast.error(res.error); return; }
       toast.success("Family member deleted successfully");
+      setDeletingMemberId(null);
       mutate();
       mutateFinance();
     });
@@ -300,15 +312,24 @@ export default function FamilyClient() {
     });
   }
 
-  async function handleDeleteTransfer(transferId: string) {
-    if (!confirm("Delete this transfer record?")) return;
+  function handleDeleteMember(id: string) {
+    setDeletingMemberId(id);
+  }
+
+  async function confirmDeleteTransfer() {
+    if (!deletingTransferId) return;
     await withLock(async () => {
-      const res = await deleteFamilyTransfer(transferId);
+      const res = await deleteFamilyTransfer(deletingTransferId);
       if (res.error) { toast.error(res.error); return; }
       toast.success("Transfer record deleted successfully");
+      setDeletingTransferId(null);
       mutate();
       mutateFinance();
     });
+  }
+
+  function handleDeleteTransfer(transferId: string) {
+    setDeletingTransferId(transferId);
   }
 
   function exportTransferCSV() {
@@ -336,11 +357,7 @@ export default function FamilyClient() {
   }
 
 
-  function openEditMember(member: Member) {
-    setEditingMember(member);
-    setMemberForm({ name: member.name, relationship: member.relationship ?? "Other" });
-    setShowMemberModal(true);
-  }
+
 
   function openSendMoney(memberId?: string) {
     if (accounts.length === 0) {
@@ -636,82 +653,98 @@ export default function FamilyClient() {
               {members.map((member) => {
                 const balance = Number(member.balance || 0);
                 const initials = member.name.trim().charAt(0).toUpperCase() || "?";
-                const avatar = getMemberAvatar(member.name, member.relationship);
+                const avatar = getMemberAvatar(member.name, member.relationship, member.avatar_url);
                 const memberTransfers = transfers.filter(t => t.family_member_id === member.id);
                 const lastTransfer = memberTransfers[0];
                 const monthSent = monthTransfers.filter(t => t.family_member_id === member.id).reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
                 return (
-                  <div key={member.id} className="glass-card flex flex-col justify-between gap-4 border-white/5 hover:border-pink-500/30 hover:shadow-[0_0_25px_rgba(236,72,153,0.12)] transition-all duration-300 relative group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div 
+                    key={member.id} 
+                    className="glass-card rich-border flex flex-col min-h-[260px] p-6 relative overflow-hidden transition-transform hover:-translate-y-1 group"
+                    style={{
+                      ['--hover-border-color' as any]: "#ec4899",
+                      ['--hover-glow-shadow' as any]: "0 12px 30px -10px rgba(236, 72, 153, 0.25)"
+                    }}
+                  >
+                    {/* Top 3px Accent Line matching Account cards */}
+                    <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-500" />
                     
-                    <div className="flex items-center gap-4">
-                      <div className="relative p-[2.5px] rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-fuchsia-500 shadow-[0_0_15px_rgba(236,72,153,0.25)] flex-shrink-0">
-                        <div className="bg-[#121214] p-[1.5px] rounded-full">
-                          {avatar ? (
-                            <Image src={avatar} alt={member.name} width={44} height={44} className="w-11 h-11 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-600 to-rose-700 flex items-center justify-center text-white font-black text-sm">
-                              {initials}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-white leading-tight truncate" title={member.name}>{member.name}</h3>
-                          <span className="shrink-0 text-[0.5rem] font-black uppercase tracking-widest text-pink-400 bg-pink-500/10 border border-pink-500/20 px-1.5 py-0.5 rounded-md">
-                            {member.relationship ?? "Other"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[--text-muted] mt-1.5 flex flex-col gap-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span>Total Sent: <span className="font-mono font-bold text-white">{fmt.format(balance)}</span></span>
-                            {member.relationship === "Child" && (
-                              <button
-                                 type="button"
-                                 onClick={(e) => { e.stopPropagation(); openSendAllowance(member.id, "500", "Allowance Support"); }}
-                                 className="text-[9.5px] font-black uppercase text-pink-400 hover:text-pink-300 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded cursor-pointer transition-all active:scale-95 shrink-0"
-                              >
-                                👶 Allowance
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-[11px] text-[--text-secondary]">
-                            <span>This Month: <span className="font-bold text-pink-400">{fmt.format(monthSent)}</span></span>
-                            {lastTransfer && (
-                              <span className="text-[10px] opacity-75">
-                                Last: {fmt.format(Number(lastTransfer.amount))} ({formatTransferDate(lastTransfer.transfer_date)})
-                              </span>
+                    {/* Top Header: Badge, Avatar & Quick Edit */}
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                          {member.relationship ?? "Family Member"}
+                        </span>
+                        <div className="flex items-center gap-3 mt-4">
+                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 via-rose-500/15 to-purple-500/20 border border-pink-500/30 flex items-center justify-center p-1 shadow-lg shadow-pink-500/10">
+                            {avatar ? (
+                              <Image src={avatar} alt={member.name} width={48} height={48} className="w-12 h-12 rounded-xl object-cover" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-700 flex items-center justify-center text-white font-black text-lg">
+                                {initials}
+                              </div>
                             )}
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex gap-2 border-t border-white/5 pt-4 mt-2">
-                      <button
-                        className="flex-1 bg-gradient-to-r from-pink-500 to-rose-600 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(236,72,153,0.25)] hover:shadow-[0_0_20px_rgba(236,72,153,0.45)] active:scale-95 cursor-pointer"
-                        onClick={() => openSendMoney(member.id)}
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        Send Money
-                      </button>
-                      <button
-                        className="bg-[#1e1e1e] hover:bg-white/5 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 active:scale-95 flex items-center justify-center cursor-pointer"
-                        onClick={() => openEditMember(member)}
+                      <button 
+                        type="button" 
+                        onClick={() => openEditMember(member)} 
+                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-[--text-muted] hover:text-white transition-all cursor-pointer"
                         title="Edit member"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <Edit2 className="w-4 h-4" />
                       </button>
-                      <button
-                        className="bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 hover:border-rose-600 text-rose-400 hover:text-white px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 active:scale-95 flex items-center justify-center cursor-pointer"
-                        onClick={() => handleDeleteMember(member.id)}
-                        disabled={submitting}
-                        title="Delete member"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    </div>
+
+                    {/* Bottom Details Section matching Account card structure */}
+                    <div className="mt-auto">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white truncate" title={member.name}>{member.name}</h3>
+                        {member.relationship === "Child" && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openSendAllowance(member.id, "500", "Allowance Support"); }}
+                            className="text-[9.5px] font-black uppercase text-pink-400 hover:text-pink-300 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-md cursor-pointer transition-all active:scale-95 shrink-0"
+                          >
+                            👶 Allowance
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-[--text-muted] truncate mt-0.5">
+                        This Month: <span className="text-pink-400 font-bold">{fmt.format(monthSent)}</span>
+                        {lastTransfer && (
+                          <span className="opacity-75 ml-1">
+                            • Last: {fmt.format(Number(lastTransfer.amount))}
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-2">
+                        <span className="text-[0.5625rem] font-black uppercase tracking-widest text-[--text-muted]">Total Sent</span>
+                        <p className="text-2xl font-black text-pink-400 mt-0.5">{fmt.format(balance)}</p>
+                      </div>
+
+                      {/* Action Buttons Row matching Account Cards */}
+                      <div className="flex gap-2 mt-6">
+                        <button
+                          type="button"
+                          className="flex-1 h-11 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] active:scale-95 cursor-pointer"
+                          onClick={() => openSendMoney(member.id)}
+                        >
+                          <Send className="w-4 h-4" />
+                          Send Money
+                        </button>
+                        <button
+                          type="button"
+                          className="w-11 h-11 rounded-xl bg-danger/10 border border-danger/20 text-danger hover:bg-danger/20 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                          onClick={() => handleDeleteMember(member.id)}
+                          disabled={submitting}
+                          title="Delete member"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -746,15 +779,6 @@ export default function FamilyClient() {
                     View All Time
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={exportTransferCSV}
-                  className="text-[10px] font-black uppercase text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-lg cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 ml-1"
-                  title="Export Statement to CSV"
-                >
-                  <Download className="w-3 h-3 text-pink-400" />
-                  CSV
-                </button>
               </div>
             </div>
 
@@ -840,20 +864,38 @@ export default function FamilyClient() {
       {showMemberModal && (
         <ModalOverlay onClose={() => { setShowMemberModal(false); resetMemberForm(); }}>
           <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-primary)", letterSpacing: "-0.03em", margin: "0 0 1.25rem" }}>
-            {editingMember ? "Edit Member" : "Add Family Member"}
+            {editingMember ? "Edit Member Details & Photo" : "Add Family Member"}
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Live Profile Photo Preview & Avatar Setting */}
+            <div className="flex items-center gap-4 p-3 bg-white/5 border border-white/10 rounded-2xl">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 via-rose-500/15 to-purple-500/20 border border-pink-500/30 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-lg shadow-pink-500/10">
+                {memberForm.avatar_url ? (
+                  <img src={memberForm.avatar_url} alt="Profile preview" className="w-12 h-12 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-700 flex items-center justify-center text-white font-black text-lg">
+                    {memberForm.name.trim().charAt(0).toUpperCase() || "👤"}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white uppercase tracking-wider">Profile Representation</p>
+                <p className="text-[0.625rem] text-[--text-muted] mt-0.5">Select a preset avatar or paste image URL below</p>
+              </div>
+            </div>
+
             <div>
               <label style={labelStyle}>Name</label>
               <input
                 className="input-premium"
-                placeholder="Enter name"
+                placeholder="Enter member name"
                 value={memberForm.name}
                 onChange={e => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
                 autoFocus
                 style={{ width: "100%" }}
               />
             </div>
+
             <div>
               <label style={labelStyle}>Relationship</label>
               <select
@@ -867,9 +909,80 @@ export default function FamilyClient() {
                 ))}
               </select>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+
+            {/* Profile Photo Settings */}
+            <div>
+              <label style={labelStyle}>Profile Photo / Avatar Settings</label>
+              <div className="space-y-2">
+                {/* Preset Avatars */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[
+                    { label: "👨 Father", url: "/avatar_father.png" },
+                    { label: "👩 Mother", url: "/avatar_mother.png" },
+                    { label: "👦 Son", url: "https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?w=150&auto=format&fit=crop&q=80" },
+                    { label: "👧 Daughter", url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80" },
+                    { label: "👴 Grandpa", url: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80" },
+                    { label: "👵 Grandma", url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setMemberForm(prev => ({ ...prev, avatar_url: preset.url }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                        memberForm.avatar_url === preset.url
+                          ? "bg-pink-500 text-white border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.4)]"
+                          : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Photo URL Input & File Upload */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    className="input-premium text-xs flex-1"
+                    placeholder="https://example.com/photo.jpg or image URL"
+                    value={memberForm.avatar_url}
+                    onChange={e => setMemberForm(prev => ({ ...prev, avatar_url: e.target.value }))}
+                  />
+                  <label className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white cursor-pointer transition-all shrink-0">
+                    Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setMemberForm(prev => ({ ...prev, avatar_url: reader.result as string }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                  {memberForm.avatar_url && (
+                    <button
+                      type="button"
+                      onClick={() => setMemberForm(prev => ({ ...prev, avatar_url: "" }))}
+                      className="px-2 py-2 text-xs font-bold text-rose-400 hover:text-rose-300 cursor-pointer"
+                      title="Clear photo"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.3)] active:scale-95 cursor-pointer disabled:opacity-50" onClick={handleAddEditMember} disabled={submitting || !memberForm.name.trim()} style={{ flex: 1 }}>
-                {submitting ? "Saving..." : editingMember ? "Update" : "Add Member"}
+                {submitting ? "Saving..." : editingMember ? "Update Member" : "Add Member"}
               </button>
               <button className="btn-secondary" onClick={() => { setShowMemberModal(false); resetMemberForm(); }} style={{ fontWeight: 700 }}>
                 Cancel
@@ -909,9 +1022,17 @@ export default function FamilyClient() {
                 style={{ width: "100%" }}
               >
                 <option value="">Select account</option>
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} ({fmt.format(Number(a.balance))})</option>
-                ))}
+                {accounts.map(a => {
+                  const symbol = a.currency === "USD" ? "$" : "₹";
+                  const nameLabel = a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+                    ? `${a.bank_name} (${a.name})`
+                    : a.name;
+                  return (
+                    <option key={a.id} value={a.id}>
+                      {nameLabel} — {symbol}{Number(a.balance).toLocaleString()}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
@@ -981,6 +1102,48 @@ export default function FamilyClient() {
                 Cancel
               </button>
             </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Delete Member Custom Modal */}
+      {deletingMemberId && (
+        <ModalOverlay onClose={() => setDeletingMemberId(null)}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Delete Family Member?</h3>
+          </div>
+          <p className="text-xs text-[--text-muted] leading-relaxed mb-6">
+            Are you sure you want to delete this family member? This action will also purge their transfer history.
+          </p>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setDeletingMemberId(null)} className="btn-secondary flex-1">Cancel</button>
+            <button type="button" onClick={confirmDeleteMember} className="btn-danger flex-1" disabled={submitting}>
+              {submitting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Delete Transfer Custom Modal */}
+      {deletingTransferId && (
+        <ModalOverlay onClose={() => setDeletingTransferId(null)}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Delete Transfer Record?</h3>
+          </div>
+          <p className="text-xs text-[--text-muted] leading-relaxed mb-6">
+            Are you sure you want to delete this family transfer record? This action cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setDeletingTransferId(null)} className="btn-secondary flex-1">Cancel</button>
+            <button type="button" onClick={confirmDeleteTransfer} className="btn-danger flex-1" disabled={submitting}>
+              {submitting ? "Deleting..." : "Delete"}
+            </button>
           </div>
         </ModalOverlay>
       )}

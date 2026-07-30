@@ -452,9 +452,17 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 onChange={(e) => setSelectedAccountId(e.target.value)}
                 className="input-premium w-full font-bold"
               >
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">{a.name} (₹{Number(a.balance).toLocaleString()})</option>
-                ))}
+                {accounts.map(a => {
+                  const symbol = a.currency === "USD" ? "$" : "₹";
+                  const nameLabel = a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+                    ? `${a.bank_name} (${a.name})`
+                    : a.name;
+                  return (
+                    <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">
+                      {nameLabel} — {symbol}{Number(a.balance).toLocaleString()}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div className="flex gap-3 pt-4">
@@ -552,9 +560,17 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                   className="input-premium w-full font-bold"
                 >
                   <option value="" disabled className="bg-[#181A20] text-white font-medium">Select an account</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">{a.name} (₹{Number(a.balance).toLocaleString()})</option>
-                  ))}
+                  {accounts.map(a => {
+                    const symbol = a.currency === "USD" ? "$" : "₹";
+                    const nameLabel = a.bank_name && a.bank_name.trim().toLowerCase() !== a.name.trim().toLowerCase()
+                      ? `${a.bank_name} (${a.name})`
+                      : a.name;
+                    return (
+                      <option key={a.id} value={a.id} className="bg-[#181A20] text-white font-medium">
+                        {nameLabel} — {symbol}{Number(a.balance).toLocaleString()}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}

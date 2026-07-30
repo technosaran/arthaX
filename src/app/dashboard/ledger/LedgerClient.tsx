@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { endOfDay, format, isWithinInterval, startOfDay } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import LedgerDataTable from "./components/LedgerDataTable";
+import MiniCalendar from "./components/MiniCalendar";
 
 type LedgerLog = {
   id: string;
@@ -192,6 +193,16 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
     );
   };
 
+  const logDatesSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const log of logs) {
+      if (log.created_at) {
+        set.add(log.created_at.split("T")[0]);
+      }
+    }
+    return set;
+  }, [logs]);
+
   return (
     <div className="flex flex-col gap-[var(--section-gap)] max-w-7xl mx-auto w-full px-2">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 px-2">
@@ -235,14 +246,22 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
               onChange={(e) => setSelectedAccountId(e.target.value)}
             >
               <option value="all" className="bg-[#181A20] text-white">All Accounts</option>
-              {accounts.map(acc => (
-                <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white">{acc.name}</option>
-              ))}
+              {accounts.map(acc => {
+                const symbol = acc.currency === "USD" ? "$" : "₹";
+                const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                  ? `${acc.bank_name} (${acc.name})`
+                  : acc.name;
+                return (
+                  <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white">
+                    {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
-          {/* Right: Quick Range Chips */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          {/* Right: Quick Range Chips & Mini Calendar */}
+          <div className="flex flex-wrap items-center gap-2">
             {[
               { label: "All", value: "All Time" },
               { label: "Today", value: "Today" },
@@ -265,13 +284,33 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
                 </button>
               );
             })}
+
+            {/* Interactive Small Calendar Component */}
+            <MiniCalendar
+              startDate={startDate}
+              endDate={endDate}
+              logDatesSet={logDatesSet}
+              onSelectDate={(dateStr) => {
+                setStartDate(dateStr);
+                setEndDate(dateStr);
+                setActiveQuickRange("Custom");
+              }}
+              onSelectRange={(startStr, endStr) => {
+                setStartDate(startStr);
+                setEndDate(endStr);
+                setActiveQuickRange("Custom");
+              }}
+              onReset={() => {
+                resetRange();
+              }}
+            />
           </div>
         </div>
 
-        {/* Date Filter & Active Filter Clear Bar */}
+        {/* Date Inputs & Active Filter Clear Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-xs text-gray-400">
           <div className="flex items-center gap-2">
-            <span className="text-[0.6875rem] font-bold uppercase tracking-wider text-gray-500">Date Range:</span>
+            <span className="text-[0.6875rem] font-bold uppercase tracking-wider text-gray-500">Manual Date:</span>
             <input
               type="date"
               className="bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 text-[0.6875rem] text-white [color-scheme:dark] outline-none focus:border-[#f26522]"
@@ -311,15 +350,18 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
       {/* Zerodha Console Summary Statements */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Opening Balance", value: openingBalance, color: "text-white" },
-          { label: "Total Credits (Pay-in)", value: totalInflow, color: "text-emerald-500" },
-          { label: "Total Debits (Pay-out)", value: totalOutflow, color: "text-rose-500" },
-          { label: "Closing Balance", value: closingBalance, color: "text-white" },
+          { label: "Opening Balance", value: openingBalance, color: "text-white", note: "Balance before selected date range" },
+          { label: "Total Credits (Pay-in)", value: totalInflow, color: "text-emerald-500", note: "Total money added or deposited" },
+          { label: "Total Debits (Pay-out)", value: totalOutflow, color: "text-rose-500", note: "Total money withdrawn or spent" },
+          { label: "Closing Balance", value: closingBalance, color: "text-white", note: "Net balance after selected date range" },
         ].map((s, i) => (
-          <div key={i} className="p-5 rounded border border-white/10 bg-[#151515] flex flex-col justify-between min-h-[90px]">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{s.label}</p>
-            <p className={`text-xl font-normal tracking-tight ${s.color} mt-2`}>
-              {formatMoney(s.value, "INR")}
+          <div key={i} className="p-5 rounded-xl border border-white/10 bg-[#151515] flex flex-col justify-between min-h-[100px]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{s.label}</p>
+              <p className="text-[0.625rem] text-gray-500 font-medium mt-0.5">{s.note}</p>
+            </div>
+            <p className={`text-xl font-bold tracking-tight ${s.color} mt-2`}>
+              {formatMoney(s.value, getLogCurrency(selectedAccountId !== "all" ? selectedAccountId : null))}
             </p>
           </div>
         ))}

@@ -10,6 +10,7 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { format } from "date-fns";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
+import { Trash2 } from "lucide-react";
 import PnLValue from "@/components/pnl-value";
 
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
@@ -134,12 +135,19 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
     setShowAddModal(true);
   };
 
-  async function handleDeleteAsset(id: string, name: string) {
-    if (!confirm(`Permanently delete this asset record: "${name}"?`)) return;
+  const [deletingAsset, setDeletingAsset] = useState<{ id: string; name: string } | null>(null);
+
+  function handleDeleteAsset(id: string, name: string) {
+    setDeletingAsset({ id, name });
+  }
+
+  async function confirmDeleteAsset() {
+    if (!deletingAsset) return;
     await withLock(async () => {
-      const res = await deleteAlternativeAsset(id);
+      const res = await deleteAlternativeAsset(deletingAsset.id);
       if (!res.error) {
-        toast.success(`Asset deleted`);
+        toast.success(`Asset "${deletingAsset.name}" deleted`);
+        setDeletingAsset(null);
         mutate();
       } else toast.error(res.error);
     });
@@ -573,9 +581,17 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                             onChange={e => setFormData({...formData, account_id: e.target.value})}
                           >
                             <option value="" className="bg-[#181A20] text-white font-medium">No Transaction</option>
-                            {accounts.map(acc => (
-                              <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">{acc.name} (₹{acc.balance.toLocaleString()})</option>
-                            ))}
+                            {accounts.map(acc => {
+                              const symbol = acc.currency === "USD" ? "$" : "₹";
+                              const nameLabel = acc.bank_name && acc.bank_name.trim().toLowerCase() !== acc.name.trim().toLowerCase()
+                                ? `${acc.bank_name} (${acc.name})`
+                                : acc.name;
+                              return (
+                                <option key={acc.id} value={acc.id} className="bg-[#181A20] text-white font-medium">
+                                  {nameLabel} — {symbol}{acc.balance.toLocaleString()}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
                       </div>
@@ -612,6 +628,29 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                 </div>
               )}
             </form>
+          </div>
+        </Drawer>
+      )}
+
+      {/* Delete Asset Custom Modal */}
+      {deletingAsset && (
+        <Drawer isOpen={!!deletingAsset} onClose={() => setDeletingAsset(null)} title="Delete Asset?" variant="center">
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Delete Asset Record</h3>
+                <p className="text-xs text-[--text-muted]">Are you sure you want to delete &quot;{deletingAsset.name}&quot;?</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setDeletingAsset(null)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={confirmDeleteAsset} className="btn-danger flex-1" disabled={submitting}>
+                {submitting ? "Deleting..." : "Delete Asset"}
+              </button>
+            </div>
           </div>
         </Drawer>
       )}

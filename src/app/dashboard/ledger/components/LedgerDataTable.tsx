@@ -88,29 +88,6 @@ export default function LedgerDataTable({
         },
         sortingFn: "datetime",
       }),
-      columnHelper.display({
-        id: "actions",
-        header: "",
-        cell: (info) => {
-          const log = info.row.original;
-          return (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsReverting(log.id);
-                  await onRevert(log.id);
-                  setIsReverting(null);
-                }}
-                disabled={isReverting === log.id}
-                className="text-[0.5625rem] font-black uppercase tracking-widest text-rose-500 bg-rose-500/5 border border-rose-500/10 px-2.5 py-1.5 rounded-lg disabled:opacity-50 cursor-pointer whitespace-nowrap"
-              >
-                {isReverting === log.id ? "..." : "Revert"}
-              </button>
-            </div>
-          );
-        },
-      }),
       columnHelper.accessor("account_name", {
         header: "Account",
         cell: (info) => <span className="text-xs font-semibold text-[--text-secondary] whitespace-nowrap">{info.getValue() || "—"}</span>
@@ -191,6 +168,30 @@ export default function LedgerDataTable({
           );
         }
       }),
+      columnHelper.display({
+        id: "actions",
+        header: "",
+        cell: (info) => {
+          const log = info.row.original;
+          if (!log.source_type || log.source_type === "account") return null;
+          return (
+            <div className="flex justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsReverting(log.id);
+                  await onRevert(log.id);
+                  setIsReverting(null);
+                }}
+                disabled={isReverting === log.id}
+                className="text-[0.5625rem] font-black uppercase tracking-widest text-rose-500 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer whitespace-nowrap transition-all shadow-sm"
+              >
+                {isReverting === log.id ? "..." : "Revert"}
+              </button>
+            </div>
+          );
+        },
+      }),
     ],
     [getLogCurrency, isDebitLog, isCreditLog, formatMoney, onRevert, isReverting]
   );
@@ -249,7 +250,7 @@ export default function LedgerDataTable({
           </thead>
           <tbody className="divide-y divide-white/10">
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-white/5">
+              <tr key={row.id} className="group border-b border-white/5 hover:bg-white/[0.03] transition-colors">
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className={`px-6 py-4.5 ${getTableCellClass(cell.column.id)}`}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
