@@ -270,84 +270,8 @@ const BANK_SLUGS: Record<string, string> = {
   "angelone.in": "angelone",
 };
 
-const BANK_INTERNET_LOGOS: Record<string, string[]> = {
-  "sbi.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/c/cc/State_Bank_of_India_logo.svg",
-    "https://logo.clearbit.com/sbi.co.in",
-    "https://www.google.com/s2/favicons?domain=sbi.co.in&sz=128",
-  ],
-  "hdfcbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg",
-    "https://logo.clearbit.com/hdfcbank.com",
-    "https://www.google.com/s2/favicons?domain=hdfcbank.com&sz=128",
-  ],
-  "icicibank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/12/ICICI_Bank_Logo.svg",
-    "https://logo.clearbit.com/icicibank.com",
-    "https://www.google.com/s2/favicons?domain=icicibank.com&sz=128",
-  ],
-  "axisbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/1a/Axis_Bank_logo.svg",
-    "https://logo.clearbit.com/axisbank.com",
-    "https://www.google.com/s2/favicons?domain=axisbank.com&sz=128",
-  ],
-  "kotak.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/1/1b/Kotak_Mahindra_Bank_logo.svg",
-    "https://logo.clearbit.com/kotak.com",
-    "https://www.google.com/s2/favicons?domain=kotak.com&sz=128",
-  ],
-  "indianbank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/4/47/Indian_Bank_logo.svg",
-    "https://logo.clearbit.com/indianbank.in",
-    "https://www.google.com/s2/favicons?domain=indianbank.in&sz=128",
-  ],
-  "pnbindia.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b8/Punjab_National_Bank_Logo.svg",
-    "https://logo.clearbit.com/pnbindia.in",
-    "https://www.google.com/s2/favicons?domain=pnbindia.in&sz=128",
-  ],
-  "bankofbaroda.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/9/91/Bank_of_Baroda_Logo.svg",
-    "https://logo.clearbit.com/bankofbaroda.in",
-    "https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=128",
-  ],
-  "canarabank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/5/50/Canara_Bank_Logo.svg",
-    "https://logo.clearbit.com/canarabank.com",
-    "https://www.google.com/s2/favicons?domain=canarabank.com&sz=128",
-  ],
-  "unionbankofindia.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/d/d0/Union_Bank_of_India_Logo.svg",
-    "https://logo.clearbit.com/unionbankofindia.co.in",
-    "https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=128",
-  ],
-  "idfcfirstbank.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/7b/IDFC_First_Bank_logo.svg",
-    "https://logo.clearbit.com/idfcfirstbank.com",
-    "https://www.google.com/s2/favicons?domain=idfcfirstbank.com&sz=128",
-  ],
-  "yesbank.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/b/b3/YES_Bank_logo.svg",
-    "https://logo.clearbit.com/yesbank.in",
-    "https://www.google.com/s2/favicons?domain=yesbank.in&sz=128",
-  ],
-  "bankofindia.co.in": [
-    "https://upload.wikimedia.org/wikipedia/commons/8/87/Bank_of_India_logo.svg",
-    "https://logo.clearbit.com/bankofindia.co.in",
-    "https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=128",
-  ],
-  "paytm.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo.svg",
-    "https://logo.clearbit.com/paytm.com",
-  ],
-  "phonepe.com": [
-    "https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg",
-    "https://logo.clearbit.com/phonepe.com",
-  ],
-};
-
 /**
- * Get ordered logo URLs for a bank from verified internet hyperlinks.
+ * Get ordered logo URLs for a bank dynamically using dedicated bank logo APIs.
  */
 export function getBankLogoSources(bankNameOrDomain: string): string[] {
   if (!bankNameOrDomain) return [];
@@ -361,19 +285,16 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
     domain = getBankDomain(raw);
   }
 
-  const sources: string[] = [];
+  if (!domain) return [];
 
-  if (domain && BANK_INTERNET_LOGOS[domain]) {
-    sources.push(...BANK_INTERNET_LOGOS[domain]);
-  }
-
-  if (domain) {
-    sources.push(`https://logo.clearbit.com/${domain}`);
-    sources.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
-    sources.push(`https://unavatar.io/${domain}`);
-  }
-
-  return Array.from(new Set(sources));
+  // Dedicated Bank Logo APIs (prioritizing high-resolution 128px sources over 16px favicons)
+  return [
+    `https://logo.clearbit.com/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    `https://api.faviconkit.com/${domain}/128`,
+    `https://unavatar.io/${domain}`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ];
 }
 
 export function getBankLogoUrl(bankNameOrDomain: string, _size: number = 128): string | null {

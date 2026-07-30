@@ -149,37 +149,35 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
   };
 
   const portfolioData = useMemo<PieEntry[]>(() => {
-    const totalAssets = showUSD ? stats.totalAssetsUSD : stats.totalAssetsINR;
-    if (totalAssets <= 0) return [];
-    
     const rawData = showUSD ? [
-        { name: 'Cash', value: stats.cashBalanceUSD, fill: getChartColour(0), color: getChartColour(0) },
-        { name: 'Stocks', value: stats.stockBalanceUSD, fill: getChartColour(1), color: getChartColour(1) },
-        { name: 'Mutual Funds', value: stats.mfBalanceUSD, fill: getChartColour(2), color: getChartColour(2) },
-        { name: 'Assets', value: stats.altBalanceUSD, fill: getChartColour(3), color: getChartColour(3) },
-        { name: 'Bonds', value: stats.bondBalanceUSD, fill: getChartColour(4), color: getChartColour(4) },
-        { name: 'Forex', value: stats.forexBalanceUSD, fill: getChartColour(5), color: getChartColour(5) },
-        { name: 'Crypto', value: stats.cryptoBalanceUSD, fill: getChartColour(6), color: getChartColour(6) }
+        { name: 'Cash', value: stats.cashBalanceUSD, fill: getChartColour(0), color: getChartColour(0), module: 'Accounts' },
+        { name: 'Stocks', value: stats.stockBalanceUSD, fill: getChartColour(1), color: getChartColour(1), module: 'Stocks' },
+        { name: 'Mutual Funds', value: stats.mfBalanceUSD, fill: getChartColour(2), color: getChartColour(2), module: 'Mutual Funds' },
+        { name: 'Assets', value: stats.altBalanceUSD, fill: getChartColour(3), color: getChartColour(3), module: 'Alt Assets' },
+        { name: 'Bonds', value: stats.bondBalanceUSD, fill: getChartColour(4), color: getChartColour(4), module: 'Bonds' },
+        { name: 'Forex', value: stats.forexBalanceUSD, fill: getChartColour(5), color: getChartColour(5), module: 'Forex' },
+        { name: 'Crypto', value: stats.cryptoBalanceUSD, fill: getChartColour(6), color: getChartColour(6), module: 'Crypto' }
     ] : [
-        { name: 'Cash', value: stats.cashBalanceINR, fill: getChartColour(0), color: getChartColour(0) },
-        { name: 'Stocks', value: stats.stockBalanceINR, fill: getChartColour(1), color: getChartColour(1) },
-        { name: 'Mutual Funds', value: stats.mfBalanceINR, fill: getChartColour(2), color: getChartColour(2) },
-        { name: 'Assets', value: stats.altBalanceINR, fill: getChartColour(3), color: getChartColour(3) },
-        { name: 'Bonds', value: stats.bondBalanceINR, fill: getChartColour(4), color: getChartColour(4) },
-        { name: 'Forex', value: stats.forexBalanceINR, fill: getChartColour(5), color: getChartColour(5) },
-        { name: 'Crypto', value: stats.cryptoBalanceINR, fill: getChartColour(6), color: getChartColour(6) }
+        { name: 'Cash', value: stats.cashBalanceINR, fill: getChartColour(0), color: getChartColour(0), module: 'Accounts' },
+        { name: 'Stocks', value: stats.stockBalanceINR, fill: getChartColour(1), color: getChartColour(1), module: 'Stocks' },
+        { name: 'Mutual Funds', value: stats.mfBalanceINR, fill: getChartColour(2), color: getChartColour(2), module: 'Mutual Funds' },
+        { name: 'Assets', value: stats.altBalanceINR, fill: getChartColour(3), color: getChartColour(3), module: 'Alt Assets' },
+        { name: 'Bonds', value: stats.bondBalanceINR, fill: getChartColour(4), color: getChartColour(4), module: 'Bonds' },
+        { name: 'Forex', value: stats.forexBalanceINR, fill: getChartColour(5), color: getChartColour(5), module: 'Forex' },
+        { name: 'Crypto', value: stats.cryptoBalanceINR, fill: getChartColour(6), color: getChartColour(6), module: 'Crypto' }
     ];
 
-    return rawData
-      .filter(item => item.value > 0)
-      .map(item => ({
-        ...item,
-        percentage: ((item.value / totalAssets) * 100).toFixed(1)
-      }));
+    const activeItems = rawData.filter(item => item.value > 0 && (item.module === 'Accounts' || enabledModules.includes(item.module)));
+    const totalActive = activeItems.reduce((acc, curr) => acc + curr.value, 0);
+    if (totalActive <= 0) return [];
+
+    return activeItems.map(item => ({
+      ...item,
+      percentage: ((item.value / totalActive) * 100).toFixed(1)
+    }));
   }, [
     showUSD,
-    stats.totalAssetsUSD,
-    stats.totalAssetsINR,
+    enabledModules,
     stats.cashBalanceUSD,
     stats.stockBalanceUSD,
     stats.mfBalanceUSD,
@@ -303,18 +301,53 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
           <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500 animate-pulse-glow" />
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
             <div className="relative z-10 w-full lg:w-auto">
-              <div 
-                className="flex flex-col cursor-pointer group/nw select-none" 
-                onClick={() => setShowUSD(!showUSD)}
-                title="Click to toggle currency"
-              >
+              <div className="flex flex-col select-none">
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="text-xs font-semibold text-[--text-muted] transition-colors group-hover/nw:text-[--text-primary]">
-                    Portfolio Net Worth ({showUSD ? 'USD' : 'INR'}) {isLoading && <span className="text-xs italic font-normal">(loading...)</span>}
+                  <span className="text-xs font-black uppercase tracking-wider text-[--text-muted]">
+                    Portfolio Net Worth
                   </span>
-                  <svg className="w-3.5 h-3.5 text-[--text-muted] opacity-50 group-hover/nw:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
+
+                  {/* Interactive Currency Switcher Pill */}
+                  <div className="flex items-center rounded-full bg-white/[0.04] border border-white/10 p-0.5 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setShowUSD(false)}
+                      className={`px-3 py-0.5 rounded-full text-[0.65rem] font-black transition-all cursor-pointer ${
+                        !showUSD ? "bg-[--accent-primary] text-white shadow-[0_0_14px_rgba(14,165,233,0.5)] border border-sky-400/30" : "text-[--text-muted] hover:text-white"
+                      }`}
+                    >
+                      ₹ INR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowUSD(true)}
+                      className={`px-3 py-0.5 rounded-full text-[0.65rem] font-black transition-all cursor-pointer ${
+                        showUSD ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)] border border-indigo-400/30" : "text-[--text-muted] hover:text-white"
+                      }`}
+                    >
+                      $ USD
+                    </button>
+                  </div>
+
+                  {/* Solvency / Health Status Badge */}
+                  {(() => {
+                    const assets = showUSD ? stats.totalAssetsUSD : stats.totalAssetsINR;
+                    const debt = showUSD ? stats.debtBalanceUSD : stats.debtBalanceINR;
+                    if (debt === 0) {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[0.6875rem] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]">
+                          🛡️ 100% Debt-Free
+                        </span>
+                      );
+                    }
+                    const solvencyRatio = assets > 0 ? (((assets - debt) / assets) * 100).toFixed(1) : "0";
+                    return (
+                      <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[0.6875rem] font-black bg-sky-500/10 text-sky-400 border border-sky-500/20 shadow-[0_0_12px_rgba(14,165,233,0.15)]">
+                        🛡️ {solvencyRatio}% Solvency Ratio
+                      </span>
+                    );
+                  })()}
+
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
                     stats.totalDayPnL >= 0 
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]' 
@@ -397,6 +430,21 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                         ? `+$${stats.liquidBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
                         : `+₹${stats.liquidBalanceINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
+                    </span>
+                  </div>
+                </motion.div>
+                <motion.div 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-3 bg-indigo-500/5 border border-indigo-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-indigo-500/10 cursor-default"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 text-base shadow-inner">💎</div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-[--text-muted]">Financial Health</span>
+                    <span className="text-sm sm:text-base font-black text-indigo-300">
+                      {(showUSD ? stats.debtBalanceUSD > 0 : stats.debtBalanceINR > 0)
+                        ? `${(showUSD ? ((stats.netWorthUSD / stats.totalAssetsUSD) * 100) : ((stats.netWorthINR / stats.totalAssetsINR) * 100)).toFixed(0)}% Solvent`
+                        : '100% Debt-Free'}
                     </span>
                   </div>
                 </motion.div>
