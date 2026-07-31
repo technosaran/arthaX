@@ -165,7 +165,7 @@ Only output raw JSON without markdown code blocks.`;
 }
 
 export interface GeminiAutonomousDecision {
-  action: "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN";
+  action: "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "SET_BUDGET" | "CREATE_GOAL" | "CONTRIBUTE_GOAL" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN";
   accountName?: string | null;
   accountType?: "checking" | "savings" | "credit" | "investment" | "cash" | null;
   initialBalance?: number | null;
@@ -182,6 +182,8 @@ export interface GeminiAutonomousDecision {
   quantity?: number | null;
   price?: number | null;
   fundName?: string | null;
+  goalName?: string | null;
+  targetAmount?: number | null;
   transcription?: string | null;
   replyMessage?: string | null;
   reasoning?: string | null;
@@ -203,7 +205,7 @@ ${userContext}
 ${historyBlock}
 Respond ONLY with valid JSON matching this schema:
 {
-  "action": "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN",
+  "action": "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "SET_BUDGET" | "CREATE_GOAL" | "CONTRIBUTE_GOAL" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN",
   "accountName": string or null (e.g. "SBI", "HDFC", "ICICI"),
   "accountType": "checking" | "savings" | "credit" | "investment" | "cash" or null,
   "initialBalance": number or null,
@@ -220,6 +222,8 @@ Respond ONLY with valid JSON matching this schema:
   "quantity": number or null,
   "price": number or null,
   "fundName": string or null,
+  "goalName": string or null,
+  "targetAmount": number or null,
   "replyMessage": string or null,
   "reasoning": string or null
 }
@@ -235,8 +239,11 @@ Action Selection Rules:
 8. "BUY_STOCK": If user bought stocks (e.g. "bought 10 shares of SBI at 800").
 9. "BUY_MUTUAL_FUND": If user invested in mutual fund (e.g. "invested 5000 in Parag Parikh Flexi Cap").
 10. "TRANSFER_BETWEEN_ACCOUNTS": ONLY if user explicitly moves funds between two existing accounts owned by user (e.g. "moved 5000 from HDFC to SBI", "transfer 1000 from SBI to ICICI").
-11. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, top spending, budget check, or summary. Provide friendly concise markdown in "replyMessage".
-12. "GREETING": If user sends a greeting like hi, hello, hey, good morning, etc. Set replyMessage to a friendly short greeting.
+11. "SET_BUDGET": If user wants to set or update a category budget (e.g. "set food budget 15000", "budget 5000 for transport"). Extract category and amount.
+12. "CREATE_GOAL": If user wants to create a savings goal (e.g. "create goal Buy Car 500000", "goal iPhone 150000"). Extract goalName and targetAmount.
+13. "CONTRIBUTE_GOAL": If user wants to add funds toward a goal (e.g. "contribute 5000 to Car goal", "save 2000 for iPhone"). Extract goalName and amount.
+14. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, top spending, budget check, or summary. Provide friendly concise markdown in "replyMessage".
+15. "GREETING": If user sends a greeting like hi, hello, hey, good morning, etc. Set replyMessage to a friendly short greeting.
 
 IMPORTANT: For DELETE_ACCOUNT, match the accountName the user mentions against the account names in the user's context. Use the exact account name from context.
 
