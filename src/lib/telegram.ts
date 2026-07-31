@@ -96,6 +96,54 @@ export async function setTelegramBotCommands(): Promise<void> {
 }
 
 /**
+ * Send a chat action status (e.g. "typing", "upload_photo") to Telegram chat
+ */
+export async function sendTelegramChatAction(
+  chatId: string,
+  action: "typing" | "upload_photo" | "record_voice" | "upload_voice" = "typing"
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action }),
+    });
+  } catch (err) {
+    console.error("Failed to send Telegram chat action:", err);
+  }
+}
+
+/**
+ * Download a file sent via Telegram (voice note, photo receipt, audio)
+ * Returns buffer and mimeType or null if failed
+ */
+export async function downloadTelegramFile(fileId: string): Promise<{ buffer: Buffer; filePath: string } | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !fileId) return null;
+  try {
+    const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`);
+    if (!fileRes.ok) return null;
+    const fileData = await fileRes.json();
+    const filePath = fileData?.result?.file_path;
+    if (!filePath) return null;
+
+    const downloadRes = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`);
+    if (!downloadRes.ok) return null;
+
+    const arrayBuffer = await downloadRes.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      filePath,
+    };
+  } catch (err) {
+    console.error("Failed to download Telegram file:", err);
+    return null;
+  }
+}
+
+/**
  * Get curated brand/bank emoji icon matching web app brand registry
  */
 export function getBrandEmoji(name: string): string {
@@ -120,3 +168,4 @@ export function getBrandEmoji(name: string): string {
   if (/rent|house|electricity|bill|utility/i.test(clean)) return "💡";
   return "🏷️";
 }
+

@@ -38,23 +38,41 @@ export function getGeminiApiKeyForProfile(profile: any): string | null {
   return key?.trim() || null;
 }
 
+export interface GeminiInlineData {
+  mimeType: string;
+  data: string; // Base64 encoded string
+}
+
 /**
- * Low-level caller for Google Gemini REST API (gemini-2.5-flash with fallback to gemini-1.5-flash)
+ * Low-level caller for Google Gemini REST API (gemini-2.5-flash with fallback to gemini-2.0-flash and gemini-1.5-flash)
+ * Supports text and multimodal inline data (images, voice/audio clips)
  */
 export async function callGeminiApi(
   apiKey: string,
   prompt: string,
-  systemInstruction?: string
+  systemInstruction?: string,
+  inlineData?: GeminiInlineData
 ): Promise<string> {
   const cleanKey = apiKey.trim();
   if (!cleanKey) {
     throw new Error("Gemini API key is empty");
   }
 
+  const parts: any[] = [];
+  if (inlineData && inlineData.data) {
+    parts.push({
+      inline_data: {
+        mime_type: inlineData.mimeType,
+        data: inlineData.data,
+      },
+    });
+  }
+  parts.push({ text: prompt });
+
   const payload: any = {
     contents: [
       {
-        parts: [{ text: prompt }],
+        parts,
       },
     ],
   };
@@ -164,6 +182,7 @@ export interface GeminiAutonomousDecision {
   quantity?: number | null;
   price?: number | null;
   fundName?: string | null;
+  transcription?: string | null;
   replyMessage?: string | null;
   reasoning?: string | null;
 }
@@ -171,15 +190,17 @@ export interface GeminiAutonomousDecision {
 export async function parseAutonomousTelegramIntent(
   text: string,
   userContext: string,
-  apiKey: string
+  apiKey: string,
+  chatHistory?: string
 ): Promise<GeminiAutonomousDecision> {
   try {
+    const historyBlock = chatHistory ? `\nRecent Conversation History:\n${chatHistory}\n` : "";
     const systemPrompt = `You are the Autonomous Financial AI Engine for FinanceOS & Telegram.
 Analyze user natural language messages and autonomously decide what financial action to execute.
 
-User's Live Financial Context (Existing Accounts, Balances, Family):
+User's Live Financial Context (Accounts, Balances, Category Spending, Investments, Budgets, Family):
 ${userContext}
-
+${historyBlock}
 Respond ONLY with valid JSON matching this schema:
 {
   "action": "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN",
@@ -214,7 +235,7 @@ Action Selection Rules:
 8. "BUY_STOCK": If user bought stocks (e.g. "bought 10 shares of SBI at 800").
 9. "BUY_MUTUAL_FUND": If user invested in mutual fund (e.g. "invested 5000 in Parag Parikh Flexi Cap").
 10. "TRANSFER_BETWEEN_ACCOUNTS": ONLY if user explicitly moves funds between two existing accounts owned by user (e.g. "moved 5000 from HDFC to SBI", "transfer 1000 from SBI to ICICI").
-11. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, or summary. Provide friendly concise markdown in "replyMessage".
+11. "FINANCIAL_QUERY": If user asked a question, for net worth, advice, top spending, budget check, or summary. Provide friendly concise markdown in "replyMessage".
 12. "GREETING": If user sends a greeting like hi, hello, hey, good morning, etc. Set replyMessage to a friendly short greeting.
 
 IMPORTANT: For DELETE_ACCOUNT, match the accountName the user mentions against the account names in the user's context. Use the exact account name from context.
@@ -255,14 +276,166 @@ Output raw JSON with no markdown tags.`;
 }
 
 /**
+ * Transcribe and parse voice notes (audio messages) using Gemini Multimodal Audio API
+ */
+export async function parseVoiceNoteWithGemini(
+  audioBase64: string,
+  mimeType: string,
+  userContext: string,
+  apiKey: string,
+  chatHistory?: string
+): Promise<GeminiAutonomousDecision> {
+  try {
+    const historyBlock = chatHistory ? `\nRecent Conversation History:\n${chatHistory}\n` : "";
+    const systemPrompt = `You are the Multimodal Voice & Audio Financial AI Engine for FinanceOS & Telegram.
+Listen to the user's recorded voice note audio message.
+1. Transcribe the audio accurately into text.
+2. Determine the user's financial intent and decide what action to execute.
+
+User's Live Financial Context:
+${userContext}
+${historyBlock}
+Respond ONLY with valid JSON matching this schema:
+{
+  "transcription": "Exact spoken audio transcription text",
+  "action": "CREATE_ACCOUNT" | "DELETE_ACCOUNT" | "UPDATE_ACCOUNT" | "LOG_EXPENSE" | "LOG_INCOME" | "FAMILY_TRANSFER" | "ADD_FAMILY_MEMBER" | "BUY_STOCK" | "BUY_MUTUAL_FUND" | "TRANSFER_BETWEEN_ACCOUNTS" | "FINANCIAL_QUERY" | "GREETING" | "UNKNOWN",
+  "accountName": string or null,
+  "accountType": "checking" | "savings" | "credit" | "investment" | "cash" or null,
+  "initialBalance": number or null,
+  "amount": number or null,
+  "category": "Food" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Health" | "Housing" | "Salary" | "Gift" | "Work" | "Investments" | "Other" or null,
+  "description": string or null,
+  "targetAccountName": string or null,
+  "fromAccountName": string or null,
+  "toAccountName": string or null,
+  "familyMemberName": string or null,
+  "symbol": string or null,
+  "quantity": number or null,
+  "price": number or null,
+  "fundName": string or null,
+  "replyMessage": string or null,
+  "reasoning": string or null
+}
+
+Output raw JSON with no markdown tags.`;
+
+    const resultText = await callGeminiApi(
+      apiKey,
+      "Transcribe audio and analyze financial intent from this voice note.",
+      systemPrompt,
+      { mimeType: mimeType || "audio/ogg", data: audioBase64 }
+    );
+
+    const cleanedJson = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleanedJson);
+
+    return {
+      transcription: parsed.transcription || "Voice audio processed",
+      action: parsed.action || "UNKNOWN",
+      accountName: parsed.accountName || null,
+      accountType: parsed.accountType || "checking",
+      initialBalance: typeof parsed.initialBalance === "number" ? parsed.initialBalance : null,
+      amount: typeof parsed.amount === "number" ? parsed.amount : null,
+      category: parsed.category || null,
+      description: parsed.description || parsed.transcription || null,
+      targetAccountName: parsed.targetAccountName || null,
+      fromAccountName: parsed.fromAccountName || null,
+      toAccountName: parsed.toAccountName || null,
+      familyMemberName: parsed.familyMemberName || null,
+      symbol: parsed.symbol || null,
+      quantity: typeof parsed.quantity === "number" ? parsed.quantity : null,
+      price: typeof parsed.price === "number" ? parsed.price : null,
+      fundName: parsed.fundName || null,
+      replyMessage: parsed.replyMessage || null,
+      reasoning: parsed.reasoning || null,
+    };
+  } catch (error: any) {
+    return {
+      action: "UNKNOWN",
+      reasoning: error.message || "Failed to process voice note with Gemini",
+    };
+  }
+}
+
+/**
+ * Scan photo receipts & bills using Gemini Vision Multimodal API (OCR + Extraction)
+ */
+export async function parseReceiptWithGemini(
+  imageBase64: string,
+  mimeType: string,
+  userContext: string,
+  apiKey: string
+): Promise<{
+  success: boolean;
+  merchantName: string;
+  amount: number | null;
+  date: string | null;
+  category: string;
+  items: string[];
+  description: string;
+  accountName?: string | null;
+  error?: string;
+}> {
+  try {
+    const systemPrompt = `You are an expert Vision Financial Receipt Scanner for FinanceOS.
+Analyze this photo receipt, invoice, or bill. Extract the key data and respond with raw JSON matching this schema:
+{
+  "merchantName": "Name of store / restaurant / vendor",
+  "amount": total final amount paid as number (e.g. 450.50),
+  "date": "YYYY-MM-DD" if present on receipt else null,
+  "category": "Food" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Health" | "Housing" | "Other",
+  "items": ["list of main items purchased"],
+  "description": "Short clean description summary of receipt",
+  "accountName": "bank name if printed on payment slip else null"
+}
+Output raw JSON with no markdown tags.`;
+
+    const resultText = await callGeminiApi(
+      apiKey,
+      "Analyze this receipt image and extract total amount, merchant, and items.",
+      systemPrompt,
+      { mimeType: mimeType || "image/jpeg", data: imageBase64 }
+    );
+
+    const cleanedJson = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleanedJson);
+
+    return {
+      success: true,
+      merchantName: parsed.merchantName || "Store Purchase",
+      amount: typeof parsed.amount === "number" && parsed.amount > 0 ? parsed.amount : null,
+      date: parsed.date || null,
+      category: parsed.category || "Shopping",
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      description: parsed.description || `${parsed.merchantName || "Receipt"} Purchase`,
+      accountName: parsed.accountName || null,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      merchantName: "Receipt",
+      amount: null,
+      date: null,
+      category: "Other",
+      items: [],
+      description: "Receipt Scan Failed",
+      error: error.message || "Failed to analyze receipt",
+    };
+  }
+}
+
+/**
  * Conversational AI Assistant for financial questions & advice
  */
 export async function askGeminiFinanceAssistant(
   query: string,
   contextSummary: string,
-  apiKey: string
+  apiKey: string,
+  chatHistory?: string
 ): Promise<string> {
-  const systemPrompt = `You are an expert AI Financial Coach for FinanceOS. Answer user questions concisely (max 3-4 bullet points), friendly, and actionable using the user's financial context when relevant. User context:\n${contextSummary}`;
+  const historyBlock = chatHistory ? `\nRecent Conversation History:\n${chatHistory}\n` : "";
+  const systemPrompt = `You are an expert AI Financial Coach for FinanceOS. Answer user questions concisely (max 3-4 bullet points), friendly, and actionable using the user's financial context when relevant. User context:\n${contextSummary}\n${historyBlock}`;
 
   return await callGeminiApi(apiKey, query, systemPrompt);
 }
+

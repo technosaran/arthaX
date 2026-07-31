@@ -678,13 +678,15 @@ export default function FamilyClient() {
                         </span>
                         <div className="flex items-center gap-3 mt-4">
                           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 via-rose-500/15 to-purple-500/20 border border-pink-500/30 flex items-center justify-center p-1 shadow-lg shadow-pink-500/10">
-                            {avatar ? (
-                              <Image src={avatar} alt={member.name} width={48} height={48} className="w-12 h-12 rounded-xl object-cover" />
+                             {avatar ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={avatar} alt={member.name} className="w-12 h-12 rounded-xl object-cover" />
                             ) : (
                               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-700 flex items-center justify-center text-white font-black text-lg">
                                 {initials}
                               </div>
                             )}
+
                           </div>
                         </div>
                       </div>
