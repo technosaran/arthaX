@@ -516,23 +516,26 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Priority chain: SVG CDN (crisp at any size) → Google 256px HD Favicon → Unavatar → IconHorse
+  // Priority chain: Clearbit HD (128-512px vector/PNG) → SVG CDN → Google 256px HD Favicon → Unavatar → IconHorse
   const sources: string[] = [];
 
-  // 1. Use curated Indian bank SVG logos first (vector = never blurry)
+  // 1. Clearbit Logo API (ultra crisp high-res brand logos)
+  sources.push(`https://logo.clearbit.com/${domain}`);
+
+  // 2. Use curated Indian bank SVG logos
   if (INDIAN_BANK_CDNS[domain]) {
     sources.push(INDIAN_BANK_CDNS[domain]);
   }
 
-  // 2. Google HD favicon at 256px (high quality raster)
+  // 3. Google HD favicon at 256px (high quality raster)
   sources.push(
     `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
   );
 
-  // 3. Unavatar (aggregator – decent quality)
+  // 4. Unavatar (aggregator – decent quality)
   sources.push(`https://unavatar.io/${domain}`);
 
-  // 4. IconHorse (final fallback – better than DuckDuckGo .ico which returns tiny 16-32px icons)
+  // 5. IconHorse (final fallback)
   sources.push(`https://icon.horse/icon/${domain}`);
 
   return sources;

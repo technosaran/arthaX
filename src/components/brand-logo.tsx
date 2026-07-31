@@ -122,7 +122,7 @@ const KNOWN_DOMAINS: Record<string, string> = {
   // Merchants & Services
   kfc: "kfc.com",
   raymond: "raymond.in",
-  otto: "otto.de",
+  otto: "ottostore.com",
   uber: "uber.com",
   ola: "olacabs.com",
   rapido: "rapido.bike",
@@ -242,8 +242,9 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
     if (!domain) return [];
 
-    // Recommended Merchant Logo API sequence (Google 256px HD Favicon → Unavatar → IconHorse)
+    // Recommended Merchant Logo API sequence (Clearbit HD → Google 256px HD Favicon → Unavatar → IconHorse)
     return [
+      `https://logo.clearbit.com/${domain}`,
       `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
       `https://unavatar.io/${domain}`,
       `https://icon.horse/icon/${domain}`,
@@ -307,7 +308,7 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
   };
 
   return (
-    <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-slate-800/90 p-1 shadow-sm border border-white/15 overflow-hidden`}>
+    <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white p-1 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}

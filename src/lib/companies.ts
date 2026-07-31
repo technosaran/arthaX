@@ -235,12 +235,14 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   makemytrip: "makemytrip.com",
   goibibo: "goibibo.com",
   redbus: "redbus.in",
+  otto: "ottostore.com",
+  raymond: "raymond.in",
   subway: "subway.com",
   pizzahut: "pizzahut.co.in",
 };
 
 /**
- * Get ordered logo URLs for a company using 256px Google HD Favicons, unavatar.io, DuckDuckGo, and IconHorse.
+ * Get ordered logo URLs for a company using Clearbit HD, 256px Google HD Favicons, unavatar.io, and IconHorse.
  */
 export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
   if (!companyNameOrDomain) return [];
@@ -256,8 +258,9 @@ export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Priority chain: Google 256px HD Favicon → Unavatar → IconHorse (no DuckDuckGo .ico – too small/blurry)
+  // Priority chain: Clearbit HD → Google 256px HD Favicon → Unavatar → IconHorse
   return [
+    `https://logo.clearbit.com/${domain}`,
     `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
     `https://unavatar.io/${domain}`,
     `https://icon.horse/icon/${domain}`,
