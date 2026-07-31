@@ -337,14 +337,14 @@ export default function Sidebar() {
       <aside className={`hidden md:flex shrink-0 flex-col h-screen sticky top-0 transition-all duration-300 ${isCollapsed ? "w-20" : "w-44"}`} style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)", backdropFilter: "blur(20px) saturate(1.2)", WebkitBackdropFilter: "blur(20px) saturate(1.2)" }}>
         <div className={`px-4 pt-6 pb-2 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
           {!isCollapsed ? (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="arthaX Logo" className="w-8 h-8 rounded-lg object-cover filter drop-shadow-md shrink-0" />
-              <span className="text-2xl font-black text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
+              <img src="/logo.png" alt="arthaX Logo" className="w-10 h-10 rounded-xl object-cover shadow-[0_0_15px_rgba(56,189,248,0.35)] border border-sky-400/20 shrink-0" />
+              <span className="text-3xl font-[950] text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
             </div>
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src="/logo.png" alt="arthaX Logo" className="w-8 h-8 rounded-lg object-cover filter drop-shadow-md shrink-0" title="arthaX" />
+            <img src="/logo.png" alt="arthaX Logo" className="w-10 h-10 rounded-xl object-cover shadow-[0_0_15px_rgba(56,189,248,0.35)] border border-sky-400/20 shrink-0" title="arthaX" />
           )}
           <button 
             type="button" 

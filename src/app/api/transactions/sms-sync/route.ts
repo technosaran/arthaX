@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     const dateObj = new Date(cleanDate);
     const minDate = new Date(dateObj.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const maxDate = new Date(dateObj.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const tableName = type === "expense" ? "expenses" : "income";
+    const tableName = type === "expense" ? "expenses" : "incomes";
 
     const [{ data: existingTable }, { data: existingTx }] = await Promise.all([
       supabase

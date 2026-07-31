@@ -1,63 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET, POST } from "@/app/api/mcp/route";
+jest.mock("@supabase/supabase-js", () => {
+  const mockAccounts = [
+    { id: "acc-1", name: "HDFC Bank", balance: 25000, currency: "INR", user_id: "u-1" }
+  ];
 
-vi.mock("@supabase/supabase-js", () => {
   return {
-    createClient: vi.fn(() => ({
-      from: vi.fn((table: string) => {
-        if (table === "accounts") {
+    createClient: jest.fn(() => ({
+      from: jest.fn((table: string) => {
+        const getTableData = () => (table === "accounts" ? mockAccounts : []);
+        const createQuery = () => {
+          const res = { data: getTableData(), error: null };
           return {
-            select: vi.fn().mockResolvedValue({
-              data: [
-                { id: "acc-1", name: "HDFC Bank", balance: "25000", currency: "INR", user_id: "u-1" },
-              ],
-              error: null,
-            }),
-            update: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
+            then: (resolve: any) => resolve(res),
+            select: jest.fn().mockImplementation(() => createQuery()),
+            eq: jest.fn().mockImplementation(() => createQuery()),
+            limit: jest.fn().mockImplementation(() => createQuery()),
+            order: jest.fn().mockImplementation(() => createQuery()),
+            single: jest.fn().mockImplementation(() => Promise.resolve({ data: getTableData()[0] || null, error: null })),
           };
-        }
-        if (table === "expenses" || table === "incomes" || table === "liabilities") {
-          return {
-            select: vi.fn().mockResolvedValue({ data: [], error: null }),
-            insert: vi.fn().mockResolvedValue({ data: null, error: null }),
-          };
-        }
-        if (table === "transactions") {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-            insert: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { id: "tx-1", description: "Coffee", amount: "100", category: "Food" },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "ledger_logs") {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-            insert: vi.fn().mockResolvedValue({ data: null, error: null }),
-          };
-        }
+        };
+
         return {
-          select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          select: jest.fn().mockImplementation(() => createQuery()),
+          update: jest.fn().mockImplementation(() => createQuery()),
+          insert: jest.fn().mockImplementation((item: any) => {
+            const data = Array.isArray(item) ? item[0] : item;
+            const res = { data, error: null };
+            return {
+              then: (resolve: any) => resolve(res),
+              select: jest.fn().mockImplementation(() => ({
+                single: jest.fn().mockImplementation(() => Promise.resolve({ data: { id: "tx-1", ...data }, error: null })),
+              })),
+            };
+          }),
         };
       }),
     })),
   };
 });
+
+import { GET, POST } from "@/app/api/mcp/route";
 
 describe("MCP API Route", () => {
   beforeEach(() => {
@@ -80,8 +61,8 @@ describe("MCP API Route", () => {
     });
 
     const response = await POST(req);
-    expect(response.status).toBe(200);
     const body = await response.json();
+    expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.result.total_bank_balance).toBe(25000);
   });
@@ -102,8 +83,8 @@ describe("MCP API Route", () => {
     });
 
     const response = await POST(req);
-    expect(response.status).toBe(200);
     const body = await response.json();
+    expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.result.account_updated).toBe("HDFC Bank");
   });

@@ -1,13 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// Define the mock inside the factory
-vi.mock("@/lib/logger", () => {
-  const infoMock = vi.fn();
-  const warnMock = vi.fn();
-  const errorMock = vi.fn();
-  const debugMock = vi.fn();
-  const fatalMock = vi.fn();
-  const childMock = vi.fn().mockReturnThis();
+jest.mock("@/lib/logger", () => {
+  const infoMock = jest.fn();
+  const warnMock = jest.fn();
+  const errorMock = jest.fn();
+  const debugMock = jest.fn();
+  const fatalMock = jest.fn();
+  const childMock = jest.fn().mockReturnThis();
 
   const mockInstance = {
     info: infoMock,
@@ -36,6 +33,8 @@ vi.mock("@/lib/logger", () => {
 
 import { SecurityLogger } from "@/lib/security-logger";
 import { Logger } from "@/lib/logger";
+
+const vi = jest;
 
 describe("SecurityLogger", () => {
   let mockLoggerInstance: any;

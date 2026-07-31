@@ -1,4 +1,3 @@
-import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Skeleton, TableSkeleton } from "@/components/ui/loading-skeleton";
 

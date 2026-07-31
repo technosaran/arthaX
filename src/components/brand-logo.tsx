@@ -2,6 +2,8 @@
 
 import { useMemo, useState, memo } from "react";
 import { getBankLogoSources } from "@/lib/banks";
+import { getCompanyLogoSources } from "@/lib/companies";
+import { getCachedLogo, setCachedLogo, setCachedLogoNotFound, NOT_FOUND } from "@/lib/logo-cache";
 
 const GENERIC_NON_MERCHANT_WORDS = new Set([
   "home", "rent", "dress", "clothes", "clothing", "food", "dinner", "lunch", "breakfast",
@@ -187,7 +189,28 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
       }
     }
 
-    // 2. Resolve domain for general brand from KNOWN_DOMAINS
+    // 2. Check logo cache for fast return or cached negative lookup
+    const cached = getCachedLogo(cleanQuery);
+    if (cached === NOT_FOUND) {
+      return [];
+    }
+    if (cached) {
+      return [cached];
+    }
+
+    // 3. Check if query is a bank
+    const bankSources = getBankLogoSources(cleanQuery);
+    if (bankSources.length > 0) {
+      return bankSources;
+    }
+
+    // 4. Check if query is a company
+    const companySources = getCompanyLogoSources(cleanQuery);
+    if (companySources.length > 0) {
+      return companySources;
+    }
+
+    // 5. Resolve domain for general merchant
     let domain: string | null = null;
     for (const [key, dom] of Object.entries(KNOWN_DOMAINS)) {
       if (clean.includes(key)) {
@@ -204,12 +227,6 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     }
 
     if (!domain) {
-      // 3. Check if query is a bank
-      const bankSources = getBankLogoSources(cleanQuery);
-      if (bankSources.length > 0) {
-        return bankSources;
-      }
-
       const firstWord = clean
         .replace(/^(dividend|salary|expense|purchase|paid to|payment to|ref):\s*/i, "")
         .replace(/\b(ltd|limited|corp|inc|co|serv|services|fund|direct|regular|plan|growth|option|mutual)\b/gi, "")
@@ -225,12 +242,13 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
     if (!domain) return [];
 
-    // General Brand Logo API sequence (Google 128px favicon CDN -> faviconkit -> unavatar -> duckduckgo)
+    // Recommended Merchant Logo API sequence (IconHorse -> DuckDuckGo -> FaviconKit -> Clearbit -> Google)
     return [
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-      `https://api.faviconkit.com/${domain}/128`,
-      `https://unavatar.io/${domain}`,
+      `https://api.iconhorse.com/v1/${domain}`,
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+      `https://api.faviconkit.com/${domain}/128`,
+      `https://logo.clearbit.com/${domain}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     ];
   }, [cleanQuery]);
 
@@ -276,6 +294,20 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     );
   }
 
+  const handleImgError = () => {
+    const nextIndex = srcIndex + 1;
+    if (nextIndex >= sources.length && cleanQuery) {
+      setCachedLogoNotFound(cleanQuery);
+    }
+    setSrcIndex(nextIndex);
+  };
+
+  const handleImgLoad = () => {
+    if (cleanQuery && currentSrc) {
+      setCachedLogo(cleanQuery, currentSrc);
+    }
+  };
+
   return (
     <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-slate-800/90 p-1 shadow-sm border border-white/15 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -285,7 +317,8 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
         alt={cleanQuery || "Logo"}
         className="w-full h-full object-contain rounded-lg"
         loading="lazy"
-        onError={() => setSrcIndex((prev) => prev + 1)}
+        onLoad={handleImgLoad}
+        onError={handleImgError}
       />
     </div>
   );

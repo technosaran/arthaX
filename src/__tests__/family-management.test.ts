@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+const vi = jest;
 
 // -------------------------------------------------------------------
 // Mock next/cache – must be declared before action imports
 // -------------------------------------------------------------------
-vi.mock('next/cache', () => ({
-  revalidatePath: vi.fn(),
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
 }));
 
 // -------------------------------------------------------------------
@@ -41,8 +41,8 @@ const mockSupabase = {
   rpc: mockRpc,
 };
 
-vi.mock('@/lib/supabase-server', () => ({
-  createClient: vi.fn().mockImplementation(async () => mockSupabase),
+jest.mock('@/lib/supabase-server', () => ({
+  createClient: jest.fn().mockImplementation(async () => mockSupabase),
 }));
 
 // -------------------------------------------------------------------

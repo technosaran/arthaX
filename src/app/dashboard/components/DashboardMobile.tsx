@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { memo, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { MODULE_KEYS } from "@/lib/modules";
 
 
@@ -31,6 +32,7 @@ const secondaryQuickActions = [
 ];
 
 const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accounts, isValidating }: Props) {
+  useRealtimeSync();
   const { data: { profile } = {} } = useFinanceData();
   
   const enabledModules = useMemo(() => {
@@ -90,15 +92,19 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
       </div>
 
       {/* Portfolio Net Asset Value Card */}
-      <div className="glass-card-static relative flex flex-col overflow-hidden border border-white/5 p-5 shadow-2xl rounded-3xl bg-gradient-to-b from-[#181a20] to-[#111216]">
+      <div className="glass-card-static relative flex flex-col overflow-hidden border border-white/10 p-5 shadow-2xl rounded-3xl bg-gradient-to-b from-slate-900/90 via-slate-950/80 to-slate-900/90 backdrop-blur-xl">
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-sky-400 via-indigo-500 to-purple-600" />
         <div className="absolute -right-16 -top-16 w-36 h-36 bg-[--accent-primary]/10 blur-3xl rounded-full" />
         <div className="absolute -left-16 -bottom-16 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full" />
         
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-[--text-muted]">Net worth</p>
-          <span className="text-xs font-semibold text-[--accent-primary] bg-[--accent-primary]/10 px-2 py-0.5 rounded-full border border-[--accent-primary]/10">
-            Live
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
+            <span>Net Worth</span>
+            <span className="text-[0.625rem] font-bold text-sky-400">({showUSD ? 'USD $' : 'INR ₹'})</span>
+          </span>
+          <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>Live</span>
           </span>
         </div>
         
@@ -107,14 +113,8 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
           onClick={() => setIsToggled(prev => !prev)}
           title="Click to toggle currency"
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold text-[--text-muted] transition-colors group-hover/nw:text-[--text-primary]">
-              Net worth ({showUSD ? 'USD' : 'INR'})
-            </p>
-            <svg className="w-3 h-3 text-[--text-muted] opacity-50 group-hover/nw:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
               stats.totalDayPnL >= 0 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
@@ -131,7 +131,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
               </span>
             </span>
 
-            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
               (stats.totalGrowthINR || 0) >= 0 
                 ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
@@ -147,18 +147,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                 ({(stats.totalGrowthPercent || 0) >= 0 ? "+" : ""}{(stats.totalGrowthPercent || 0).toFixed(1)}%)
               </span>
             </span>
-
-            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all bg-sky-500/10 text-sky-400 border-sky-500/20 shadow-[0_0_10px_rgba(14,165,233,0.15)]">
-              <span>🛡️ Runway: </span>
-              <span>
-                {stats.monthlySpend > 0
-                  ? `${(stats.liquidBalanceINR / stats.monthlySpend).toFixed(1)} Mos`
-                  : stats.liquidBalanceINR > 0 ? "Infinite" : "0 Mos"
-                }
-              </span>
-            </span>
           </div>
-
 
           <div className="relative flex items-center justify-start h-[2.5rem] mt-1 w-[300px]">
             <AnimatePresence>
@@ -168,7 +157,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute left-0 text-3xl font-[900] tracking-tight text-white whitespace-nowrap"
+                className="absolute left-0 text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap"
               >
                 {showUSD 
                   ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`

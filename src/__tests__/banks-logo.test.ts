@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "@jest/globals";
 import { getBankDomain, getBankLogoSources, searchBanks } from "@/lib/banks";
 
 describe("Bank Logo and Domain Resolution", () => {
@@ -57,14 +57,14 @@ describe("Bank Logo and Domain Resolution", () => {
     expect(getBankDomain("Angel One")).toBe("angelone.in");
   });
 
-  it("generates multi-CDN logo sources correctly", () => {
+  it("generates multi-CDN online logo sources correctly", () => {
     const sources = getBankLogoSources("HDFC Bank");
-    expect(sources).toHaveLength(5);
-    expect(sources[0]).toContain("google.com/s2/favicons?domain=hdfcbank.com");
-    expect(sources[1]).toContain("api.faviconkit.com/hdfcbank.com/128");
-    expect(sources[2]).toContain("unavatar.io/hdfcbank.com");
-    expect(sources[3]).toContain("icons.duckduckgo.com/ip3/hdfcbank.com.ico");
-    expect(sources[4]).toContain("logo.clearbit.com/hdfcbank.com");
+    expect(sources.length).toBeGreaterThanOrEqual(5);
+    expect(sources[0]).toBe("https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/hdfc.svg");
+    expect(sources).toContain("https://api.iconhorse.com/v1/hdfcbank.com");
+    expect(sources).toContain("https://logo.clearbit.com/hdfcbank.com");
+    expect(sources).toContain("https://api.faviconkit.com/hdfcbank.com/128");
+    expect(sources).toContain("https://icons.duckduckgo.com/ip3/hdfcbank.com.ico");
   });
 
 

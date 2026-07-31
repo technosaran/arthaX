@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { useMemo, memo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Greeting from "@/components/greeting";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { MODULE_KEYS } from "@/lib/modules";
@@ -106,6 +107,7 @@ type Props = {
 };
 
 const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goals: _goals, accounts, isLoading }: Props) {
+  useRealtimeSync();
   const { data: { profile } = {} } = useFinanceData();
   const [activeChartMetric, setActiveChartMetric] = useState<"cashflow" | "assets" | "investments">("cashflow");
   const [timeframe, setTimeframe] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("6M");
@@ -299,28 +301,34 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           whileHover={{ y: -2 }}
-          className="glass-card-static rich-border group relative overflow-hidden p-8 md:p-10 lg:col-span-3 hover:border-sky-500/20 hover:shadow-[0_20px_50px_rgba(14,165,233,0.15)] transition-all duration-300"
+          className="glass-card-static rich-border group relative overflow-hidden p-8 md:p-10 lg:col-span-3 border border-white/10 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-slate-900/90 hover:border-sky-500/30 hover:shadow-[0_25px_60px_rgba(14,165,233,0.18)] transition-all duration-500 backdrop-blur-2xl rounded-3xl"
         >
           <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500 animate-pulse-glow" />
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+          <div className="absolute -top-24 -right-24 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-10 relative z-10">
             <div className="relative z-10 w-full lg:w-auto">
               <div 
                 className="flex flex-col select-none cursor-pointer group/nw"
                 onClick={() => setShowUSD(prev => !prev)}
                 title="Click to toggle currency (INR / USD)"
               >
-                <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-[--text-muted] group-hover/nw:text-white transition-colors flex items-center gap-1.5">
-                    Portfolio Net Worth ({showUSD ? 'USD' : 'INR'})
-                    <svg className="w-3 h-3 text-[--text-muted] opacity-50 group-hover/nw:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-[--text-muted] group-hover/nw:text-white transition-colors flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                    <span>Portfolio Net Worth</span>
+                    <span className="text-[0.625rem] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded-md">
+                      {showUSD ? 'USD $' : 'INR ₹'}
+                    </span>
+                    <svg className="w-3.5 h-3.5 text-sky-400 group-hover/nw:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                   </span>
 
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.6875rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
                     stats.totalDayPnL >= 0 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.15)]' 
-                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 shadow-[0_0_15px_rgba(52,211,153,0.2)]' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/25 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
                   }`}>
                     <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
                     <span>
@@ -329,7 +337,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                         : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       }
                     </span>
-                    <span className="opacity-75">
+                    <span className="opacity-80">
                       ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(2)}%)
                     </span>
                   </span>
@@ -342,10 +350,10 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                       exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                      className={`absolute left-0 bg-clip-text bg-gradient-to-r text-[clamp(2.2rem,5vw,3.5rem)] font-[950] leading-none tracking-[-0.04em] text-transparent [font-family:'Outfit',sans-serif] whitespace-nowrap overflow-hidden transition-all duration-500 ${
+                      className={`absolute left-0 bg-clip-text bg-gradient-to-r text-[clamp(2.4rem,5vw,3.8rem)] font-[950] leading-none tracking-[-0.04em] text-transparent [font-family:'Outfit',sans-serif] whitespace-nowrap overflow-hidden transition-all duration-500 ${
                         showUSD 
-                          ? "from-white via-sky-200 to-indigo-300 drop-shadow-[0_10px_35px_rgba(99,102,241,0.3)]" 
-                          : "from-white via-white to-slate-300 drop-shadow-[0_10px_35px_rgba(14,165,233,0.3)]"
+                          ? "from-white via-sky-200 to-indigo-300 drop-shadow-[0_10px_35px_rgba(99,102,241,0.35)]" 
+                          : "from-white via-white to-slate-200 drop-shadow-[0_10px_35px_rgba(14,165,233,0.35)]"
                       }`}
                     >
                     {showUSD 
@@ -357,18 +365,18 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-wrap items-center gap-4 sm:gap-6">
+              <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-5">
                 <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all cursor-default ${
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all cursor-default backdrop-blur-md ${
                     stats.totalDayPnL >= 0 
-                      ? 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10' 
-                      : 'bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10'
+                      ? 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15 shadow-[0_4px_20px_rgba(16,185,129,0.1)]' 
+                      : 'bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/15 shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
                   }`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-inner ${
-                    stats.totalDayPnL >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                    stats.totalDayPnL >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
                   }`}>
                     {stats.totalDayPnL >= 0 ? "⚡" : "📉"}
                   </div>
@@ -386,14 +394,15 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     </span>
                   </div>
                 </motion.div>
+
                 <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-emerald-500/10 cursor-default"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-5 py-3.5 rounded-2xl transition-all hover:bg-emerald-500/15 shadow-[0_4px_20px_rgba(16,185,129,0.1)] backdrop-blur-md cursor-default"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-base shadow-inner">📈</div>
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-300 text-base shadow-inner">📈</div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-[--text-muted]">Liquid assets</span>
+                    <span className="text-xs font-semibold text-[--text-muted]">Liquid Assets</span>
                     <span className="text-sm sm:text-base font-black text-emerald-400">
                       {showUSD 
                         ? `+$${stats.liquidBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
@@ -405,16 +414,16 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
 
                 {/* Total All-Time Growth Badge */}
                 <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all cursor-default ${
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className={`flex items-center gap-3 border px-5 py-3.5 rounded-2xl transition-all backdrop-blur-md cursor-default ${
                     (stats.totalGrowthINR || 0) >= 0 
-                      ? 'bg-purple-500/5 border-purple-500/10 hover:bg-purple-500/10' 
-                      : 'bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10'
+                      ? 'bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/15 shadow-[0_4px_20px_rgba(168,85,247,0.1)]' 
+                      : 'bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/15 shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
                   }`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-inner ${
-                    (stats.totalGrowthINR || 0) >= 0 ? 'bg-purple-500/10 text-purple-400' : 'bg-rose-500/10 text-rose-400'
+                    (stats.totalGrowthINR || 0) >= 0 ? 'bg-purple-500/20 text-purple-300' : 'bg-rose-500/20 text-rose-300'
                   }`}>
                     🏆
                   </div>
@@ -432,27 +441,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     </span>
                   </div>
                 </motion.div>
-
-                {/* Financial Runway / Emergency Coverage Badge */}
-                <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 bg-sky-500/5 border border-sky-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-sky-500/10 cursor-default"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 text-base shadow-inner">🛡️</div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-[--text-muted]">Financial Runway</span>
-                    <span className="text-sm sm:text-base font-black text-sky-400">
-                      {stats.monthlySpend > 0
-                        ? `${(stats.liquidBalanceINR / stats.monthlySpend).toFixed(1)} Mos Coverage`
-                        : stats.liquidBalanceINR > 0 ? "Infinite Coverage" : "0 Mos Coverage"
-                      }
-                    </span>
-                  </div>
-                </motion.div>
-
               </div>
-
             </div>
 
             <div className="flex-1 max-w-md w-full">

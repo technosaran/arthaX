@@ -188,9 +188,17 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10">
-          <h1 className="text-[clamp(2.5rem,4vw,3.5rem)] font-black text-white tracking-tight mb-4">
-            artha<span className="text-sky-400">X</span>
-          </h1>
+          <div className="flex items-center gap-4 mb-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logo.png" 
+              alt="arthaX Logo" 
+              className="w-14 h-14 rounded-2xl object-cover shadow-[0_0_25px_rgba(56,189,248,0.4)] border border-sky-400/30" 
+            />
+            <h1 className="text-[clamp(2.8rem,4.5vw,3.8rem)] font-[950] text-white tracking-tight">
+              artha<span className="text-sky-400">X</span>
+            </h1>
+          </div>
           <p className="text-lg font-medium text-white/50 max-w-md leading-relaxed">
             Enterprise Wealth Terminal. Unify your assets, optimize your portfolio, and track performance in real-time.
           </p>
@@ -223,9 +231,15 @@ export default function LoginPage() {
           variants={containerVariants}
           className="relative z-10 w-full max-w-[440px] glass-card-static bg-white/[0.02] border border-white/5 rounded-3xl p-8 sm:p-10 shadow-2xl backdrop-blur-2xl"
         >
-          {/* Mobile Logo */}
-          <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-8">
-            <h1 className="text-3xl font-black text-white tracking-tight">
+          {/* Mobile Logo Header */}
+          <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logo.png" 
+              alt="arthaX Logo" 
+              className="w-12 h-12 rounded-xl object-cover shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-sky-400/30 mb-2" 
+            />
+            <h1 className="text-3xl font-[950] text-white tracking-tight">
               artha<span className="text-sky-400">X</span>
             </h1>
           </motion.div>

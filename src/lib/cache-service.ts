@@ -47,6 +47,20 @@ export class CacheService {
   }
 
   /**
+   * High-level query cache wrapper. Returns cached item or executes fetcher, caches result, and returns.
+   */
+  public async getOrSet<T>(key: string, fetchFn: () => Promise<T>, ttlSeconds?: number): Promise<T> {
+    const cached = await this.get<T>(key);
+    if (cached !== null) return cached;
+
+    const fresh = await fetchFn();
+    if (fresh !== null && fresh !== undefined) {
+      await this.set(key, fresh, ttlSeconds);
+    }
+    return fresh;
+  }
+
+  /**
    * Deletes keys matching a wildcard pattern (e.g. "user:123:*").
    */
   public async deletePattern(pattern: string): Promise<void> {
@@ -75,24 +89,6 @@ export class CacheService {
         console.error("[CacheService] FLUSH failed:", err);
       }
     }
-  }
-
-  /**
-   * Gets a value from cache if it exists, otherwise calls factory to compute and stores it.
-   */
-  public async getOrSet<T>(
-    key: string,
-    factory: () => Promise<T>,
-    ttlSeconds?: number
-  ): Promise<T> {
-    const cached = await this.get<T>(key);
-    if (cached !== null) {
-      return cached;
-    }
-
-    const value = await factory();
-    await this.set(key, value, ttlSeconds);
-    return value;
   }
 }
 

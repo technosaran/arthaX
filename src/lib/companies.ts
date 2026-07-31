@@ -294,3 +294,72 @@ export function getCompanyDomain(name: string): string | null {
 
   return null;
 }
+
+const COMPANY_SIMPLE_ICONS: Record<string, string> = {
+  "google.com": "google",
+  "microsoft.com": "microsoft",
+  "apple.com": "apple",
+  "amazon.com": "amazon",
+  "amazon.in": "amazon",
+  "meta.com": "meta",
+  "netflix.com": "netflix",
+  "adobe.com": "adobe",
+  "salesforce.com": "salesforce",
+  "oracle.com": "oracle",
+  "ibm.com": "ibm",
+  "accenture.com": "accenture",
+  "cognizant.com": "cognizant",
+  "infosys.com": "infosys",
+  "tcs.com": "tata",
+  "tata.com": "tata",
+  "wipro.com": "wipro",
+  "swiggy.in": "swiggy",
+  "zomato.com": "zomato",
+  "stripe.com": "stripe",
+  "razorpay.com": "razorpay",
+  "upwork.com": "upwork",
+  "fiverr.com": "fiverr",
+  "github.com": "github",
+  "gitlab.com": "gitlab",
+  "atlassian.com": "atlassian",
+  "uber.com": "uber",
+  "zoom.us": "zoom",
+  "linkedin.com": "linkedin",
+};
+
+/**
+ * Get ordered logo URLs for a company using online SimpleIcons CDN, IconHorse, FaviconKit, DuckDuckGo, Clearbit and Google.
+ */
+export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
+  if (!companyNameOrDomain) return [];
+  const raw = companyNameOrDomain.trim();
+  const domainRegex = /^[a-z0-9\-]+\.(?:com|in|co|io|ai|org|net|tech|app|dev)$/i;
+
+  let domain: string | null = null;
+  if (domainRegex.test(raw)) {
+    domain = raw.toLowerCase();
+  } else {
+    domain = getCompanyDomain(raw);
+  }
+
+  if (!domain) return [];
+
+  const sources: string[] = [];
+
+  // 1. SimpleIcons Online CDN first
+  const simpleIconSlug = COMPANY_SIMPLE_ICONS[domain];
+  if (simpleIconSlug) {
+    sources.push(`https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/${simpleIconSlug}.svg`);
+  }
+
+  // 2. Multi-provider online CDN chain for Companies (IconHorse -> FaviconKit -> DuckDuckGo -> Clearbit -> Google)
+  sources.push(
+    `https://api.iconhorse.com/v1/${domain}`,
+    `https://api.faviconkit.com/${domain}/128`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://logo.clearbit.com/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+  );
+
+  return sources;
+}

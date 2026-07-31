@@ -9,7 +9,6 @@ import { useFinanceData } from "@/hooks/use-finance-data";
 import type { FinanceData } from "@/hooks/use-finance-data";
 import { MODULE_KEYS } from "@/lib/modules";
 
-
 import ProfileTab from "./components/ProfileTab";
 import ModulesTab from "./components/ModulesTab";
 import DefaultsTab from "./components/DefaultsTab";
@@ -19,22 +18,29 @@ import IntegrationsTab from "./components/IntegrationsTab";
 import SystemStatusTab from "./components/SystemStatusTab";
 import DangerZoneTab from "./components/DangerZoneTab";
 
-
-
 type TabKey = "profile" | "modules" | "defaults" | "imports" | "integrations" | "exports" | "status" | "danger";
+
+interface NavigationCategory {
+  category: string;
+  items: {
+    key: TabKey;
+    label: string;
+    icon: string;
+    badge?: string;
+    description: string;
+  }[];
+}
 
 export default function SettingsPage() {
   const { username, setUsername, loading, isSyncing } = useUser();
   const { data, mutate } = useFinanceData();
-  const {
-    profile,
-    accounts = [],
-  } = data || {};
+  const { profile, accounts = [] } = data || {};
 
   const [input, setInput] = useState(username);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const prevIsSyncingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -42,7 +48,6 @@ export default function SettingsPage() {
       const gmailStatus = params.get("gmail");
       if (gmailStatus) {
         setActiveTab("integrations");
-
         const url = new URL(window.location.href);
         url.searchParams.delete("gmail");
         url.searchParams.delete("reason");
@@ -88,7 +93,7 @@ export default function SettingsPage() {
 
   const defaultAccounts = profile?.default_accounts || {};
   const baseCurrency = profile?.base_currency || "INR";
-  const theme = profile?.theme || "system";
+  const theme = profile?.theme || "dark";
   const timezone = profile?.timezone || "Asia/Kolkata";
 
   const enabledModules = useMemo(() => {
@@ -156,14 +161,14 @@ export default function SettingsPage() {
   const saveSetting = async (key: string, value: unknown, successMessage: string) => {
     const optimisticProfile = {
       username: profile?.username || "",
-      base_currency: key === "base_currency" ? value : baseCurrency,
-      theme: key === "theme" ? value : theme,
-      timezone: key === "timezone" ? value : timezone,
-      enabled_modules: key === "enabled_modules" ? value : enabledModules,
-      default_accounts: key === "default_accounts" ? value : defaultAccounts,
+      base_currency: key === "base_currency" ? (value as string) : baseCurrency,
+      theme: key === "theme" ? (value as string) : theme,
+      timezone: key === "timezone" ? (value as string) : timezone,
+      enabled_modules: key === "enabled_modules" ? (value as string[]) : enabledModules,
+      default_accounts: key === "default_accounts" ? (value as Record<string, string | null>) : defaultAccounts,
     };
 
-    mutate((prev: FinanceData | undefined) => (prev ? { ...prev, profile: optimisticProfile } : prev), false);
+    mutate((prev: FinanceData | undefined) => (prev ? { ...prev, profile: optimisticProfile as any } : prev), false);
 
     const res = await updateSettings({ [key]: value });
     if (res.error) {
@@ -298,10 +303,7 @@ export default function SettingsPage() {
 
         globalMutate(
           "finance_family",
-          {
-            members: [],
-            transfers: [],
-          },
+          { members: [], transfers: [] },
           { revalidate: false }
         );
 
@@ -320,121 +322,246 @@ export default function SettingsPage() {
 
   const canExecuteReset = resetConfirmText === "RESET" && resetCountdown <= 0 && !isResetting;
 
+  const NAV_CATEGORIES: NavigationCategory[] = [
+    {
+      category: "Account & Workspace",
+      items: [
+        { key: "profile", label: "Profile & Identity", icon: "👤", description: "Display name, currency & theme" },
+        { key: "modules", label: "Module Visibility", icon: "🧩", badge: `${enabledModules.length} Active`, description: "Enable or hide dashboard modules" },
+        { key: "defaults", label: "Default Bank Accounts", icon: "⚙️", description: "Default payment nodes per feature" },
+      ],
+    },
+    {
+      category: "Data & Storage",
+      items: [
+        { key: "imports", label: "Data Imports", icon: "📥", badge: "2 Parsers", description: "Bank statement PDF & CAS parser" },
+        { key: "exports", label: "Data Exports", icon: "📤", badge: "10 Formats", description: "CSV exports & custom reports" },
+      ],
+    },
+    {
+      category: "AI & Integrations",
+      items: [
+        {
+          key: "integrations",
+          label: "Connected Services",
+          icon: "⚡",
+          badge: profile?.telegram_chat_id ? "Active" : "Ready",
+          description: "Telegram Assistant & Gemini AI",
+        },
+      ],
+    },
+    {
+      category: "System & Safety",
+      items: [
+        { key: "status", label: "System Status", icon: "🟢", description: "API health & latency checks" },
+        { key: "danger", label: "Danger Zone", icon: "⚠️", description: "Reset workspace & delete data" },
+      ],
+    },
+  ];
+
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return NAV_CATEGORIES;
+    const q = searchQuery.toLowerCase().trim();
+    return NAV_CATEGORIES.map((cat) => ({
+      ...cat,
+      items: cat.items.filter(
+        (item) =>
+          item.label.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q) ||
+          item.key.toLowerCase().includes(q)
+      ),
+    })).filter((cat) => cat.items.length > 0);
+  }, [searchQuery]);
+
   return (
-    <div className="flex flex-col gap-[var(--section-gap)] animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex flex-col gap-6 animate-fade-in pb-12">
+      {/* Top Banner Header with Quick Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-6 md:p-8 rounded-3xl bg-gradient-to-r from-slate-900/80 via-indigo-950/30 to-slate-950/80 border border-white/10 shadow-2xl">
         <div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-[--text-primary]">
-            Settings
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-black uppercase tracking-wider mb-2">
+            <span>⚙️ Workspace Settings</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white">
+            Settings & Preferences
           </h1>
-          <p className="mt-1 text-sm md:text-sm text-[--text-secondary]">
-            Manage your account preferences, modules, and database defaults.
+          <p className="mt-1 text-xs md:text-sm text-[--text-muted]">
+            Manage account identity, module layout, default bank nodes, imports/exports, and connected AI services.
           </p>
         </div>
-      </div>
 
-      {/* Premium Segmented Toggle Bar */}
-      <div className="w-full overflow-x-auto no-scrollbar scroll-smooth py-1">
-        <div className="flex items-center gap-1.5 rounded-2xl bg-white/[0.02] border border-white/10 p-1.5 w-max min-w-full md:w-auto shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] backdrop-blur-md">
-          {[
-            { key: "profile", label: "Profile", icon: "👤" },
-            { key: "modules", label: "Modules", icon: "🧩" },
-            { key: "defaults", label: "Defaults", icon: "⚙️" },
-            { key: "imports", label: "Data Imports", icon: "📥" },
-            { key: "exports", label: "Data Exports", icon: "📤" },
-            { key: "integrations", label: "Integrations", icon: "⚡" },
-            { key: "status", label: "System Status", icon: "🟢" },
-            { key: "danger", label: "Danger Zone", icon: "⚠️" },
-          ].map((tab) => {
-            const isActive = activeTab === tab.key;
-
-            let activeStyles = "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_4px_20px_rgba(6,182,212,0.35)]";
-            if (tab.key === "imports") activeStyles = "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-[0_4px_20px_rgba(168,85,247,0.35)]";
-            if (tab.key === "exports") activeStyles = "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_4px_20px_rgba(16,185,129,0.35)]";
-            if (tab.key === "danger") activeStyles = "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-[0_4px_20px_rgba(244,63,94,0.35)]";
-
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key as TabKey)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 whitespace-nowrap active:scale-95 cursor-pointer shrink-0 ${
-                  isActive
-                    ? `${activeStyles} border border-white/20`
-                    : "text-[--text-muted] hover:text-white hover:bg-white/5 border border-transparent"
-                }`}
-              >
-                <span className="text-sm select-none">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        {/* Real-time Settings Search Filter */}
+        <div className="w-full md:w-80 relative shrink-0">
+          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-gray-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search preferences or settings..."
+            className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition-all font-medium shadow-inner"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute inset-y-0 right-3.5 flex items-center text-xs text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Tab Contents */}
-      {activeTab === "profile" && (
-        <ProfileTab
-          input={input}
-          username={username}
-          isSyncing={isSyncing}
-          lastSaved={lastSaved}
-          handleChange={handleChange}
-          handleBlur={handleBlur}
-          handleKeyDown={handleKeyDown}
-        />
-      )}
+      {/* Main Dual Pane Layout Architecture */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        {/* Left Sidebar Navigation (Desktop md:grid-cols-4) */}
+        <div className="hidden md:block md:col-span-4 lg:col-span-3 sticky top-6 space-y-4">
+          <div className="glass-card p-4 rounded-3xl bg-slate-900/60 border border-white/10 shadow-xl space-y-5">
+            {filteredCategories.map((cat) => (
+              <div key={cat.category} className="space-y-1.5">
+                <p className="px-3 text-[0.625rem] font-black uppercase tracking-[0.2em] text-indigo-400/80">
+                  {cat.category}
+                </p>
+                <div className="space-y-1">
+                  {cat.items.map((item) => {
+                    const isActive = activeTab === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setActiveTab(item.key)}
+                        className={`w-full p-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between group cursor-pointer ${
+                          isActive
+                            ? "bg-gradient-to-r from-indigo-600/30 to-purple-600/20 border border-indigo-500/40 text-white shadow-[0_4px_20px_rgba(99,102,241,0.2)]"
+                            : "text-[--text-muted] hover:text-white hover:bg-white/[0.04] border border-transparent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-base select-none shrink-0">{item.icon}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate group-hover:text-white">{item.label}</p>
+                            <p className="text-[0.625rem] text-gray-500 truncate">{item.description}</p>
+                          </div>
+                        </div>
+                        {item.badge && (
+                          <span
+                            className={`text-[0.5625rem] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 border ${
+                              isActive
+                                ? "bg-indigo-500/20 border-indigo-400/40 text-indigo-200"
+                                : "bg-white/5 border-white/10 text-gray-400"
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
 
-      {activeTab === "modules" && (
-        <ModulesTab enabledModules={enabledModules} toggleModule={toggleModule} />
-      )}
+            {filteredCategories.length === 0 && (
+              <div className="p-4 text-center text-xs text-gray-400">
+                No setting matching &quot;{searchQuery}&quot; found.
+              </div>
+            )}
+          </div>
+        </div>
 
-      {activeTab === "defaults" && (
-        <DefaultsTab
-          defaultAccounts={defaultAccounts}
-          accounts={accounts}
-          handleDefaultAccountChange={handleDefaultAccountChange}
-          sectionsRequiringAccount={SECTIONS_REQUIRING_ACCOUNT}
-        />
-      )}
+        {/* Mobile Horizontal Pill Scrollbar (< md) */}
+        <div className="md:hidden w-full overflow-x-auto no-scrollbar scroll-smooth py-1">
+          <div className="flex items-center gap-2 rounded-2xl bg-slate-900/80 border border-white/10 p-2 w-max min-w-full backdrop-blur-md">
+            {NAV_CATEGORIES.flatMap((c) => c.items).map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 transition-all ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30"
+                      : "text-gray-400 hover:text-white bg-white/5 border border-transparent"
+                  }`}
+                >
+                  <span className="text-sm">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {activeTab === "imports" && (
-        <ImportsTab accounts={accounts} mutate={mutate} />
-      )}
+        {/* Right Main Content Canvas (Desktop md:grid-cols-8) */}
+        <div className="col-span-1 md:col-span-8 lg:col-span-9 min-w-0">
+          {activeTab === "profile" && (
+            <ProfileTab
+              input={input}
+              username={username}
+              isSyncing={isSyncing}
+              lastSaved={lastSaved}
+              handleChange={handleChange}
+              handleBlur={handleBlur}
+              handleKeyDown={handleKeyDown}
+              baseCurrency={baseCurrency}
+              theme={theme}
+              timezone={timezone}
+              onSaveSetting={saveSetting}
+            />
+          )}
 
-      {activeTab === "exports" && (
-        <ExportsTab />
-      )}
+          {activeTab === "modules" && (
+            <ModulesTab enabledModules={enabledModules} toggleModule={toggleModule} />
+          )}
 
-      {activeTab === "integrations" && (
-        <IntegrationsTab
-          profile={profile}
-          mutate={mutate}
-        />
-      )}
+          {activeTab === "defaults" && (
+            <DefaultsTab
+              defaultAccounts={defaultAccounts}
+              accounts={accounts}
+              handleDefaultAccountChange={handleDefaultAccountChange}
+              sectionsRequiringAccount={SECTIONS_REQUIRING_ACCOUNT}
+            />
+          )}
 
-      {activeTab === "status" && (
-        <SystemStatusTab
-          diagnostics={diagnostics}
-          runningDiagnostics={runningDiagnostics}
-          runDiagnostics={runDiagnostics}
-        />
-      )}
+          {activeTab === "imports" && (
+            <ImportsTab accounts={accounts} mutate={mutate} />
+          )}
 
-      {activeTab === "danger" && (
-        <DangerZoneTab
-          handleResetClick={handleResetClick}
-          showResetModal={showResetModal}
-          setShowResetModal={setShowResetModal}
-          resetConfirmText={resetConfirmText}
-          setResetConfirmText={setResetConfirmText}
-          resetCountdown={resetCountdown}
-          isResetting={isResetting}
-          handleResetConfirm={handleResetConfirm}
-          canExecuteReset={canExecuteReset}
-        />
-      )}
+          {activeTab === "exports" && (
+            <ExportsTab />
+          )}
+
+          {activeTab === "integrations" && (
+            <IntegrationsTab profile={profile} mutate={mutate} />
+          )}
+
+          {activeTab === "status" && (
+            <SystemStatusTab
+              diagnostics={diagnostics}
+              runningDiagnostics={runningDiagnostics}
+              runDiagnostics={runDiagnostics}
+            />
+          )}
+
+          {activeTab === "danger" && (
+            <DangerZoneTab
+              handleResetClick={handleResetClick}
+              showResetModal={showResetModal}
+              setShowResetModal={setShowResetModal}
+              resetConfirmText={resetConfirmText}
+              setResetConfirmText={setResetConfirmText}
+              resetCountdown={resetCountdown}
+              isResetting={isResetting}
+              handleResetConfirm={handleResetConfirm}
+              canExecuteReset={canExecuteReset}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

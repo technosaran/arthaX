@@ -1,55 +1,53 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "@/app/api/sync/route";
 import { getDb } from "@/lib/db";
 
 process.env.CRON_SECRET = "mock_secret";
 
-
 // Mock drizzle and db
-vi.mock("@/lib/db", () => {
+jest.mock("@/lib/db", () => {
   const mockDb: any = {
-    selectDistinct: vi.fn().mockReturnThis(),
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    values: vi.fn().mockReturnThis(),
+    selectDistinct: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    set: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    values: jest.fn().mockReturnThis(),
     then: (onfulfilled: any) => Promise.resolve([]).then(onfulfilled),
     [Symbol.iterator]: [][Symbol.iterator],
-    transaction: vi.fn().mockImplementation(async (callback) => {
+    transaction: jest.fn().mockImplementation(async (callback) => {
       const tx = {
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        for: vi.fn().mockResolvedValue([
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        for: jest.fn().mockResolvedValue([
           { id: "acc-123", name: "Salary Account", balance: "5000", currency: "INR" }
         ]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue({}),
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockResolvedValue({}),
       };
       return callback(tx);
     }),
   };
   return {
-    getDb: vi.fn().mockReturnValue(mockDb),
+    getDb: jest.fn().mockReturnValue(mockDb),
   };
 });
 
-vi.mock("@/app/dashboard/mutual-funds/actions", () => ({
-  fetchLiveMFNAV: vi.fn().mockResolvedValue({ nav: 100, previousNav: 98 }),
+jest.mock("@/app/dashboard/mutual-funds/actions", () => ({
+  fetchLiveMFNAV: jest.fn().mockResolvedValue({ nav: 100, previousNav: 98 }),
 }));
 
-vi.mock("@/app/dashboard/stocks/actions", () => ({
-  fetchLiveStockPrice: vi.fn().mockResolvedValue({ price: 1500, previousClose: 1480 }),
+jest.mock("@/app/dashboard/stocks/actions", () => ({
+  fetchLiveStockPrice: jest.fn().mockResolvedValue({ price: 1500, previousClose: 1480 }),
 }));
 
 describe("Sync API Route", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it("successfully parses GET request and processes recurring transactions", async () => {
@@ -62,8 +60,6 @@ describe("Sync API Route", () => {
     db.where.mockImplementation((expr: any) => {
       // Return simulated active templates
       if (expr && expr.toString().includes("is_recurring = true")) {
-        // Here we can mock recurring items. We detect table name based on what's active.
-        // But for mock simplicity, we can let it return templates based on call count.
         return [
           {
             id: "inc-123",
@@ -78,7 +74,7 @@ describe("Sync API Route", () => {
           }
         ];
       }
-      return []; // Return empty for other filters (stocks, mutual funds, expenses)
+      return []; // Return empty for other filters
     });
 
     const request = new Request("http://localhost/api/sync", {
