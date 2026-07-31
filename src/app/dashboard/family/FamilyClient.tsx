@@ -209,7 +209,7 @@ export default function FamilyClient() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   /* ── Form state ── */
-  const [memberForm, setMemberForm] = useState<{ name: string; relationship: string; avatar_url: string }>({ name: "", relationship: "Other", avatar_url: "" });
+  const [memberForm, setMemberForm] = useState<{ name: string; relationship: string; avatar_url: string }>({ name: "", relationship: RELATIONSHIPS[0], avatar_url: "" });
   const [transferForm, setTransferForm] = useState({ family_member_id: "", account_id: "", amount: "", note: "" });
 
   /* ── Auto-open from URL ── */
@@ -246,7 +246,7 @@ export default function FamilyClient() {
   }, [monthTransfers, historySearch, getMemberName]);
 
   const resetMemberForm = () => {
-    setMemberForm({ name: "", relationship: "Other", avatar_url: "" });
+    setMemberForm({ name: "", relationship: RELATIONSHIPS[0], avatar_url: "" });
     setEditingMember(null);
   };
 
@@ -779,6 +779,15 @@ export default function FamilyClient() {
                     View All Time
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={exportTransferCSV}
+                  className="text-[10px] font-black uppercase text-white bg-white/5 hover:bg-white/10 border border-white/10 px-2.5 py-1 rounded-lg cursor-pointer transition-all flex items-center gap-1 active:scale-95"
+                  title="Export transfers statement as CSV"
+                >
+                  <Download className="w-3 h-3 text-pink-400" />
+                  Export CSV
+                </button>
               </div>
             </div>
 
@@ -833,7 +842,7 @@ export default function FamilyClient() {
                   })}
                   {filteredTransfers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-xs font-bold text-[--text-muted] uppercase tracking-[0.3em]">
+                      <td colSpan={6} className="py-12 text-center text-xs font-bold text-[--text-muted] uppercase tracking-[0.3em]">
                         {showAllTime 
                           ? "No historical records detected" 
                           : `No transfers recorded for ${format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy")}`}
@@ -866,7 +875,7 @@ export default function FamilyClient() {
           <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-primary)", letterSpacing: "-0.03em", margin: "0 0 1.25rem" }}>
             {editingMember ? "Edit Member Details & Photo" : "Add Family Member"}
           </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleAddEditMember(); }} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Live Profile Photo Preview & Avatar Setting */}
             <div className="flex items-center gap-4 p-3 bg-white/5 border border-white/10 rounded-2xl">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 via-rose-500/15 to-purple-500/20 border border-pink-500/30 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-lg shadow-pink-500/10">
@@ -880,7 +889,7 @@ export default function FamilyClient() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-white uppercase tracking-wider">Profile Representation</p>
-                <p className="text-[0.625rem] text-[--text-muted] mt-0.5">Select a preset avatar or paste image URL below</p>
+                <p className="text-[0.625rem] text-[--text-muted] mt-0.5">Select a preset avatar or upload image below</p>
               </div>
             </div>
 
@@ -957,9 +966,35 @@ export default function FamilyClient() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
+                          const img = document.createElement("img");
                           const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setMemberForm(prev => ({ ...prev, avatar_url: reader.result as string }));
+                          reader.onload = (event) => {
+                            img.src = event.target?.result as string;
+                            img.onload = () => {
+                              const canvas = document.createElement("canvas");
+                              const MAX_SIZE = 200;
+                              let width = img.width;
+                              let height = img.height;
+                              if (width > height) {
+                                if (width > MAX_SIZE) {
+                                  height = Math.round((height * MAX_SIZE) / width);
+                                  width = MAX_SIZE;
+                                }
+                              } else {
+                                if (height > MAX_SIZE) {
+                                  width = Math.round((width * MAX_SIZE) / height);
+                                  height = MAX_SIZE;
+                                }
+                              }
+                              canvas.width = width;
+                              canvas.height = height;
+                              const ctx = canvas.getContext("2d");
+                              if (ctx) {
+                                ctx.drawImage(img, 0, 0, width, height);
+                                const compressed = canvas.toDataURL("image/jpeg", 0.8);
+                                setMemberForm(prev => ({ ...prev, avatar_url: compressed }));
+                              }
+                            };
                           };
                           reader.readAsDataURL(file);
                         }
@@ -981,14 +1016,24 @@ export default function FamilyClient() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-              <button className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.3)] active:scale-95 cursor-pointer disabled:opacity-50" onClick={handleAddEditMember} disabled={submitting || !memberForm.name.trim()} style={{ flex: 1 }}>
+              <button
+                type="submit"
+                className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(236,72,153,0.3)] active:scale-95 cursor-pointer disabled:opacity-50"
+                disabled={submitting || !memberForm.name.trim()}
+                style={{ flex: 1 }}
+              >
                 {submitting ? "Saving..." : editingMember ? "Update Member" : "Add Member"}
               </button>
-              <button className="btn-secondary" onClick={() => { setShowMemberModal(false); resetMemberForm(); }} style={{ fontWeight: 700 }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setShowMemberModal(false); resetMemberForm(); }}
+                style={{ fontWeight: 700 }}
+              >
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         </ModalOverlay>
       )}
 

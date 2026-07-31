@@ -226,6 +226,7 @@ input, textarea, [contenteditable="true"] {
 @media (max-width: 767.98px) {
   input, select, textarea, [contenteditable="true"] {
     font-size: 16px !important;
+    touch-action: manipulation;
   }
 }
 
@@ -286,7 +287,9 @@ input, textarea, [contenteditable="true"] {
 
   .mobile-dialog-panel {
     width: min(100%, calc(100vw - 1rem));
-    max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 1rem);
+    max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 1.5rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 1rem !important;
     border-radius: calc(var(--radius-lg) + 2px);
   }

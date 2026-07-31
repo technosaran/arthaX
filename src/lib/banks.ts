@@ -1,6 +1,6 @@
 export type Bank = { name: string; domain: string; isBank?: boolean };
 
-// Curated Bank registry containing ONLY top, widely used banks & financial institutions
+// Curated Bank registry containing top Indian & Global banks, small finance banks, payment banks, brokers & financial institutions
 const BANKS: Bank[] = [
   // Major Public Sector Banks
   { name: "State Bank of India (SBI)",  domain: "sbi.co.in", isBank: true },
@@ -15,9 +15,10 @@ const BANKS: Bank[] = [
   { name: "Bank of India (BOI)",        domain: "bankofindia.co.in", isBank: true },
   { name: "Indian Bank",                domain: "indianbank.in", isBank: true },
   { name: "Central Bank of India",      domain: "centralbankofindia.co.in", isBank: true },
-  { name: "Indian Overseas Bank",       domain: "iob.in", isBank: true },
+  { name: "Indian Overseas Bank (IOB)", domain: "iob.in", isBank: true },
   { name: "UCO Bank",                   domain: "ucobank.com", isBank: true },
   { name: "Bank of Maharashtra",        domain: "bankofmaharashtra.in", isBank: true },
+  { name: "Punjab & Sind Bank",         domain: "punjabandsindbank.co.in", isBank: true },
 
   // Major Private Sector Banks
   { name: "IDFC First Bank",            domain: "idfcfirstbank.com", isBank: true },
@@ -27,17 +28,45 @@ const BANKS: Bank[] = [
   { name: "RBL Bank",                   domain: "rblbank.com", isBank: true },
   { name: "Bandhan Bank",               domain: "bandhanbank.com", isBank: true },
   { name: "IDBI Bank",                  domain: "idbibank.in", isBank: true },
+  { name: "South Indian Bank",          domain: "southindianbank.com", isBank: true },
+  { name: "Karur Vysya Bank (KVB)",     domain: "kvb.co.in", isBank: true },
+  { name: "City Union Bank (CUB)",      domain: "cityunionbank.com", isBank: true },
+  { name: "Tamilnad Mercantile Bank",   domain: "tmb.in", isBank: true },
+  { name: "Karnataka Bank",             domain: "karnatakabank.com", isBank: true },
+  { name: "CSB Bank",                   domain: "csb.co.in", isBank: true },
+  { name: "Dhanlaxmi Bank",             domain: "dhanbank.com", isBank: true },
+  { name: "Jammu & Kashmir Bank",       domain: "jkbank.com", isBank: true },
+  { name: "Nainital Bank",              domain: "nainitalbank.co.in", isBank: true },
 
-  // Payments & Small Finance Banks
+  // Small Finance & Payment Banks
   { name: "AU Small Finance Bank",      domain: "aubank.in", isBank: true },
-  { name: "Paytm Payments Bank",        domain: "paytm.com", isBank: true },
+  { name: "Equitas Small Finance Bank", domain: "equitasbank.com", isBank: true },
+  { name: "Ujjivan Small Finance Bank", domain: "ujjivansfb.in", isBank: true },
+  { name: "Jana Small Finance Bank",    domain: "janabank.com", isBank: true },
+  { name: "Capital Small Finance Bank", domain: "capitalbank.co.in", isBank: true },
+  { name: "ESAF Small Finance Bank",    domain: "esafbank.com", isBank: true },
+  { name: "Suryoday Small Finance Bank",domain: "suryodaybank.com", isBank: true },
+  { name: "Utkarsh Small Finance Bank", domain: "utkarsh.bank", isBank: true },
+  { name: "Paytm Payments Bank",        domain: "paytmbank.com", isBank: true },
   { name: "Airtel Payments Bank",       domain: "airtel.in", isBank: true },
   { name: "Jio Payments Bank",          domain: "jio.com", isBank: true },
   { name: "India Post Payments Bank",   domain: "ippbonline.com", isBank: true },
+  { name: "Fino Payments Bank",         domain: "finobank.com", isBank: true },
 
-  // Neo-Banks & Digital Banking
+  // Co-operative Banks
+  { name: "Saraswat Bank",              domain: "saraswatbank.com", isBank: true },
+  { name: "Cosmos Bank",                domain: "cosmosbank.com", isBank: true },
+  { name: "TJSB Bank",                  domain: "tjsbbank.co.in", isBank: true },
+  { name: "SVC Bank",                   domain: "svcbank.com", isBank: true },
+  { name: "Abhyudaya Bank",             domain: "abhyudayabank.co.in", isBank: true },
+  { name: "Bharat Bank",                domain: "bharatbank.com", isBank: true },
+
+  // Neo-Banks & Digital Fintech
   { name: "Jupiter",                    domain: "jupiter.money", isBank: true },
   { name: "Fi Money",                   domain: "fi.money", isBank: true },
+  { name: "Niyo",                       domain: "goniyo.com", isBank: true },
+  { name: "Slice",                      domain: "sliceit.com", isBank: false },
+  { name: "OneCard",                    domain: "getonecard.app", isBank: false },
   { name: "PhonePe",                    domain: "phonepe.com", isBank: false },
   { name: "Google Pay",                 domain: "pay.google.com", isBank: false },
   { name: "CRED",                       domain: "cred.club", isBank: false },
@@ -47,12 +76,22 @@ const BANKS: Bank[] = [
   { name: "Groww",                      domain: "groww.in", isBank: false },
   { name: "Upstox",                     domain: "upstox.com", isBank: false },
   { name: "Angel One",                  domain: "angelone.in", isBank: false },
+  { name: "Dhan",                       domain: "dhan.co", isBank: false },
+  { name: "Paytm Money",                domain: "paytmmoney.com", isBank: false },
+  { name: "5Paisa",                     domain: "5paisa.com", isBank: false },
+  { name: "Sharekhan",                  domain: "sharekhan.com", isBank: false },
+  { name: "Motilal Oswal",              domain: "motilaloswal.com", isBank: false },
+  { name: "ICICI Direct",               domain: "icicidirect.com", isBank: false },
+  { name: "HDFC Securities",            domain: "hdfcsec.com", isBank: false },
+  { name: "Kotak Securities",           domain: "kotaksecurities.com", isBank: false },
 
   // Top Global Financial Institutions
   { name: "HSBC India",                 domain: "hsbc.co.in", isBank: true },
   { name: "Standard Chartered",         domain: "sc.com", isBank: true },
   { name: "Citibank India",             domain: "citibank.co.in", isBank: true },
   { name: "DBS Bank India",             domain: "dbs.com", isBank: true },
+  { name: "Barclays India",             domain: "barclays.in", isBank: true },
+  { name: "Deutsche Bank India",        domain: "deutschebank.co.in", isBank: true },
   { name: "Chase Bank",                 domain: "chase.com", isBank: true },
   { name: "Bank of America",            domain: "bankofamerica.com", isBank: true },
   { name: "Wells Fargo",                domain: "wellsfargo.com", isBank: true },
@@ -64,70 +103,249 @@ const BANKS: Bank[] = [
 const SHORTHAND_DOMAINS: Record<string, string> = {
   sbi: "sbi.co.in",
   sb: "sbi.co.in",
+  sbibank: "sbi.co.in",
+  sbicard: "sbi.co.in",
+  sbisavings: "sbi.co.in",
+  sbisalary: "sbi.co.in",
   "state bank": "sbi.co.in",
   "state bank of india": "sbi.co.in",
+  "state bank of india (sbi)": "sbi.co.in",
+
   hdfc: "hdfcbank.com",
+  hdfcbank: "hdfcbank.com",
   "hdfc bank": "hdfcbank.com",
+  hdfcsavings: "hdfcbank.com",
+  hdfcsalary: "hdfcbank.com",
+  hdfccredit: "hdfcbank.com",
+  hdfcsec: "hdfcsec.com",
+
   icici: "icicibank.com",
+  icicibank: "icicibank.com",
   "icici bank": "icicibank.com",
+  icicisavings: "icicibank.com",
+  icicidirect: "icicidirect.com",
+  icicipru: "icicipruamc.com",
+
   axis: "axisbank.com",
+  axisbank: "axisbank.com",
   "axis bank": "axisbank.com",
+  axissavings: "axisbank.com",
+  axisdirect: "simple.axisdirect.in",
+
   kotak: "kotak.com",
+  kotakbank: "kotak.com",
   "kotak bank": "kotak.com",
   "kotak mahindra": "kotak.com",
   "kotak mahindra bank": "kotak.com",
+  kotak811: "kotak.com",
+  "kotak 811": "kotak.com",
+  kotaksec: "kotaksecurities.com",
+
   pnb: "pnbindia.in",
+  pnbbank: "pnbindia.in",
   "punjab national bank": "pnbindia.in",
+
   bob: "bankofbaroda.in",
   baroda: "bankofbaroda.in",
+  bankofbaroda: "bankofbaroda.in",
   "bank of baroda": "bankofbaroda.in",
+
   canara: "canarabank.com",
+  canarabank: "canarabank.com",
   "canara bank": "canarabank.com",
+
   union: "unionbankofindia.co.in",
+  unionbank: "unionbankofindia.co.in",
   "union bank": "unionbankofindia.co.in",
   "union bank of india": "unionbankofindia.co.in",
+
   boi: "bankofindia.co.in",
+  bankofindia: "bankofindia.co.in",
   "bank of india": "bankofindia.co.in",
+
   indianbank: "indianbank.in",
   "indian bank": "indianbank.in",
   indian: "indianbank.in",
+
   cbi: "centralbankofindia.co.in",
+  centralbank: "centralbankofindia.co.in",
   "central bank": "centralbankofindia.co.in",
   "central bank of india": "centralbankofindia.co.in",
+
   iob: "iob.in",
+  iobbank: "iob.in",
   "indian overseas bank": "iob.in",
+
   uco: "ucobank.com",
+  ucobank: "ucobank.com",
   "uco bank": "ucobank.com",
+
   bom: "bankofmaharashtra.in",
+  bankofmaharashtra: "bankofmaharashtra.in",
   "bank of maharashtra": "bankofmaharashtra.in",
+
+  psb: "punjabandsindbank.co.in",
+  punjabandsind: "punjabandsindbank.co.in",
+  "punjab & sind bank": "punjabandsindbank.co.in",
+  "punjab and sind bank": "punjabandsindbank.co.in",
+
   idfc: "idfcfirstbank.com",
+  idfcfirst: "idfcfirstbank.com",
+  idfcbank: "idfcfirstbank.com",
+  idfcfirstbank: "idfcfirstbank.com",
   "idfc first": "idfcfirstbank.com",
   "idfc bank": "idfcfirstbank.com",
   "idfc first bank": "idfcfirstbank.com",
+
   indusind: "indusind.com",
+  indusindbank: "indusind.com",
   "indusind bank": "indusind.com",
+
   yes: "yesbank.in",
+  yesbank: "yesbank.in",
   "yes bank": "yesbank.in",
+
   federal: "federalbank.co.in",
+  federalbank: "federalbank.co.in",
   "federal bank": "federalbank.co.in",
+
   rbl: "rblbank.com",
+  rblbank: "rblbank.com",
   "rbl bank": "rblbank.com",
+
   bandhan: "bandhanbank.com",
+  bandhanbank: "bandhanbank.com",
   "bandhan bank": "bandhanbank.com",
+
   idbi: "idbibank.in",
+  idbibank: "idbibank.in",
   "idbi bank": "idbibank.in",
+
+  southindian: "southindianbank.com",
+  southindianbank: "southindianbank.com",
+  "south indian bank": "southindianbank.com",
+  sib: "southindianbank.com",
+
+  kvb: "kvb.co.in",
+  karurvysya: "kvb.co.in",
+  "karur vysya bank": "kvb.co.in",
+
+  cub: "cityunionbank.com",
+  cityunion: "cityunionbank.com",
+  "city union bank": "cityunionbank.com",
+
+  tmb: "tmb.in",
+  tamilnad: "tmb.in",
+  "tamilnad mercantile bank": "tmb.in",
+
+  karnataka: "karnatakabank.com",
+  karnatakabank: "karnatakabank.com",
+  "karnataka bank": "karnatakabank.com",
+
+  csb: "csb.co.in",
+  catholicsyrian: "csb.co.in",
+  "csb bank": "csb.co.in",
+
+  dhanlaxmi: "dhanbank.com",
+  dhanbank: "dhanbank.com",
+  "dhanlaxmi bank": "dhanbank.com",
+
+  jkbank: "jkbank.com",
+  "j&k bank": "jkbank.com",
+  "jammu & kashmir bank": "jkbank.com",
+
+  nainital: "nainitalbank.co.in",
+  nainitalbank: "nainitalbank.co.in",
+
   au: "aubank.in",
+  aubank: "aubank.in",
   "au bank": "aubank.in",
   "au small finance bank": "aubank.in",
+
+  equitas: "equitasbank.com",
+  equitasbank: "equitasbank.com",
+  "equitas small finance bank": "equitasbank.com",
+
+  ujjivan: "ujjivansfb.in",
+  ujjivansfb: "ujjivansfb.in",
+  "ujjivan small finance bank": "ujjivansfb.in",
+
+  jana: "janabank.com",
+  janabank: "janabank.com",
+  "jana small finance bank": "janabank.com",
+
+  suryoday: "suryodaybank.com",
+  esaf: "esafbank.com",
+  utkarsh: "utkarsh.bank",
+  capital: "capitalbank.co.in",
+
+  paytm: "paytmbank.com",
+  paytmbank: "paytmbank.com",
+  "paytm payments bank": "paytmbank.com",
+
+  airtel: "airtel.in",
+  airtelbank: "airtel.in",
+  "airtel payments bank": "airtel.in",
+
+  jio: "jio.com",
+  jiobank: "jio.com",
+  "jio payments bank": "jio.com",
+
+  ippb: "ippbonline.com",
+  "india post": "ippbonline.com",
+  "india post payments bank": "ippbonline.com",
+
+  fino: "finobank.com",
+  finobank: "finobank.com",
+
+  saraswat: "saraswatbank.com",
+  saraswatbank: "saraswatbank.com",
+
+  cosmos: "cosmosbank.com",
+  cosmosbank: "cosmosbank.com",
+
+  tjsb: "tjsbbank.co.in",
+  tjsbbank: "tjsbbank.co.in",
+
+  svc: "svcbank.com",
+  svcbank: "svcbank.com",
+
+  abhyudaya: "abhyudayabank.co.in",
+  bharatbank: "bharatbank.com",
+
+  jupiter: "jupiter.money",
+  fi: "fi.money",
+  fimoney: "fi.money",
+  niyo: "goniyo.com",
+  slice: "sliceit.com",
+  onecard: "getonecard.app",
+  phonepe: "phonepe.com",
+  gpay: "pay.google.com",
+  googlepay: "pay.google.com",
+  cred: "cred.club",
+
+  zerodha: "zerodha.com",
+  groww: "groww.in",
+  upstox: "upstox.com",
+  angelone: "angelone.in",
+  dhan: "dhan.co",
+  paytmmoney: "paytmmoney.com",
+  "5paisa": "5paisa.com",
+  sharekhan: "sharekhan.com",
+  motilaloswal: "motilaloswal.com",
+
   hsbc: "hsbc.co.in",
   "hsbc bank": "hsbc.co.in",
   "hsbc india": "hsbc.co.in",
   "standard chartered": "sc.com",
+  stanchart: "sc.com",
   citi: "citibank.co.in",
   citibank: "citibank.co.in",
   "citibank india": "citibank.co.in",
   dbs: "dbs.com",
   "dbs bank": "dbs.com",
+  barclays: "barclays.in",
+  deutsche: "deutschebank.co.in",
   chase: "chase.com",
   bofa: "bankofamerica.com",
   "bank of america": "bankofamerica.com",
@@ -136,15 +354,6 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   revolut: "revolut.com",
   wise: "wise.com",
   paypal: "paypal.com",
-  paytm: "paytm.com",
-  phonepe: "phonepe.com",
-  cred: "cred.club",
-  zerodha: "zerodha.com",
-  coin: "zerodha.com",
-  "coin by zerodha": "zerodha.com",
-  groww: "groww.in",
-  upstox: "upstox.com",
-  angelone: "angelone.in",
 };
 
 /**
@@ -154,23 +363,40 @@ export function getBankDomain(bankName: string): string | null {
   if (!bankName) return null;
   const raw = bankName.trim();
 
-  // Direct match if input already contains a domain
-  const domainRegex = /\b([a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money))\b/i;
+  // 1. Direct match if input already contains a valid domain
+  const domainRegex = /\b([a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money|bank))\b/i;
   const directMatch = raw.match(domainRegex);
   if (directMatch) {
     return directMatch[1].toLowerCase();
   }
 
+  // 2. Normalize input string
   const normalizedSearch = raw.toLowerCase().trim();
 
+  // Direct lookup in shorthand dictionary
   if (SHORTHAND_DOMAINS[normalizedSearch]) {
     return SHORTHAND_DOMAINS[normalizedSearch];
   }
 
+  // Strip account numbers, special symbols, and filler words
+  const cleanedSearch = normalizedSearch
+    .replace(/[\d\-_#()/\\:]+/g, " ")
+    .replace(/\b(bank|checking|savings|account|wallet|card|primary|personal|business|salary|current|deposit|fd|rd|od|overdraft|loan|credit|debit|co-operative|cooperative|corp|ltd|limited)\b/g, "")
+    .trim();
+
+  if (cleanedSearch && SHORTHAND_DOMAINS[cleanedSearch]) {
+    return SHORTHAND_DOMAINS[cleanedSearch];
+  }
+
+  // 3. Exact or cleaned match in BANKS list
   const cleanBankName = (bName: string) => bName.replace(/\s*\([^)]*\)/g, "").toLowerCase().trim();
 
   let bank = BANKS.find((b) => b.name.toLowerCase() === normalizedSearch || cleanBankName(b.name) === normalizedSearch);
   
+  if (!bank && cleanedSearch) {
+    bank = BANKS.find((b) => cleanBankName(b.name) === cleanedSearch);
+  }
+
   if (!bank) {
     bank = BANKS.find((b) => {
       const match = b.name.match(/\(([^)]+)\)/);
@@ -178,36 +404,34 @@ export function getBankDomain(bankName: string): string | null {
     });
   }
 
-  if (!bank) {
-    bank = BANKS.find((b) => cleanBankName(b.name) === normalizedSearch);
-  }
-
-  if (!bank) {
-    const tokens = normalizedSearch.split(/[\s\-_\/]+/);
-    for (const token of tokens) {
-      if (token.length >= 2 && SHORTHAND_DOMAINS[token]) {
-        return SHORTHAND_DOMAINS[token];
-      }
-      const matched = BANKS.find((b) => {
-        const clean = cleanBankName(b.name);
-        return clean === token || clean.split(" ")[0] === token;
-      });
-      if (matched) return matched.domain;
+  // 4. Token-based matching against SHORTHAND_DOMAINS and BANKS
+  const tokens = normalizedSearch.split(/[\s\-_\/]+/);
+  for (const token of tokens) {
+    const cleanToken = token.replace(/[^a-z0-9]/g, "");
+    if (cleanToken.length >= 2 && SHORTHAND_DOMAINS[cleanToken]) {
+      return SHORTHAND_DOMAINS[cleanToken];
     }
+    const matched = BANKS.find((b) => {
+      const clean = cleanBankName(b.name);
+      return clean === cleanToken || clean.split(" ")[0] === cleanToken;
+    });
+    if (matched) return matched.domain;
   }
 
+  // 5. Candidate substring match
   if (!bank) {
+    const searchTarget = cleanedSearch || normalizedSearch;
     const candidates = BANKS.filter((b) => {
       const clean = cleanBankName(b.name);
-      return clean.includes(normalizedSearch) || normalizedSearch.includes(clean);
+      return clean.includes(searchTarget) || searchTarget.includes(clean);
     });
 
     if (candidates.length > 0) {
       candidates.sort((a, b) => {
         const cleanA = cleanBankName(a.name);
         const cleanB = cleanBankName(b.name);
-        const diffA = Math.abs(cleanA.length - normalizedSearch.length);
-        const diffB = Math.abs(cleanB.length - normalizedSearch.length);
+        const diffA = Math.abs(cleanA.length - searchTarget.length);
+        const diffB = Math.abs(cleanB.length - searchTarget.length);
         return diffA - diffB;
       });
       bank = candidates[0];
@@ -216,60 +440,21 @@ export function getBankDomain(bankName: string): string | null {
 
   if (bank) return bank.domain;
 
-  const cleanWord = normalizedSearch
-    .replace(/\b(bank|checking|savings|account|wallet|card|primary|personal|business)\b/g, "")
-    .trim()
-    .split(/\s+/)[0]
-    .replace(/[^a-z0-9]/g, "");
+  // 6. Final fallback to clean first word if 3+ characters
+  if (cleanedSearch.length >= 3) {
+    const firstWord = cleanedSearch.split(/\s+/)[0];
+    if (SHORTHAND_DOMAINS[firstWord]) return SHORTHAND_DOMAINS[firstWord];
+    return `${firstWord}.com`;
+  }
 
-  if (cleanWord.length >= 3) {
-    if (SHORTHAND_DOMAINS[cleanWord]) return SHORTHAND_DOMAINS[cleanWord];
-    return `${cleanWord}.com`;
+  const rawFirstWord = normalizedSearch.split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+  if (rawFirstWord.length >= 3) {
+    if (SHORTHAND_DOMAINS[rawFirstWord]) return SHORTHAND_DOMAINS[rawFirstWord];
+    return `${rawFirstWord}.com`;
   }
 
   return null;
 }
-
-const BANK_SLUGS: Record<string, string> = {
-  "sbi.co.in": "sbi",
-  "hdfcbank.com": "hdfc",
-  "icicibank.com": "icici",
-  "axisbank.com": "axis",
-  "kotak.com": "kotak",
-  "pnbindia.in": "pnb",
-  "bankofbaroda.in": "bob",
-  "canarabank.com": "canara",
-  "unionbankofindia.co.in": "unionbank",
-  "bankofindia.co.in": "bankofindia",
-  "indianbank.in": "indianbank",
-  "centralbankofindia.co.in": "centralbank",
-  "iob.in": "iob",
-  "ucobank.com": "uco",
-  "bankofmaharashtra.in": "bankofmaharashtra",
-  "idfcfirstbank.com": "idfcfirst",
-  "yesbank.in": "yesbank",
-  "indusind.com": "indusind",
-  "federalbank.co.in": "federalbank",
-  "rblbank.com": "rbl",
-  "aubank.in": "aubank",
-  "idbibank.in": "idbi",
-  "chase.com": "chase",
-  "bankofamerica.com": "bofa",
-  "wellsfargo.com": "wellsfargo",
-  "hsbc.com": "hsbc",
-  "hsbc.co.in": "hsbc",
-  "revolut.com": "revolut",
-  "wise.com": "wise",
-  "paytm.com": "paytm",
-  "phonepe.com": "phonepe",
-  "jupiter.money": "jupiter",
-  "fi.money": "fi",
-  "cred.club": "cred",
-  "zerodha.com": "zerodha",
-  "groww.in": "groww",
-  "upstox.com": "upstox",
-  "angelone.in": "angelone",
-};
 
 /**
  * Get ordered logo URLs for a bank dynamically using dedicated bank logo APIs.
@@ -277,7 +462,7 @@ const BANK_SLUGS: Record<string, string> = {
 export function getBankLogoSources(bankNameOrDomain: string): string[] {
   if (!bankNameOrDomain) return [];
   const raw = bankNameOrDomain.trim();
-  const domainRegex = /^[a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money)$/i;
+  const domainRegex = /^[a-z0-9\-]+\.(?:co\.in|com|in|co|io|ai|org|net|tech|app|dev|club|money|bank)$/i;
   let domain: string | null = null;
 
   if (domainRegex.test(raw)) {
@@ -288,12 +473,18 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Dedicated Bank Logo APIs (Google 128px favicon CDN -> unavatar -> faviconkit -> duckduckgo)
+  // Multi-source CDN chain:
+  // 1. Clearbit Logo API (Official high-res brand vector/PNG logos, returns 404 on miss)
+  // 2. Unavatar API (Aggregates multiple brand/social/icon APIs, returns 404 on miss)
+  // 3. FaviconKit API (High quality 128px favicons, returns 404 on miss)
+  // 4. DuckDuckGo ICO API (DuckDuckGo icon CDN)
+  // 5. Google 128px Favicon CDN (Google favicon service fallback)
   return [
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    `https://logo.clearbit.com/${domain}`,
     `https://unavatar.io/${domain}`,
     `https://api.faviconkit.com/${domain}/128`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
   ];
 }
 
