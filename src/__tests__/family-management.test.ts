@@ -99,6 +99,7 @@ describe('addFamilyMember', () => {
       user_id: 'test-user-id',
       name: 'Alice',
       relationship: 'Daughter',
+      avatar_url: null,
       balance: 0,
     });
   });

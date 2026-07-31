@@ -3,13 +3,18 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 
+import { headers } from "next/headers";
+
 export async function triggerMarketAndDividendSync() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const headersList = await headers();
+    const host = headersList.get("host") || "localhost:3000";
+    const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
+    const origin = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
 
     const [marketRes, dividendRes] = await Promise.allSettled([
       fetch(`${origin}/api/cron/market-sync`, { cache: "no-store" }),

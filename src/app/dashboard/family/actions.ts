@@ -32,8 +32,8 @@ export async function addFamilyMember(data: { name: string; relationship: string
       balance: 0,
     }).select("id").single();
 
-    if (insertRes.error && insertRes.error.message?.includes("avatar_url")) {
-      // Fallback if avatar_url column is not yet present in Supabase table
+    if (insertRes.error) {
+      // Fallback if avatar_url column is not present or throws schema error in Supabase table
       insertRes = await supabase.from("family_members").insert({
         user_id: user.id,
         name: data.name.trim(),
@@ -86,8 +86,8 @@ export async function updateFamilyMember(id: string, data: { name: string; relat
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (updateRes.error && updateRes.error.message?.includes("avatar_url")) {
-      // Fallback if avatar_url column is not yet present in Supabase table
+    if (updateRes.error) {
+      // Fallback if avatar_url column is not present in Supabase table
       updateRes = await supabase
         .from("family_members")
         .update({

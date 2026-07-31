@@ -434,6 +434,7 @@ export const familyMembers = pgTable("family_members", {
   user_id: uuid("user_id").notNull(),
   name: text("name").notNull(),
   relationship: text("relationship").notNull(),
+  avatar_url: text("avatar_url"),
   balance: numeric("balance").default("0").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
