@@ -106,12 +106,14 @@ BEGIN
         DELETE FROM public.accounts WHERE user_id = v_user_id;
 
         -- 3. ACCOUNTS
-        INSERT INTO public.accounts (id, user_id, name, type, balance, currency, bank_name, color) VALUES 
-            (v_acc_hdfc, v_user_id, 'HDFC Salary', 'savings', 850000.00, 'INR', 'HDFC Bank', '#1e40af'),
-            (v_acc_icici, v_user_id, 'ICICI Credit', 'credit', -45000.00, 'INR', 'ICICI Bank', '#ea580c'),
-            (v_acc_sbi, v_user_id, 'SBI Savings', 'savings', 1200000.00, 'INR', 'SBI', '#0284c7'),
-            (v_acc_chase, v_user_id, 'Chase Checking', 'checking', 25000.00, 'USD', 'Chase Bank', '#0ea5e9'),
-            (v_acc_crypto, v_user_id, 'Binance Wallet', 'investment', 15000.00, 'USD', 'Binance', '#8b5cf6');
+        INSERT INTO public.accounts (id, user_id, name, type, balance, currency, bank_name, color, is_protected) VALUES 
+            (v_acc_hdfc, v_user_id, 'HDFC Salary', 'savings', 850000.00, 'INR', 'HDFC Bank', '#1e40af', false),
+            (v_acc_icici, v_user_id, 'ICICI Credit', 'credit', -45000.00, 'INR', 'ICICI Bank', '#ea580c', false),
+            (v_acc_sbi, v_user_id, 'SBI Savings', 'savings', 1200000.00, 'INR', 'SBI', '#0284c7', false),
+            (v_acc_chase, v_user_id, 'Chase Checking', 'checking', 25000.00, 'USD', 'Chase Bank', '#0ea5e9', false),
+            (v_acc_crypto, v_user_id, 'Binance Wallet', 'investment', 15000.00, 'USD', 'Binance', '#8b5cf6', false),
+            (gen_random_uuid(), v_user_id, 'Cash Reserve', 'cash', 0.00, 'INR', 'Cash', '#f59e0b', true),
+            (gen_random_uuid(), v_user_id, 'Zerodha Funds', 'investment', 0.00, 'INR', 'Zerodha', '#f6540b', true);
 
         -- 4. FAMILY
         INSERT INTO public.family_members (id, user_id, name, relationship, balance) VALUES 

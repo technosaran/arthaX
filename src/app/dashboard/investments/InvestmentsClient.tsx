@@ -49,7 +49,7 @@ export default function InvestmentsClient() {
     const populated = [...raw] as string[];
     
     if (raw.includes("Investments")) {
-      populated.push("Stocks", "Mutual Funds", "Bonds", "FnO", "Forex");
+      populated.push("Stocks", "Mutual Funds", "Bonds", "FnO", "Forex", "Crypto");
     }
     if (raw.includes("Alt Assets") || raw.includes("Assets")) {
       populated.push("Alt Assets", "Assets");

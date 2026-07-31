@@ -85,8 +85,9 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   useEffect(() => {
     if (accounts.length > 0 && showAddModal && !formData.account_id) {
       const defaultAccId = profile?.default_accounts?.mutual_funds;
+      const zerodhaAcc = accounts.find(a => a.name.toLowerCase().includes("zerodha"));
       const defaultAccExists = defaultAccId && accounts.some(a => a.id === defaultAccId);
-      const chosenAccount = defaultAccExists ? defaultAccId : accounts[0].id;
+      const chosenAccount = defaultAccExists ? defaultAccId : (zerodhaAcc ? zerodhaAcc.id : accounts[0].id);
       setTimeout(() => {
         setFormData(prev => ({ ...prev, account_id: chosenAccount }));
       }, 0);

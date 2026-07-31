@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addExpense, deleteExpense } from "./actions";
+import { addExpense, deleteExpense, updateExpense } from "./actions";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
@@ -174,10 +174,22 @@ export default function ExpensesClient({ initialData }: { initialData?: FinanceD
 
   async function handleSubmitForm(data: any) {
     await withLock(async () => {
-      const result = await addExpense(data);
+      const isEdit = Boolean(editingExpense || data.id);
+      const result = isEdit
+        ? await updateExpense({
+            id: editingExpense?.id || data.id,
+            description: data.description,
+            amount: typeof data.amount === "number" ? data.amount : parseFloat(data.amount),
+            category: data.category,
+            date: data.date,
+            account_id: data.account_id || undefined,
+          })
+        : await addExpense(data);
+
       if (!result?.error) {
-        toast.success(result.message || "Daily expenditure recorded: Ledger updated");
+        toast.success(isEdit ? "Expense entry updated successfully" : (result.message || "Daily expenditure recorded: Ledger updated"));
         setShowAddModal(false);
+        setEditingExpense(null);
         mutate();
       } else {
         toast.error(result.error);

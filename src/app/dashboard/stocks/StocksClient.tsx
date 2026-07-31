@@ -120,8 +120,9 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
   useEffect(() => {
     if (accounts.length > 0 && showAddModal && !formData.deduct_from_account) {
       const defaultAccId = profile?.default_accounts?.stocks;
+      const zerodhaAcc = accounts.find(a => a.name.toLowerCase().includes("zerodha"));
       const defaultAccExists = defaultAccId && accounts.some(a => a.id === defaultAccId);
-      const chosenAccount = defaultAccExists ? defaultAccId : accounts[0].id;
+      const chosenAccount = defaultAccExists ? defaultAccId : (zerodhaAcc ? zerodhaAcc.id : accounts[0].id);
       setTimeout(() => {
         setFormData(prev => ({ ...prev, deduct_from_account: chosenAccount }));
       }, 0);

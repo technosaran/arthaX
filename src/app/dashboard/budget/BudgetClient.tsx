@@ -65,6 +65,16 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+function normalizeCategory(cat: string): string {
+  if (!cat) return "Others";
+  const lower = cat.trim().toLowerCase();
+  if (lower === "food & dining" || lower === "dining" || lower === "groceries") return "Food";
+  if (lower === "housing") return "Rent";
+  if (lower === "bills & utilities" || lower === "bills") return "Utilities";
+  if (lower === "transportation") return "Transport";
+  return cat;
+}
+
   const formatCurrency = (val: number) => {
     if (val >= 100000) return `₹${(val / 1000).toFixed(0)}k`;
     if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
@@ -78,7 +88,8 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
       const date = parseISO(e.date);
       if (date.getMonth() + 1 === selectedMonth && date.getFullYear() === selectedYear) {
         const amt = Number(e.amount);
-        spending[e.category] = (spending[e.category] || 0) + amt;
+        const norm = normalizeCategory(e.category);
+        spending[norm] = (spending[norm] || 0) + amt;
       }
     });
     return spending;
@@ -96,7 +107,9 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   }, [incomes, selectedMonth, selectedYear]);
 
   const currentBudgets = useMemo(() => {
-    return budgets.filter(b => b.period_month === selectedMonth && b.period_year === selectedYear);
+    return budgets
+      .filter(b => b.period_month === selectedMonth && b.period_year === selectedYear)
+      .map(b => ({ ...b, category: normalizeCategory(b.category) }));
   }, [budgets, selectedMonth, selectedYear]);
 
   const totalBudgeted = currentBudgets.reduce((s, b) => s + Number(b.amount), 0);
@@ -153,19 +166,21 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
     BUDGET_CATEGORIES.forEach(c => catsMap.set(c.label, c.icon));
     
     Object.keys(actualSpending).forEach(c => {
-      if (!catsMap.has(c)) catsMap.set(c, "📦");
+      const norm = normalizeCategory(c);
+      if (!catsMap.has(norm)) catsMap.set(norm, "📦");
     });
     currentBudgets.forEach(b => {
-      if (!catsMap.has(b.category)) catsMap.set(b.category, "📦");
+      const norm = normalizeCategory(b.category);
+      if (!catsMap.has(norm)) catsMap.set(norm, "📦");
     });
     
     return Array.from(catsMap.entries()).map(([label, icon]) => {
       let finalIcon = icon;
       const lower = label.toLowerCase();
-      if (lower === "food & dining") finalIcon = "🍔";
-      else if (lower === "housing") finalIcon = "🏠";
-      else if (lower === "bills & utilities") finalIcon = "⚡";
-      else if (lower === "transportation") finalIcon = "🚌";
+      if (lower === "food & dining" || lower === "food") finalIcon = "🍔";
+      else if (lower === "housing" || lower === "rent") finalIcon = "🏠";
+      else if (lower === "bills & utilities" || lower === "utilities") finalIcon = "⚡";
+      else if (lower === "transportation" || lower === "transport") finalIcon = "🚌";
       
       return { label, icon: finalIcon };
     }).sort((a, b) => {

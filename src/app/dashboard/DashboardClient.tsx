@@ -241,8 +241,8 @@ export default function DashboardClient() {
 
     // Calculate historical curves walking backward
     const monthsKeys = Object.keys(trendMap);
-    let runningNetWorth = (netWorthINR || 100000);
-    let runningInvestments = (stockBalanceINR || 0) + (mfBalance || 0) + (bondBalance || 0);
+    let runningNetWorth = typeof netWorthINR === "number" ? netWorthINR : 0;
+    let runningInvestments = (stockBalanceINR || 0) + (mfBalanceINR || 0) + (bondBalanceINR || 0);
 
     for (let i = monthsKeys.length - 1; i >= 0; i--) {
       const key = monthsKeys[i];

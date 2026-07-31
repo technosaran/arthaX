@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-import { addIncome, deleteIncome } from "./actions";
+import { addIncome, deleteIncome, updateIncome } from "./actions";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
@@ -249,6 +249,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null);
+  const [editingIncome, setEditingIncome] = useState<any | null>(null);
 
   const defaultDate = useMemo(() => {
     const today = new Date();
@@ -314,6 +315,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
   }
 
   const handleOpenAddModal = () => {
+    setEditingIncome(null);
     const defaultAccId = profile?.default_accounts?.income;
     const account_id = (defaultAccId && accounts.some(a => a.id === defaultAccId)) ? defaultAccId : "";
     setFormData({
@@ -326,6 +328,22 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
       recurrence_frequency: "monthly",
       recurrence_day: 1,
       recurrence_end_date: "",
+    });
+    setShowAddModal(true);
+  };
+
+  const handleEditIncome = (inc: any) => {
+    setEditingIncome(inc);
+    setFormData({
+      description: inc.description.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim(),
+      amount: String(inc.amount),
+      category: inc.category || "Salary",
+      date: inc.date ? inc.date.split("T")[0] : defaultDate,
+      account_id: inc.account_id || "",
+      is_recurring: Boolean(inc.is_recurring),
+      recurrence_frequency: inc.recurrence_frequency || "monthly",
+      recurrence_day: inc.recurrence_day || 1,
+      recurrence_end_date: inc.recurrence_end_date ? inc.recurrence_end_date.split("T")[0] : "",
     });
     setShowAddModal(true);
   };
@@ -463,13 +481,23 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
       return;
     }
     await withLock(async () => {
-      const result = await addIncome({ 
-        ...formData, 
-        amount: parseFloat(formData.amount), 
-        account_id: formData.account_id || undefined 
-      });
+      const result = editingIncome
+        ? await updateIncome({
+            id: editingIncome.id,
+            description: formData.description,
+            amount: parseFloat(formData.amount),
+            category: formData.category,
+            date: formData.date,
+            account_id: formData.account_id || undefined,
+          })
+        : await addIncome({ 
+            ...formData, 
+            amount: parseFloat(formData.amount), 
+            account_id: formData.account_id || undefined 
+          });
+
       if (!result?.error) {
-        toast.success("Revenue inflow registered successfully");
+        toast.success(editingIncome ? "Income record updated successfully" : "Revenue inflow registered successfully");
         const today = new Date();
         const yyyy = selectedYear;
         const mm = String(selectedMonth).padStart(2, '0');
@@ -489,6 +517,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           recurrence_end_date: "",
         });
         setShowAddModal(false);
+        setEditingIncome(null);
         mutate();
       } else {
         toast.error(result.error);
@@ -676,12 +705,13 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Segment</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] hidden sm:table-cell">Destination</th>
                   <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Credit</th>
+                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {filteredIncomes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">No income transactions logged for this period.</td>
+                    <td colSpan={6} className="px-6 py-20 text-center text-[--text-muted] text-sm italic">No income transactions logged for this period.</td>
                   </tr>
                 ) : (
                   filteredIncomes.map((inc) => {
@@ -723,6 +753,30 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap text-right">
                           <p className="text-xs md:text-sm font-black text-success">+{getAccountCurrency(inc.account_id) === 'USD' ? '$' : '₹'}{Number(inc.amount).toLocaleString()}</p>
+                        </td>
+                        <td className="px-4 md:px-6 py-3 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleEditIncome(inc)}
+                              className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-[--text-muted] hover:text-white hover:bg-white/10 transition-colors"
+                              title="Edit income entry"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteIncome(inc.id)}
+                              className="p-1.5 rounded-lg bg-danger/10 border border-danger/20 text-rose-400 hover:bg-danger/20 transition-colors"
+                              title="Delete income entry"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -773,6 +827,22 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                     <div className="flex items-center gap-2">
                       <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditIncome(inc)}
+                        className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-[--text-muted] hover:text-white"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteIncome(inc.id)}
+                        className="px-2.5 py-1 rounded-lg bg-danger/10 border border-danger/20 text-[10px] font-bold text-rose-400"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -854,8 +924,8 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
       {showAddModal && (
         <Drawer
           isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          title="Add Income"
+          onClose={() => { setShowAddModal(false); setEditingIncome(null); }}
+          title={editingIncome ? "Edit Income Entry" : "Add Income"}
         >
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -993,7 +1063,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             
             <div className="pt-2 mt-4">
               <button type="submit" disabled={submitting} className="btn-primary w-full h-10 shadow-xl shadow-[--accent-primary]/20 text-xs font-black uppercase tracking-widest cursor-pointer">
-                {submitting ? "Deploying..." : "Finalize Entry"}
+                {submitting ? "Processing..." : (editingIncome ? "Update Entry" : "Finalize Entry")}
               </button>
             </div>
           </form>
