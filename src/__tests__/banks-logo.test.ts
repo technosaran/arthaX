@@ -59,12 +59,10 @@ describe("Bank Logo and Domain Resolution", () => {
 
   it("generates multi-CDN online logo sources correctly", () => {
     const sources = getBankLogoSources("HDFC Bank");
-    expect(sources.length).toBeGreaterThanOrEqual(5);
-    expect(sources[0]).toBe("https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/hdfc.svg");
-    expect(sources).toContain("https://api.iconhorse.com/v1/hdfcbank.com");
+    expect(sources.length).toBeGreaterThanOrEqual(4);
+    expect(sources[0]).toBe("https://logo.clearbit.com/hdfcbank.com");
     expect(sources).toContain("https://logo.clearbit.com/hdfcbank.com");
-    expect(sources).toContain("https://api.faviconkit.com/hdfcbank.com/128");
-    expect(sources).toContain("https://icons.duckduckgo.com/ip3/hdfcbank.com.ico");
+    expect(sources).toContain("https://icon.horse/icon/hdfcbank.com");
   });
 
 

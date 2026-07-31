@@ -594,7 +594,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                         className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-all"
                         style={{ background: hexToRgba(color, 0.12), border: `1px solid ${hexToRgba(color, 0.28)}` }}
                       >
-                        <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-12 h-12" />
+                        <BankLogo bankName={a.bank_name} accountName={a.name} accountType={a.type} className="w-14 h-14" />
                         <div className="flex flex-col min-w-0 flex-1 text-left">
                           <p className="font-bold text-xs text-[--text-secondary] truncate">{a.name}</p>
                           <p className="font-black text-sm" style={{ color: color }}>{getCurrencySymbol(a.currency)}{a.balance.toLocaleString()}</p>
