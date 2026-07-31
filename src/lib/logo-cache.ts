@@ -3,7 +3,7 @@
  * and negative lookup caching ("NOT_FOUND") to eliminate redundant network requests.
  */
 
-const CACHE_KEY = "arthax_logo_cache_v2";
+const CACHE_KEY = "arthax_logo_cache_v4";
 export const NOT_FOUND = "NOT_FOUND";
 
 // In-memory cache for instant synchronous lookups

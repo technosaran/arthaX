@@ -84,13 +84,19 @@ const getBankGradient = (name: string) => {
 };
 
 const BankLogo = memo(({ bankName, accountName, accountType: _accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType?: string; className?: string }) => {
-  const query = (bankName || accountName || "").trim().toLowerCase();
-  const brandProfile = Object.entries(BANK_BRAND_PROFILES).find(([k]) => query.includes(k))?.[1];
+  const rawQuery = bankName || accountName || "";
+  const query = rawQuery.trim().toLowerCase();
+
+  const isCash = _accountType === "cash" || query.includes("cash");
+
+  const brandProfile = useMemo(() => {
+    return Object.entries(BANK_BRAND_PROFILES).find(([k]) => query.includes(k))?.[1];
+  }, [query]);
 
   const sources = useMemo(() => {
-    const rawQuery = bankName || accountName || "";
+    if (isCash) return [];
     return getBankLogoSources(rawQuery);
-  }, [bankName, accountName]);
+  }, [rawQuery, isCash]);
 
   const [srcIndex, setSrcIndex] = useState(0);
   const [showFallback, setShowFallback] = useState(false);
@@ -102,12 +108,20 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
     setShowFallback(false);
   }
 
+  if (isCash) {
+    return (
+      <div className={`${className} rounded-2xl bg-gradient-to-br from-amber-500 via-yellow-600 to-amber-700 border border-amber-400/30 flex items-center justify-center text-white text-xl shadow-lg shrink-0 select-none`}>
+        💵
+      </div>
+    );
+  }
+
   const monogram = brandProfile?.monogram || getBankMonogram(bankName, accountName);
   const gradient = brandProfile?.gradient || getBankGradient(bankName || accountName || "");
 
   if (!sources.length || srcIndex >= sources.length || showFallback) {
     return (
-      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/20 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-lg shrink-0 select-none p-1 text-center`}>
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/20 flex items-center justify-center text-white font-black text-xs tracking-wider shadow-lg shrink-0 select-none p-1 text-center truncate`}>
         {monogram}
       </div>
     );
@@ -116,7 +130,7 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-slate-800/90 p-1 shadow-md border border-white/20 overflow-hidden relative`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-1.5 shadow-md border border-white/30 overflow-hidden relative group`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
@@ -135,7 +149,6 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
     </div>
   );
 });
-
 
 BankLogo.displayName = "BankLogo";
 

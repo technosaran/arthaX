@@ -953,14 +953,14 @@ export default function FamilyClient() {
                 {/* Custom Photo URL Input & File Upload */}
                 <div className="flex items-center gap-2">
                   <input
-                    type="url"
+                    type="text"
                     className="input-premium text-xs flex-1"
-                    placeholder="https://example.com/photo.jpg or image URL"
+                    placeholder="Paste image URL (https://...) or upload photo"
                     value={memberForm.avatar_url}
                     onChange={e => setMemberForm(prev => ({ ...prev, avatar_url: e.target.value }))}
                   />
-                  <label className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white cursor-pointer transition-all shrink-0">
-                    Upload
+                  <label className="px-3.5 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 border border-pink-400/30 rounded-xl text-xs font-bold text-white cursor-pointer transition-all shrink-0 flex items-center gap-1.5 shadow-md active:scale-95">
+                    <span>📷 Upload Photo</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -968,35 +968,47 @@ export default function FamilyClient() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const img = document.createElement("img");
                           const reader = new FileReader();
                           reader.onload = (event) => {
-                            img.src = event.target?.result as string;
+                            const dataUrl = event.target?.result as string;
+                            if (!dataUrl) return;
+
+                            const img = document.createElement("img");
                             img.onload = () => {
-                              const canvas = document.createElement("canvas");
-                              const MAX_SIZE = 200;
-                              let width = img.width;
-                              let height = img.height;
-                              if (width > height) {
-                                if (width > MAX_SIZE) {
-                                  height = Math.round((height * MAX_SIZE) / width);
-                                  width = MAX_SIZE;
+                              try {
+                                const canvas = document.createElement("canvas");
+                                const MAX_SIZE = 300;
+                                let width = img.width;
+                                let height = img.height;
+                                if (width > height) {
+                                  if (width > MAX_SIZE) {
+                                    height = Math.round((height * MAX_SIZE) / width);
+                                    width = MAX_SIZE;
+                                  }
+                                } else {
+                                  if (height > MAX_SIZE) {
+                                    width = Math.round((width * MAX_SIZE) / height);
+                                    height = MAX_SIZE;
+                                  }
                                 }
-                              } else {
-                                if (height > MAX_SIZE) {
-                                  width = Math.round((width * MAX_SIZE) / height);
-                                  height = MAX_SIZE;
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext("2d");
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0, width, height);
+                                  const compressed = canvas.toDataURL("image/jpeg", 0.85);
+                                  setMemberForm(prev => ({ ...prev, avatar_url: compressed }));
+                                } else {
+                                  setMemberForm(prev => ({ ...prev, avatar_url: dataUrl }));
                                 }
-                              }
-                              canvas.width = width;
-                              canvas.height = height;
-                              const ctx = canvas.getContext("2d");
-                              if (ctx) {
-                                ctx.drawImage(img, 0, 0, width, height);
-                                const compressed = canvas.toDataURL("image/jpeg", 0.8);
-                                setMemberForm(prev => ({ ...prev, avatar_url: compressed }));
+                              } catch {
+                                setMemberForm(prev => ({ ...prev, avatar_url: dataUrl }));
                               }
                             };
+                            img.onerror = () => {
+                              setMemberForm(prev => ({ ...prev, avatar_url: dataUrl }));
+                            };
+                            img.src = dataUrl;
                           };
                           reader.readAsDataURL(file);
                         }
@@ -1007,10 +1019,10 @@ export default function FamilyClient() {
                     <button
                       type="button"
                       onClick={() => setMemberForm(prev => ({ ...prev, avatar_url: "" }))}
-                      className="px-2 py-2 text-xs font-bold text-rose-400 hover:text-rose-300 cursor-pointer"
+                      className="px-2.5 py-2 text-xs font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl border border-rose-500/20 cursor-pointer transition-all"
                       title="Clear photo"
                     >
-                      ✕
+                      Clear ✕
                     </button>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 
 interface ProfileTabProps {
   input: string;
@@ -16,29 +16,6 @@ interface ProfileTabProps {
   onSaveSetting?: (key: string, value: unknown, msg: string) => void;
 }
 
-const CURRENCIES = [
-  { code: "INR", symbol: "₹", name: "Indian Rupee", flag: "🇮🇳" },
-  { code: "USD", symbol: "$", name: "US Dollar", flag: "🇺🇸" },
-  { code: "EUR", symbol: "€", name: "Euro", flag: "🇪🇺" },
-  { code: "GBP", symbol: "£", name: "British Pound", flag: "🇬🇧" },
-  { code: "JPY", symbol: "¥", name: "Japanese Yen", flag: "🇯🇵" },
-  { code: "CAD", symbol: "C$", name: "Canadian Dollar", flag: "🇨🇦" },
-  { code: "AUD", symbol: "A$", name: "Australian Dollar", flag: "🇦🇺" },
-  { code: "AED", symbol: "د.إ", name: "UAE Dirham", flag: "🇦🇪" },
-  { code: "SGD", symbol: "S$", name: "Singapore Dollar", flag: "🇸🇬" },
-];
-
-const TIMEZONES = [
-  { value: "Asia/Kolkata", label: "Asia/Kolkata (IST • UTC+5:30)" },
-  { value: "UTC", label: "Coordinated Universal Time (UTC)" },
-  { value: "America/New_York", label: "America/New_York (EST • UTC-5:00)" },
-  { value: "America/Los_Angeles", label: "America/Los_Angeles (PST • UTC-8:00)" },
-  { value: "Europe/London", label: "Europe/London (GMT • UTC+0:00)" },
-  { value: "Asia/Dubai", label: "Asia/Dubai (GST • UTC+4:00)" },
-  { value: "Asia/Singapore", label: "Asia/Singapore (SGT • UTC+8:00)" },
-  { value: "Australia/Sydney", label: "Australia/Sydney (AEST • UTC+10:00)" },
-];
-
 export default function ProfileTab({
   input,
   username,
@@ -47,30 +24,7 @@ export default function ProfileTab({
   handleChange,
   handleBlur,
   handleKeyDown,
-  baseCurrency = "INR",
-  theme = "dark",
-  timezone = "Asia/Kolkata",
-  onSaveSetting,
 }: ProfileTabProps) {
-  const [selectedCurrency, setSelectedCurrency] = useState(baseCurrency);
-  const [selectedTheme, setSelectedTheme] = useState(theme);
-  const [selectedTimezone, setSelectedTimezone] = useState(timezone);
-
-  const handleCurrencyChange = (curr: string) => {
-    setSelectedCurrency(curr);
-    onSaveSetting?.("base_currency", curr, `Base currency updated to ${curr}`);
-  };
-
-  const handleThemeChange = (th: string) => {
-    setSelectedTheme(th);
-    onSaveSetting?.("theme", th, `Theme set to ${th}`);
-  };
-
-  const handleTimezoneChange = (tz: string) => {
-    setSelectedTimezone(tz);
-    onSaveSetting?.("timezone", tz, `Timezone updated to ${tz}`);
-  };
-
   return (
     <div className="max-w-3xl space-y-6 animate-fade-in">
       {/* Profile & Account Identity Card */}
@@ -84,7 +38,7 @@ export default function ProfileTab({
             </div>
             <div>
               <h2 className="text-lg font-black text-white tracking-tight">Account & Identity</h2>
-              <p className="text-xs text-[--text-muted]">Manage your profile display name, base currency, and regional defaults</p>
+              <p className="text-xs text-[--text-muted]">Manage your profile display name and account settings</p>
             </div>
           </div>
           <div>
@@ -124,10 +78,11 @@ export default function ProfileTab({
 
         {/* Display Name Input */}
         <div className="space-y-2">
-          <label className="block text-xs font-black uppercase tracking-wider text-gray-300">
+          <label htmlFor="display-name-input" className="block text-xs font-black uppercase tracking-wider text-gray-300">
             Display Name
           </label>
           <input
+            id="display-name-input"
             type="text"
             value={input}
             onChange={handleChange}
@@ -145,114 +100,7 @@ export default function ProfileTab({
           </p>
         </div>
       </div>
-
-      {/* Currency & Regional Preferences */}
-      <div className="glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden bg-slate-900/50 border border-white/10 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-lg">
-            🌐
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Currency & Regional Preferences</h3>
-            <p className="text-xs text-[--text-muted]">Configure default valuation currency and timezone display</p>
-          </div>
-        </div>
-
-        {/* Currency Grid */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
-            Base Reporting Currency
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {CURRENCIES.map((curr) => {
-              const isSelected = selectedCurrency === curr.code;
-              return (
-                <button
-                  key={curr.code}
-                  type="button"
-                  onClick={() => handleCurrencyChange(curr.code)}
-                  className={`p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                    isSelected
-                      ? "bg-cyan-500/10 border-cyan-500/50 text-white shadow-[0_0_20px_rgba(6,182,212,0.15)]"
-                      : "bg-white/[0.02] border-white/5 text-gray-400 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base select-none">{curr.flag}</span>
-                    <div className="text-left">
-                      <p className="text-xs font-black">{curr.code} ({curr.symbol})</p>
-                      <p className="text-[0.625rem] text-gray-500 font-medium truncate max-w-[80px]">{curr.name}</p>
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Timezone Selector */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-            Default System Timezone
-          </label>
-          <select
-            value={selectedTimezone}
-            onChange={(e) => handleTimezoneChange(e.target.value)}
-            className="w-full bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white font-medium outline-none focus:border-cyan-500 transition-colors"
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value} className="bg-slate-900 text-white">
-                {tz.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Appearance & Theme Selection */}
-      <div className="glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden bg-slate-900/50 border border-white/10 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-lg">
-            🎨
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Appearance Theme</h3>
-            <p className="text-xs text-[--text-muted]">Choose your visual dashboard style</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { id: "dark", label: "Dark Obsidian", icon: "🌙", desc: "Sleek high-contrast dark theme" },
-            { id: "light", label: "Light Crystal", icon: "☀️", desc: "Clean bright interface" },
-            { id: "system", label: "System Default", icon: "💻", desc: "Follow OS system preference" },
-          ].map((th) => {
-            const isSelected = selectedTheme === th.id;
-            return (
-              <button
-                key={th.id}
-                type="button"
-                onClick={() => handleThemeChange(th.id)}
-                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                  isSelected
-                    ? "bg-purple-500/10 border-purple-500/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)]"
-                    : "bg-white/[0.02] border-white/5 text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg">{th.icon}</span>
-                  {isSelected && <span className="text-[0.625rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">Active</span>}
-                </div>
-                <p className="text-xs font-bold text-white">{th.label}</p>
-                <p className="text-[0.6875rem] text-gray-500 mt-0.5">{th.desc}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
+

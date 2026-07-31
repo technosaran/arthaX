@@ -1,4 +1,4 @@
-const CACHE_NAME = "financeos-cache-v1";
+const CACHE_NAME = "financeos-cache-v2";
 const ASSETS_TO_CACHE = [
   "/dashboard",
   "/manifest.json",
@@ -32,6 +32,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  const url = new URL(event.request.url);
+
+  // Skip caching for external domains (logo APIs, CDNs, etc.)
+  // Only cache same-origin app assets to prevent stale logo images
+  if (url.origin !== self.location.origin) return;
+
+  // Skip caching for API routes (dynamic data should always be fresh)
+  if (url.pathname.startsWith("/api/")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -50,3 +59,4 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+

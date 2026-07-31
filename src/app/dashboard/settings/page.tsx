@@ -42,12 +42,22 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const handleTabChange = (key: TabKey) => {
+    setActiveTab(key);
+    if (typeof window !== "undefined") {
+      const mainEl = document.getElementById("main-content");
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const gmailStatus = params.get("gmail");
       if (gmailStatus) {
-        setActiveTab("integrations");
+        handleTabChange("integrations");
         const url = new URL(window.location.href);
         url.searchParams.delete("gmail");
         url.searchParams.delete("reason");
@@ -221,6 +231,10 @@ export default function SettingsPage() {
     saveSetting("enabled_modules", newModules, `${module} visibility updated`);
   };
 
+  const handleEnableAllModules = () => {
+    saveSetting("enabled_modules", [...MODULE_KEYS], "All dashboard modules enabled!");
+  };
+
   const SECTIONS_REQUIRING_ACCOUNT = [
     { key: "expenses", label: "Expenses", icon: "💳" },
     { key: "income", label: "Income", icon: "💰" },
@@ -326,7 +340,7 @@ export default function SettingsPage() {
     {
       category: "Account & Workspace",
       items: [
-        { key: "profile", label: "Profile & Identity", icon: "👤", description: "Display name, currency & theme" },
+        { key: "profile", label: "Profile & Identity", icon: "👤", description: "Display name & account identity" },
         { key: "modules", label: "Module Visibility", icon: "🧩", badge: `${enabledModules.length} Active`, description: "Enable or hide dashboard modules" },
         { key: "defaults", label: "Default Bank Accounts", icon: "⚙️", description: "Default payment nodes per feature" },
       ],
@@ -373,6 +387,14 @@ export default function SettingsPage() {
     })).filter((cat) => cat.items.length > 0);
   }, [searchQuery]);
 
+  const totalMatchingItems = useMemo(() => {
+    return filteredCategories.reduce((acc, cat) => acc + cat.items.length, 0);
+  }, [filteredCategories]);
+
+  const mobileNavItems = useMemo(() => {
+    return filteredCategories.flatMap((c) => c.items);
+  }, [filteredCategories]);
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in pb-12">
       {/* Top Banner Header with Quick Search Bar */}
@@ -401,7 +423,7 @@ export default function SettingsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search preferences or settings..."
-            className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition-all font-medium shadow-inner"
+            className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-9 py-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition-all font-medium shadow-inner"
           />
           {searchQuery && (
             <button
@@ -415,25 +437,41 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Search Result Bar */}
+      {searchQuery && (
+        <div className="px-4 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
+          <span>
+            Found <strong>{totalMatchingItems}</strong> setting section{totalMatchingItems !== 1 ? "s" : ""} matching &quot;{searchQuery}&quot;
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="text-xs font-bold text-indigo-400 hover:underline"
+          >
+            Clear Search
+          </button>
+        </div>
+      )}
+
       {/* Main Dual Pane Layout Architecture */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        {/* Left Sidebar Navigation (Desktop md:grid-cols-4) */}
-        <div className="hidden md:block md:col-span-4 lg:col-span-3 sticky top-6 space-y-4">
-          <div className="glass-card p-4 rounded-3xl bg-slate-900/60 border border-white/10 shadow-xl space-y-5">
+        {/* Left Sidebar Navigation (Desktop md:grid-cols-4) with Independent Overflow Scroll */}
+        <div className="hidden md:block md:col-span-4 lg:col-span-3 sticky top-6 max-h-[calc(100vh-5rem)] overflow-y-auto no-scrollbar pr-1">
+          <div className="glass-card p-3 rounded-3xl bg-slate-900/60 border border-white/10 shadow-xl space-y-3.5">
             {filteredCategories.map((cat) => (
-              <div key={cat.category} className="space-y-1.5">
+              <div key={cat.category} className="space-y-1">
                 <p className="px-3 text-[0.625rem] font-black uppercase tracking-[0.2em] text-indigo-400/80">
                   {cat.category}
                 </p>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {cat.items.map((item) => {
                     const isActive = activeTab === item.key;
                     return (
                       <button
                         key={item.key}
                         type="button"
-                        onClick={() => setActiveTab(item.key)}
-                        className={`w-full p-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between group cursor-pointer ${
+                        onClick={() => handleTabChange(item.key)}
+                        className={`w-full p-2.5 rounded-2xl text-left transition-all duration-200 flex items-center justify-between group cursor-pointer ${
                           isActive
                             ? "bg-gradient-to-r from-indigo-600/30 to-purple-600/20 border border-indigo-500/40 text-white shadow-[0_4px_20px_rgba(99,102,241,0.2)]"
                             : "text-[--text-muted] hover:text-white hover:bg-white/[0.04] border border-transparent"
@@ -472,16 +510,16 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Mobile Horizontal Pill Scrollbar (< md) */}
-        <div className="md:hidden w-full overflow-x-auto no-scrollbar scroll-smooth py-1">
-          <div className="flex items-center gap-2 rounded-2xl bg-slate-900/80 border border-white/10 p-2 w-max min-w-full backdrop-blur-md">
-            {NAV_CATEGORIES.flatMap((c) => c.items).map((tab) => {
+        {/* Mobile Horizontal Sticky Pill Scrollbar (< md) */}
+        <div className="md:hidden sticky top-0 z-20 w-full overflow-x-auto no-scrollbar scroll-smooth py-2 bg-[#0b0f19]/90 backdrop-blur-md border-b border-white/10">
+          <div className="flex items-center gap-2 rounded-2xl bg-slate-900/80 border border-white/10 p-2 w-max min-w-full">
+            {mobileNavItems.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleTabChange(tab.key)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 transition-all ${
                     isActive
                       ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30"
@@ -493,6 +531,10 @@ export default function SettingsPage() {
                 </button>
               );
             })}
+
+            {mobileNavItems.length === 0 && (
+              <span className="text-xs text-gray-400 px-3 py-2">No matching settings tab.</span>
+            )}
           </div>
         </div>
 
@@ -515,7 +557,11 @@ export default function SettingsPage() {
           )}
 
           {activeTab === "modules" && (
-            <ModulesTab enabledModules={enabledModules} toggleModule={toggleModule} />
+            <ModulesTab
+              enabledModules={enabledModules}
+              toggleModule={toggleModule}
+              onEnableAll={handleEnableAllModules}
+            />
           )}
 
           {activeTab === "defaults" && (
@@ -565,3 +611,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+

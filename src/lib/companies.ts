@@ -150,6 +150,7 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   msft: "microsoft.com",
   microsoft: "microsoft.com",
   apple: "apple.com",
+  samsung: "samsung.com",
   amazon: "amazon.com",
   meta: "meta.com",
   fb: "meta.com",
@@ -188,6 +189,9 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   capgemini: "capgemini.com",
   upwork: "upwork.com",
   fiverr: "fiverr.com",
+  fiver: "fiverr.com",
+  tvs: "tvsmotor.com",
+  mrf: "mrftyres.com",
   stripe: "stripe.com",
   zoho: "zoho.com",
   freshworks: "freshworks.com",
@@ -235,7 +239,30 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   pizzahut: "pizzahut.co.in",
 };
 
+/**
+ * Get ordered logo URLs for a company using 256px Google HD Favicons, unavatar.io, DuckDuckGo, and IconHorse.
+ */
+export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
+  if (!companyNameOrDomain) return [];
+  const raw = companyNameOrDomain.trim();
+  const domainRegex = /^[a-z0-9\-]+\.(?:com|in|co|io|ai|org|net|tech|app|dev)$/i;
 
+  let domain: string | null = null;
+  if (domainRegex.test(raw)) {
+    domain = raw.toLowerCase();
+  } else {
+    domain = getCompanyDomain(raw);
+  }
+
+  if (!domain) return [];
+
+  // Priority chain: Google 256px HD Favicon → Unavatar → IconHorse (no DuckDuckGo .ico – too small/blurry)
+  return [
+    `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
+    `https://unavatar.io/${domain}`,
+    `https://icon.horse/icon/${domain}`,
+  ];
+}
 
 /**
  * Get web domain registered or inferred for a company or income description
@@ -251,17 +278,35 @@ export function getCompanyDomain(name: string): string | null {
     return directMatch[1].toLowerCase();
   }
 
-  const normalized = raw.toLowerCase();
+  // Clean noise prefixes/suffixes from description (e.g., "income from apple" -> "apple", "Dividend: MRF (MRF) - ₹229.00/share" -> "mrf")
+  const cleaned = raw
+    .replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "")
+    .replace(/^(income from|payout from|salary from|dividend:?|payment from|paid to|payment to|received from|salary|dividend|interest|bonus|freelance|payout|credit|debit|refund|from|to|transfer)\s*/i, "")
+    .replace(/\s*(income|payout|salary|dividend|interest|bonus|freelance)$/i, "")
+    .replace(/\b(ltd|limited|corp|corporation|inc|incorporated|serv|services|lt|co)\b/gi, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[—–\-]\s*₹.*$/i, "")
+    .trim();
+
+  const normalized = (cleaned || raw).toLowerCase();
 
   // 2. Direct shorthand lookup
   if (COMPANY_SHORTHANDS[normalized]) {
     return COMPANY_SHORTHANDS[normalized];
   }
 
-  // 3. Registry exact match
+  // 3. Token check against COMPANY_SHORTHANDS (e.g. "apple" in "income from apple")
+  const tokens = normalized.split(/[\s\-_\/]+/);
+  for (const token of tokens) {
+    const cleanTok = token.replace(/[^a-z0-9]/g, "");
+    if (cleanTok.length >= 2 && COMPANY_SHORTHANDS[cleanTok]) {
+      return COMPANY_SHORTHANDS[cleanTok];
+    }
+  }
+
+  // 4. Registry exact or substring match
   let company = COMPANIES.find((c) => c.name.toLowerCase() === normalized);
 
-  // 4. Registry substring / word match
   if (!company) {
     company = COMPANIES.find((c) => {
       const cName = c.name.toLowerCase();
@@ -269,12 +314,13 @@ export function getCompanyDomain(name: string): string | null {
     });
   }
 
-  // 5. Token match
+  // 5. Token match against COMPANIES registry
   if (!company) {
-    const tokens = normalized.split(/[\s\-_\/]+/);
     for (const token of tokens) {
-      if (token.length > 2 && COMPANY_SHORTHANDS[token]) {
-        return COMPANY_SHORTHANDS[token];
+      const cleanTok = token.replace(/[^a-z0-9]/g, "");
+      if (cleanTok.length >= 3) {
+        const matched = COMPANIES.find((c) => c.name.toLowerCase().startsWith(cleanTok) || c.name.toLowerCase().includes(cleanTok));
+        if (matched) return matched.domain;
       }
     }
   }
@@ -293,73 +339,4 @@ export function getCompanyDomain(name: string): string | null {
   }
 
   return null;
-}
-
-const COMPANY_SIMPLE_ICONS: Record<string, string> = {
-  "google.com": "google",
-  "microsoft.com": "microsoft",
-  "apple.com": "apple",
-  "amazon.com": "amazon",
-  "amazon.in": "amazon",
-  "meta.com": "meta",
-  "netflix.com": "netflix",
-  "adobe.com": "adobe",
-  "salesforce.com": "salesforce",
-  "oracle.com": "oracle",
-  "ibm.com": "ibm",
-  "accenture.com": "accenture",
-  "cognizant.com": "cognizant",
-  "infosys.com": "infosys",
-  "tcs.com": "tata",
-  "tata.com": "tata",
-  "wipro.com": "wipro",
-  "swiggy.in": "swiggy",
-  "zomato.com": "zomato",
-  "stripe.com": "stripe",
-  "razorpay.com": "razorpay",
-  "upwork.com": "upwork",
-  "fiverr.com": "fiverr",
-  "github.com": "github",
-  "gitlab.com": "gitlab",
-  "atlassian.com": "atlassian",
-  "uber.com": "uber",
-  "zoom.us": "zoom",
-  "linkedin.com": "linkedin",
-};
-
-/**
- * Get ordered logo URLs for a company using online SimpleIcons CDN, IconHorse, FaviconKit, DuckDuckGo, Clearbit and Google.
- */
-export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
-  if (!companyNameOrDomain) return [];
-  const raw = companyNameOrDomain.trim();
-  const domainRegex = /^[a-z0-9\-]+\.(?:com|in|co|io|ai|org|net|tech|app|dev)$/i;
-
-  let domain: string | null = null;
-  if (domainRegex.test(raw)) {
-    domain = raw.toLowerCase();
-  } else {
-    domain = getCompanyDomain(raw);
-  }
-
-  if (!domain) return [];
-
-  const sources: string[] = [];
-
-  // 1. SimpleIcons Online CDN first
-  const simpleIconSlug = COMPANY_SIMPLE_ICONS[domain];
-  if (simpleIconSlug) {
-    sources.push(`https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/${simpleIconSlug}.svg`);
-  }
-
-  // 2. Multi-provider online CDN chain for Companies (IconHorse -> FaviconKit -> DuckDuckGo -> Clearbit -> Google)
-  sources.push(
-    `https://api.iconhorse.com/v1/${domain}`,
-    `https://api.faviconkit.com/${domain}/128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-    `https://logo.clearbit.com/${domain}`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-  );
-
-  return sources;
 }

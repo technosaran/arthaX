@@ -1,14 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { MODULE_KEYS, MODULE_DISPLAY_LABELS } from "@/lib/modules";
 
 interface ModulesTabProps {
   enabledModules: string[];
   toggleModule: (module: string) => void;
+  onEnableAll?: () => void;
 }
 
-export default function ModulesTab({ enabledModules, toggleModule }: ModulesTabProps) {
+export default function ModulesTab({ enabledModules, toggleModule, onEnableAll }: ModulesTabProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+
   const MODULE_METADATA: Record<string, { icon: string; desc: string; category: string }> = {
     "Income & Expenses": { icon: "💰", desc: "Track daily revenue, recurring debits, and cash flow", category: "Core Cashflow" },
     "Budget": { icon: "📊", desc: "Set spending limits and receive over-budget alerts", category: "Planning" },
@@ -20,11 +23,23 @@ export default function ModulesTab({ enabledModules, toggleModule }: ModulesTabP
     "Ledger": { icon: "📑", desc: "Immutable audit trail of all balance adjustments", category: "Audit" },
   };
 
-  const handleEnableAll = () => {
-    MODULE_KEYS.forEach((mod) => {
-      if (!enabledModules.includes(mod)) toggleModule(mod);
-    });
+  const categories = ["All", "Core Cashflow", "Planning", "Wealth", "Debt", "Household", "Audit"];
+
+  const handleEnableAllClick = () => {
+    if (onEnableAll) {
+      onEnableAll();
+    } else {
+      MODULE_KEYS.forEach((mod) => {
+        if (!enabledModules.includes(mod)) toggleModule(mod);
+      });
+    }
   };
+
+  const filteredModules = MODULE_KEYS.filter((key) => {
+    if (selectedCategory === "All") return true;
+    const cat = MODULE_METADATA[key]?.category || "General";
+    return cat === selectedCategory;
+  });
 
   return (
     <div className="max-w-4xl space-y-6 animate-fade-in">
@@ -37,22 +52,48 @@ export default function ModulesTab({ enabledModules, toggleModule }: ModulesTabP
               🧩
             </div>
             <div>
-              <h2 className="text-lg font-black text-white tracking-tight">Module Architecture & Visibility</h2>
-              <p className="text-xs text-[--text-muted]">Customize active workspace modules. Disabling hides sections from UI without deleting historical data.</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-white tracking-tight">Module Architecture & Visibility</h2>
+                <span className="text-[0.6875rem] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                  {enabledModules.length} / {MODULE_KEYS.length} Active
+                </span>
+              </div>
+              <p className="text-xs text-[--text-muted] mt-0.5">Customize active workspace modules. Disabling hides sections from UI without deleting data.</p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={handleEnableAll}
-            className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold transition-all cursor-pointer shrink-0"
+            onClick={handleEnableAllClick}
+            className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95"
           >
             ⚡ Enable All Modules
           </button>
         </div>
 
+        {/* Category Filters */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3 mb-4">
+          {categories.map((cat) => {
+            const isActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20"
+                    : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {MODULE_KEYS.map((module) => {
+          {filteredModules.map((module) => {
             const displayLabel = MODULE_DISPLAY_LABELS[module];
             const isEnabled = enabledModules.includes(module);
             const meta = MODULE_METADATA[module] || { icon: "⚙️", desc: "Module feature section", category: "General" };
@@ -84,6 +125,7 @@ export default function ModulesTab({ enabledModules, toggleModule }: ModulesTabP
 
                   <button
                     type="button"
+                    aria-label={`Toggle module ${displayLabel}`}
                     onClick={() => toggleModule(module)}
                     className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer focus:outline-none ${
                       isEnabled ? "bg-cyan-500" : "bg-white/10"
@@ -111,3 +153,4 @@ export default function ModulesTab({ enabledModules, toggleModule }: ModulesTabP
     </div>
   );
 }
+

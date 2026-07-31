@@ -113,48 +113,16 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
     return name.replace(/^\[(gemini ai|telegram|ai|bot)\]\s*/i, "").trim();
   }, [name]);
 
-  const domain = useMemo(() => {
-    if (!cleanName) return null;
-    const clean = cleanName.toLowerCase();
-    
-    // Check known company domains first
-    for (const [key, dom] of Object.entries(COMPANY_LOGO_DOMAINS)) {
-      if (clean.includes(key)) return dom;
-    }
-
-    // Try to extract domain from text
-    const domainMatch = clean.match(/\b([a-z0-9\-]+\.(?:com|in|co|org|io|dev|ai|app|net|tech|money|club|us))\b/i);
-    if (domainMatch) return domainMatch[1].toLowerCase();
-
-    // Smart cleanup for income descriptions like "Dividend: TATA CONSULTANCY SERV LT (TCS)"
-    const stripped = clean
-      .replace(/^(dividend|salary|interest|bonus|freelance|payout|credit|payment|refund|from|to|transfer):\s*/i, "")
-      .replace(/\b(ltd|limited|corp|corporation|inc|incorporated|serv|services|lt|co)\b/gi, "")
-      .replace(/\([^)]*\)/g, "")
-      .replace(/[—–\-]\s*₹.*$/i, "")
-      .trim();
-    const firstWord = stripped.split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
-    if (firstWord.length >= 3) return `${firstWord}.com`;
-    return null;
-  }, [cleanName]);
-
   const sources = useMemo(() => {
     if (!cleanName) return [];
-    const bankSources = getBankLogoSources(cleanName);
-    if (bankSources.length > 0) return bankSources;
-
     const companySources = getCompanyLogoSources(cleanName);
     if (companySources.length > 0) return companySources;
 
-    if (!domain) return [];
-    return [
-      `https://api.iconhorse.com/v1/${domain}`,
-      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-      `https://api.faviconkit.com/${domain}/128`,
-      `https://logo.clearbit.com/${domain}`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    ];
-  }, [cleanName, domain]);
+    const bankSources = getBankLogoSources(cleanName);
+    if (bankSources.length > 0) return bankSources;
+
+    return [];
+  }, [cleanName]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
@@ -169,20 +137,20 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 
   if (!sources.length || srcIndex >= sources.length) {
     return (
-      <div className={`${className} rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-md shrink-0`}>
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-black text-xs tracking-wider shadow-md shrink-0 select-none p-1 text-center truncate`}>
         {initials}
       </div>
     );
   }
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-1.5 shadow-md border border-white/30 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={sources[srcIndex]}
         src={sources[srcIndex]}
         alt={cleanName || "Company"}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain rounded-xl"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -192,10 +160,14 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 CompanyLogo.displayName = "CompanyLogo";
 
 const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: { bankName?: string | null; accountName?: string; className?: string }) => {
+  const query = (bankName || accountName || "").trim().toLowerCase();
+  const isCash = query.includes("cash");
+  const isDirect = query.includes("direct") || query.includes("ledger");
+
   const sources = useMemo(() => {
-    const query = bankName || accountName || "";
-    return getBankLogoSources(query);
-  }, [bankName, accountName]);
+    if (isCash || isDirect) return [];
+    return getBankLogoSources(bankName || accountName || "");
+  }, [bankName, accountName, isCash, isDirect]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
@@ -205,10 +177,26 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
     setSrcIndex(0);
   }
 
+  if (isCash) {
+    return (
+      <div className={`${className} rounded-lg bg-gradient-to-br from-amber-500 via-yellow-600 to-amber-700 border border-amber-400/30 flex items-center justify-center text-white text-[11px] shadow-md shrink-0 select-none`}>
+        💵
+      </div>
+    );
+  }
+
+  if (isDirect) {
+    return (
+      <div className={`${className} rounded-lg bg-slate-800 border border-white/20 flex items-center justify-center text-sky-400 font-black text-[10px] shrink-0 select-none`}>
+        D
+      </div>
+    );
+  }
+
   if (!sources || sources.length === 0 || srcIndex >= sources.length) {
     return (
-      <div className={`${className} rounded-lg bg-white/10 flex items-center justify-center text-slate-300 font-bold text-[10px] shrink-0`}>
-        {(accountName || "D").charAt(0).toUpperCase()}
+      <div className={`${className} rounded-lg bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-white font-bold text-[10px] shrink-0 select-none`}>
+        {(accountName || bankName || "B").charAt(0).toUpperCase()}
       </div>
     );
   }
@@ -216,13 +204,13 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-lg bg-white p-0.5 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain filter drop-shadow-sm"
+        className="w-full h-full object-contain"
         loading="lazy"
         onError={() => setSrcIndex(prev => prev + 1)}
       />
