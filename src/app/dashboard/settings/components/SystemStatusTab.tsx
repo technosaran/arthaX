@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 interface DiagnosticResult {
   name: string;
@@ -21,14 +21,36 @@ export default function SystemStatusTab({
   runningDiagnostics,
   runDiagnostics,
 }: SystemStatusTabProps) {
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (diagnostics.length > 0 && !runningDiagnostics) {
+      setLastChecked(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    }
+  }, [diagnostics, runningDiagnostics]);
+
+  const healthyCount = diagnostics.filter((d) => d.status === "Healthy").length;
+  const totalCount = diagnostics.length;
+  const healthPercentage = totalCount > 0 ? Math.round((healthyCount / totalCount) * 100) : 100;
+
+  const getLatencyStyle = (latencyStr: string) => {
+    if (latencyStr === "—") return "text-gray-500";
+    const num = parseInt(latencyStr, 10);
+    if (isNaN(num)) return "text-gray-400";
+    if (num < 300) return "text-emerald-400 font-bold";
+    if (num < 800) return "text-amber-400 font-bold";
+    return "text-rose-400 font-bold";
+  };
+
   return (
-    <div className="max-w-2xl animate-fade-in-up">
-      <div className="glass-card-static p-6 md:p-10 relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-emerald-500/70" />
-        <div className="flex items-center justify-between mb-8">
+    <div className="max-w-3xl space-y-6 animate-fade-in">
+      <div className="glass-card-static p-6 md:p-8 relative overflow-hidden bg-slate-900/50 border border-white/10 rounded-3xl">
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl shadow-inner">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -37,51 +59,71 @@ export default function SystemStatusTab({
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">System & API Diagnostics</h2>
-              <p className="text-xs text-[--text-muted]">Check if external service connections or data APIs are rate-limited or offline</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-white tracking-tight">System & API Diagnostics</h2>
+                {totalCount > 0 && (
+                  <span className={`text-[0.6875rem] font-bold px-2.5 py-0.5 rounded-full border ${
+                    healthPercentage >= 80 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                  }`}>
+                    {healthPercentage}% Health ({healthyCount}/{totalCount})
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[--text-muted] mt-0.5">Check real-time network health, market API latencies, and DB connection stability</p>
             </div>
           </div>
-          <button
-            onClick={runDiagnostics}
-            disabled={runningDiagnostics}
-            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 active:scale-95 cursor-pointer"
-          >
-            {runningDiagnostics ? (
-              <>
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25" />
-                  <path
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    className="opacity-75"
-                  />
-                </svg>
-                Pinging...
-              </>
-            ) : (
-              "Run Diagnostics"
+
+          <div className="flex items-center gap-3 shrink-0">
+            {lastChecked && (
+              <span className="text-[0.625rem] font-mono text-gray-400">
+                Pinged {lastChecked}
+              </span>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={runDiagnostics}
+              disabled={runningDiagnostics}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/10"
+            >
+              {runningDiagnostics ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25" />
+                    <path
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      className="opacity-75"
+                    />
+                  </svg>
+                  Pinging APIs...
+                </>
+              ) : (
+                "⚡ Re-Run Diagnostics"
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {diagnostics.map((api, idx) => (
             <div
               key={idx}
               className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors"
             >
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-bold text-white">{api.name}</span>
+              <div className="flex flex-col gap-1 min-w-0">
+                <span className="text-xs font-bold text-white truncate">{api.name}</span>
                 {api.error && (
-                  <span className="text-xs text-rose-400 font-mono max-w-sm truncate" title={api.error}>
+                  <span className="text-[0.6875rem] text-rose-400 font-mono truncate max-w-sm" title={api.error}>
                     Error: {api.error}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-[--text-muted] font-mono">{api.latency}</span>
+              <div className="flex items-center gap-4 shrink-0">
+                <span className={`text-xs font-mono ${getLatencyStyle(api.latency)}`}>
+                  {api.latency}
+                </span>
                 <span
-                  className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-[4px] border ${
+                  className={`text-[0.625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
                     api.status === "Healthy"
                       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                       : api.status === "Rate Limited"
@@ -94,9 +136,10 @@ export default function SystemStatusTab({
               </div>
             </div>
           ))}
+
           {diagnostics.length === 0 && !runningDiagnostics && (
-            <div className="text-center py-6 text-xs text-[--text-muted]">
-              No diagnostics run yet. Click &quot;Run Diagnostics&quot; to check API health.
+            <div className="text-center py-8 text-xs text-[--text-muted]">
+              No diagnostics run yet. Click &quot;⚡ Re-Run Diagnostics&quot; to test API connections.
             </div>
           )}
         </div>
@@ -104,3 +147,4 @@ export default function SystemStatusTab({
     </div>
   );
 }
+

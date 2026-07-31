@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { exportToCSV } from "@/lib/export-csv";
 import dynamic from "next/dynamic";
@@ -11,6 +12,8 @@ const ReportDownloadButton = dynamic(
 
 export default function ExportsTab() {
   const { data } = useFinanceData();
+  const [exportSearch, setExportSearch] = useState("");
+
   const {
     incomes = [],
     expenses = [],
@@ -216,6 +219,14 @@ export default function ExportsTab() {
     },
   ];
 
+  const filteredCards = useMemo(() => {
+    if (!exportSearch.trim()) return exportCards;
+    const q = exportSearch.toLowerCase().trim();
+    return exportCards.filter(
+      (c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
+    );
+  }, [exportSearch, exportCards]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Top Banner: Custom Statement & PDF/CSV Builder */}
@@ -240,15 +251,27 @@ export default function ExportsTab() {
 
       {/* Grid of One-Click Module Exporters */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
             Module Quick CSV Exporters
           </h3>
-          <span className="text-xs font-mono text-[--text-muted]">10 Modules Available</span>
+          
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={exportSearch}
+              onChange={(e) => setExportSearch(e.target.value)}
+              placeholder="Filter exporter modules..."
+              className="bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 outline-none focus:border-cyan-500 transition-all font-medium"
+            />
+            <span className="text-xs font-mono text-[--text-muted] shrink-0">
+              {filteredCards.length} / {exportCards.length} Ready
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {exportCards.map((card) => (
+          {filteredCards.map((card) => (
             <div
               key={card.title}
               className="glass-card rich-border p-5 rounded-2xl border border-white/5 hover:border-white/20 transition-all flex flex-col justify-between group"
@@ -256,7 +279,9 @@ export default function ExportsTab() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-2xl">{card.icon}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[0.625rem] font-mono font-bold bg-white/5 border border-white/10 text-[--text-muted]">
+                  <span className={`px-2 py-0.5 rounded-full text-[0.625rem] font-mono font-bold border ${
+                    card.count > 0 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-white/5 border-white/10 text-[--text-muted]"
+                  }`}>
                     {card.count} records
                   </span>
                 </div>
@@ -269,8 +294,8 @@ export default function ExportsTab() {
               </div>
 
               <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
-                <span className="text-[0.625rem] font-black uppercase tracking-wider text-emerald-400">
-                  Ready to download
+                <span className={`text-[0.625rem] font-black uppercase tracking-wider ${card.count > 0 ? "text-emerald-400" : "text-gray-500"}`}>
+                  {card.count > 0 ? "Ready to download" : "No records"}
                 </span>
                 <button
                   type="button"
@@ -287,7 +312,14 @@ export default function ExportsTab() {
             </div>
           ))}
         </div>
+
+        {filteredCards.length === 0 && (
+          <div className="p-8 text-center text-xs text-gray-400 rounded-2xl bg-white/[0.02] border border-white/5 mt-4">
+            No CSV exporters matching &quot;{exportSearch}&quot;.
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

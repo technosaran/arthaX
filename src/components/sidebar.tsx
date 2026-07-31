@@ -126,7 +126,7 @@ function NavItem({ label, href, icon, pathname, isCollapsed }: (typeof nav)[0] &
       aria-label={label}
       title={isCollapsed ? label : undefined}
       className={`relative flex items-center rounded-xl transition-all duration-300 no-underline border ${
-        isCollapsed ? "justify-center p-2.5 w-10 h-10 mx-auto" : "gap-3 px-3 py-2.5 hover:pl-4"
+        isCollapsed ? "justify-center p-2 w-9 h-9 mx-auto" : "gap-2.5 px-3 py-2 hover:pl-3.5"
       } ${
         active 
           ? "text-[--accent-primary-light] bg-[--sidebar-active] border-[rgba(99,102,241,0.15)] shadow-[0_0_15px_rgba(99,102,241,0.08)] font-bold" 
@@ -335,21 +335,21 @@ export default function Sidebar() {
 
       {/* Desktop Sidebar */}
       <aside className={`hidden md:flex shrink-0 flex-col h-screen sticky top-0 transition-all duration-300 ${isCollapsed ? "w-20" : "w-44"}`} style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)", backdropFilter: "blur(20px) saturate(1.2)", WebkitBackdropFilter: "blur(20px) saturate(1.2)" }}>
-        <div className={`px-4 pt-6 pb-2 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
+        <div className={`px-3.5 pt-4 pb-2 flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
           {!isCollapsed ? (
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="arthaX Logo" className="w-10 h-10 rounded-xl object-cover shadow-[0_0_15px_rgba(56,189,248,0.35)] border border-sky-400/20 shrink-0" />
-              <span className="text-3xl font-[950] text-white tracking-tight">artha<span className="text-sky-400">X</span></span>
+              <img src="/logo.png" alt="arthaX Logo" className="w-11 h-11 rounded-2xl object-cover shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-sky-400/30 shrink-0" />
+              <span className="text-3xl font-[950] text-white tracking-tight leading-none">artha<span className="text-sky-400">X</span></span>
             </div>
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src="/logo.png" alt="arthaX Logo" className="w-10 h-10 rounded-xl object-cover shadow-[0_0_15px_rgba(56,189,248,0.35)] border border-sky-400/20 shrink-0" title="arthaX" />
+            <img src="/logo.png" alt="arthaX Logo" className="w-11 h-11 rounded-2xl object-cover shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-sky-400/30 shrink-0" title="arthaX" />
           )}
           <button 
             type="button" 
             onClick={toggleCollapse} 
-            className="p-1.5 rounded-lg hover:bg-white/5 text-[--text-muted] hover:text-white transition-colors"
+            className="p-1 rounded-lg hover:bg-white/5 text-[--text-muted] hover:text-white transition-colors"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -360,19 +360,19 @@ export default function Sidebar() {
             )}
           </button>
         </div>
-        <nav className="flex-1 px-3 pt-4 space-y-1.5 overflow-y-auto no-scrollbar">
-          {!isCollapsed && <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[--text-muted] opacity-60">Navigation</p>}
+        <nav className="flex-1 px-2.5 pt-2 space-y-0.5 overflow-y-auto no-scrollbar">
+          {!isCollapsed && <p className="px-3 pb-1 text-[0.625rem] font-bold uppercase tracking-[0.2em] text-[--text-muted] opacity-60">Navigation</p>}
           {filteredNav.map((item) => (<NavItem key={item.href} {...item} pathname={pathname} isCollapsed={isCollapsed} />))}
         </nav>
-        <div className="px-3 py-4 mt-auto pb-8 flex justify-center">
+        <div className="px-2.5 py-3 mt-auto pb-4 flex justify-center">
           {!isCollapsed ? (
-            <button type="button" onClick={handleLogout} className="flex w-full items-center justify-center gap-3 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all bg-rose-500 text-white shadow-lg shadow-rose-500/20 hover:bg-rose-600 hover:shadow-rose-500/30 active:scale-[0.98]">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <button type="button" onClick={handleLogout} className="flex w-full items-center justify-center gap-2.5 rounded-xl px-3 py-2 text-[0.6875rem] font-black uppercase tracking-widest transition-all bg-rose-500 text-white shadow-lg shadow-rose-500/20 hover:bg-rose-600 hover:shadow-rose-500/30 active:scale-[0.98]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               Sign Out
             </button>
           ) : (
-            <button type="button" onClick={handleLogout} className="p-3 rounded-xl bg-rose-500 text-white hover:bg-rose-600 active:scale-95 shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center w-10 h-10" title="Sign Out">
-              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <button type="button" onClick={handleLogout} className="p-2.5 rounded-xl bg-rose-500 text-white hover:bg-rose-600 active:scale-95 shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center w-9 h-9" title="Sign Out">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             </button>
           )}
         </div>

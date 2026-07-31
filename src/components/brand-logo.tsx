@@ -242,13 +242,11 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
     if (!domain) return [];
 
-    // Recommended Merchant Logo API sequence (IconHorse -> DuckDuckGo -> FaviconKit -> Clearbit -> Google)
+    // Recommended Merchant Logo API sequence (Google 256px HD Favicon → Unavatar → IconHorse)
     return [
-      `https://api.iconhorse.com/v1/${domain}`,
-      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-      `https://api.faviconkit.com/${domain}/128`,
-      `https://logo.clearbit.com/${domain}`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+      `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
+      `https://unavatar.io/${domain}`,
+      `https://icon.horse/icon/${domain}`,
     ];
   }, [cleanQuery]);
 

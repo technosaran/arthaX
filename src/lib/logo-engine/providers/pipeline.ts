@@ -138,11 +138,28 @@ export class GoogleFaviconProvider implements LogoProvider {
   }
 }
 
+export class UnavatarProvider implements LogoProvider {
+  name = "unavatar";
+  priority = 1;
+
+  async fetchLogo(domain: string): Promise<ProviderResult> {
+    return {
+      provider: this.name,
+      domain,
+      assets: [
+        { url: `https://unavatar.io/${domain}`, format: "svg", provider: this.name },
+      ],
+      success: true,
+    };
+  }
+}
+
 export class ProviderPipeline {
   private providers: LogoProvider[];
 
   constructor() {
     this.providers = [
+      new UnavatarProvider(),
       new BrandfetchProvider(),
       new LogoDevProvider(),
       new IconHorseProvider(),

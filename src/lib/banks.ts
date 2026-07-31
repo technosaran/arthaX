@@ -457,26 +457,46 @@ export function getBankDomain(bankName: string): string | null {
 }
 
 const INDIAN_BANK_CDNS: Record<string, string> = {
-  "sbi.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/sbi.svg",
-  "hdfcbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/hdfc.svg",
-  "icicibank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/icici.svg",
-  "axisbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/axis.svg",
-  "kotak.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/kotak.svg",
-  "pnbindia.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/pnb.svg",
-  "bankofbaroda.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/bob.svg",
-  "canarabank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/cnrb.svg",
-  "unionbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/ubin.svg",
-  "bankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/bkid.svg",
-  "indianbank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/idib.svg",
-  "centralbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/cbin.svg",
-  "iob.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/ioba.svg",
-  "ucobank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/ucba.svg",
-  "bankofmaharashtra.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/mahb.svg",
-  "idfcfirstbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/idfb.svg",
-  "yesbank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/yesb.svg",
-  "indusind.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/indb.svg",
-  "federalbank.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/fdrl.svg",
-  "rblbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@master/assets/logos/ratn.svg",
+  // Correct path: @main branch, IFSC-based subdirectories, symbol.svg for compact icons
+  "sbi.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/sbin/symbol.svg",
+  "hdfcbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/hdfc/symbol.svg",
+  "icicibank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/icic/symbol.svg",
+  "axisbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/utib/symbol.svg",
+  "kotak.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/kkbk/symbol.svg",
+  "pnbindia.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/punb/symbol.svg",
+  "bankofbaroda.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/barb/symbol.svg",
+  "canarabank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cnrb/symbol.svg",
+  "unionbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ubin/symbol.svg",
+  "bankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/bkid/symbol.svg",
+  "indianbank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/idib/symbol.svg",
+  "centralbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cbin/symbol.svg",
+  "iob.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ioba/symbol.svg",
+  "ucobank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ucba/symbol.svg",
+  "bankofmaharashtra.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/mahb/symbol.svg",
+  "idfcfirstbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/idfb/symbol.svg",
+  "yesbank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/yesb/symbol.svg",
+  "indusind.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/indb/symbol.svg",
+  "federalbank.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/fdrl/symbol.svg",
+  "rblbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ratn/symbol.svg",
+  "bandhanbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/bdbl/symbol.svg",
+  "idbibank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ibkl/symbol.svg",
+  "southindianbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/sibl/symbol.svg",
+  "kvb.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/kvbl/symbol.svg",
+  "cityunionbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ciub/symbol.svg",
+  "karnatakabank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/karb/symbol.svg",
+  "punjabandsindbank.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/psib/symbol.svg",
+  "jkbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/jaka/symbol.svg",
+  "aubank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/aubl/symbol.svg",
+  "tmb.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/tmbl/symbol.svg",
+  "dhanbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/dlxb/symbol.svg",
+  "csb.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/csbk/symbol.svg",
+  "sc.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/scbl/symbol.svg",
+  "nainitalbank.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ntbl/symbol.svg",
+  "ujjivansfb.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ujvn/symbol.svg",
+  "finobank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/fino/symbol.svg",
+  "paytmbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/pytm/symbol.svg",
+  "airtel.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/airp/symbol.svg",
+  "dcbl.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/dcbl/symbol.svg",
 };
 
 /**
@@ -496,20 +516,24 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
+  // Priority chain: SVG CDN (crisp at any size) → Google 256px HD Favicon → Unavatar → IconHorse
   const sources: string[] = [];
 
-  // 1. Dedicated Indian Banks Online CDN
-  const cdnUrl = INDIAN_BANK_CDNS[domain];
-  if (cdnUrl) sources.push(cdnUrl);
+  // 1. Use curated Indian bank SVG logos first (vector = never blurry)
+  if (INDIAN_BANK_CDNS[domain]) {
+    sources.push(INDIAN_BANK_CDNS[domain]);
+  }
 
-  // 2. Multi-provider online CDN chain for Banks (FaviconKit -> DuckDuckGo -> IconHorse -> Clearbit -> Google)
+  // 2. Google HD favicon at 256px (high quality raster)
   sources.push(
-    `https://api.faviconkit.com/${domain}/128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-    `https://api.iconhorse.com/v1/${domain}`,
-    `https://logo.clearbit.com/${domain}`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
   );
+
+  // 3. Unavatar (aggregator – decent quality)
+  sources.push(`https://unavatar.io/${domain}`);
+
+  // 4. IconHorse (final fallback – better than DuckDuckGo .ico which returns tiny 16-32px icons)
+  sources.push(`https://icon.horse/icon/${domain}`);
 
   return sources;
 }
