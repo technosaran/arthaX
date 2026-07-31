@@ -60,12 +60,13 @@ describe("Bank Logo and Domain Resolution", () => {
   it("generates multi-CDN logo sources correctly", () => {
     const sources = getBankLogoSources("HDFC Bank");
     expect(sources).toHaveLength(5);
-    expect(sources[0]).toContain("logo.clearbit.com/hdfcbank.com");
-    expect(sources[1]).toContain("unavatar.io/hdfcbank.com");
-    expect(sources[2]).toContain("api.faviconkit.com/hdfcbank.com/128");
+    expect(sources[0]).toContain("google.com/s2/favicons?domain=hdfcbank.com");
+    expect(sources[1]).toContain("api.faviconkit.com/hdfcbank.com/128");
+    expect(sources[2]).toContain("unavatar.io/hdfcbank.com");
     expect(sources[3]).toContain("icons.duckduckgo.com/ip3/hdfcbank.com.ico");
-    expect(sources[4]).toContain("google.com/s2/favicons?domain=hdfcbank.com");
+    expect(sources[4]).toContain("logo.clearbit.com/hdfcbank.com");
   });
+
 
   it("searches banks cleanly", () => {
     const results = searchBanks("SBI");

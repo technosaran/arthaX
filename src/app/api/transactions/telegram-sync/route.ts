@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
-import { sendTelegramMessage, answerCallbackQuery, setTelegramBotCommands, getBrandEmoji } from "@/lib/telegram";
+import { sendTelegramMessage, answerCallbackQuery, setTelegramBotCommands, getBrandEmoji, sendTelegramChatAction, downloadTelegramFile } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
-import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent } from "@/lib/gemini";
+import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent, parseVoiceNoteWithGemini, parseReceiptWithGemini } from "@/lib/gemini";
+
 
 // Persistent Telegram Reply Keyboard (docked cleanly at the bottom drawer of Telegram text input)
 const MAIN_REPLY_KEYBOARD = {
@@ -280,7 +281,95 @@ function classifyTextFuzzy(text: string): { type: "expense" | "income"; category
   return { type: "expense", category: "Other" };
 }
 
+// Helper to build 360-degree live financial context for Gemini AI
+async function buildRichUserContext(supabase: any, profile: any, accounts: any[], familyMembers: any[], goals: any[]) {
+  try {
+    let totalNetWorth = 0;
+    if (accounts) {
+      totalNetWorth = accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0);
+    }
+
+    const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+
+    const [{ data: recentTxs }, { data: monthlyTxs }, { data: stocks }, { data: mfs }, { data: budgets }] = await Promise.all([
+      supabase.from("transactions").select("amount, type, category, description, date").eq("user_id", profile.id).order("created_at", { ascending: false }).limit(15),
+      supabase.from("transactions").select("amount, category").eq("user_id", profile.id).eq("type", "expense").gte("date", firstDay),
+      supabase.from("investments").select("symbol, quantity, buy_price, current_price").eq("user_id", profile.id),
+      supabase.from("mutual_funds").select("fund_name, units, current_nav").eq("user_id", profile.id),
+      supabase.from("budgets").select("category, amount").eq("user_id", profile.id),
+    ]);
+
+    const categorySpending: Record<string, number> = {};
+    if (monthlyTxs) {
+      for (const t of monthlyTxs) {
+        const cat = t.category || "Other";
+        categorySpending[cat] = (categorySpending[cat] || 0) + (parseFloat(t.amount) || 0);
+      }
+    }
+
+    let stocksTotal = 0;
+    const stockList = (stocks || []).map((s: any) => {
+      const val = (parseFloat(s.quantity) || 0) * (parseFloat(s.current_price) || parseFloat(s.buy_price) || 0);
+      stocksTotal += val;
+      return `${s.symbol} (${s.quantity} @ ₹${s.current_price || s.buy_price})`;
+    });
+
+    let mfTotal = 0;
+    const mfList = (mfs || []).map((m: any) => {
+      const val = (parseFloat(m.units) || 0) * (parseFloat(m.current_nav) || 100);
+      mfTotal += val;
+      return `${m.fund_name} (₹${Math.round(val)})`;
+    });
+
+    const budgetStatus = (budgets || []).map((b: any) => {
+      const spent = categorySpending[b.category] || 0;
+      const limit = parseFloat(b.amount) || 0;
+      return `${b.category}: Spent ₹${spent}/₹${limit} (${limit > 0 ? Math.round((spent / limit) * 100) : 0}%)`;
+    });
+
+    return `User Profile: Name=${profile.full_name || profile.username || 'User'}, BaseCurrency=${profile.base_currency || 'INR'}.
+Bank Accounts Net Worth: ₹${totalNetWorth.toLocaleString("en-IN")}.
+Accounts: ${JSON.stringify(accounts.map((a: any) => ({ name: a.name, bank: a.bank_name, balance: a.balance, type: a.type })))}.
+This Month Category Spending: ${JSON.stringify(categorySpending)}.
+Budgets: ${budgetStatus.join("; ") || "None set"}.
+Investments: Stocks Total=₹${Math.round(stocksTotal)} [${stockList.join(", ")}], Mutual Funds Total=₹${Math.round(mfTotal)} [${mfList.join(", ")}].
+Recent 15 Transactions: ${JSON.stringify((recentTxs || []).map((t: any) => `${t.date} ${t.type.toUpperCase()} ₹${t.amount} (${t.category}: ${t.description})`))}.
+Goals: ${JSON.stringify((goals || []).map((g: any) => `${g.name}: saved ₹${g.current_amount || 0} / target ₹${g.target_amount}`))}.
+Family: ${JSON.stringify((familyMembers || []).map((f: any) => `${f.name} (${f.relationship}): balance ₹${f.balance || 0}`))}.`;
+  } catch (err) {
+    return `User: ${profile.username || 'User'}. Net Worth: ₹${accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0)}. Accounts: ${JSON.stringify(accounts)}.`;
+  }
+}
+
+// Conversation Memory Helpers
+async function getTelegramChatHistory(chatId: string): Promise<string> {
+  try {
+    const raw = await redisGet(`tg_chat_history_${chatId}`);
+    if (!raw) return "";
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return "";
+    return list.map((item: any) => `${item.role === 'user' ? 'User' : 'Assistant'}: ${item.text}`).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function appendTelegramChatHistory(chatId: string, userMsg: string, aiMsg: string): Promise<void> {
+  try {
+    const raw = await redisGet(`tg_chat_history_${chatId}`);
+    let list: any[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    list.push({ role: 'user', text: userMsg });
+    list.push({ role: 'assistant', text: aiMsg });
+    if (list.length > 8) list = list.slice(list.length - 8);
+    await redisSet(`tg_chat_history_${chatId}`, JSON.stringify(list), 7200);
+  } catch (err) {
+    console.error("Failed to append chat history:", err);
+  }
+}
+
 export async function POST(req: NextRequest) {
+
   try {
     const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
     if (webhookSecret) {
@@ -324,22 +413,161 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: "No message or callback_query to process" });
     }
 
+    if (chatId) {
+      sendTelegramChatAction(chatId, "typing").catch(() => {});
+    }
+
     if (rawText.startsWith("cmd_")) {
       const mappedCmd = rawText.replace(/^cmd_/, "");
       rawText = `/${mappedCmd}`;
     }
 
-    // Handle voice notes without text
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Handle voice notes with live Gemini 2.5 Flash Audio Transcription
     if (!rawText && body?.message?.voice) {
+      sendTelegramChatAction(chatId, "record_voice").catch(() => {});
+      const voiceFileId = body.message.voice.file_id;
+      const downloadedVoice = await downloadTelegramFile(voiceFileId);
+
+      if (downloadedVoice) {
+        const { data: prof } = await supabase.from("profiles").select("*").eq("telegram_chat_id", String(chatId)).maybeSingle();
+        const geminiKey = prof ? getGeminiApiKeyForProfile(prof) : null;
+
+        if (prof && geminiKey) {
+          const [accsRes, famsRes, goalsRes] = await Promise.all([
+            supabase.from("accounts").select("id, name, bank_name, balance, type").eq("user_id", prof.id),
+            supabase.from("family_members").select("id, name, relationship, balance").eq("user_id", prof.id),
+            supabase.from("goals").select("id, name, target_amount, current_amount").eq("user_id", prof.id),
+          ]);
+          const accs = accsRes.data || [];
+          const fams = famsRes.data || [];
+          const gls = goalsRes.data || [];
+
+          const userContext = await buildRichUserContext(supabase, prof, accs, fams, gls);
+          const history = await getTelegramChatHistory(chatId);
+          const audioBase64 = downloadedVoice.buffer.toString("base64");
+
+          const voiceDecision = await parseVoiceNoteWithGemini(audioBase64, "audio/ogg", userContext, geminiKey, history);
+
+          if (voiceDecision && voiceDecision.transcription) {
+            rawText = voiceDecision.transcription;
+            await sendTelegramMessage(chatId, `🎙️ *Voice Note Transcribed*: "${voiceDecision.transcription}"`);
+
+            if (voiceDecision.action === "LOG_EXPENSE" && voiceDecision.amount) {
+              const matchedAcc = accs.find((a: any) => (a.name || "").toLowerCase().includes((voiceDecision.accountName || "").toLowerCase())) || accs[0];
+              if (matchedAcc) {
+                const newBal = (parseFloat(matchedAcc.balance) || 0) - voiceDecision.amount;
+                const cat = voiceDecision.category || "Other";
+                const desc = voiceDecision.description || voiceDecision.transcription;
+
+                const { data: txData } = await supabase.from("transactions").insert({
+                  user_id: prof.id,
+                  amount: voiceDecision.amount,
+                  type: "expense",
+                  category: cat,
+                  description: desc,
+                  account_id: matchedAcc.id,
+                  date: new Date().toISOString().split("T")[0],
+                  source_type: "expense"
+                }).select("id").single();
+
+                await supabase.from("accounts").update({ balance: newBal }).eq("id", matchedAcc.id);
+                await checkAndNotifyBudget(supabase, prof.id, chatId, cat, voiceDecision.amount);
+
+                const confirmMsg = `🤖 *Voice Decision*: Expense Logged!\n\n` +
+                  `💸 *Amount*: ₹${voiceDecision.amount.toLocaleString("en-IN")}\n` +
+                  `🏷️ *Category*: ${cat}\n` +
+                  `📝 *Details*: ${desc}\n` +
+                  `💳 *Account*: ${matchedAcc.name} (Bal: ₹${newBal.toLocaleString("en-IN")})\n` +
+                  `🧠 *Reasoning*: ${voiceDecision.reasoning || "Parsed from voice audio."}\n\n` +
+                  `⚡ *Status*: Synced with dashboard.`;
+
+                await sendTelegramMessage(chatId, confirmMsg, CATEGORY_KEYBOARD(txData?.id || ""));
+                await appendTelegramChatHistory(chatId, `[Voice] ${voiceDecision.transcription}`, confirmMsg);
+                return NextResponse.json({ success: true });
+              }
+            } else if (voiceDecision.replyMessage || voiceDecision.action === "FINANCIAL_QUERY") {
+              const reply = voiceDecision.replyMessage || `I transcribed your voice note: "${voiceDecision.transcription}".`;
+              await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${reply}`);
+              await appendTelegramChatHistory(chatId, `[Voice] ${voiceDecision.transcription}`, reply);
+              return NextResponse.json({ success: true });
+            }
+          }
+        }
+      }
+
       await sendTelegramMessage(
         chatId,
-        "🎙️ *Voice Note Received*\nAudio transcription active. _(Note: If running without live audio transcription API keys configured, please add a caption or text: e.g. `350 Lunch at Zomato`)_"
+        "🎙️ *Voice Note Received*\nAudio transcription active. _(Tip: Ensure Gemini AI is enabled in your dashboard Settings > Gemini AI Key)_"
       );
       return NextResponse.json({ success: true });
     }
 
-    // Handle receipt/bill photos without text/caption
+    // Handle receipt/bill photos with Gemini 2.5 Flash Vision OCR
     if (!rawText && body?.message?.photo) {
+      sendTelegramChatAction(chatId, "upload_photo").catch(() => {});
+      const photos = body.message.photo;
+      const largestPhoto = photos[photos.length - 1];
+      const downloadedPhoto = await downloadTelegramFile(largestPhoto.file_id);
+
+      if (downloadedPhoto) {
+        const { data: prof } = await supabase.from("profiles").select("*").eq("telegram_chat_id", String(chatId)).maybeSingle();
+        const geminiKey = prof ? getGeminiApiKeyForProfile(prof) : null;
+
+        if (prof && geminiKey) {
+          const [accsRes, famsRes, goalsRes] = await Promise.all([
+            supabase.from("accounts").select("id, name, bank_name, balance, type").eq("user_id", prof.id),
+            supabase.from("family_members").select("id, name, relationship, balance").eq("user_id", prof.id),
+            supabase.from("goals").select("id, name, target_amount, current_amount").eq("user_id", prof.id),
+          ]);
+          const accs = accsRes.data || [];
+          const fams = famsRes.data || [];
+          const gls = goalsRes.data || [];
+
+          const userContext = await buildRichUserContext(supabase, prof, accs, fams, gls);
+          const imgBase64 = downloadedPhoto.buffer.toString("base64");
+
+          const receiptRes = await parseReceiptWithGemini(imgBase64, "image/jpeg", userContext, geminiKey);
+
+          if (receiptRes.success && receiptRes.amount && accs.length > 0) {
+            const matchedAcc = accs.find((a: any) => (a.name || "").toLowerCase().includes((receiptRes.accountName || "").toLowerCase())) || accs[0];
+            const newBal = (parseFloat(matchedAcc.balance) || 0) - receiptRes.amount;
+            const txDate = receiptRes.date || new Date().toISOString().split("T")[0];
+
+            const { data: txData } = await supabase.from("transactions").insert({
+              user_id: prof.id,
+              amount: receiptRes.amount,
+              type: "expense",
+              category: receiptRes.category,
+              description: receiptRes.description,
+              account_id: matchedAcc.id,
+              date: txDate,
+              source_type: "receipt_ocr"
+            }).select("id").single();
+
+            await supabase.from("accounts").update({ balance: newBal }).eq("id", matchedAcc.id);
+            await checkAndNotifyBudget(supabase, prof.id, chatId, receiptRes.category, receiptRes.amount);
+
+            const itemListStr = receiptRes.items.length > 0 ? receiptRes.items.join(", ") : receiptRes.description;
+
+            const receiptMsg = `🧾 *Receipt Scanned with Gemini Vision!*\n\n` +
+              `🏪 *Merchant*: ${receiptRes.merchantName}\n` +
+              `💸 *Amount*: ₹${receiptRes.amount.toLocaleString("en-IN")}\n` +
+              `🏷️ *Category*: ${receiptRes.category}\n` +
+              `🛒 *Items*: ${itemListStr}\n` +
+              `💳 *Account*: ${matchedAcc.name} (Bal: ₹${newBal.toLocaleString("en-IN")})\n` +
+              `📅 *Date*: ${txDate}\n\n` +
+              `⚡ *Status*: Expense logged live to dashboard!`;
+
+            await sendTelegramMessage(chatId, receiptMsg, CATEGORY_KEYBOARD(txData?.id || ""));
+            return NextResponse.json({ success: true });
+          }
+        }
+      }
+
       await sendTelegramMessage(
         chatId,
         "📸 *Receipt Photo Received*\nTap a quick amount & category below or reply with a caption (e.g., `450 Dinner`) to log this receipt:",
@@ -367,9 +595,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: "No text or caption to parse" });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Handle Account Link command (/link tg-123456, /start tg-123456, or bare tg-123456)
     const linkMatch = rawText.match(/^(?:\/)?(?:link|start)?\s*(tg-\d+)/i);
@@ -539,14 +764,11 @@ export async function POST(req: NextRequest) {
     const geminiApiKey = getGeminiApiKeyForProfile(profile);
     if (geminiApiKey && !rawText.startsWith("cat_") && !rawText.startsWith("/")) {
       try {
-        let totalNetWorth = 0;
-        if (accounts) {
-          totalNetWorth = accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0);
-        }
+        const userContext = await buildRichUserContext(supabase, profile, accounts, familyMembers, goals);
+        const chatHistory = await getTelegramChatHistory(chatId);
 
-        const userContext = `User: ${profile.full_name || profile.username || 'User'}. Total Net Worth: ₹${totalNetWorth}. Accounts: ${JSON.stringify(accounts.map((a: any) => ({ id: a.id, name: a.name, bank_name: a.bank_name, balance: a.balance, type: a.type })))}. Family: ${JSON.stringify(familyMembers.map((f: any) => ({ id: f.id, name: f.name, relationship: f.relationship })))}. Base Currency: ${profile.base_currency || 'INR'}.`;
+        const decision = await parseAutonomousTelegramIntent(rawText, userContext, geminiApiKey, chatHistory);
 
-        const decision = await parseAutonomousTelegramIntent(rawText, userContext, geminiApiKey);
 
         const findAccountByName = (accName?: string | null) => {
           if (!accounts || accounts.length === 0) return null;
@@ -872,8 +1094,10 @@ export async function POST(req: NextRequest) {
           // 9. Autonomous FINANCIAL_QUERY
           if (decision.action === "FINANCIAL_QUERY" && decision.replyMessage) {
             await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${decision.replyMessage}`);
+            await appendTelegramChatHistory(chatId, rawText, decision.replyMessage);
             return NextResponse.json({ success: true });
           }
+
 
           // 10. Autonomous DELETE_ACCOUNT
           if (decision.action === "DELETE_ACCOUNT") {
@@ -2760,11 +2984,14 @@ export async function POST(req: NextRequest) {
 
             // 4. Live Data Inquiry Intent via Gemini AI
             if (aiResult.success && aiResult.intentType === "inquiry") {
-              const contextSummary = `User accounts: ${JSON.stringify(accounts || [])}. User goals: ${JSON.stringify(goals || [])}.`;
-              const aiAnswer = await askGeminiFinanceAssistant(text, contextSummary, geminiApiKey);
+              const contextSummary = await buildRichUserContext(supabase, profile, accounts, familyMembers, goals);
+              const chatHistory = await getTelegramChatHistory(chatId);
+              const aiAnswer = await askGeminiFinanceAssistant(text, contextSummary, geminiApiKey, chatHistory);
               await sendTelegramMessage(chatId, `🤖 *Gemini AI Financial Coach*:\n\n${aiAnswer}`);
+              await appendTelegramChatHistory(chatId, text, aiAnswer);
               return NextResponse.json({ success: true });
             }
+
           } catch (geminiErr) {
             console.warn("Gemini AI parse failed, using rule-based fallback:", geminiErr);
           }

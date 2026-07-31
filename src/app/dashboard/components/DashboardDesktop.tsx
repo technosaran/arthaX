@@ -433,7 +433,26 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                   </div>
                 </motion.div>
 
+                {/* Financial Runway / Emergency Coverage Badge */}
+                <motion.div 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-3 bg-sky-500/5 border border-sky-500/10 px-5 py-3.5 rounded-2xl transition-all hover:bg-sky-500/10 cursor-default"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 text-base shadow-inner">🛡️</div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-[--text-muted]">Financial Runway</span>
+                    <span className="text-sm sm:text-base font-black text-sky-400">
+                      {stats.monthlySpend > 0
+                        ? `${(stats.liquidBalanceINR / stats.monthlySpend).toFixed(1)} Mos Coverage`
+                        : stats.liquidBalanceINR > 0 ? "Infinite Coverage" : "0 Mos Coverage"
+                      }
+                    </span>
+                  </div>
+                </motion.div>
+
               </div>
+
             </div>
 
             <div className="flex-1 max-w-md w-full">

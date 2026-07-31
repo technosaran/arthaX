@@ -67,9 +67,10 @@ export default function InvestmentsClient() {
   const availableTabs = useMemo(() => {
     const list = [{ key: "overview", label: "Overview" }];
     if (currencyMode === "USD") {
-      // USD mode: Overview + Forex + Crypto
+      // USD mode: Overview + US Equities + Forex + Crypto
+      if (hasStocks) list.push({ key: "stocks-usd", label: "US Equities" });
       if (hasForex) list.push({ key: "forex", label: "Forex" });
-      list.push({ key: "crypto", label: "Crypto" });
+      list.push({ key: "crypto", label: "Crypto ($ USDT)" });
     } else {
       // INR mode: show sub-tabs for active/enabled investments
       if (hasStocks) list.push({ key: "stocks", label: "Stocks" });
@@ -77,9 +78,11 @@ export default function InvestmentsClient() {
       if (hasBonds) list.push({ key: "bonds", label: "Bonds" });
       if (hasFnO) list.push({ key: "fno", label: "FnO Trading" });
       if (hasAltAssets) list.push({ key: "alt-assets", label: "Alternative Assets" });
+      list.push({ key: "crypto", label: "Crypto" });
     }
     return list;
   }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets, currencyMode]);
+
 
   const tabParam = searchParams.get("tab");
   const validTabParam = useMemo(() => {
@@ -572,9 +575,12 @@ export default function InvestmentsClient() {
       {currencyMode === "INR" && activeTab === "bonds" && hasBonds && <BondsClient />}
       {currencyMode === "INR" && activeTab === "fno" && hasFnO && <FnoClient />}
       {currencyMode === "INR" && activeTab === "alt-assets" && hasAltAssets && <AlternativeAssetsClient isSubComponent />}
-      {/* USD sub-clients: Forex + Crypto */}
+      {activeTab === "crypto" && <CryptoClient />}
+
+      {/* USD sub-clients: US Equities + Forex + Crypto */}
+      {currencyMode === "USD" && activeTab === "stocks-usd" && hasStocks && <StocksClient showUSD={true} />}
       {currencyMode === "USD" && activeTab === "forex" && hasForex && <ForexClient />}
-      {currencyMode === "USD" && activeTab === "crypto" && <CryptoClient />}
     </div>
   );
+
 }

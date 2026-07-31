@@ -130,7 +130,36 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                 ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(1)}%)
               </span>
             </span>
+
+            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+              (stats.totalGrowthINR || 0) >= 0 
+                ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
+                : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
+            }`}>
+              <span>Growth: {(stats.totalGrowthINR || 0) >= 0 ? "+" : "-"}</span>
+              <span>
+                {showUSD 
+                  ? `$${Math.abs(stats.totalGrowthUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  : `₹${Math.abs(stats.totalGrowthINR || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                }
+              </span>
+              <span className="opacity-75">
+                ({(stats.totalGrowthPercent || 0) >= 0 ? "+" : ""}{(stats.totalGrowthPercent || 0).toFixed(1)}%)
+              </span>
+            </span>
+
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all bg-sky-500/10 text-sky-400 border-sky-500/20 shadow-[0_0_10px_rgba(14,165,233,0.15)]">
+              <span>🛡️ Runway: </span>
+              <span>
+                {stats.monthlySpend > 0
+                  ? `${(stats.liquidBalanceINR / stats.monthlySpend).toFixed(1)} Mos`
+                  : stats.liquidBalanceINR > 0 ? "Infinite" : "0 Mos"
+                }
+              </span>
+            </span>
           </div>
+
+
           <div className="relative flex items-center justify-start h-[2.5rem] mt-1 w-[300px]">
             <AnimatePresence>
               <motion.h1 

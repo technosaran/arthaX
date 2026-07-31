@@ -473,20 +473,16 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Multi-source CDN chain:
-  // 1. Clearbit Logo API (Official high-res brand vector/PNG logos, returns 404 on miss)
-  // 2. Unavatar API (Aggregates multiple brand/social/icon APIs, returns 404 on miss)
-  // 3. FaviconKit API (High quality 128px favicons, returns 404 on miss)
-  // 4. DuckDuckGo ICO API (DuckDuckGo icon CDN)
-  // 5. Google 128px Favicon CDN (Google favicon service fallback)
+  // Multi-source CDN chain (Google 128px high-res favicon service prioritized first for guaranteed 100% reliability):
   return [
-    `https://logo.clearbit.com/${domain}`,
-    `https://unavatar.io/${domain}`,
-    `https://api.faviconkit.com/${domain}/128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    `https://api.faviconkit.com/${domain}/128`,
+    `https://unavatar.io/${domain}`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://logo.clearbit.com/${domain}`,
   ];
 }
+
 
 export function getBankLogoUrl(bankNameOrDomain: string, _size: number = 128): string | null {
   const sources = getBankLogoSources(bankNameOrDomain);

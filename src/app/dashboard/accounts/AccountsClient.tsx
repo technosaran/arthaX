@@ -37,6 +37,21 @@ const CategoryIcon = memo(({ type, className = "w-6 h-6" }: { type: string; clas
 });
 CategoryIcon.displayName = "CategoryIcon";
 
+const BANK_BRAND_PROFILES: Record<string, { monogram: string; gradient: string }> = {
+  icici: { monogram: "ICICI", gradient: "from-amber-600 via-orange-600 to-red-700" },
+  hdfc: { monogram: "HDFC", gradient: "from-blue-700 via-indigo-700 to-sky-800" },
+  sbi: { monogram: "SBI", gradient: "from-sky-500 via-blue-600 to-indigo-700" },
+  axis: { monogram: "AXIS", gradient: "from-rose-800 via-pink-900 to-red-950" },
+  kotak: { monogram: "KOTAK", gradient: "from-red-600 via-rose-700 to-red-900" },
+  pnb: { monogram: "PNB", gradient: "from-amber-500 via-yellow-600 to-amber-700" },
+  bob: { monogram: "BOB", gradient: "from-orange-500 via-amber-600 to-red-600" },
+  indian: { monogram: "INDIAN", gradient: "from-blue-600 via-sky-600 to-indigo-800" },
+  canara: { monogram: "CANARA", gradient: "from-blue-600 via-cyan-600 to-amber-500" },
+  union: { monogram: "UNION", gradient: "from-red-700 via-blue-700 to-indigo-800" },
+  idfc: { monogram: "IDFC", gradient: "from-red-900 via-rose-900 to-pink-950" },
+  cash: { monogram: "💵 CASH", gradient: "from-emerald-500 via-teal-600 to-amber-500" },
+};
+
 const BANK_MONOGRAM_GRADIENTS = [
   "from-blue-600 via-indigo-600 to-purple-700",
   "from-emerald-600 via-teal-600 to-cyan-700",
@@ -69,9 +84,12 @@ const getBankGradient = (name: string) => {
 };
 
 const BankLogo = memo(({ bankName, accountName, accountType: _accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType?: string; className?: string }) => {
+  const query = (bankName || accountName || "").trim().toLowerCase();
+  const brandProfile = Object.entries(BANK_BRAND_PROFILES).find(([k]) => query.includes(k))?.[1];
+
   const sources = useMemo(() => {
-    const query = bankName || accountName || "";
-    return getBankLogoSources(query);
+    const rawQuery = bankName || accountName || "";
+    return getBankLogoSources(rawQuery);
   }, [bankName, accountName]);
 
   const [srcIndex, setSrcIndex] = useState(0);
@@ -84,12 +102,12 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
     setShowFallback(false);
   }
 
-  const monogram = getBankMonogram(bankName, accountName);
-  const gradient = getBankGradient(bankName || accountName || "");
+  const monogram = brandProfile?.monogram || getBankMonogram(bankName, accountName);
+  const gradient = brandProfile?.gradient || getBankGradient(bankName || accountName || "");
 
   if (!sources.length || srcIndex >= sources.length || showFallback) {
     return (
-      <div className={`${className} rounded-xl bg-gradient-to-br ${gradient} border border-white/10 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-md shrink-0 select-none`}>
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/20 flex items-center justify-center text-white font-black text-[0.65rem] tracking-wider shadow-lg shrink-0 select-none p-1 text-center`}>
         {monogram}
       </div>
     );
@@ -98,19 +116,27 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white/90 p-1 shadow-sm border border-white/20 overflow-hidden`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-slate-800/90 p-1 shadow-md border border-white/20 overflow-hidden relative`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain rounded-xl"
         loading="eager"
-        onError={() => setSrcIndex((prev) => prev + 1)}
+        onError={() => {
+          if (srcIndex + 1 >= sources.length) {
+            setShowFallback(true);
+          } else {
+            setSrcIndex((prev) => prev + 1);
+          }
+        }}
       />
     </div>
   );
 });
+
+
 BankLogo.displayName = "BankLogo";
 
 const TYPE_STYLES: Record<string, { gradient: string; badge: string; badgeBorder: string; color: string; iconBg: string }> = {
