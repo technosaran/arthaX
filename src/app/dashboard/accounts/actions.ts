@@ -92,6 +92,7 @@ export async function ensureCashReserveAccount() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // 1. Ensure Cash Reserve account
     const { data: existingCash } = await supabase
       .from("accounts")
       .select("id")
@@ -107,10 +108,29 @@ export async function ensureCashReserveAccount() {
         p_currency: "INR",
         p_bank_name: "Cash",
       });
-      revalidatePath("/dashboard", "layout");
     }
+
+    // 2. Ensure Zerodha Funds wallet account
+    const { data: existingZerodha } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .ilike("name", "%zerodha%");
+
+    if (!existingZerodha || existingZerodha.length === 0) {
+      await supabase.rpc("create_account_atomic", {
+        p_user_id: user.id,
+        p_name: "Zerodha Funds",
+        p_type: "investment",
+        p_balance: 0,
+        p_currency: "INR",
+        p_bank_name: "Zerodha",
+      });
+    }
+
+    revalidatePath("/dashboard", "layout");
   } catch (err) {
-    console.error("Error ensuring Cash Reserve account:", err);
+    console.error("Error ensuring built-in accounts:", err);
   }
 }
 
@@ -130,10 +150,12 @@ export async function deleteAccount(id: string) {
     if (
       targetAccount &&
       (targetAccount.type === "cash" ||
+        (targetAccount as any).is_protected ||
         targetAccount.name.toLowerCase().includes("cash reserve") ||
+        targetAccount.name.toLowerCase().includes("zerodha") ||
         targetAccount.name.toLowerCase() === "cash")
     ) {
-      return { error: "The built-in Cash Reserve account is permanent and cannot be deleted." };
+      return { error: "Built-in accounts (Cash Reserve, Zerodha Funds) are permanent and cannot be deleted." };
     }
 
     // Unlink any transactions that reference this account to prevent foreign key constraint violations

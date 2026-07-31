@@ -468,7 +468,7 @@ const INDIAN_BANK_CDNS: Record<string, string> = {
   "canarabank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cnrb/symbol.svg",
   "unionbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ubin/symbol.svg",
   "bankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/bkid/symbol.svg",
-  "indianbank.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/idib/symbol.svg",
+  "indianbank.in": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://indianbank.in&size=256",
   "centralbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cbin/symbol.svg",
   "iob.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ioba/symbol.svg",
   "ucobank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ucba/symbol.svg",

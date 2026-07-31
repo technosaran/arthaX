@@ -117,13 +117,14 @@ export default function SettingsPage() {
     }
 
     if (raw.includes("Investments")) {
-      populated.push("Stocks", "Mutual Funds", "Bonds", "FnO", "Forex");
+      populated.push("Stocks", "Mutual Funds", "Bonds", "FnO", "Forex", "Crypto");
     } else if (
       raw.includes("Stocks") ||
       raw.includes("Mutual Funds") ||
       raw.includes("Bonds") ||
       raw.includes("FnO") ||
-      raw.includes("Forex")
+      raw.includes("Forex") ||
+      raw.includes("Crypto")
     ) {
       populated.push("Investments");
     }

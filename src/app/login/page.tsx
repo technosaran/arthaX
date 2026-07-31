@@ -381,8 +381,8 @@ export default function LoginPage() {
                     {passwordStrength.feedback.warning && (
                       <p className="text-rose-400 mt-2 text-xs">{passwordStrength.feedback.warning}</p>
                     )}
-                    {passwordInput.length > 0 && passwordInput.length < 12 && (
-                      <p className="text-rose-400 mt-2 text-xs">At least 12 characters required.</p>
+                    {passwordInput.length > 0 && passwordInput.length < 6 && (
+                      <p className="text-rose-400 mt-2 text-xs">At least 6 characters required.</p>
                     )}
                   </div>
                 </motion.div>

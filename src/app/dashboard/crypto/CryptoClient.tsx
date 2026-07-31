@@ -110,9 +110,10 @@ export default function CryptoClient() {
   useEffect(() => {
     if (accounts.length > 0 && showModal && !formData.deduct_from_account) {
       const usdAcc = accounts.find(a => a.currency === "USD");
+      const zerodhaAcc = accounts.find(a => a.name.toLowerCase().includes("zerodha"));
       setFormData(prev => ({
         ...prev,
-        deduct_from_account: usdAcc ? usdAcc.id : accounts[0].id
+        deduct_from_account: usdAcc ? usdAcc.id : (zerodhaAcc ? zerodhaAcc.id : accounts[0].id)
       }));
     }
   }, [accounts, showModal, formData.deduct_from_account]);

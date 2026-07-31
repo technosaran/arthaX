@@ -44,6 +44,13 @@ export async function GET(req: NextRequest) {
       logger.info("Executing Gemini Telegram context migration SQL...");
       await client.query(sql3);
     }
+
+    const zerodhaAccountMigrationPath = path.join(process.cwd(), "supabase", "migrations", "20260801000000_add_zerodha_funds_account.sql");
+    if (fs.existsSync(zerodhaAccountMigrationPath)) {
+      const sql4 = fs.readFileSync(zerodhaAccountMigrationPath, "utf8");
+      logger.info("Executing Zerodha Funds account migration SQL...");
+      await client.query(sql4);
+    }
     
     logger.info("Reloading PostgREST schema cache...");
     await client.query("NOTIFY pgrst, 'reload schema';");
