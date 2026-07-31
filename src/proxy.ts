@@ -199,7 +199,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname.startsWith("/api/cron/");
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname.startsWith("/api/bots/") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname === "/api/run-migration" || pathname.startsWith("/api/cron/");
 
   let finalResponse: NextResponse;
 

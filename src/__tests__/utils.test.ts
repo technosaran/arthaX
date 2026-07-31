@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { cn, parseToISODate, getExchangeRate } from '@/lib/utils';
 
 describe('cn (class name merger)', () => {

@@ -1,4 +1,3 @@
-import { describe, it, expect } from "vitest";
 import { fetchLiveGoldSilverRates } from "@/lib/market-scrapers/gold-silver-scraper";
 import { fetchBatchCryptoPrices } from "@/lib/market-scrapers/crypto-sync";
 

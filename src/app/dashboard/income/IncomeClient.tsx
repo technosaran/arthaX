@@ -12,6 +12,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/empty-state";
 
 import { getBankLogoSources } from "@/lib/banks";
+import { getCompanyLogoSources } from "@/lib/companies";
 
 import { CHART_COLOURS, CHART_SERIES_COLOURS } from "@/lib/chart-colours";
 function getColorByLabel(label: string | null | undefined) {
@@ -138,14 +139,22 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
   }, [cleanName]);
 
   const sources = useMemo(() => {
+    if (!cleanName) return [];
+    const bankSources = getBankLogoSources(cleanName);
+    if (bankSources.length > 0) return bankSources;
+
+    const companySources = getCompanyLogoSources(cleanName);
+    if (companySources.length > 0) return companySources;
+
     if (!domain) return [];
     return [
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-      `https://unavatar.io/${domain}`,
-      `https://api.faviconkit.com/${domain}/128`,
+      `https://api.iconhorse.com/v1/${domain}`,
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+      `https://api.faviconkit.com/${domain}/128`,
+      `https://logo.clearbit.com/${domain}`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     ];
-  }, [domain]);
+  }, [cleanName, domain]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 

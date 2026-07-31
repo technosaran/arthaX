@@ -9,8 +9,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
+  modal,
 }: {
   children: React.ReactNode;
+  modal?: React.ReactNode;
 }) {
   const supabase = await createClient();
   const { data: initialData } = await supabase.rpc("get_finance_overview_v2");
@@ -55,6 +57,7 @@ export default async function DashboardLayout({
             >
               <ErrorBoundary>
                 {children}
+                {modal}
               </ErrorBoundary>
             </div>
           </main>

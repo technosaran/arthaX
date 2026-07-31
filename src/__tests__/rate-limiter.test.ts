@@ -1,27 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
 const mockMulti = {
-  zremrangebyscore: vi.fn().mockReturnThis(),
-  zadd: vi.fn().mockReturnThis(),
-  zcard: vi.fn().mockReturnThis(),
-  expire: vi.fn().mockReturnThis(),
-  exec: vi.fn().mockResolvedValue([[null, 0], [null, 1], [null, 1], [null, 1]]),
+  zremrangebyscore: jest.fn().mockReturnThis(),
+  zadd: jest.fn().mockReturnThis(),
+  zcard: jest.fn().mockReturnThis(),
+  expire: jest.fn().mockReturnThis(),
+  exec: jest.fn().mockResolvedValue([[null, 0], [null, 1], [null, 1], [null, 1]]),
 };
 
 const mockRedis = {
-  multi: vi.fn().mockReturnValue(mockMulti),
-  del: vi.fn().mockResolvedValue(1),
+  multi: jest.fn().mockReturnValue(mockMulti),
+  del: jest.fn().mockResolvedValue(1),
 };
 
-vi.mock("@/lib/redis", () => {
+jest.mock("@/lib/redis", () => {
   return {
-    getRedisClient: vi.fn().mockImplementation(() => mockRedis),
-    isRedisHealthy: vi.fn().mockReturnValue(true),
-    redisGet: vi.fn(),
-    redisSet: vi.fn(),
-    redisDel: vi.fn(),
-    redisIncr: vi.fn(),
-    redisExpire: vi.fn(),
+    getRedisClient: jest.fn().mockImplementation(() => mockRedis),
+    isRedisHealthy: jest.fn().mockReturnValue(true),
+    redisGet: jest.fn(),
+    redisSet: jest.fn(),
+    redisDel: jest.fn(),
+    redisIncr: jest.fn(),
+    redisExpire: jest.fn(),
   };
 });
 
@@ -30,8 +28,8 @@ import { isRedisHealthy } from "@/lib/redis";
 
 describe("RateLimiter", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(isRedisHealthy).mockReturnValue(true);
+    jest.clearAllMocks();
+    (isRedisHealthy as jest.Mock).mockReturnValue(true);
     mockMulti.exec.mockResolvedValue([[null, 0], [null, 1], [null, 1], [null, 1]]);
   });
 
@@ -67,7 +65,7 @@ describe("RateLimiter", () => {
   });
 
   it("should fall back to in-memory window when Redis is unhealthy", async () => {
-    vi.mocked(isRedisHealthy).mockReturnValue(false);
+    (isRedisHealthy as jest.Mock).mockReturnValue(false);
     const limiter = new RateLimiter({ maxRequests: 3, windowMs: 1000, keyPrefix: "mem-fallback" });
 
     // First request

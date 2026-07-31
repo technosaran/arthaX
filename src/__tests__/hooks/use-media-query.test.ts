@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+const vi = jest;
 import { renderHook, act } from '@testing-library/react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 

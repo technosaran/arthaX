@@ -1,4 +1,3 @@
-import { describe, it, expect } from "vitest";
 import { parseCASText, detectCASType } from "@/lib/cas-parser/cas-parser-engine";
 
 describe("CAS Statement Parser Engine", () => {

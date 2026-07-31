@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+const vi = jest;
 import { TransactionService, CreateTransactionInput } from "@/services/transaction-service";
 
 describe("TransactionService", () => {

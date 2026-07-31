@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+const vi = jest;
 import { render, fireEvent } from "@testing-library/react";
 import { FocusTrap } from "@/components/ui/focus-trap";
 

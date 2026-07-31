@@ -1,24 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("@/lib/redis", () => {
+jest.mock("@/lib/redis", () => {
   const store = new Map<string, string>();
   return {
-    redisGet: vi.fn().mockImplementation(async (key) => store.get(key) || null),
-    redisSet: vi.fn().mockImplementation(async (key, val) => {
+    redisGet: jest.fn().mockImplementation(async (key) => store.get(key) || null),
+    redisSet: jest.fn().mockImplementation(async (key, val) => {
       store.set(key, val);
       return true;
     }),
-    redisDel: vi.fn().mockImplementation(async (key) => {
+    redisDel: jest.fn().mockImplementation(async (key) => {
       store.delete(key);
       return true;
     }),
-    getRedisClient: vi.fn(),
-    isRedisHealthy: vi.fn().mockReturnValue(true),
+    getRedisClient: jest.fn(),
+    isRedisHealthy: jest.fn().mockReturnValue(true),
   };
 });
 
 import { CacheService } from "@/lib/cache-service";
 import { redisGet, redisSet, redisDel } from "@/lib/redis";
+
+const vi = jest;
 
 describe("CacheService", () => {
   let cacheService: CacheService;

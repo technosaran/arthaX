@@ -1,30 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET } from "@/app/api/reports/download/route";
-import { createClient } from "@/lib/supabase-server";
-
 import { Readable } from "stream";
 
-// Mock dependencies
-vi.mock("@/lib/supabase-server", () => ({
-  createClient: vi.fn(),
+// Hoisted mocks for dependencies
+jest.mock("@/lib/supabase-server", () => ({
+  createClient: jest.fn(),
 }));
 
-vi.mock("@react-pdf/renderer", () => ({
-  renderToStream: vi.fn().mockImplementation(() => Promise.resolve(Readable.from("mock-pdf-stream"))),
+jest.mock("@react-pdf/renderer", () => ({
+  renderToStream: jest.fn().mockImplementation(() => Promise.resolve(Readable.from("mock-pdf-stream"))),
 }));
 
-vi.mock("@/components/reports/FinancialStatementPDF", () => ({
+jest.mock("@/components/reports/FinancialStatementPDF", () => ({
   default: () => "MockPDFComponent",
 }));
 
 // Mock Repositories resolved from DI Container
 const mockAccountRepo = {
-  findAll: vi.fn().mockResolvedValue([
+  findAll: jest.fn().mockResolvedValue([
     { id: "acc-1", name: "Savings", balance: 15000, type: "savings", currency: "INR" }
   ])
 };
 const mockTransactionRepo = {
-  findByDateRange: vi.fn().mockResolvedValue([
+  findByDateRange: jest.fn().mockResolvedValue([
     { id: "tx-1", date: "2026-07-01", description: "Salary", amount: 10000, type: "income", category: "Salary", account_id: "acc-1" }
   ])
 };
@@ -37,27 +33,30 @@ const mockContainer = {
   }
 };
 
-vi.mock("@/lib/container", () => ({
+jest.mock("@/lib/container", () => ({
   createAppContainer: () => mockContainer
 }));
+
+import { GET } from "@/app/api/reports/download/route";
+import { createClient } from "@/lib/supabase-server";
 
 describe("Reports Download API Route", () => {
   let mockSupabase: any;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
 
     mockSupabase = {
       auth: {
-        getUser: vi.fn(),
+        getUser: jest.fn(),
       },
-      from: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockReturnThis(),
     };
 
-    vi.mocked(createClient).mockResolvedValue(mockSupabase as any);
+    (createClient as jest.Mock).mockResolvedValue(mockSupabase as any);
   });
 
   it("returns 401 if user is not authenticated", async () => {

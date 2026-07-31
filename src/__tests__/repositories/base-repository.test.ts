@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+const vi = jest;
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
 import { SupabaseRepository } from "@/repositories/base-repository";

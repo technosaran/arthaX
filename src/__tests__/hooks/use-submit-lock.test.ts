@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+const vi = jest;
 import { renderHook, act } from '@testing-library/react';
 import { useSubmitLock } from '@/hooks/use-submit-lock';
 
