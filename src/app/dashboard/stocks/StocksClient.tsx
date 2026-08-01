@@ -247,7 +247,12 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
         toast.error(result.error);
       } else {
         mutate();
-        toast.success(result.message || "Market prices refreshed & dividend detection completed!");
+        if (!marketStatus.isOpen) {
+          const reason = marketStatus.isWeekend ? "Weekend" : marketStatus.isHoliday ? "Trading Holiday" : "Market Closed";
+          toast.success(`Market is closed (${reason}). Refreshed latest settled closing prices from NSE/BSE.`);
+        } else {
+          toast.success(result.message || "Refreshed live market LTP & dividend status from NSE/BSE.");
+        }
       }
     } catch {
       toast.error("Failed to sync market prices and dividends.");
@@ -563,20 +568,36 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                       <div className="flex justify-between items-center mb-1">
                         <p className="text-[0.65rem] text-[#848E9C] font-bold uppercase tracking-widest">Day&apos;s P&amp;L</p>
                         <span 
-                          className="text-[0.5625rem] font-bold px-1.5 py-0.2 rounded border uppercase tracking-wider"
+                          className="text-[0.5625rem] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider"
                           style={{ 
                             backgroundColor: `${marketStatus.badgeColor}15`, 
                             color: marketStatus.badgeColor,
                             borderColor: `${marketStatus.badgeColor}30`
                           }}
                         >
-                          {marketStatus.isOpen ? 'LIVE' : 'SETTLED'}
+                          {marketStatus.isOpen ? 'LIVE' : marketStatus.isWeekend ? 'WEEKEND' : marketStatus.isHoliday ? 'HOLIDAY' : 'SETTLED'}
                         </span>
                       </div>
-                      <div className={`text-xl font-extrabold ${stats.dayPnL >= 0 ? 'text-[#41B883]' : 'text-[#FF5722]'}`}>
-                        {stats.dayPnL >= 0 ? '+' : ''}{formatMoney(stats.dayPnL)}
-                        <div className="text-xs font-bold mt-0.5">{stats.dayPnLPercent >= 0 ? '+' : ''}{stats.dayPnLPercent.toFixed(2)}%</div>
-                      </div>
+                      
+                      {marketStatus.isOpen ? (
+                        <div className={`text-xl font-extrabold ${stats.dayPnL >= 0 ? 'text-[#41B883]' : 'text-[#FF5722]'}`}>
+                          {stats.dayPnL >= 0 ? '+' : ''}{formatMoney(stats.dayPnL)}
+                          <div className="text-xs font-bold mt-0.5">{stats.dayPnLPercent >= 0 ? '+' : ''}{stats.dayPnLPercent.toFixed(2)}%</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-xl font-extrabold text-[#848E9C]">
+                            {showUSD ? "$0.00" : "₹0.00"}
+                            <span className="text-xs font-bold ml-1.5">(0.00%)</span>
+                          </div>
+                          <div className="text-[0.6875rem] font-semibold mt-1 flex items-center gap-1">
+                            <span className="text-[#848E9C]">Prev. Close:</span>
+                            <span className={stats.dayPnL >= 0 ? 'text-[#41B883] font-bold' : 'text-[#FF5722] font-bold'}>
+                              {stats.dayPnL >= 0 ? '+' : ''}{formatMoney(stats.dayPnL)} ({stats.dayPnLPercent >= 0 ? '+' : ''}{stats.dayPnLPercent.toFixed(2)}%)
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

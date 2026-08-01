@@ -130,13 +130,13 @@ const BankLogo = memo(({ bankName, accountName, accountType: _accountType, class
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-1.5 shadow-md border border-white/30 overflow-hidden relative group`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-0.5 shadow-md border border-white/30 overflow-hidden relative group`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain rounded-xl"
+        className="w-full h-full object-contain rounded-xl scale-110 group-hover:scale-115 transition-transform duration-300"
         loading="eager"
         onError={() => {
           if (srcIndex + 1 >= sources.length) {

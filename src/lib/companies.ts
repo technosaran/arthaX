@@ -56,7 +56,7 @@ const COMPANIES: Company[] = [
   { name: "Dominos", domain: "dominos.com" },
   { name: "Domino's", domain: "dominos.com" },
   { name: "Starbucks", domain: "starbucks.com" },
-  { name: "Burger King", domain: "bk.com" },
+  { name: "Burger King", domain: "burgerking.in" },
   { name: "Razorpay", domain: "razorpay.com" },
   { name: "Paytm", domain: "paytm.com" },
   { name: "PhonePe", domain: "phonepe.com" },
@@ -89,7 +89,7 @@ const COMPANIES: Company[] = [
   { name: "Dabur", domain: "dabur.com" },
   { name: "Britannia", domain: "britannia.co.in" },
   { name: "Asian Paints", domain: "asianpaints.com" },
-  { name: "Titan", domain: "titan.co.in" },
+  { name: "Titan", domain: "titancompany.in" },
   { name: "Avenue Supermarts (DMart)", domain: "dmartindia.com" },
 
   // E-Commerce, Retail & Quick Commerce
@@ -98,7 +98,7 @@ const COMPANIES: Company[] = [
   { name: "Ajio", domain: "ajio.com" },
   { name: "Meesho", domain: "meesho.com" },
   { name: "Blinkit", domain: "blinkit.com" },
-  { name: "Zepto", domain: "zepto.now" },
+  { name: "Zepto", domain: "zeptonow.com" },
   { name: "BigBasket", domain: "bigbasket.com" },
   { name: "Urban Company", domain: "urbancompany.com" },
   { name: "Ola Cabs", domain: "olacabs.com" },
@@ -176,8 +176,8 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   dominos: "dominos.com",
   "domino's": "dominos.com",
   starbucks: "starbucks.com",
-  "burger king": "bk.com",
-  bk: "bk.com",
+  "burger king": "burgerking.in",
+  bk: "burgerking.in",
   tcs: "tcs.com",
   infy: "infosys.com",
   infosys: "infosys.com",
@@ -200,7 +200,7 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
   razorpay: "razorpay.com",
   flipkart: "flipkart.com",
   youtube: "youtube.com",
-  zepto: "zepto.co",
+  zepto: "zeptonow.com",
   blinkit: "blinkit.com",
   instamart: "swiggy.in",
   myntra: "myntra.com",
@@ -242,7 +242,7 @@ const COMPANY_SHORTHANDS: Record<string, string> = {
 };
 
 /**
- * Get ordered logo URLs for a company using Clearbit HD, 256px Google HD Favicons, unavatar.io, and IconHorse.
+ * Get ordered logo URLs for a company using logo.dev HD, 256px Google HD Favicons, unavatar.io, and IconHorse.
  */
 export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
   if (!companyNameOrDomain) return [];
@@ -258,12 +258,9 @@ export function getCompanyLogoSources(companyNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Priority chain: Clearbit HD → Google 256px HD Favicon → Unavatar → IconHorse
+  // logo.dev — single source with built-in monogram fallback (always returns 200 OK)
   return [
-    `https://logo.clearbit.com/${domain}`,
-    `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
-    `https://unavatar.io/${domain}`,
-    `https://icon.horse/icon/${domain}`,
+    `https://img.logo.dev/${domain}?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256`,
   ];
 }
 

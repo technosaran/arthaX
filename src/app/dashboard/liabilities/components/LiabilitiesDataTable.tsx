@@ -41,7 +41,7 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
         cell: (info) => {
           return (
             <div className="flex items-center gap-3">
-              <BrandLogo name={info.getValue()} className="w-8 h-8" />
+              <BrandLogo name={info.getValue()} className="w-10 h-10" />
               <div className="flex flex-col max-w-[200px]">
                 <p className="text-sm font-bold text-white group-hover:text-rose-400 transition-colors truncate">
                   {info.getValue()}

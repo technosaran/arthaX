@@ -57,12 +57,10 @@ describe("Bank Logo and Domain Resolution", () => {
     expect(getBankDomain("Angel One")).toBe("angelone.in");
   });
 
-  it("generates multi-CDN online logo sources correctly", () => {
+  it("generates logo.dev logo source correctly", () => {
     const sources = getBankLogoSources("HDFC Bank");
-    expect(sources.length).toBeGreaterThanOrEqual(4);
-    expect(sources[0]).toBe("https://logo.clearbit.com/hdfcbank.com");
-    expect(sources).toContain("https://logo.clearbit.com/hdfcbank.com");
-    expect(sources).toContain("https://icon.horse/icon/hdfcbank.com");
+    expect(sources.length).toBe(1);
+    expect(sources[0]).toBe("https://img.logo.dev/hdfcbank.com?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256");
   });
 
 

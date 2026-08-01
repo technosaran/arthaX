@@ -76,7 +76,7 @@ export default function MutualFundsDataTable({ funds, onEdit, onBuy, onSell, onA
                   {/* Fund Name */}
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
-                      <BrandLogo name={fund.amc_name || fund.fund_name} symbol={fund.fund_symbol} className="w-8 h-8 rounded-lg shrink-0" />
+                      <BrandLogo name={fund.amc_name || fund.fund_name} symbol={fund.fund_symbol} className="w-10 h-10 rounded-lg shrink-0" />
                       <div className="min-w-0">
                         <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[200px] lg:max-w-[280px]" title={fund.fund_name}>
                           {fund.fund_name}
