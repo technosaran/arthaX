@@ -52,7 +52,7 @@ export async function logLedgerEntry(
       action_type: params.action_type,
       account_id: params.account_id || null,
       account_name: params.account_name || null,
-      amount: params.amount ?? null,
+      amount: params.amount !== null && params.amount !== undefined ? Math.abs(params.amount) : null,
       previous_balance: params.previous_balance ?? null,
       new_balance: params.new_balance ?? null,
       details: params.details || null,

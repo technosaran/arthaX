@@ -106,9 +106,6 @@ export default function LoginPage() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            prompt: "select_account",
-          },
         },
       });
       if (error) {
@@ -519,6 +516,8 @@ export default function LoginPage() {
               <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy Policy</Link>
               <span>•</span>
               <Link href="/terms" className="hover:text-white/70 transition-colors">Terms of Service</Link>
+              <span>•</span>
+              <a href="https://www.logo.dev" target="_blank" rel="noopener" className="hover:text-white/70 transition-colors">Logos by Logo.dev</a>
             </div>
           </motion.div>
         </motion.div>

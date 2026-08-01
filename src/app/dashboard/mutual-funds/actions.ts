@@ -409,3 +409,15 @@ export async function importCASPortfolio(items: Array<{
   }
 }
 
+export async function syncMFNavsAction() {
+  try {
+    const { syncAllMutualFundPrices } = await import("@/lib/sync-mf");
+    const res = await syncAllMutualFundPrices();
+    revalidatePath("/dashboard/mutual-funds");
+    revalidatePath("/dashboard");
+    return { success: true, message: `Successfully synced live NAVs for ${res.updatedCount} mutual funds!` };
+  } catch (err) {
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+

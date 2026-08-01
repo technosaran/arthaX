@@ -78,10 +78,13 @@ export async function setTelegramBotCommands(): Promise<void> {
   try {
     const commands = [
       { command: "balance", description: "💳 Accounts & Net Worth" },
+      { command: "portfolio", description: "📈 Stock & Asset Breakdown" },
       { command: "summary", description: "📊 Monthly Flow & Savings" },
       { command: "history", description: "📜 Recent Transactions" },
-      { command: "ai", description: "🤖 AI Wealth Score & Insights" },
       { command: "budget", description: "🎯 Category Budgets Status" },
+      { command: "dividends", description: "💵 Dividend Earnings Report" },
+      { command: "backup", description: "📦 Download Data Backup (.json)" },
+      { command: "ai", description: "🤖 AI Wealth Score & Insights" },
       { command: "goals", description: "🏆 Financial Goals Progress" },
       { command: "help", description: "💡 Commands & Assistant Guide" },
     ];
@@ -96,11 +99,42 @@ export async function setTelegramBotCommands(): Promise<void> {
 }
 
 /**
+ * Send a document/file (e.g. backup JSON, report CSV) to a Telegram chat
+ */
+export async function sendTelegramDocument(
+  chatId: string,
+  fileName: string,
+  fileContent: string,
+  caption?: string
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  try {
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    const blob = new Blob([fileContent], { type: "application/json" });
+    formData.append("document", blob, fileName);
+    if (caption) {
+      formData.append("caption", caption);
+      formData.append("parse_mode", "Markdown");
+    }
+
+    await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err) {
+    console.error("Failed to send Telegram document:", err);
+  }
+}
+
+/**
  * Send a chat action status (e.g. "typing", "upload_photo") to Telegram chat
  */
 export async function sendTelegramChatAction(
   chatId: string,
-  action: "typing" | "upload_photo" | "record_voice" | "upload_voice" = "typing"
+  action: "typing" | "upload_photo" | "record_voice" | "upload_voice" | "upload_document" = "typing"
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;

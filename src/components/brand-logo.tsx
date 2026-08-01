@@ -312,7 +312,8 @@ export const BrandLogo = memo(({ name, symbol, className = "", style }: { name?:
         src={currentSrc}
         alt={cleanQuery || "Logo"}
         className="w-full h-full object-contain rounded-lg scale-110 hover:scale-115 transition-transform duration-300"
-        loading="lazy"
+        loading="eager"
+        decoding="async"
         referrerPolicy="no-referrer"
         onLoad={handleImgLoad}
         onError={handleImgError}

@@ -118,7 +118,8 @@ export function Logo({
         src={logoUrl}
         alt={cleanName}
         className="w-full h-full object-contain rounded-lg"
-        loading="lazy"
+        loading="eager"
+        decoding="async"
         onError={() => setHasError(true)}
       />
     </div>

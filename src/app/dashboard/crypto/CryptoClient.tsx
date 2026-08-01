@@ -118,19 +118,7 @@ export default function CryptoClient() {
     }
   }, [accounts, showModal, formData.deduct_from_account]);
 
-  // Auto refresh live prices on mount if holdings exist
-  const refreshedRef = useRef(false);
-  useEffect(() => {
-    if (activeHoldings.length > 0 && !refreshedRef.current) {
-      refreshedRef.current = true;
-      const today = new Date().toISOString().split("T")[0];
-      if (localStorage.getItem("last_crypto_refresh") !== today) {
-        localStorage.setItem("last_crypto_refresh", today);
-        handleRefreshPrices();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeHoldings.length]);
+
 
   // ─── Real-Time Batch Refresh ───────────────────────────────────────────────
   const handleRefreshPrices = async () => {

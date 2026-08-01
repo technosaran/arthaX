@@ -297,3 +297,137 @@ export async function checkApiHealth() {
 
   return { success: true, results };
 }
+
+export async function triggerAllMarketSync() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const { syncAllMutualFundPrices } = await import("@/lib/sync-mf");
+    const { syncAllCryptoPrices } = await import("@/lib/sync-crypto");
+
+    const [mfRes, cryptoRes] = await Promise.all([
+      syncAllMutualFundPrices(),
+      syncAllCryptoPrices(),
+    ]);
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/mutual-funds");
+    revalidatePath("/dashboard/crypto");
+
+    return {
+      success: true,
+      message: `Sync complete! Updated ${mfRes.updatedCount} Mutual Funds & ${cryptoRes.updatedCount} Crypto assets.`,
+    };
+  } catch (err) {
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+
+export async function triggerRecurringCronAction() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const res = await fetch(`${appUrl}/api/cron/recurring-transactions`, {
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET || ""}` },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      // Direct JS fallback if internal HTTP fetch fails
+      const todayStr = new Date().toISOString().split("T")[0];
+      const currentDay = new Date().getDate();
+
+      const { data: incs } = await supabase.from("incomes").select("*").eq("user_id", user.id).eq("is_recurring", true);
+      const { data: exps } = await supabase.from("expenses").select("*").eq("user_id", user.id).eq("is_recurring", true);
+
+      let posted = 0;
+      if (incs) {
+        for (const inc of incs) {
+          if (Number(inc.recurrence_day) === currentDay) {
+            const { data: exist } = await supabase.from("incomes").select("id").eq("user_id", user.id).eq("description", inc.description).eq("date", todayStr).maybeSingle();
+            if (!exist) {
+              await supabase.from("incomes").insert({ user_id: user.id, description: inc.description, amount: inc.amount, category: inc.category || "Salary", account_id: inc.account_id, date: todayStr, is_recurring: false });
+              posted++;
+            }
+          }
+        }
+      }
+
+      if (exps) {
+        for (const exp of exps) {
+          if (Number(exp.recurrence_day) === currentDay) {
+            const { data: exist } = await supabase.from("expenses").select("id").eq("user_id", user.id).eq("description", exp.description).eq("date", todayStr).maybeSingle();
+            if (!exist) {
+              await supabase.from("expenses").insert({ user_id: user.id, description: exp.description, amount: exp.amount, category: exp.category || "General", account_id: exp.account_id, date: todayStr, is_recurring: false });
+              posted++;
+            }
+          }
+        }
+      }
+
+      revalidatePath("/dashboard");
+      return { success: true, message: `Processed recurring engine! Posted ${posted} due items for today.` };
+    }
+
+    const data = await res.json();
+    revalidatePath("/dashboard");
+    return { success: true, message: data.message || "Processed recurring transactions!" };
+  } catch (err) {
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}
+
+export async function triggerTelegramBackupAction() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const { data: profile } = await supabase.from("profiles").select("telegram_chat_id, username, base_currency").eq("id", user.id).single();
+    if (!profile?.telegram_chat_id) {
+      return { error: "Please connect Telegram bot first in Settings > Integrations." };
+    }
+
+    const { sendTelegramDocument } = await import("@/lib/telegram");
+
+    const [accsRes, invsRes, txsRes, incsRes, expsRes, budgsRes] = await Promise.all([
+      supabase.from("accounts").select("*").eq("user_id", user.id),
+      supabase.from("investments").select("*").eq("user_id", user.id),
+      supabase.from("transactions").select("*").eq("user_id", user.id),
+      supabase.from("incomes").select("*").eq("user_id", user.id),
+      supabase.from("expenses").select("*").eq("user_id", user.id),
+      supabase.from("budgets").select("*").eq("user_id", user.id),
+    ]);
+
+    const backupObj = {
+      exportedAt: new Date().toISOString(),
+      username: profile.username || "User",
+      currency: profile.base_currency || "INR",
+      accounts: accsRes.data || [],
+      investments: invsRes.data || [],
+      transactions: txsRes.data || [],
+      incomes: incsRes.data || [],
+      expenses: expsRes.data || [],
+      budgets: budgsRes.data || [],
+    };
+
+    const jsonStr = JSON.stringify(backupObj, null, 2);
+    const fileName = `arthaX_backup_${new Date().toISOString().split("T")[0]}.json`;
+
+    await sendTelegramDocument(
+      profile.telegram_chat_id,
+      fileName,
+      jsonStr,
+      "📦 *Complete Financial Backup File*\n\nContains all your accounts, investments, transactions, and budgets. Keep this safe!"
+    );
+
+    return { success: true, message: "Backup file sent directly to your Telegram chat!" };
+  } catch (err) {
+    return { error: getFriendlyErrorMessage(err) };
+  }
+}

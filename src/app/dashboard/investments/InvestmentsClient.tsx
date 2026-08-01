@@ -242,17 +242,6 @@ export default function InvestmentsClient() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="px-4 py-2.5 rounded-2xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50 shadow-lg backdrop-blur-md"
-            title="Sync live market prices and detect incoming dividends"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? "animate-spin" : ""}`} />
-            {isSyncing ? "Syncing..." : "Sync Prices"}
-          </button>
-
           {/* Currency Switcher Toggle in Top Right */}
           <div className="flex items-center gap-1 p-1.5 bg-white/[0.03] border border-white/10 rounded-2xl shadow-xl backdrop-blur-md">
             <button

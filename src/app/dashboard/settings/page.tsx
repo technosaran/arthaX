@@ -554,6 +554,7 @@ export default function SettingsPage() {
               theme={theme}
               timezone={timezone}
               onSaveSetting={saveSetting}
+              profile={profile}
             />
           )}
 

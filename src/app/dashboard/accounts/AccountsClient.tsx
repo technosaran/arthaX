@@ -630,7 +630,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       paddingAngle={5} 
                       dataKey="value" 
                       stroke="none"
-                      animationDuration={1000}
+                      isAnimationActive={false}
                     >
                       {chartData.map((e, i) => (<Cell key={`cell-${i}`} fill={e.fill} />))}
                     </Pie>
@@ -693,7 +693,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
                       paddingAngle={5} 
                       dataKey="value" 
                       stroke="none"
-                      animationDuration={1000}
+                      isAnimationActive={false}
                     >
                       {chartData.map((e, i) => (<Cell key={`cell-${i}`} fill={e.fill} />))}
                     </Pie>
@@ -1353,7 +1353,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
 
       {showDeleteConfirm && (
         <div className="mobile-dialog-shell fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[--bg-base]/80 backdrop-blur-md animate-fade-in">
-          <div className="mobile-dialog-panel glass-card-static w-full max-w-sm p-6 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/10 rounded-2xl">
+          <div className="mobile-dialog-panel glass-card-static w-full max-w-md md:max-w-lg p-6 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/10 rounded-2xl">
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center">
                 <svg className="w-6 h-6 text-rose-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -1418,7 +1418,7 @@ function CenteredModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-card-static relative w-full max-w-md overflow-hidden border border-white/10 rounded-2xl shadow-2xl animate-scale-in"
+        className="glass-card-static relative w-full max-w-md md:max-w-lg overflow-hidden border border-white/10 rounded-2xl shadow-2xl animate-scale-in"
         style={{ backgroundColor: "rgba(18, 22, 32, 0.95)" }}
       >
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[--accent-primary] via-purple-500 to-emerald-500" />

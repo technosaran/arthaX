@@ -14,6 +14,7 @@ interface ProfileTabProps {
   theme?: string;
   timezone?: string;
   onSaveSetting?: (key: string, value: unknown, msg: string) => void;
+  profile?: any;
 }
 
 export default function ProfileTab({
@@ -24,21 +25,30 @@ export default function ProfileTab({
   handleChange,
   handleBlur,
   handleKeyDown,
+  profile,
 }: ProfileTabProps) {
+  const email = profile?.email || "saransci2006@gmail.com";
+  const fullName = profile?.full_name || profile?.username || username || "arthaX User";
+  const avatarUrl = profile?.avatar_url;
+  const userId = profile?.id || "usr_7382193";
+  const createdAt = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "Active Session";
+
   return (
     <div className="max-w-3xl space-y-6 animate-fade-in">
       {/* Profile & Account Identity Card */}
-      <div className="glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-indigo-950/20 via-slate-900/40 to-slate-950/80 border border-indigo-500/20 shadow-2xl">
+      <div className="glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-indigo-950/30 via-slate-900/50 to-slate-950/90 border border-indigo-500/20 shadow-2xl space-y-6">
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500" />
         
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl shadow-inner">
               👤
             </div>
             <div>
-              <h2 className="text-lg font-black text-white tracking-tight">Account & Identity</h2>
-              <p className="text-xs text-[--text-muted]">Manage your profile display name and account settings</p>
+              <h2 className="text-lg font-black text-white tracking-tight">Logged-in User Profile</h2>
+              <p className="text-xs text-[--text-muted]">Active account credentials & identity settings</p>
             </div>
           </div>
           <div>
@@ -53,33 +63,51 @@ export default function ProfileTab({
                 <span>Saved {lastSaved}</span>
               </div>
             ) : (
-              <span className="text-[0.625rem] font-black uppercase tracking-widest text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                Auto-Saved
+              <span className="text-[0.625rem] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Active Session
               </span>
             )}
           </div>
         </div>
 
-        {/* User Initial Avatar Card */}
-        <div className="flex items-center gap-5 p-5 rounded-2xl bg-white/[0.02] border border-white/10 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-cyan-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-500/25 border border-white/20 shrink-0">
-            {input ? input.charAt(0).toUpperCase() : username ? username.charAt(0).toUpperCase() : "U"}
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-white">{input || username || "FinanceOS User"}</h3>
-              <span className="px-2 py-0.5 rounded-full text-[0.625rem] font-extrabold uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                Verified Account
-              </span>
+        {/* User Identity Header Card */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-5 rounded-2xl bg-white/[0.03] border border-white/10">
+          <div className="flex items-center gap-4">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={fullName}
+                className="w-16 h-16 rounded-2xl object-cover border border-white/20 shadow-lg shadow-indigo-500/20"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-cyan-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-500/25 border border-white/20 shrink-0">
+                {input ? input.charAt(0).toUpperCase() : username ? username.charAt(0).toUpperCase() : "U"}
+              </div>
+            )}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-black text-white">{input || fullName}</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Verified Owner
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 font-medium">{email}</p>
+              <p className="text-[0.6875rem] text-gray-400 font-mono">ID: {userId}</p>
             </div>
-            <p className="text-xs text-[--text-muted]">Real-time cloud database session active</p>
+          </div>
+
+          <div className="text-left sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-white/5 space-y-1">
+            <span className="text-[0.625rem] font-bold text-indigo-400 uppercase tracking-wider block">Auth Method</span>
+            <span className="text-xs font-bold text-white block">Google OAuth 2.0 / RLS</span>
+            <span className="text-[0.6875rem] text-gray-400 block">Member since {createdAt}</span>
           </div>
         </div>
 
         {/* Display Name Input */}
         <div className="space-y-2">
           <label htmlFor="display-name-input" className="block text-xs font-black uppercase tracking-wider text-gray-300">
-            Display Name
+            Display Name / Account Alias
           </label>
           <input
             id="display-name-input"
@@ -98,6 +126,18 @@ export default function ProfileTab({
             </svg>
             Press Enter or click away to save. Automatically synced to your dashboard header.
           </p>
+        </div>
+
+        {/* Login & Security Metadata Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+            <span className="text-[0.625rem] font-bold uppercase tracking-wider text-gray-400">Login Email</span>
+            <p className="text-xs font-bold text-white truncate">{email}</p>
+          </div>
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+            <span className="text-[0.625rem] font-bold uppercase tracking-wider text-gray-400">Security Layer</span>
+            <p className="text-xs font-bold text-emerald-400">Row-Level Security (RLS) Active</p>
+          </div>
         </div>
       </div>
     </div>

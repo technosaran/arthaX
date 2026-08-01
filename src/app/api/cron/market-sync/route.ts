@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { syncAllMutualFundPrices } from "@/lib/sync-mf";
+import { syncAllCryptoPrices } from "@/lib/sync-crypto";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow 60 seconds execution time
@@ -183,11 +185,18 @@ export async function GET(request: Request) {
       }
     }
 
+    // -------------------------------------------------------------
+    // 3. UPDATE CRYPTO & ASSET INVESTMENTS
+    // -------------------------------------------------------------
+    const cryptoSyncRes = await syncAllCryptoPrices();
+    const mfSyncRes = await syncAllMutualFundPrices();
+
     return NextResponse.json({
       success: true,
       timestamp: nowIso,
-      mutualFundsUpdated: mfUpdatedCount,
+      mutualFundsUpdated: mfUpdatedCount + (mfSyncRes.updatedCount || 0),
       stocksUpdated: stockUpdatedCount,
+      cryptoUpdated: cryptoSyncRes.updatedCount || 0,
       totalMutualFunds: mutualFunds?.length || 0,
       totalStocks: investments?.length || 0,
     });
