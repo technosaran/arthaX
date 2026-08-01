@@ -9,7 +9,22 @@ import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveFo
 
 // Persistent Telegram Reply Keyboard (docked cleanly at the bottom drawer of Telegram text input)
 const MAIN_REPLY_KEYBOARD = {
-  remove_keyboard: true
+  keyboard: [
+    [
+      { text: "💳 Accounts & Net Worth" },
+      { text: "📊 Summary & Flow" }
+    ],
+    [
+      { text: "📈 Portfolio & Assets" },
+      { text: "🎯 Budgets & Goals" }
+    ],
+    [
+      { text: "📜 Recent Logs" },
+      { text: "🤖 AI Coach" }
+    ]
+  ],
+  resize_keyboard: true,
+  is_persistent: true
 };
 
 const MAIN_MENU_KEYBOARD = MAIN_REPLY_KEYBOARD;
@@ -18,7 +33,11 @@ const MAIN_MENU_KEYBOARD = MAIN_REPLY_KEYBOARD;
 const TX_CONFIRM_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: "↩️ Undo", callback_data: "cmd_undo" }
+      { text: "↩️ Undo", callback_data: "cmd_undo" },
+      { text: "📜 Recent Logs", callback_data: "cmd_recent" }
+    ],
+    [
+      { text: "🌐 Open Web Dashboard", url: "https://technosaranfin.vercel.app/dashboard" }
     ]
   ]
 };
@@ -420,6 +439,18 @@ export async function POST(req: NextRequest) {
     if (rawText.startsWith("cmd_")) {
       const mappedCmd = rawText.replace(/^cmd_/, "");
       rawText = `/${mappedCmd}`;
+    } else if (rawText === "💳 Accounts & Net Worth") {
+      rawText = "/balance";
+    } else if (rawText === "📊 Summary & Flow") {
+      rawText = "/summary";
+    } else if (rawText === "📈 Portfolio & Assets") {
+      rawText = "/portfolio";
+    } else if (rawText === "🎯 Budgets & Goals") {
+      rawText = "/budget";
+    } else if (rawText === "📜 Recent Logs") {
+      rawText = "/recent";
+    } else if (rawText === "🤖 AI Coach") {
+      rawText = "/ai";
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

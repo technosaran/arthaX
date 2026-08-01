@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   startTransition,
@@ -186,8 +187,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }, 400); // Reduced to 400ms for better responsiveness
   }, [supabase]);
 
+  const contextValue = useMemo(() => ({
+    username,
+    user_id: currentUserId,
+    loading,
+    isSyncing,
+    setUsername
+  }), [username, currentUserId, loading, isSyncing, setUsername]);
+
   return (
-    <UserContext.Provider value={{ username, user_id: currentUserId, loading, isSyncing, setUsername }}>
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

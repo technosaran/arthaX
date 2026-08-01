@@ -68,6 +68,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
     return () => clearTimeout(timer);
   }, []);
 
+  const [selectedExchange, setSelectedExchange] = useState<"NSE" | "BSE">("NSE");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ symbol: string, name: string, fullSymbol?: string, exchange?: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -78,7 +79,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
       setIsSearching(true);
       setShowSearchDropdown(true);
       const timeoutId = setTimeout(async () => {
-        const results = await searchStocks(searchQuery);
+        const results = await searchStocks(searchQuery, selectedExchange);
         setSearchResults(results);
         setIsSearching(false);
       }, 500);
@@ -87,12 +88,13 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
       setSearchResults([]);
       setShowSearchDropdown(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, selectedExchange]);
 
-  const handleSelectSearchResult = async (stock: { symbol: string, name: string }) => {
+  const handleSelectSearchResult = async (stock: { symbol: string, name: string, fullSymbol?: string, exchange?: string }) => {
     setIsSearching(true);
     try {
-      const liveData = await fetchLiveStockPrice(stock.symbol);
+      const targetSymbol = stock.fullSymbol || stock.symbol;
+      const liveData = await fetchLiveStockPrice(targetSymbol, selectedExchange);
       const ltp = liveData?.price ? liveData.price.toString() : "0";
       setFormData(prev => ({
         ...prev,
@@ -668,12 +670,27 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
             <div className={`p-4 rounded-t flex items-center justify-between ${
               formData.trade_type === "buy" ? "bg-[#4185f4]" : "bg-[var(--accent-primary)]"
             } text-white`}>
-              <div>
+              <div className="flex items-center gap-3">
                 <span className="text-base font-bold uppercase tracking-wider">{editingId ? "Modify" : formData.trade_type === "buy" ? "Buy" : "Sell"} {formData.symbol || "Stock"}</span>
-                <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded font-black tracking-widest">NSE</span>
+                <div className="flex items-center bg-black/20 rounded-lg p-0.5 border border-white/20">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExchange("NSE")}
+                    className={`px-2 py-0.5 text-[10px] font-black rounded transition-all ${selectedExchange === "NSE" ? "bg-white text-slate-900 shadow font-bold" : "text-white/80 hover:text-white"}`}
+                  >
+                    NSE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExchange("BSE")}
+                    className={`px-2 py-0.5 text-[10px] font-black rounded transition-all ${selectedExchange === "BSE" ? "bg-white text-slate-900 shadow font-bold" : "text-white/80 hover:text-white"}`}
+                  >
+                    BSE
+                  </button>
+                </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-white/70">LTP</span>
+                <span className="text-xs text-white/70">LTP ({selectedExchange})</span>
                 <span className="ml-1 text-sm font-bold">₹{parseFloat(formData.current_price || "0").toFixed(2)}</span>
               </div>
             </div>

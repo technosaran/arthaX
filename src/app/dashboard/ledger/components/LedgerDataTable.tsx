@@ -73,6 +73,33 @@ export default function LedgerDataTable({
     }
   };
 
+  const getSourceBadgeStyle = (srcType: string | null) => {
+    if (!srcType) {
+      return "bg-slate-500/15 border-slate-500/30 text-slate-300";
+    }
+    switch (srcType.toLowerCase()) {
+      case "expense":
+        return "bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.15)]";
+      case "income":
+        return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]";
+      case "transfer":
+      case "family_transfer":
+        return "bg-sky-500/15 border-sky-500/30 text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.15)]";
+      case "investment":
+      case "mutual_fund":
+      case "bond":
+      case "forex":
+      case "alternative_asset":
+        return "bg-violet-500/15 border-violet-500/30 text-violet-400 shadow-[0_0_10px_rgba(168,85,247,0.15)]";
+      case "liability":
+        return "bg-amber-500/15 border-amber-500/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.15)]";
+      case "goal":
+        return "bg-cyan-500/15 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]";
+      default:
+        return "bg-slate-500/15 border-slate-500/30 text-slate-300";
+    }
+  };
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("created_at", {
@@ -97,8 +124,9 @@ export default function LedgerDataTable({
         cell: (info) => {
           const val = info.getValue();
           const label = getSourceLabel(val);
+          const badgeStyle = getSourceBadgeStyle(val);
           return (
-            <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/10 text-gray-300 whitespace-nowrap">
+            <span className={`text-[0.5625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-[6px] border whitespace-nowrap transition-colors ${badgeStyle}`}>
               {label}
             </span>
           );

@@ -159,7 +159,7 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 });
 CompanyLogo.displayName = "CompanyLogo";
 
-const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: { bankName?: string | null; accountName?: string; className?: string }) => {
+const AccountBankLogo = memo(({ bankName, accountName, className = "w-10 h-10" }: { bankName?: string | null; accountName?: string; className?: string }) => {
   const query = (bankName || accountName || "").trim().toLowerCase();
   const isCash = query.includes("cash");
   const isDirect = query.includes("direct") || query.includes("ledger");
@@ -179,7 +179,7 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
 
   if (isCash) {
     return (
-      <div className={`${className} rounded-lg bg-gradient-to-br from-amber-500 via-yellow-600 to-amber-700 border border-amber-400/30 flex items-center justify-center text-white text-[11px] shadow-md shrink-0 select-none`}>
+      <div className={`${className} rounded-2xl bg-gradient-to-br from-amber-500 via-yellow-600 to-amber-700 border border-amber-400/30 flex items-center justify-center text-white text-xs shadow-md shrink-0 select-none`}>
         💵
       </div>
     );
@@ -187,16 +187,18 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
 
   if (isDirect) {
     return (
-      <div className={`${className} rounded-lg bg-slate-800 border border-white/20 flex items-center justify-center text-sky-400 font-black text-[10px] shrink-0 select-none`}>
+      <div className={`${className} rounded-2xl bg-slate-800 border border-white/20 flex items-center justify-center text-sky-400 font-black text-xs shrink-0 select-none`}>
         D
       </div>
     );
   }
 
   if (!sources || sources.length === 0 || srcIndex >= sources.length) {
+    const initials = (accountName || bankName || "B").charAt(0).toUpperCase();
+    const gradient = getGradientForName(accountName || bankName || "");
     return (
-      <div className={`${className} rounded-lg bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-white font-bold text-[10px] shrink-0 select-none`}>
-        {(accountName || bankName || "B").charAt(0).toUpperCase()}
+      <div className={`${className} rounded-2xl bg-gradient-to-br ${gradient} border border-white/20 flex items-center justify-center text-white font-black text-xs shrink-0 select-none`}>
+        {initials}
       </div>
     );
   }
@@ -204,7 +206,7 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
   const currentSrc = sources[srcIndex];
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-lg bg-white p-0.5 shadow-sm border border-white/20 overflow-hidden`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-0.5 shadow-md border border-white/30 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
@@ -769,7 +771,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                         </td>
                         <td className="px-4 md:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
                           <div className="flex items-center gap-2.5">
-                            <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
+                            <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-10 h-10" />
                             <span className="text-xs font-semibold text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                           </div>
                         </td>
@@ -847,7 +849,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   </div>
                   <div className="flex items-center justify-between border-t border-white/[0.03] pt-2 mt-1">
                     <div className="flex items-center gap-2">
-                      <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-6 h-6" />
+                      <AccountBankLogo bankName={account?.bank_name} accountName={account?.name} className="w-10 h-10" />
                       <span className="text-xs font-medium text-[--text-secondary]">{account?.name || "Direct Log"}</span>
                     </div>
                     <div className="flex items-center gap-2">

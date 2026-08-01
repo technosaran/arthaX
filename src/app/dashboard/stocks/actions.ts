@@ -131,13 +131,14 @@ export async function searchStocks(query: string, exchange: string = "NSE") {
   }
 }
 
-export async function fetchLiveStockPrice(symbol: string) {
-  const cacheKey = `stock_price_${symbol.toUpperCase()}`;
+export async function fetchLiveStockPrice(symbol: string, exchange: string = "NSE") {
+  const cleanSymbol = symbol.toUpperCase();
+  const cacheKey = `stock_price_${cleanSymbol}_${exchange}`;
   return fetchWithMarketCache(cacheKey, async () => {
     try {
-      let querySymbol = symbol;
-      if (querySymbol && !querySymbol.includes(".")) {
-        querySymbol = `${querySymbol}.NS`;
+      let querySymbol = cleanSymbol;
+      if (!querySymbol.includes(".")) {
+        querySymbol = exchange === "BSE" ? `${querySymbol}.BO` : `${querySymbol}.NS`;
       }
       let url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(querySymbol)}`;
       let res: Response | null = null;
