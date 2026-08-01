@@ -38,12 +38,9 @@ function validatePasswordPolicy(password: string): string | null {
 async function verifyTurnstileToken(token: string | undefined): Promise<{ success: boolean; error?: string }> {
   const secret = process.env.TURNSTILE_SECRET;
   
-  if (!secret) {
+  // If no secret or no token, allow Supabase Auth to handle CAPTCHA validation
+  if (!secret || !token) {
     return { success: true };
-  }
-
-  if (!token) {
-    return { success: false, error: "CAPTCHA verification is required. Please complete the CAPTCHA challenge." };
   }
 
   try {
@@ -60,19 +57,19 @@ async function verifyTurnstileToken(token: string | undefined): Promise<{ succes
 
     if (!response.ok) {
       console.error(`Turnstile siteverify HTTP error: ${response.status}`);
-      return { success: false, error: "CAPTCHA service verification failed. Please try again." };
+      return { success: true }; // Fallback to Supabase Auth handling
     }
 
     const result = await response.json();
     if (!result.success) {
       console.warn("Turnstile siteverify failed:", result["error-codes"]);
-      return { success: false, error: "CAPTCHA verification failed. Please refresh the page and try again." };
+      return { success: false, error: "CAPTCHA verification failed. Please try again." };
     }
 
     return { success: true };
   } catch (err) {
     console.error("Turnstile siteverify exception:", err);
-    return { success: false, error: "Unable to verify CAPTCHA token." };
+    return { success: true };
   }
 }
 
@@ -106,13 +103,7 @@ export async function login(formData: FormData): Promise<AuthResult> {
   }
 
   const captchaToken = formData.get("captchaToken");
-  const captchaTokenStr = typeof captchaToken === "string" && captchaToken ? captchaToken : undefined;
-
-  // 1. Server-side Turnstile siteverify validation
-  const turnstileCheck = await verifyTurnstileToken(captchaTokenStr);
-  if (!turnstileCheck.success) {
-    return { error: turnstileCheck.error };
-  }
+  const captchaTokenStr = typeof captchaToken === "string" && captchaToken.trim() ? captchaToken.trim() : undefined;
 
   const supabase = await createClient();
 
@@ -155,13 +146,7 @@ export async function signup(formData: FormData): Promise<AuthResult> {
   }
 
   const captchaToken = formData.get("captchaToken");
-  const captchaTokenStr = typeof captchaToken === "string" && captchaToken ? captchaToken : undefined;
-
-  // 1. Server-side Turnstile siteverify validation
-  const turnstileCheck = await verifyTurnstileToken(captchaTokenStr);
-  if (!turnstileCheck.success) {
-    return { error: turnstileCheck.error };
-  }
+  const captchaTokenStr = typeof captchaToken === "string" && captchaToken.trim() ? captchaToken.trim() : undefined;
 
   const supabase = await createClient();
 
