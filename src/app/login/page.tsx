@@ -26,6 +26,8 @@ const itemVariants: any = {
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 400, damping: 30 } }
 };
 
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAEDNJ2mbzl3LpvQm";
+
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
@@ -36,6 +38,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -463,19 +470,27 @@ export default function LoginPage() {
             )}
 
             {/* Cloudflare Turnstile CAPTCHA */}
-            <motion.div variants={itemVariants} className="flex justify-center my-1 min-h-[65px]">
-              <Turnstile
-                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAEDNJ2mbzl3LpvQm"}
-                onSuccess={(token) => setCaptchaToken(token)}
-                onExpire={() => setCaptchaToken(null)}
-                onError={() => setCaptchaToken(null)}
-                options={{
-                  theme: "dark",
-                  size: "normal",
-                  action: "turnstile-spin-v2",
-                }}
-              />
-            </motion.div>
+            <div className="flex justify-center my-1.5 min-h-[65px] w-full">
+              {mounted && (
+                <Turnstile
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => {
+                    setCaptchaToken(token);
+                    setError("");
+                  }}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={(err) => {
+                    console.warn("Turnstile error:", err);
+                    setCaptchaToken(null);
+                  }}
+                  options={{
+                    theme: "dark",
+                    size: "normal",
+                    action: "turnstile-spin-v2",
+                  }}
+                />
+              )}
+            </div>
 
             <motion.button
               variants={itemVariants}
