@@ -48,7 +48,7 @@ export default function MFHistoryTable({ trades }: MFHistoryTableProps) {
         header: "Scheme Name",
         cell: (info) => (
           <div className="flex items-center gap-2.5">
-            <BrandLogo name={info.getValue()} className="w-7 h-7 rounded-lg shrink-0" />
+            <BrandLogo name={info.getValue()} className="w-9 h-9 rounded-lg shrink-0" />
             <span className="text-sm font-medium text-[--text-primary] max-w-[280px] truncate" title={info.getValue()}>{info.getValue()}</span>
           </div>
         ),

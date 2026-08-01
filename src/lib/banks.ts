@@ -294,6 +294,10 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   ippb: "ippbonline.com",
   "india post": "ippbonline.com",
   "india post payments bank": "ippbonline.com",
+  "post office": "ippbonline.com",
+  "post office bank": "ippbonline.com",
+  "post office savings": "ippbonline.com",
+  indiapost: "ippbonline.com",
 
   fino: "finobank.com",
   finobank: "finobank.com",
@@ -356,6 +360,12 @@ const SHORTHAND_DOMAINS: Record<string, string> = {
   paypal: "paypal.com",
 };
 
+const GENERIC_ACCOUNT_WORDS = new Set([
+  "savings", "checking", "salary", "account", "wallet", "card", 
+  "primary", "personal", "business", "current", "deposit", "fd", 
+  "rd", "od", "overdraft", "loan", "credit", "debit", "cash", "bank", "direct", "ledger"
+]);
+
 /**
  * Get the domain registered for a bank name or account title
  */
@@ -372,6 +382,10 @@ export function getBankDomain(bankName: string): string | null {
 
   // 2. Normalize input string
   const normalizedSearch = raw.toLowerCase().trim();
+
+  if (GENERIC_ACCOUNT_WORDS.has(normalizedSearch)) {
+    return null;
+  }
 
   // Direct lookup in shorthand dictionary
   if (SHORTHAND_DOMAINS[normalizedSearch]) {
@@ -440,17 +454,17 @@ export function getBankDomain(bankName: string): string | null {
 
   if (bank) return bank.domain;
 
-  // 6. Final fallback to clean first word if 3+ characters
+  // 6. Final fallback to clean first word if 3+ characters (excluding generic words)
   if (cleanedSearch.length >= 3) {
     const firstWord = cleanedSearch.split(/\s+/)[0];
     if (SHORTHAND_DOMAINS[firstWord]) return SHORTHAND_DOMAINS[firstWord];
-    return `${firstWord}.com`;
+    if (!GENERIC_ACCOUNT_WORDS.has(firstWord)) return `${firstWord}.com`;
   }
 
   const rawFirstWord = normalizedSearch.split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
   if (rawFirstWord.length >= 3) {
     if (SHORTHAND_DOMAINS[rawFirstWord]) return SHORTHAND_DOMAINS[rawFirstWord];
-    return `${rawFirstWord}.com`;
+    if (!GENERIC_ACCOUNT_WORDS.has(rawFirstWord)) return `${rawFirstWord}.com`;
   }
 
   return null;
@@ -468,7 +482,9 @@ const INDIAN_BANK_CDNS: Record<string, string> = {
   "canarabank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cnrb/symbol.svg",
   "unionbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ubin/symbol.svg",
   "bankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/bkid/symbol.svg",
-  "indianbank.in": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://indianbank.in&size=256",
+  "indianbank.in": `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230A529C"/><g fill="%23FDB813" transform="translate(50,50)"><path d="M0,-32 C16,-32 34,-10 22,8 C10,26 -14,26 -22,8 C-34,-10 -16,-32 0,-32 Z" transform="rotate(0)"/><path d="M0,-32 C16,-32 34,-10 22,8 C10,26 -14,26 -22,8 C-34,-10 -16,-32 0,-32 Z" transform="rotate(120)"/><path d="M0,-32 C16,-32 34,-10 22,8 C10,26 -14,26 -22,8 C-34,-10 -16,-32 0,-32 Z" transform="rotate(240)"/><circle cx="0" cy="0" r="9" fill="%230A529C"/><circle cx="0" cy="0" r="4.5" fill="%23FFFFFF"/></g></svg>`,
+  "ippbonline.com": `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23C41230"/><g fill="%23FDB813" transform="translate(50,50)"><path d="M-28,-14 L0,14 L28,-14 L28,18 C28,21 25,23 22,23 L-22,23 C-25,23 -28,21 -28,18 Z"/><path d="M-30,-18 L0,8 L30,-18 C30,-20 27,-22 24,-22 L-24,-22 C-27,-22 -30,-20 -30,-18 Z" fill="%23FFFFFF"/></g></svg>`,
+  "indiapost.gov.in": `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23C41230"/><g fill="%23FDB813" transform="translate(50,50)"><path d="M-28,-14 L0,14 L28,-14 L28,18 C28,21 25,23 22,23 L-22,23 C-25,23 -28,21 -28,18 Z"/><path d="M-30,-18 L0,8 L30,-18 C30,-20 27,-22 24,-22 L-24,-22 C-27,-22 -30,-20 -30,-18 Z" fill="%23FFFFFF"/></g></svg>`,
   "centralbankofindia.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/cbin/symbol.svg",
   "iob.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ioba/symbol.svg",
   "ucobank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/ucba/symbol.svg",
@@ -516,29 +532,10 @@ export function getBankLogoSources(bankNameOrDomain: string): string[] {
 
   if (!domain) return [];
 
-  // Priority chain: Clearbit HD (128-512px vector/PNG) → SVG CDN → Google 256px HD Favicon → Unavatar → IconHorse
-  const sources: string[] = [];
-
-  // 1. Clearbit Logo API (ultra crisp high-res brand logos)
-  sources.push(`https://logo.clearbit.com/${domain}`);
-
-  // 2. Use curated Indian bank SVG logos
-  if (INDIAN_BANK_CDNS[domain]) {
-    sources.push(INDIAN_BANK_CDNS[domain]);
-  }
-
-  // 3. Google HD favicon at 256px (high quality raster)
-  sources.push(
-    `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
-  );
-
-  // 4. Unavatar (aggregator – decent quality)
-  sources.push(`https://unavatar.io/${domain}`);
-
-  // 5. IconHorse (final fallback)
-  sources.push(`https://icon.horse/icon/${domain}`);
-
-  return sources;
+  // logo.dev — single source with built-in monogram fallback (always returns 200 OK)
+  return [
+    `https://img.logo.dev/${domain}?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256`,
+  ];
 }
 
 

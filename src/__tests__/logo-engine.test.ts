@@ -27,9 +27,9 @@ describe("arthaX Logo Management System - Normalization Engine", () => {
     expect(res.category).toBe("company");
   });
 
-  it("normalizes KFC INDIA to online.kfc.co.in", () => {
+  it("normalizes KFC INDIA to kfc.co.in", () => {
     const res = normalizeMerchant("KFC INDIA");
-    expect(res.domain).toBe("online.kfc.co.in");
+    expect(res.domain).toBe("kfc.co.in");
     expect(res.category).toBe("merchant");
   });
 });

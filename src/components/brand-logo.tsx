@@ -167,7 +167,7 @@ const KNOWN_DOMAINS: Record<string, string> = {
   twitter: "x.com",
 };
 
-export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: { name?: string | null; symbol?: string | null; className?: string; style?: React.CSSProperties }) => {
+export const BrandLogo = memo(({ name, symbol, className = "", style }: { name?: string | null; symbol?: string | null; className?: string; style?: React.CSSProperties }) => {
   const query = (symbol || name || "").trim();
 
   const cleanQuery = useMemo(() => {
@@ -242,12 +242,9 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
 
     if (!domain) return [];
 
-    // Recommended Merchant Logo API sequence (Clearbit HD → Google 256px HD Favicon → Unavatar → IconHorse)
+    // logo.dev — single source with built-in monogram fallback (always returns 200 OK)
     return [
-      `https://logo.clearbit.com/${domain}`,
-      `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`,
-      `https://unavatar.io/${domain}`,
-      `https://icon.horse/icon/${domain}`,
+      `https://img.logo.dev/${domain}?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256`,
     ];
   }, [cleanQuery]);
 
@@ -275,7 +272,7 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
       return (
         <div
           style={style}
-          className={`${className} flex items-center justify-center rounded-xl bg-slate-800/90 border border-white/10 text-base shrink-0 shadow-sm select-none`}
+          className={`${className} aspect-square flex items-center justify-center rounded-xl bg-slate-800/90 border border-white/10 text-base shrink-0 shadow-sm select-none`}
         >
           {categoryIcon}
         </div>
@@ -286,7 +283,7 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
     return (
       <div
         style={style}
-        className={`${className} flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-700/60 text-sky-400 font-bold text-xs shrink-0 shadow-sm select-none`}
+        className={`${className} aspect-square flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-700/60 text-sky-400 font-bold text-xs shrink-0 shadow-sm select-none`}
       >
         {letter}
       </div>
@@ -308,14 +305,15 @@ export const BrandLogo = memo(({ name, symbol, className = "w-8 h-8", style }: {
   };
 
   return (
-    <div style={style} className={`${className} flex items-center justify-center shrink-0 rounded-xl bg-white p-1 shadow-sm border border-white/20 overflow-hidden`}>
+    <div style={style} className={`${className} aspect-square flex items-center justify-center shrink-0 rounded-xl bg-white p-0.5 shadow-sm border border-white/20 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={currentSrc}
         src={currentSrc}
         alt={cleanQuery || "Logo"}
-        className="w-full h-full object-contain rounded-lg"
+        className="w-full h-full object-contain rounded-lg scale-110 hover:scale-115 transition-transform duration-300"
         loading="lazy"
+        referrerPolicy="no-referrer"
         onLoad={handleImgLoad}
         onError={handleImgError}
       />

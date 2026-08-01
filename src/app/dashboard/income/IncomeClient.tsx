@@ -25,7 +25,7 @@ function getColorByLabel(label: string | null | undefined) {
 }
 
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "@/components/ui/recharts";
-// Direct HQ logo URLs for known companies (Clearbit full-color logos — NOT monochrome icons)
+// Direct HQ logo URLs for known companies (logo.dev full-color logos — NOT monochrome icons)
 const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   samsung: "samsung.com",
   tvs: "tvsmotor.com",
@@ -144,13 +144,13 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
   }
 
   return (
-    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-1.5 shadow-md border border-white/30 overflow-hidden`}>
+    <div className={`${className} flex items-center justify-center shrink-0 rounded-2xl bg-white p-0.5 shadow-md border border-white/30 overflow-hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={sources[srcIndex]}
         src={sources[srcIndex]}
         alt={cleanName || "Company"}
-        className="w-full h-full object-contain rounded-xl"
+        className="w-full h-full object-contain rounded-xl scale-110"
         loading="eager"
         onError={() => setSrcIndex((prev) => prev + 1)}
       />
@@ -210,7 +210,7 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
         key={currentSrc}
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain scale-110"
         loading="lazy"
         onError={() => setSrcIndex(prev => prev + 1)}
       />
@@ -392,6 +392,19 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
     });
     const totalIncome = incomes.reduce((s, i) => s + Number(i.amount), 0);
     const monthlyTotal = currentMonth.reduce((s, i) => s + Number(i.amount), 0);
+
+    // Calculate unique active months with logged income
+    const uniqueMonths = new Set(
+      incomes
+        .filter((i): i is typeof i & { date: string } => Boolean(i.date))
+        .map((i) => {
+          const d = parseISO(i.date);
+          return `${d.getFullYear()}-${d.getMonth() + 1}`;
+        })
+    );
+    const activeMonthsCount = Math.max(1, uniqueMonths.size);
+    const monthlyAverage = totalIncome / activeMonthsCount;
+    const perEntryAverage = incomes.length ? totalIncome / incomes.length : 0;
     
     // YoY comparison - same month last year
     const lastYearSameMonth = new Date(selectedYear - 1, selectedMonth - 1, 1);
@@ -444,7 +457,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
     );
     const totalDividends = dividendIncomes.reduce((s, i) => s + Number(i.amount), 0);
 
-    return { totalIncome, monthlyTotal, pieData, trendData, yoyChange, yoyAbsolute, lastYearTotal, totalDividends };
+    return { totalIncome, monthlyTotal, pieData, trendData, yoyChange, yoyAbsolute, lastYearTotal, totalDividends, monthlyAverage, perEntryAverage, activeMonthsCount };
   }, [incomes, selectedMonth, selectedYear]);
 
   const filteredIncomes = useMemo(() => {
@@ -635,12 +648,20 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
           )}
         </div>
         <div className="glass-card-static p-5 md:p-8 flex flex-col justify-between">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Average Inflow</p>
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[--text-muted]">Monthly Average</p>
+            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold shrink-0">
+              {stats.activeMonthsCount} {stats.activeMonthsCount === 1 ? 'month' : 'months'} avg
+            </span>
+          </div>
+          <div className="mt-3 flex flex-col justify-between">
             <h3 className="text-xl md:text-2xl font-black text-success">
-              +₹{(incomes.length ? stats.totalIncome / incomes.length : 0).toLocaleString(undefined, {maximumFractionDigits: 0})}
+              +₹{Math.round(stats.monthlyAverage).toLocaleString()}
+              <span className="text-xs text-[--text-muted] font-normal ml-1">/ mo</span>
             </h3>
-            <span className="text-[0.5625rem] w-fit px-2 py-0.5 rounded-full bg-white/5 text-[--text-muted] shrink-0">{incomes.length} entries</span>
+            <div className="mt-2 text-[0.6875rem] font-semibold text-[--text-muted]">
+              Avg per payout: <span className="text-white font-bold">+₹{Math.round(stats.perEntryAverage).toLocaleString()}</span> ({incomes.length} entries)
+            </div>
           </div>
         </div>
       </div>
