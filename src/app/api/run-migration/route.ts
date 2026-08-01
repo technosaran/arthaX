@@ -51,6 +51,13 @@ export async function GET(req: NextRequest) {
       logger.info("Executing Zerodha Funds account migration SQL...");
       await client.query(sql4);
     }
+
+    const ledgerAmountTriggerPath = path.join(process.cwd(), "supabase", "migrations", "20260801120000_fix_ledger_amount_trigger.sql");
+    if (fs.existsSync(ledgerAmountTriggerPath)) {
+      const sql5 = fs.readFileSync(ledgerAmountTriggerPath, "utf8");
+      logger.info("Executing Ledger Amount Trigger migration SQL...");
+      await client.query(sql5);
+    }
     
     logger.info("Reloading PostgREST schema cache...");
     await client.query("NOTIFY pgrst, 'reload schema';");

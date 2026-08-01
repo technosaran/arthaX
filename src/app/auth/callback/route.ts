@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
               const opts = {
                 ...options,
                 maxAge: isDeleting ? 0 : (options?.maxAge ?? THIRTY_DAYS_IN_SECONDS),
-                sameSite: options?.sameSite ?? ("lax" as const),
-                path: options?.path ?? "/",
+                sameSite: "lax" as const,
+                path: "/",
               };
               try {
                 cookieStore.set(name, value, opts);

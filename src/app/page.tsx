@@ -191,6 +191,7 @@ export default function HomePage() {
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="hover:text-gray-300 transition-colors underline">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-gray-300 transition-colors underline">Terms of Service</Link>
+            <a href="https://www.logo.dev" target="_blank" rel="noopener" className="hover:text-gray-300 transition-colors underline">Logos by Logo.dev</a>
             <a href="mailto:saransci2006@gmail.com" className="hover:text-gray-300 transition-colors underline">Contact</a>
           </div>
         </div>

@@ -211,7 +211,8 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-6 h-6" }: 
         src={currentSrc}
         alt={bankName || accountName || "Bank"}
         className="w-full h-full object-contain scale-110"
-        loading="lazy"
+        loading="eager"
+        decoding="async"
         onError={() => setSrcIndex(prev => prev + 1)}
       />
     </div>
@@ -685,12 +686,12 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
                   contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '12px' }}
                   cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
                 />
-                <Area type="monotone" dataKey="value" stroke={CHART_SERIES_COLOURS.income} strokeWidth={3} fillOpacity={1} fill="url(#incomeGradient)" />
+                <Area type="monotone" dataKey="value" stroke={CHART_SERIES_COLOURS.income} strokeWidth={3} fillOpacity={1} fill="url(#incomeGradient)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="glass-card-static p-5 md:p-8"><h3 className="text-sm font-bold uppercase tracking-[0.2em] text-[--text-muted] mb-8">Source Distribution</h3><div className="h-[240px] w-full"><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}><PieChart><Pie data={stats.pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={8} dataKey="value">{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} stroke="none" />))}</Pie><Tooltip contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px" }} /></PieChart></ResponsiveContainer></div><div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">{stats.pieData.slice(0, 4).map((item) => (<div key={item.name} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{background: item.color}} /><span className="text-xs font-bold text-[--text-secondary] truncate">{item.name}</span></div>))}</div></div>
+        <div className="glass-card-static p-5 md:p-8"><h3 className="text-sm font-bold uppercase tracking-[0.2em] text-[--text-muted] mb-8">Source Distribution</h3><div className="h-[240px] w-full"><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}><PieChart><Pie data={stats.pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={8} dataKey="value" isAnimationActive={false}>{stats.pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} stroke="none" />))}</Pie><Tooltip contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "12px" }} /></PieChart></ResponsiveContainer></div><div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">{stats.pieData.slice(0, 4).map((item) => (<div key={item.name} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{background: item.color}} /><span className="text-xs font-bold text-[--text-secondary] truncate">{item.name}</span></div>))}</div></div>
       </div>
 
       <div className="glass-card-static overflow-hidden border-white/5">
@@ -922,7 +923,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
 
       {showDeleteConfirm && (
         <div role="dialog" aria-modal="true" className="mobile-dialog-shell fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[--bg-base]/80 backdrop-blur-md animate-fade-in">
-          <div className="mobile-dialog-panel glass-card-static w-full max-w-sm p-8 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="mobile-dialog-panel glass-card-static w-full max-w-md md:max-w-lg p-6 md:p-8 animate-scale-in max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/10 rounded-2xl">
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center">
                 <svg className="w-7 h-7 text-rose-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">

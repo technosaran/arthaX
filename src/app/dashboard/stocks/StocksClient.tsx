@@ -261,18 +261,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
     }
   };
 
-  const refreshedRef = useRef(false);
-  useEffect(() => {
-    if (activeStocks.length > 0 && !refreshedRef.current) {
-      refreshedRef.current = true;
-      const today = new Date().toISOString().split("T")[0];
-      if (localStorage.getItem("last_stocks_refresh") !== today) {
-        localStorage.setItem("last_stocks_refresh", today);
-        handleRefreshPrices();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStocks]);
+
 
   // Zerodha Live Market Auto-Polling Engine (15s polling during live trading hours)
   useEffect(() => {
@@ -500,7 +489,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                   <div className="w-[300px] h-[300px] relative mt-8">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={85} outerRadius={115} paddingAngle={3} dataKey="value" stroke="none">
+                        <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={85} outerRadius={115} paddingAngle={3} dataKey="value" stroke="none" isAnimationActive={false}>
                           {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                         </Pie>
                         <RechartsTooltip 

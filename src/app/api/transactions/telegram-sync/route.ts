@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
-import { sendTelegramMessage, answerCallbackQuery, setTelegramBotCommands, getBrandEmoji, sendTelegramChatAction, downloadTelegramFile } from "@/lib/telegram";
+import { sendTelegramMessage, answerCallbackQuery, setTelegramBotCommands, getBrandEmoji, sendTelegramChatAction, downloadTelegramFile, sendTelegramDocument } from "@/lib/telegram";
 import { redisGet, redisSet, redisDel, isRedisConfigured } from "@/lib/redis";
 import { getExchangeRate } from "@/lib/utils";
 import { parseTransactionWithGemini, askGeminiFinanceAssistant, isGeminiActiveForProfile, getGeminiApiKeyForProfile, parseAutonomousTelegramIntent, parseVoiceNoteWithGemini, parseReceiptWithGemini } from "@/lib/gemini";
@@ -1467,6 +1467,16 @@ export async function POST(req: NextRequest) {
       goal: "goals",
       budgt: "budget",
       budgets: "budget",
+      portfolio: "portfolio",
+      stocks: "portfolio",
+      mf: "portfolio",
+      mutualfunds: "portfolio",
+      crypto: "portfolio",
+      bonds: "portfolio",
+      dividends: "dividends",
+      dividend: "dividends",
+      backup: "backup",
+      exportdata: "backup",
       ai: "ai",
       "ai score": "ai",
       "ai health": "ai",
@@ -1489,6 +1499,121 @@ export async function POST(req: NextRequest) {
     const commandText = COMMAND_ALIASES[rawCommand] || rawCommand;
 
     // 3. Handle System & Inquiry Commands (/menu, /ai, /family, /ledger, /calc, /help, /balance, /summary, /recent, /undo, /goals, /budget, /unlink)
+    if (commandText === "portfolio") {
+      const { data: invs } = await supabase
+        .from("investments")
+        .select("*")
+        .eq("user_id", profile.id);
+
+      if (!invs || invs.length === 0) {
+        await sendTelegramMessage(chatId, "📈 *No Investments Found*: Add stocks, mutual funds, or crypto in your dashboard!");
+        return NextResponse.json({ success: true });
+      }
+
+      let totalVal = 0;
+      let totalCost = 0;
+      const typeMap: Record<string, { current: number; cost: number; count: number }> = {};
+
+      for (const i of invs) {
+        const qty = Number(i.quantity || 0);
+        if (qty <= 0) continue;
+        const curPrice = Number(i.current_price || 0);
+        const buyPrice = Number(i.buy_price || 0);
+        const curVal = qty * curPrice;
+        const costVal = qty * buyPrice;
+
+        totalVal += curVal;
+        totalCost += costVal;
+
+        const type = i.type || "other";
+        if (!typeMap[type]) typeMap[type] = { current: 0, cost: 0, count: 0 };
+        typeMap[type].current += curVal;
+        typeMap[type].cost += costVal;
+        typeMap[type].count += 1;
+      }
+
+      const totalPnL = totalVal - totalCost;
+      const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+      const pnlSign = totalPnL >= 0 ? "+" : "";
+
+      let msg = `📈 *Portfolio Asset Breakdown*\n\n`;
+      msg += `💼 *Total Portfolio Value*: *₹${totalVal.toLocaleString("en-IN")}*\n`;
+      msg += `📊 *Total P&L*: *${pnlSign}₹${totalPnL.toLocaleString("en-IN")} (${pnlSign}${totalPnLPercent.toFixed(2)}%)*\n\n`;
+
+      for (const [type, data] of Object.entries(typeMap)) {
+        const typeTitle = type === "stock" ? "🏢 Stocks" : type === "mutual_fund" ? "🎯 Mutual Funds" : type === "crypto" ? "🪙 Crypto" : type === "bond" ? "📜 Bonds" : "💎 Assets";
+        const pnl = data.current - data.cost;
+        const pct = data.cost > 0 ? (pnl / data.cost) * 100 : 0;
+        const sign = pnl >= 0 ? "+" : "";
+        msg += `${typeTitle}: *₹${data.current.toLocaleString("en-IN")}* (${data.count} items) | P&L: ${sign}₹${pnl.toLocaleString("en-IN")} (${sign}${pct.toFixed(2)}%)\n`;
+      }
+
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ success: true });
+    }
+
+    if (commandText === "dividends") {
+      const { data: divIncomes } = await supabase
+        .from("incomes")
+        .select("amount, description, date, category")
+        .eq("user_id", profile.id)
+        .or("category.ilike.%dividend%,description.ilike.%dividend%");
+
+      if (!divIncomes || divIncomes.length === 0) {
+        await sendTelegramMessage(chatId, "💵 *No Dividends Detected*: Dividend payouts auto-detected from bank SMS & uploads will appear here!");
+        return NextResponse.json({ success: true });
+      }
+
+      const totalDividends = divIncomes.reduce((s, i) => s + Number(i.amount || 0), 0);
+      let msg = `💵 *Dividend Earnings Summary*\n\n`;
+      msg += `💰 *Total Dividend Earned*: *₹${totalDividends.toLocaleString("en-IN")}*\n`;
+      msg += `📊 *Payout Count*: ${divIncomes.length} payments\n\n`;
+      msg += `📜 *Recent Payouts*:\n`;
+
+      for (const div of divIncomes.slice(-5).reverse()) {
+        msg += `• *${div.description || "Dividend"}*: +₹${Number(div.amount).toLocaleString("en-IN")} (${div.date || "recent"})\n`;
+      }
+
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ success: true });
+    }
+
+    if (commandText === "backup") {
+      sendTelegramChatAction(chatId, "upload_document").catch(() => {});
+
+      const [accsRes, invsRes, txsRes, incsRes, expsRes, budgsRes] = await Promise.all([
+        supabase.from("accounts").select("*").eq("user_id", profile.id),
+        supabase.from("investments").select("*").eq("user_id", profile.id),
+        supabase.from("transactions").select("*").eq("user_id", profile.id),
+        supabase.from("incomes").select("*").eq("user_id", profile.id),
+        supabase.from("expenses").select("*").eq("user_id", profile.id),
+        supabase.from("budgets").select("*").eq("user_id", profile.id),
+      ]);
+
+      const backupObj = {
+        exportedAt: new Date().toISOString(),
+        username: profile.username || "User",
+        currency: profile.base_currency || "INR",
+        accounts: accsRes.data || [],
+        investments: invsRes.data || [],
+        transactions: txsRes.data || [],
+        incomes: incsRes.data || [],
+        expenses: expsRes.data || [],
+        budgets: budgsRes.data || [],
+      };
+
+      const jsonStr = JSON.stringify(backupObj, null, 2);
+      const fileName = `arthaX_backup_${new Date().toISOString().split("T")[0]}.json`;
+
+      await sendTelegramDocument(
+        chatId,
+        fileName,
+        jsonStr,
+        `📦 *Complete Financial Backup File*\n\nContains all your accounts, investments, transactions, and budgets. Keep this safe!`
+      );
+      return NextResponse.json({ success: true });
+    }
+
     if (commandText === "menu") {
       await sendTelegramMessage(
         chatId,

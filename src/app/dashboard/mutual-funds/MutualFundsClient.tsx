@@ -229,18 +229,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
     }
   };
 
-  const refreshedRef = useRef(false);
-  useEffect(() => {
-    if (rawMfs.length > 0 && !refreshedRef.current) {
-      refreshedRef.current = true;
-      const today = new Date().toISOString().split("T")[0];
-      if (localStorage.getItem("last_mf_refresh") !== today) {
-        localStorage.setItem("last_mf_refresh", today);
-        handleRefreshNAV();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawMfs]);
+
 
   async function handleAddMF(e: React.FormEvent) {
     e.preventDefault();

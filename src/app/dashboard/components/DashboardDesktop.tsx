@@ -473,7 +473,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     <div className="h-[140px] w-[140px] flex-shrink-0 relative">
                       <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <PieChart>
-                          <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={50} outerRadius={65} paddingAngle={5} dataKey="value">
+                          <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={50} outerRadius={65} paddingAngle={5} dataKey="value" isAnimationActive={false}>
                             {portfolioData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
                             ))}
@@ -608,16 +608,16 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                     />
                     <Tooltip content={<CustomChartTooltip />} />
                     {activeChartMetric === "cashflow" && enabledModules.includes("Income") && (
-                      <Area type="monotone" dataKey="income" stroke="var(--accent-primary)" strokeWidth={3} fillOpacity={1} fill="url(#incomeGlow)" />
+                      <Area type="monotone" dataKey="income" stroke="var(--accent-primary)" strokeWidth={3} fillOpacity={1} fill="url(#incomeGlow)" isAnimationActive={false} />
                     )}
                     {activeChartMetric === "cashflow" && enabledModules.includes("Expenses") && (
-                      <Area type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#expenseGlow)" />
+                      <Area type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#expenseGlow)" isAnimationActive={false} />
                     )}
                     {activeChartMetric === "assets" && (
-                      <Area type="monotone" dataKey="netWorth" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#netWorthGlow)" />
+                      <Area type="monotone" dataKey="netWorth" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#netWorthGlow)" isAnimationActive={false} />
                     )}
                     {activeChartMetric === "investments" && (
-                      <Area type="monotone" dataKey="investments" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#investmentGlow)" />
+                      <Area type="monotone" dataKey="investments" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#investmentGlow)" isAnimationActive={false} />
                     )}
                   </AreaChart>
                 </ResponsiveContainer>

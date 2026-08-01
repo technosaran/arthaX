@@ -93,7 +93,7 @@ export function Drawer({
       onClick={onClose}
     >
         <div
-          className={`w-full ${width || "max-w-xl md:max-w-2xl"} bg-[var(--bg-surface)] border border-white/10 rounded-2xl sm:rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-scale-in max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem)] relative z-10`}
+          className={`w-full ${width || "max-w-md md:max-w-lg"} bg-[var(--bg-surface)] border border-white/10 rounded-2xl sm:rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-scale-in max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem)] relative z-10`}
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"

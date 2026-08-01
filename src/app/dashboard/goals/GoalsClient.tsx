@@ -480,7 +480,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
           setShowAddModal(false);
           setEditingGoalId(null);
           setFormData({ name: "", target_amount: "", current_amount: "0", deadline: "", category: "Others", account_id: "" });
-        }} title={editingGoalId ? "Edit Goal" : "Create New Goal"} variant="center" width="max-w-xl">
+        }} title={editingGoalId ? "Edit Goal" : "Create New Goal"} variant="center" width="max-w-md md:max-w-lg">
         <div className="p-2 w-full">
           <form onSubmit={handleAddGoal} className="space-y-5">
             <div>
