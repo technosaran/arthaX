@@ -32,13 +32,22 @@ export async function fetchBatchCryptoPrices(symbols: string[]): Promise<Record<
     .map((s) => COINGECKO_ID_MAP[s])
     .filter(Boolean);
 
+function getTimeoutSignal(ms: number) {
+  if (typeof AbortSignal !== "undefined" && typeof (AbortSignal as any).timeout === "function") {
+    return (AbortSignal as any).timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
   // 1. Try CoinGecko free simple price API
   if (cgIds.length > 0) {
     try {
       const url = `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds.join(",")}&vs_currencies=inr,usd&include_24hr_change=true`;
       const res = await fetch(url, {
         next: { revalidate: 60 },
-        signal: AbortSignal.timeout(5000),
+        signal: getTimeoutSignal(5000),
       });
 
       if (res.ok) {
@@ -68,7 +77,7 @@ export async function fetchBatchCryptoPrices(symbols: string[]): Promise<Record<
         const symbolUsdt = `${sym}USDT`;
         const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbolUsdt}`, {
           next: { revalidate: 60 },
-          signal: AbortSignal.timeout(3000),
+          signal: getTimeoutSignal(3000),
         });
 
         if (res.ok) {

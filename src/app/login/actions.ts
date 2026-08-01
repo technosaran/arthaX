@@ -35,43 +35,7 @@ function validatePasswordPolicy(password: string): string | null {
   return null;
 }
 
-async function verifyTurnstileToken(token: string | undefined): Promise<{ success: boolean; error?: string }> {
-  const secret = process.env.TURNSTILE_SECRET;
-  
-  // If no secret or no token, allow Supabase Auth to handle CAPTCHA validation
-  if (!secret || !token) {
-    return { success: true };
-  }
 
-  try {
-    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        secret,
-        response: token,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Turnstile siteverify HTTP error: ${response.status}`);
-      return { success: true }; // Fallback to Supabase Auth handling
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      console.warn("Turnstile siteverify failed:", result["error-codes"]);
-      return { success: false, error: "CAPTCHA verification failed. Please try again." };
-    }
-
-    return { success: true };
-  } catch (err) {
-    console.error("Turnstile siteverify exception:", err);
-    return { success: true };
-  }
-}
 
 export type AuthResult = {
   success?: boolean;
@@ -102,15 +66,11 @@ export async function login(formData: FormData): Promise<AuthResult> {
     console.warn("Brute force check skipped:", err);
   }
 
-  const captchaToken = formData.get("captchaToken");
-  const captchaTokenStr = typeof captchaToken === "string" && captchaToken.trim() ? captchaToken.trim() : undefined;
-
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
     email: emailStr,
     password,
-    options: captchaTokenStr ? { captchaToken: captchaTokenStr } : undefined,
   });
 
   if (error) {
@@ -145,15 +105,11 @@ export async function signup(formData: FormData): Promise<AuthResult> {
     return { error: policyError };
   }
 
-  const captchaToken = formData.get("captchaToken");
-  const captchaTokenStr = typeof captchaToken === "string" && captchaToken.trim() ? captchaToken.trim() : undefined;
-
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
-    options: captchaTokenStr ? { captchaToken: captchaTokenStr } : undefined,
   });
 
   if (error) {

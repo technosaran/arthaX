@@ -15,12 +15,21 @@ const BASELINE_RATES: BullionRates = {
   updatedAt: new Date().toISOString(),
 };
 
+function getTimeoutSignal(ms: number) {
+  if (typeof AbortSignal !== "undefined" && typeof (AbortSignal as any).timeout === "function") {
+    return (AbortSignal as any).timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export async function fetchLiveGoldSilverRates(): Promise<BullionRates> {
   try {
     // 1. Try fetching live rates from open metals/exchange rate endpoint
     const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD", {
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(4000),
+      signal: getTimeoutSignal(4000),
     });
 
     if (res.ok) {

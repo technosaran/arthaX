@@ -64,7 +64,10 @@ export class RateLimiter {
     const redis = getRedisClient();
     if (redis && isRedisHealthy()) {
       try {
-        const member = `${now}:${crypto.randomUUID()}`;
+        const uuid = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" 
+          ? crypto.randomUUID() 
+          : Math.random().toString(36).substring(2);
+        const member = `${now}:${uuid}`;
         
         // Pipeline/multi for atomic operations
         const pipeline = redis.multi();

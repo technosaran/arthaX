@@ -3,7 +3,7 @@ const mockMulti = {
   zadd: jest.fn().mockReturnThis(),
   zcard: jest.fn().mockReturnThis(),
   expire: jest.fn().mockReturnThis(),
-  exec: jest.fn().mockResolvedValue([[null, 0], [null, 1], [null, 1], [null, 1]]),
+  exec: jest.fn(),
 };
 
 const mockRedis = {
@@ -30,7 +30,6 @@ describe("RateLimiter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (isRedisHealthy as jest.Mock).mockReturnValue(true);
-    mockMulti.exec.mockResolvedValue([[null, 0], [null, 1], [null, 1], [null, 1]]);
   });
 
   it("should initialize with custom config", () => {

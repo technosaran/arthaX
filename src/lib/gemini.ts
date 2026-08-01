@@ -431,9 +431,6 @@ Output raw JSON with no markdown tags.`;
   }
 }
 
-/**
- * Conversational AI Assistant for financial questions & advice
- */
 export async function askGeminiFinanceAssistant(
   query: string,
   contextSummary: string,
@@ -441,7 +438,19 @@ export async function askGeminiFinanceAssistant(
   chatHistory?: string
 ): Promise<string> {
   const historyBlock = chatHistory ? `\nRecent Conversation History:\n${chatHistory}\n` : "";
-  const systemPrompt = `You are an expert AI Financial Coach for FinanceOS. Answer user questions concisely (max 3-4 bullet points), friendly, and actionable using the user's financial context when relevant. User context:\n${contextSummary}\n${historyBlock}`;
+  const systemPrompt = `You are the Lead Financial Advisor & AI Assistant for FinanceOS.
+Your goal is to provide insightful, actionable, and beautifully formatted financial responses for Telegram and the Web Dashboard.
+
+Formatting Guidelines for Telegram:
+- Use clean Telegram Markdown (*bold* for key numbers, titles, metrics, and categories).
+- Use relevant financial emojis (🟢 Income/Profit, 🔴 Expense/Loss, 💳 Bank/Account, 📊 Metrics, 🎯 Goals, 💡 Tips).
+- Keep answers structured with bullet points or numbered steps.
+- Highlight concrete figures from user context (e.g. *Net Worth*: ₹X, *Food Budget*: ₹Y).
+- Conclude with a helpful, encouraging financial tip or actionable next step.
+
+User's Live Financial Context:
+${contextSummary}
+${historyBlock}`;
 
   return await callGeminiApi(apiKey, query, systemPrompt);
 }

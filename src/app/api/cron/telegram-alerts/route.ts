@@ -18,11 +18,12 @@ async function handleCronAlerts(req: NextRequest) {
     const secretParam = new URL(req.url).searchParams.get("secret");
     const expectedSecret = process.env.CRON_SECRET;
 
-    if (expectedSecret) {
-      const isAuthorized =
+    if (process.env.NODE_ENV === "production" || expectedSecret) {
+      const isAuthorized = expectedSecret && (
         authHeader === `Bearer ${expectedSecret}` ||
         cronSecretHeader === expectedSecret ||
-        secretParam === expectedSecret;
+        secretParam === expectedSecret
+      );
       if (!isAuthorized) {
         return NextResponse.json({ error: "Unauthorized cron request" }, { status: 401 });
       }
