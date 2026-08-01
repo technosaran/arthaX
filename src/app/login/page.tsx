@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { login, signup } from "./actions";
 import { createClient } from "@/lib/supabase-browser";
+import { Turnstile } from "@marsidev/react-turnstile";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import zxcvbn from "zxcvbn";
@@ -34,6 +35,7 @@ export default function LoginPage() {
   const [emailInput, setEmailInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -133,6 +135,9 @@ export default function LoginPage() {
     
     try {
       const formData = new FormData(e.currentTarget);
+      if (captchaToken) {
+        formData.set("captchaToken", captchaToken);
+      }
       const result = isSignUp 
         ? await signup(formData)
         : await login(formData);
@@ -456,6 +461,21 @@ export default function LoginPage() {
                 Too many attempts. Try again in {lockoutSeconds}s
               </motion.div>
             )}
+
+            {/* Cloudflare Turnstile CAPTCHA */}
+            <motion.div variants={itemVariants} className="flex justify-center my-1 min-h-[65px]">
+              <Turnstile
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAEDNJ2mbzl3LpvQm"}
+                onSuccess={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+                options={{
+                  theme: "dark",
+                  size: "normal",
+                  action: "turnstile-spin-v2",
+                }}
+              />
+            </motion.div>
 
             <motion.button
               variants={itemVariants}

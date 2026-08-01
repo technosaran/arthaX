@@ -35,6 +35,47 @@ function validatePasswordPolicy(password: string): string | null {
   return null;
 }
 
+async function verifyTurnstileToken(token: string | undefined): Promise<{ success: boolean; error?: string }> {
+  const secret = process.env.TURNSTILE_SECRET;
+  
+  if (!secret) {
+    return { success: true };
+  }
+
+  if (!token) {
+    return { success: false, error: "CAPTCHA verification is required. Please complete the CAPTCHA challenge." };
+  }
+
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Turnstile siteverify HTTP error: ${response.status}`);
+      return { success: false, error: "CAPTCHA service verification failed. Please try again." };
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      console.warn("Turnstile siteverify failed:", result["error-codes"]);
+      return { success: false, error: "CAPTCHA verification failed. Please refresh the page and try again." };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("Turnstile siteverify exception:", err);
+    return { success: false, error: "Unable to verify CAPTCHA token." };
+  }
+}
+
 export type AuthResult = {
   success?: boolean;
   error?: string;
@@ -64,11 +105,21 @@ export async function login(formData: FormData): Promise<AuthResult> {
     console.warn("Brute force check skipped:", err);
   }
 
+  const captchaToken = formData.get("captchaToken");
+  const captchaTokenStr = typeof captchaToken === "string" && captchaToken ? captchaToken : undefined;
+
+  // 1. Server-side Turnstile siteverify validation
+  const turnstileCheck = await verifyTurnstileToken(captchaTokenStr);
+  if (!turnstileCheck.success) {
+    return { error: turnstileCheck.error };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
     email: emailStr,
     password,
+    options: captchaTokenStr ? { captchaToken: captchaTokenStr } : undefined,
   });
 
   if (error) {
@@ -103,11 +154,21 @@ export async function signup(formData: FormData): Promise<AuthResult> {
     return { error: policyError };
   }
 
+  const captchaToken = formData.get("captchaToken");
+  const captchaTokenStr = typeof captchaToken === "string" && captchaToken ? captchaToken : undefined;
+
+  // 1. Server-side Turnstile siteverify validation
+  const turnstileCheck = await verifyTurnstileToken(captchaTokenStr);
+  if (!turnstileCheck.success) {
+    return { error: turnstileCheck.error };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
+    options: captchaTokenStr ? { captchaToken: captchaTokenStr } : undefined,
   });
 
   if (error) {
