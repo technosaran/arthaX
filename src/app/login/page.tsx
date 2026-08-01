@@ -174,13 +174,13 @@ export default function LoginPage() {
   const passwordStrength = zxcvbn(passwordInput);
 
   return (
-    <div className="login-wrapper relative min-h-screen w-full flex flex-col lg:flex-row bg-[#03050a] font-sans selection:bg-sky-500/30">
+    <div className="login-wrapper relative h-screen w-full flex flex-col lg:flex-row bg-[#03050a] font-sans selection:bg-sky-500/30 overflow-hidden">
       
       {/* Background Noise Texture */}
       <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
 
       {/* Left Pane - Branding & Effects */}
-      <div className="relative hidden lg:flex flex-col w-1/2 overflow-hidden bg-[#03050a] justify-between p-12 lg:p-20 border-r border-white/5">
+      <div className="relative hidden lg:flex flex-col w-1/2 h-full overflow-hidden bg-[#03050a] justify-between p-8 lg:p-12 border-r border-white/5">
         <div className="absolute inset-0 z-0">
           <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-sky-500/10 rounded-full blur-[120px] mix-blend-screen animate-blob" />
           <div className="absolute top-1/3 -right-1/4 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[100px] mix-blend-screen animate-blob animation-delay-2000" />
@@ -190,35 +190,35 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-4 mb-5">
+          <div className="flex items-center gap-4 mb-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/logo.png" 
               alt="arthaX Logo" 
-              className="w-14 h-14 rounded-2xl object-cover shadow-[0_0_25px_rgba(56,189,248,0.4)] border border-sky-400/30" 
+              className="w-12 h-12 rounded-2xl object-cover shadow-[0_0_25px_rgba(56,189,248,0.4)] border border-sky-400/30" 
             />
-            <h1 className="text-[clamp(2.8rem,4.5vw,3.8rem)] font-[950] text-white tracking-tight">
+            <h1 className="text-[clamp(2.4rem,4vw,3.2rem)] font-[950] text-white tracking-tight">
               artha<span className="text-sky-400">X</span>
             </h1>
           </div>
-          <p className="text-lg font-medium text-white/50 max-w-md leading-relaxed">
+          <p className="text-base font-medium text-white/50 max-w-md leading-relaxed">
             Enterprise Wealth Terminal. Unify your assets, optimize your portfolio, and track performance in real-time.
           </p>
         </div>
 
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
             <div className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </div>
-            <span className="text-xs font-semibold text-white/80 tracking-wide uppercase">Systems Operational</span>
+            <span className="text-[0.65rem] font-semibold text-white/80 tracking-wide uppercase">Systems Operational</span>
           </div>
         </div>
       </div>
 
       {/* Right Pane - Form */}
-      <div className="relative flex flex-col items-center justify-center w-full lg:w-1/2 p-6 sm:p-12 min-h-screen lg:min-h-0 bg-[#03050a] lg:bg-transparent overflow-hidden">
+      <div className="relative flex flex-col items-center justify-center w-full lg:w-1/2 h-full p-4 sm:p-6 bg-[#03050a] lg:bg-transparent overflow-hidden">
         
         {/* Mobile Background Fallback */}
         <div className="absolute inset-0 z-0 lg:hidden">
@@ -231,34 +231,34 @@ export default function LoginPage() {
           initial="hidden"
           animate="visible"
           variants={containerVariants}
-          className="relative z-10 w-full max-w-[440px] glass-card-static bg-white/[0.02] border border-white/5 rounded-3xl p-8 sm:p-10 shadow-2xl backdrop-blur-2xl"
+          className="relative z-10 w-full max-w-[420px] glass-card-static bg-white/[0.02] border border-white/5 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-2xl"
         >
           {/* Mobile Logo Header */}
-          <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-6">
+          <motion.div variants={itemVariants} className="flex lg:hidden flex-col items-center text-center mb-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/logo.png" 
               alt="arthaX Logo" 
-              className="w-12 h-12 rounded-xl object-cover shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-sky-400/30 mb-2" 
+              className="w-10 h-10 rounded-xl object-cover shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-sky-400/30 mb-1" 
             />
-            <h1 className="text-3xl font-[950] text-white tracking-tight">
+            <h1 className="text-2xl font-[950] text-white tracking-tight">
               artha<span className="text-sky-400">X</span>
             </h1>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="mb-8 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+          <motion.div variants={itemVariants} className="mb-4 text-center">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 tracking-tight">
               {isSignUp ? "Create Account" : "Welcome Back"}
             </h2>
-            <p className="text-white/50 text-sm font-medium">
+            <p className="text-white/50 text-xs font-medium">
               {isSignUp ? "Secure your wealth today." : "Authenticate to access your terminal."}
             </p>
           </motion.div>
 
           {/* Seamless Toggle Switch */}
-          <motion.div variants={itemVariants} className="relative flex bg-black/40 p-1.5 rounded-[14px] mb-8 w-full border border-white/5 shadow-inner">
+          <motion.div variants={itemVariants} className="relative flex bg-black/40 p-1 rounded-[12px] mb-4 w-full border border-white/5 shadow-inner">
             <motion.div 
-              className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-[10px] z-0"
+              className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-[8px] z-0"
               initial={false}
               animate={{ 
                 x: isSignUp ? "100%" : "0%",
@@ -270,20 +270,20 @@ export default function LoginPage() {
             <button 
               type="button" 
               onClick={() => { setIsSignUp(false); setError(""); }}
-              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${!isSignUp ? "text-white" : "text-white/40 hover:text-white/70"}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${!isSignUp ? "text-white" : "text-white/40 hover:text-white/70"}`}
             >
               Sign In
             </button>
             <button 
               type="button" 
               onClick={() => { setIsSignUp(true); setError(""); }}
-              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${isSignUp ? "text-white" : "text-white/40 hover:text-white/70"}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${isSignUp ? "text-white" : "text-white/40 hover:text-white/70"}`}
             >
               Sign Up
             </button>
           </motion.div>
 
-          <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             <AnimatePresence mode="popLayout">
               {/* Floating Label Email Field */}
               <motion.div variants={itemVariants} layout key="email-field" className="relative group">
@@ -509,7 +509,7 @@ export default function LoginPage() {
             </motion.button>
           </form>
 
-          <motion.div variants={itemVariants} className="flex items-center gap-3 my-7">
+          <motion.div variants={itemVariants} className="flex items-center gap-3 my-3.5">
             <div className="flex-1 h-px bg-gradient-to-r from-transparent to-white/10" />
             <span className="text-[0.65rem] font-bold text-white/30 uppercase tracking-[0.2em]">Or connect with</span>
             <div className="flex-1 h-px bg-gradient-to-l from-transparent to-white/10" />
@@ -520,7 +520,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading || isLockedOut}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 rounded-xl text-white text-sm font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 rounded-xl text-white text-xs font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
           >
             <svg className="w-4 h-4 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -531,8 +531,8 @@ export default function LoginPage() {
             <span>Google</span>
           </motion.button>
 
-          <motion.div variants={itemVariants} className="mt-8 pt-6 border-t border-white/5 flex flex-col justify-center items-center">
-            <div className="flex items-center gap-4 text-xs font-medium text-white/30">
+          <motion.div variants={itemVariants} className="mt-4 pt-3 border-t border-white/5 flex flex-col justify-center items-center">
+            <div className="flex items-center gap-4 text-[0.7rem] font-medium text-white/30">
               <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy Policy</Link>
               <span>•</span>
               <Link href="/terms" className="hover:text-white/70 transition-colors">Terms of Service</Link>
