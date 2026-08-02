@@ -16,6 +16,7 @@ export default function ModulesTab({ enabledModules, toggleModule, onEnableAll }
     "Income & Expenses": { icon: "💰", desc: "Track daily revenue, recurring debits, and cash flow", category: "Core Cashflow" },
     "Budget": { icon: "📊", desc: "Set spending limits and receive over-budget alerts", category: "Planning" },
     "Investments": { icon: "📈", desc: "Manage Stocks, Mutual Funds, Bonds, FnO & Forex portfolios", category: "Wealth" },
+    "Tax & Reports": { icon: "🧾", desc: "India-first tax center, fiscal reports, and CA-ready export packs", category: "Compliance" },
     "Alt Assets": { icon: "🏢", desc: "Track Real Estate, Gold, Startup equity, & Collectibles", category: "Wealth" },
     "Liabilities": { icon: "💸", desc: "Monitor Loans, EMIs, Mortgages, and Outstanding Debt", category: "Debt" },
     "Goals": { icon: "🎯", desc: "Target savings milestones and track progress live", category: "Planning" },
@@ -23,7 +24,7 @@ export default function ModulesTab({ enabledModules, toggleModule, onEnableAll }
     "Ledger": { icon: "📑", desc: "Immutable audit trail of all balance adjustments", category: "Audit" },
   };
 
-  const categories = ["All", "Core Cashflow", "Planning", "Wealth", "Debt", "Household", "Audit"];
+  const categories = ["All", "Core Cashflow", "Planning", "Wealth", "Debt", "Compliance", "Household", "Audit"];
 
   const handleEnableAllClick = () => {
     if (onEnableAll) {
@@ -153,4 +154,3 @@ export default function ModulesTab({ enabledModules, toggleModule, onEnableAll }
     </div>
   );
 }
-
