@@ -70,6 +70,15 @@ const nav = [
     ),
   },
   {
+    label: "Tax & Reports",
+    href: "/dashboard/tax-reports",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+        <path d="M9 7h9m-9 5h9m-9 5h9M5 7h.01M5 12h.01M5 17h.01" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     label: "Loans",
     href: "/dashboard/liabilities",
     icon: (

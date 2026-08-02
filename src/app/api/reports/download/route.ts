@@ -6,6 +6,7 @@ import FinancialStatementPDF from "@/components/reports/FinancialStatementPDF";
 import { createAppContainer } from "@/lib/container";
 import { AccountRepository } from "@/repositories/account-repository";
 import { TransactionRepository } from "@/repositories/transaction-repository";
+import { computeIndiaTaxReport, formatFYLabel } from "@/lib/tax/india-tax-engine";
 
 export async function GET(request: Request) {
   try {
@@ -165,11 +166,15 @@ export async function GET(request: Request) {
     // 8. FETCH AND MAP TRANSACTIONS & PARTICULARS FILTERING
     // ===================================================
     const pad = (n: number) => String(n).padStart(2, "0");
+    const fyStartYearParam = searchParams.get("fyStartYear");
+    const fyStartYear = fyStartYearParam ? Number(fyStartYearParam) : undefined;
     const lastDay = new Date(year, month, 0).getDate();
     const customStart = searchParams.get("startDate");
     const customEnd = searchParams.get("endDate");
-    const startDate = customStart || `${year}-${pad(month)}-01T00:00:00.000Z`;
-    const endDate = customEnd || `${year}-${pad(month)}-${pad(lastDay)}T23:59:59.999Z`;
+    const fyStart = fyStartYear ? `${fyStartYear}-04-01T00:00:00.000Z` : null;
+    const fyEnd = fyStartYear ? `${fyStartYear + 1}-03-31T23:59:59.999Z` : null;
+    const startDate = customStart || fyStart || `${year}-${pad(month)}-01T00:00:00.000Z`;
+    const endDate = customEnd || fyEnd || `${year}-${pad(month)}-${pad(lastDay)}T23:59:59.999Z`;
 
     const txns = await transactionRepo.findByDateRange(user.id, startDate, endDate);
     const sortedTxns = [...txns].sort((a, b) => {
@@ -199,7 +204,9 @@ export async function GET(request: Request) {
     ];
     const statementPeriod = customStart && customEnd
       ? `${customStart.split("T")[0]} to ${customEnd.split("T")[0]}`
-      : `${monthNames[month - 1]} ${year}`;
+      : fyStartYear
+        ? formatFYLabel(fyStartYear)
+        : `${monthNames[month - 1]} ${year}`;
     const generatedAt = new Date().toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "2-digit",
@@ -217,6 +224,24 @@ export async function GET(request: Request) {
     const filteredInrLiabilities = hasModule("liabilities") ? inrLiabilitiesList : [];
     const filteredUsdStocks = hasModule("usd_portfolio") ? usdStocksList : [];
     const filteredUsdCrypto = hasModule("usd_portfolio") ? usdCryptoList : [];
+
+    const effectiveFyStart = fyStartYear ?? (new Date(startDate).getUTCMonth() >= 3 ? new Date(startDate).getUTCFullYear() : new Date(startDate).getUTCFullYear() - 1);
+    const taxReport = computeIndiaTaxReport({
+      fyStartYear: effectiveFyStart,
+      regime: "new",
+      incomes: (await supabase.from("incomes").select("*").eq("user_id", user.id)).data || [],
+      expenses: (await supabase.from("expenses").select("*").eq("user_id", user.id)).data || [],
+      transactions: txns,
+      investments: dbInvestments || [],
+      mutualFunds: dbMutualFunds || [],
+      bonds: dbBonds || [],
+      alternativeAssets: dbAlternativeAssets || [],
+      liabilities: dbLiabilities || [],
+    });
+
+    const includeTaxSummary = hasModule("fy_tax_summary") || hasModule("ca_ready_bundle");
+    const includeCapitalGains = hasModule("capital_gains_statement") || hasModule("ca_ready_bundle");
+    const includeDeductions = hasModule("deduction_statement") || hasModule("ca_ready_bundle");
 
     // Check if CSV format is requested
     if (searchParams.get("format") === "csv") {
@@ -274,6 +299,43 @@ export async function GET(request: Request) {
         csvRows.push("");
       }
 
+      if (includeTaxSummary) {
+        csvRows.push("--- INDIA FY TAX SUMMARY ---");
+        csvRows.push("Financial Year,Rule Version,Tax Regime,Gross Income,Tax Paid,Tax Payable,Tax Refund Estimate");
+        csvRows.push(`"${taxReport.fiscal.label}","${taxReport.fiscal.ruleVersion}","${taxReport.fiscal.taxRegime}",${taxReport.taxHeads.grossIncome},${taxReport.taxPayment.totalTaxPaid},${taxReport.taxPayment.taxPayable},${taxReport.taxPayment.taxRefundEstimate}`);
+        csvRows.push("Head,Amount");
+        csvRows.push(`Salary Income,${taxReport.taxHeads.salaryIncome}`);
+        csvRows.push(`House Property,${taxReport.taxHeads.housePropertyIncome}`);
+        csvRows.push(`STCG,${taxReport.taxHeads.capitalGains.stcg}`);
+        csvRows.push(`LTCG,${taxReport.taxHeads.capitalGains.ltcg}`);
+        csvRows.push(`Other Sources,${taxReport.taxHeads.otherSourcesIncome}`);
+        csvRows.push("");
+      }
+
+      if (includeCapitalGains) {
+        csvRows.push("--- CAPITAL GAINS STATEMENT ---");
+        csvRows.push("Asset Class,Asset,Type,Gain,Source Row ID");
+        taxReport.capitalGainsRows.forEach((r) => csvRows.push(`"${(r.assetClass || "").replace(/"/g, '""')}","${(r.name || "").replace(/"/g, '""')}",${r.type},${r.gain},"${r.sourceId || ""}"`));
+        csvRows.push("");
+      }
+
+      if (includeDeductions) {
+        csvRows.push("--- DEDUCTION STATEMENT ---");
+        csvRows.push("Section,Limit,Used,Eligible");
+        taxReport.deductions.items.forEach((d) => csvRows.push(`${d.code},${d.limit},${d.used},${d.eligible}`));
+        csvRows.push("");
+      }
+
+      if (hasModule("ca_ready_bundle")) {
+        csvRows.push("--- CA READY AUDIT TRACE ---");
+        csvRows.push("Trace Type,Row Count");
+        csvRows.push(`Income Rows,${taxReport.audit.incomeRows.length}`);
+        csvRows.push(`Expense Rows,${taxReport.audit.expenseRows.length}`);
+        csvRows.push(`Transaction Rows,${taxReport.audit.transactionRows.length}`);
+        csvRows.push(`Capital Gain Source Rows,${taxReport.audit.capitalGainSourceRows.length}`);
+        csvRows.push("");
+      }
+
       const csvString = csvRows.join("\n");
       const filenamePeriod = statementPeriod.replace(/[^a-zA-Z0-9]/g, "-");
       return new Response(csvString, {
@@ -311,6 +373,15 @@ export async function GET(request: Request) {
         inrLiabilities: filteredInrLiabilities,
         usdStocks: filteredUsdStocks,
         usdCrypto: filteredUsdCrypto,
+        indiaTaxSummary: includeTaxSummary ? {
+          fyLabel: taxReport.fiscal.label,
+          ruleVersion: taxReport.fiscal.ruleVersion,
+          grossIncome: taxReport.taxHeads.grossIncome,
+          totalTaxPaid: taxReport.taxPayment.totalTaxPaid,
+          taxPayable: taxReport.taxPayment.taxPayable,
+        } : undefined,
+        capitalGainsSummary: includeCapitalGains ? taxReport.capitalGainsRows : undefined,
+        deductionSummary: includeDeductions ? taxReport.deductions.items : undefined,
       }) as any
     );
 

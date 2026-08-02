@@ -14,6 +14,10 @@ const AVAILABLE_MODULES = [
   { id: "alternative_assets", label: "Alternative Assets", desc: "Real estate, gold, and startup equity" },
   { id: "liabilities", label: "Loans & Outstanding Liabilities", desc: "Home loans, car loans, and EMI status" },
   { id: "usd_portfolio", label: "USD Portfolio & Crypto Assets", desc: "US stocks, crypto tokens, and USD cash" },
+  { id: "fy_tax_summary", label: "FY Tax Summary (India)", desc: "FY taxable income, tax payable vs paid, and regime overview" },
+  { id: "capital_gains_statement", label: "Capital Gains Statement", desc: "STCG/LTCG by asset class with source traceability" },
+  { id: "deduction_statement", label: "Deduction Statement", desc: "80C/80D/80CCD utilization and limits" },
+  { id: "ca_ready_bundle", label: "CA Ready Bundle", desc: "Combined export package for tax consultation and filing prep" },
 ];
 
 const MONTHS = [
@@ -28,9 +32,10 @@ export default function ReportDownloadButton() {
   const [isOpen, setIsOpen] = useState(false);
 
   const now = new Date();
-  const [rangeMode, setRangeMode] = useState<"monthly" | "custom">("monthly");
+  const [rangeMode, setRangeMode] = useState<"monthly" | "fy" | "custom">("monthly");
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [fyStartYear, setFyStartYear] = useState(now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`);
@@ -76,6 +81,8 @@ export default function ReportDownloadButton() {
     if (rangeMode === "monthly") {
       params.set("month", String(month));
       params.set("year", String(year));
+    } else if (rangeMode === "fy") {
+      params.set("fyStartYear", String(fyStartYear));
     } else {
       const startIso = `${startDate}T00:00:00.000Z`;
       const endIso = `${endDate}T23:59:59.999Z`;
@@ -90,6 +97,7 @@ export default function ReportDownloadButton() {
   };
 
   const yearsList = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+  const fyList = [fyStartYear - 2, fyStartYear - 1, fyStartYear, fyStartYear + 1];
 
   return (
     <div className="flex items-center">
@@ -170,6 +178,17 @@ export default function ReportDownloadButton() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setRangeMode("fy")}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                      rangeMode === "fy"
+                        ? "bg-[--accent-primary] text-white shadow"
+                        : "text-[--text-muted] hover:text-white"
+                    }`}
+                  >
+                    Financial Year
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setRangeMode("custom")}
                     className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                       rangeMode === "custom"
@@ -212,6 +231,19 @@ export default function ReportDownloadButton() {
                       ))}
                     </select>
                   </div>
+                </div>
+              ) : rangeMode === "fy" ? (
+                <div className="bg-white/[0.02] p-3.5 rounded-xl border border-white/10">
+                  <label className="text-xs font-semibold text-[--text-muted] block mb-1">Financial Year</label>
+                  <select
+                    value={fyStartYear}
+                    onChange={(e) => setFyStartYear(Number(e.target.value))}
+                    className="w-full bg-black/60 border border-white/15 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    {fyList.map((fy) => (
+                      <option key={fy} value={fy}>{`FY ${fy}-${String(fy + 1).slice(2)}`}</option>
+                    ))}
+                  </select>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 bg-white/[0.02] p-3.5 rounded-xl border border-white/10">
