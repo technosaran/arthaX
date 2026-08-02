@@ -196,6 +196,15 @@ export interface PDFStatementProps {
   inrLiabilities: Array<{ name: string; category: string; total_amount: number; remaining_amount: number; interest_rate: number; monthly_payment: number }>;
   usdStocks: Array<{ symbol: string; name: string; quantity: number; buy_price: number; current_price: number; value: number }>;
   usdCrypto: Array<{ symbol: string; name: string; quantity: number; buy_price: number; current_price: number; value: number }>;
+  indiaTaxSummary?: {
+    fyLabel: string;
+    ruleVersion: string;
+    grossIncome: number;
+    totalTaxPaid: number;
+    taxPayable: number;
+  };
+  capitalGainsSummary?: Array<{ assetClass: string; name: string; type: "STCG" | "LTCG"; gain: number; sourceId?: string }>;
+  deductionSummary?: Array<{ code: string; limit: number; used: number; eligible: number }>;
 }
 
 export default function FinancialStatementPDF({
@@ -213,6 +222,9 @@ export default function FinancialStatementPDF({
   inrLiabilities = [],
   usdStocks = [],
   usdCrypto = [],
+  indiaTaxSummary,
+  capitalGainsSummary = [],
+  deductionSummary = [],
 }: PDFStatementProps) {
   const inrAccounts = accounts.filter(a => a.currency === "INR");
   const usdAccounts = accounts.filter(a => a.currency === "USD");
@@ -581,6 +593,92 @@ export default function FinancialStatementPDF({
           <Text>Page 3 of 3</Text>
         </View>
       </Page>
+
+      {(indiaTaxSummary || capitalGainsSummary.length > 0 || deductionSummary.length > 0) && (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <View style={styles.brandSection}>
+              <Text style={styles.title}>INDIA TAX APPENDIX</Text>
+              <Text style={styles.subtitle}>FY Summary, Capital Gains & Deductions</Text>
+            </View>
+            <View style={styles.metaSection}>
+              <Text>Prepared For: {userName}</Text>
+              <Text>Statement Period: {statementPeriod}</Text>
+            </View>
+          </View>
+
+          {indiaTaxSummary && (
+            <>
+              <Text style={styles.sectionTitle}>FY Tax Summary</Text>
+              <View style={styles.table}>
+                <View style={[styles.tableRow, styles.tableHeaderRow]}>
+                  <Text style={[styles.tableColHeader, { flex: 1.4 }]}>FY</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.4 }]}>Rule Version</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: "right" }]}>Gross Income</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: "right" }]}>Tax Paid</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: "right" }]}>Tax Payable</Text>
+                </View>
+                <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+                  <Text style={[styles.tableCol, { flex: 1.4 }]}>{indiaTaxSummary.fyLabel}</Text>
+                  <Text style={[styles.tableCol, { flex: 1.4 }]}>{indiaTaxSummary.ruleVersion}</Text>
+                  <Text style={[styles.tableCol, { flex: 1.2, textAlign: "right" }]}>{formatMoney(indiaTaxSummary.grossIncome, "INR")}</Text>
+                  <Text style={[styles.tableCol, { flex: 1.2, textAlign: "right" }]}>{formatMoney(indiaTaxSummary.totalTaxPaid, "INR")}</Text>
+                  <Text style={[styles.tableCol, { flex: 1.2, textAlign: "right", fontWeight: "bold" }]}>{formatMoney(indiaTaxSummary.taxPayable, "INR")}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {capitalGainsSummary.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Capital Gains Statement</Text>
+              <View style={styles.table}>
+                <View style={[styles.tableRow, styles.tableHeaderRow]}>
+                  <Text style={[styles.tableColHeader, { flex: 1.2 }]}>Asset Class</Text>
+                  <Text style={[styles.tableColHeader, { flex: 2 }]}>Asset</Text>
+                  <Text style={[styles.tableColHeader, { flex: 0.8 }]}>Type</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: "right" }]}>Gain</Text>
+                </View>
+                {capitalGainsSummary.slice(0, 12).map((row, idx) => (
+                  <View key={idx} style={[styles.tableRow, idx === Math.min(capitalGainsSummary.length, 12) - 1 ? { borderBottomWidth: 0 } : {}]}>
+                    <Text style={[styles.tableCol, { flex: 1.2 }]}>{row.assetClass}</Text>
+                    <Text style={[styles.tableCol, { flex: 2 }]}>{row.name}</Text>
+                    <Text style={[styles.tableCol, { flex: 0.8 }]}>{row.type}</Text>
+                    <Text style={[styles.tableCol, { flex: 1.2, textAlign: "right" }]}>{formatMoney(row.gain, "INR")}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {deductionSummary.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Deduction Statement</Text>
+              <View style={styles.table}>
+                <View style={[styles.tableRow, styles.tableHeaderRow]}>
+                  <Text style={[styles.tableColHeader, { flex: 1 }]}>Section</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1, textAlign: "right" }]}>Limit</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1, textAlign: "right" }]}>Used</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1, textAlign: "right" }]}>Eligible</Text>
+                </View>
+                {deductionSummary.map((row, idx) => (
+                  <View key={idx} style={[styles.tableRow, idx === deductionSummary.length - 1 ? { borderBottomWidth: 0 } : {}]}>
+                    <Text style={[styles.tableCol, { flex: 1 }]}>{row.code}</Text>
+                    <Text style={[styles.tableCol, { flex: 1, textAlign: "right" }]}>{formatMoney(row.limit, "INR")}</Text>
+                    <Text style={[styles.tableCol, { flex: 1, textAlign: "right" }]}>{formatMoney(row.used, "INR")}</Text>
+                    <Text style={[styles.tableCol, { flex: 1, textAlign: "right", fontWeight: "bold" }]}>{formatMoney(row.eligible, "INR")}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          <View style={styles.footer}>
+            <Text>Finance OS Tax Report • Confidential</Text>
+            <Text>Tax Appendix</Text>
+          </View>
+        </Page>
+      )}
     </Document>
   );
 }
