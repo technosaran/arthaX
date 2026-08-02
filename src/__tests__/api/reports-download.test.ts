@@ -109,4 +109,46 @@ describe("Reports Download API Route", () => {
     expect(response.headers.get("Content-Type")).toBe("application/pdf");
     expect(response.headers.get("Content-Disposition")).toContain("Financial-Statement-July-2026.pdf");
   });
+
+  it("returns FY CSV export with India tax summary pack", async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } }
+    });
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "profiles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { username: "john_doe" } })
+            })
+          })
+        };
+      }
+      if (table === "liabilities") {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [{ remaining_amount: "5000", monthly_payment: "500" }] }) }) };
+      }
+      if (table === "incomes") {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [{ id: "i1", amount: "100000", category: "Salary", date: "2025-06-10" }] }) }) };
+      }
+      if (table === "expenses") {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [{ id: "e1", amount: "1000", category: "EPF", date: "2025-06-11" }] }) }) };
+      }
+      return {
+        select: () => ({
+          eq: () => Promise.resolve({ data: [] })
+        })
+      };
+    });
+
+    const request = new Request("http://localhost/api/reports/download?format=csv&fyStartYear=2025&modules=fy_tax_summary,ca_ready_bundle");
+    const response = await GET(request);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/csv");
+    expect(body).toContain("INDIA FY TAX SUMMARY");
+    expect(body).toContain("CA READY AUDIT TRACE");
+    expect(body).toContain("FY 2025-26");
+  });
 });
