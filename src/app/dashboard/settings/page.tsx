@@ -32,7 +32,7 @@ interface NavigationCategory {
 }
 
 export default function SettingsPage() {
-  const { username, setUsername, loading, isSyncing } = useUser();
+  const { user, username, setUsername, loading, isSyncing } = useUser();
   const { data, mutate } = useFinanceData();
   const { profile, accounts = [] } = data || {};
 
@@ -337,7 +337,7 @@ export default function SettingsPage() {
 
   const canExecuteReset = resetConfirmText === "RESET" && resetCountdown <= 0 && !isResetting;
 
-  const NAV_CATEGORIES: NavigationCategory[] = [
+  const NAV_CATEGORIES: NavigationCategory[] = useMemo(() => [
     {
       category: "Account & Workspace",
       items: [
@@ -372,7 +372,7 @@ export default function SettingsPage() {
         { key: "danger", label: "Danger Zone", icon: "⚠️", description: "Reset workspace & delete data" },
       ],
     },
-  ];
+  ], [enabledModules.length, profile?.telegram_chat_id]);
 
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return NAV_CATEGORIES;
@@ -386,7 +386,7 @@ export default function SettingsPage() {
           item.key.toLowerCase().includes(q)
       ),
     })).filter((cat) => cat.items.length > 0);
-  }, [searchQuery]);
+  }, [searchQuery, NAV_CATEGORIES]);
 
   const totalMatchingItems = useMemo(() => {
     return filteredCategories.reduce((acc, cat) => acc + cat.items.length, 0);
@@ -555,6 +555,7 @@ export default function SettingsPage() {
               timezone={timezone}
               onSaveSetting={saveSetting}
               profile={profile}
+              user={user}
             />
           )}
 

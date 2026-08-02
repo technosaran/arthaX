@@ -22,7 +22,7 @@ export function useRealtimeSync(tables: RealtimeTables[] = DEFAULT_TABLES, enabl
     let supabase: ReturnType<typeof createClient> | null = null;
     try {
       supabase = createClient();
-    } catch (_e) {
+    } catch {
       // Ignore client creation error if env vars missing in preview
       return;
     }

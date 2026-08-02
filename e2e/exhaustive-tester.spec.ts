@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginOrSignUp } from './auth-helper';
 
 const MODULES = [
   '/dashboard',
@@ -27,18 +28,7 @@ test.describe('Exhaustive Application Test Suite', () => {
   test.setTimeout(300000); 
 
   test('Test all modules sequentially with a single login session', async ({ page }) => {
-    console.log("Logging into the application...");
-    await page.goto('/login');
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-    
-    // Fill in credentials
-    await page.locator('input[type="email"]').fill('tester@example.com');
-    await page.locator('input[type="password"]').fill('password123');
-    await page.click('button[type="submit"]');
-    
-    // Wait for successful login
-    await page.waitForURL(/dashboard/, { timeout: 15000 });
-    console.log("Successfully logged in!");
+    await loginOrSignUp(page);
 
     for (const mod of MODULES) {
       console.log(`\nTesting ${mod}...`);

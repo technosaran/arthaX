@@ -13,12 +13,13 @@ export async function GET(request: NextRequest) {
   if (code) {
     // Determine redirect URL
     const forwardedHost = request.headers.get("x-forwarded-host");
+    const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
     const isLocalEnv = process.env.NODE_ENV === "development";
     let redirectUrl: string;
     if (isLocalEnv) {
       redirectUrl = `${origin}${next}`;
     } else if (forwardedHost) {
-      redirectUrl = `https://${forwardedHost}${next}`;
+      redirectUrl = `${forwardedProto}://${forwardedHost}${next}`;
     } else {
       redirectUrl = `${origin}${next}`;
     }

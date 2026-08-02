@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import { memo, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
-import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { MODULE_KEYS } from "@/lib/modules";
 
 
@@ -32,7 +31,6 @@ const secondaryQuickActions = [
 ];
 
 const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accounts, isValidating }: Props) {
-  useRealtimeSync();
   const { data: { profile } = {} } = useFinanceData();
   
   const enabledModules = useMemo(() => {

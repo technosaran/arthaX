@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
       return makeRedirect(new URL("/dashboard/settings?gmail=error&reason=missing_server_credentials", req.url));
     }
 
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/$/, "");
+    const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    const isEnvLocalhost = !rawSiteUrl || rawSiteUrl.includes("localhost");
+    const isReqRemote = !req.nextUrl.origin.includes("localhost");
+    const siteUrl = (isEnvLocalhost && isReqRemote ? req.nextUrl.origin : (rawSiteUrl || req.nextUrl.origin)).replace(/\/$/, "");
     const redirectUri = `${siteUrl}/api/auth/google/callback`;
 
     // 1. Exchange authorization code for tokens

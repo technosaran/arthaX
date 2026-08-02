@@ -230,6 +230,8 @@ export function useNetWorth() {
       totalGrowthINR,
       totalGrowthUSD,
       totalGrowthPercent,
+      totalInvestedINR,
+      totalInvestedUSD,
       cashBalance,
       cashBalanceINR,
       cashBalanceUSD,

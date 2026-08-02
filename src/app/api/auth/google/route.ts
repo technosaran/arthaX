@@ -15,8 +15,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=Please%20log%20in%20to%20connect%20Gmail", req.url));
   }
 
-  // Construct target redirect URI using NEXT_PUBLIC_SITE_URL
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/$/, "");
+  // Construct target redirect URI dynamically based on request origin / NEXT_PUBLIC_SITE_URL
+  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const isEnvLocalhost = !rawSiteUrl || rawSiteUrl.includes("localhost");
+  const isReqRemote = !req.nextUrl.origin.includes("localhost");
+  const siteUrl = (isEnvLocalhost && isReqRemote ? req.nextUrl.origin : (rawSiteUrl || req.nextUrl.origin)).replace(/\/$/, "");
   const redirectUri = `${siteUrl}/api/auth/google/callback`;
 
   // Scopes requested (Gmail read-only to fetch transaction alerts)

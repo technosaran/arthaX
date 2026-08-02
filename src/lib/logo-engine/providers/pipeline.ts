@@ -47,7 +47,7 @@ export class ProviderPipeline {
         if (result.success && result.assets.length > 0) {
           allAssets.push(...result.assets);
         }
-      } catch (_e) {
+      } catch {
         // Continue to next provider in fallback pipeline
       }
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { exportToCSV } from "@/lib/export-csv";
 import dynamic from "next/dynamic";
@@ -21,6 +21,8 @@ export default function ExportsTab() {
     ledgerLogs = [],
     investments = [],
     mutualFunds = [],
+    stockTrades = [],
+    mutualFundTrades = [],
     bonds = [],
     liabilities = [],
     alternativeAssets = [],
@@ -122,7 +124,27 @@ export default function ExportsTab() {
       { key: "account_label", label: "Account Label" },
       { key: "currency", label: "Currency" },
       { key: "balance", label: "Balance" },
-      { key: "total_pnl", label: "Total P&L" },
+    ]);
+  };
+
+  const handleExportStockTrades = () => {
+    exportToCSV(stockTrades, "stock_trades_history", [
+      { key: "symbol", label: "Symbol" },
+      { key: "trade_type", label: "Type" },
+      { key: "quantity", label: "Quantity" },
+      { key: "price", label: "Price" },
+      { key: "trade_date", label: "Date" },
+    ]);
+  };
+
+  const handleExportMutualFundTrades = () => {
+    exportToCSV(mutualFundTrades, "mutual_fund_trades_history", [
+      { key: "fund_name", label: "Fund Name" },
+      { key: "trade_type", label: "Type" },
+      { key: "units", label: "Units" },
+      { key: "nav", label: "NAV" },
+      { key: "amount", label: "Amount" },
+      { key: "date", label: "Date" },
     ]);
   };
 
@@ -138,9 +160,9 @@ export default function ExportsTab() {
     },
     {
       title: "Expense Transactions",
-      desc: "Categorized outflow, spending records, and debit history",
+      desc: "Categorized outflow transactions & spending history",
       count: expenses.length,
-      icon: "💸",
+      icon: "💳",
       action: handleExportExpenses,
       badge: "CSV",
       color: "rose",
@@ -182,8 +204,26 @@ export default function ExportsTab() {
       color: "indigo",
     },
     {
-      title: "Bonds & Fixed Income",
-      desc: "Fixed yield bonds, coupons, face values, and maturity schedules",
+      title: "Equity & Stock Trades",
+      desc: "Executed stock trades, buy/sell executions, and P&L history",
+      count: stockTrades.length,
+      icon: "📈",
+      action: handleExportStockTrades,
+      badge: "CSV",
+      color: "sky",
+    },
+    {
+      title: "Mutual Fund Trades",
+      desc: "SIP investments, lumpsum purchases, and redemption records",
+      count: mutualFundTrades.length,
+      icon: "🏦",
+      action: handleExportMutualFundTrades,
+      badge: "CSV",
+      color: "indigo",
+    },
+    {
+      title: "Bond Holdings & Fixed Income",
+      desc: "Corporate bonds, sovereign gold bonds, and yield records",
       count: bonds.length,
       icon: "📜",
       action: handleExportBonds,
@@ -219,13 +259,12 @@ export default function ExportsTab() {
     },
   ];
 
-  const filteredCards = useMemo(() => {
-    if (!exportSearch.trim()) return exportCards;
-    const q = exportSearch.toLowerCase().trim();
-    return exportCards.filter(
-      (c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
-    );
-  }, [exportSearch, exportCards]);
+  const q = exportSearch.toLowerCase().trim();
+  const filteredCards = !q
+    ? exportCards
+    : exportCards.filter(
+        (c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
+      );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">

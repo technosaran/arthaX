@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginOrSignUp } from './auth-helper';
 
 test.describe('Human Data Adder', () => {
   test.afterEach(async ({ page }, testInfo) => {
@@ -10,23 +11,7 @@ test.describe('Human Data Adder', () => {
   test('Log in and add data to all modules', async ({ page }) => {
     test.slow(); // Increases timeout
 
-    // 1. Sign In as the pre-verified tester
-    const testEmail = 'tester@example.com';
-    console.log(`Navigating to login page to sign in: ${testEmail}...`);
-    await page.goto('/login');
-    
-    // Switch to Sign In tab
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-    
-    // Fill in credentials for a new account (mimic human typing)
-    await page.locator('input[type="email"]').pressSequentially(testEmail, { delay: 50 });
-    await page.locator('input[type="password"]').pressSequentially('password123', { delay: 50 });
-    
-    // Submit Sign In form
-    await page.click('button[type="submit"]');
-    
-    // Wait for navigation to dashboard (or onboarding)
-    await page.waitForURL(/dashboard|onboarding/, { timeout: 30000 });
+    await loginOrSignUp(page);
     console.log('Successfully logged in!');
 
     // 2. Add an Account

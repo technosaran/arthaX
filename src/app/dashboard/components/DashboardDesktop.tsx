@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import { useMemo, memo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Greeting from "@/components/greeting";
-import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { MODULE_KEYS } from "@/lib/modules";
@@ -107,7 +106,6 @@ type Props = {
 };
 
 const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goals: _goals, accounts, isLoading }: Props) {
-  useRealtimeSync();
   const { data: { profile } = {} } = useFinanceData();
   const [activeChartMetric, setActiveChartMetric] = useState<"cashflow" | "assets" | "investments">("cashflow");
   const [timeframe, setTimeframe] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("6M");

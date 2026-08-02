@@ -48,14 +48,14 @@ class MockRequest {
     this._body = init?.body;
   }
   async json() {
-    let b = (this as any)._json ?? (this as any)._bodyInit ?? this._body;
+    const b = (this as any)._json ?? (this as any)._bodyInit ?? this._body;
     if (typeof b === 'string') {
       try { return JSON.parse(b); } catch { return b; }
     }
     return b || {};
   }
   async text() {
-    let b = (this as any)._json ?? (this as any)._bodyInit ?? this._body;
+    const b = (this as any)._json ?? (this as any)._bodyInit ?? this._body;
     if (typeof b === 'string') return b;
     return JSON.stringify(b || {});
   }
@@ -84,7 +84,7 @@ class MockResponse {
   }
   async json() {
     if (this._json !== undefined) return this._json;
-    let b = (this as any)._bodyInit ?? this._body;
+    const b = (this as any)._bodyInit ?? this._body;
     if (typeof b === 'string') {
       try { return JSON.parse(b); } catch { return b; }
     }
@@ -108,6 +108,7 @@ if (!global.fetch) {
 
 // Override NextResponse.json so that in tests it returns a MockResponse with accessible .json()
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nextServer = require('next/server');
   if (nextServer && nextServer.NextResponse) {
     nextServer.NextResponse.json = function (data: any, init?: any) {

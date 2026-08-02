@@ -355,7 +355,7 @@ Investments: Stocks Total=₹${Math.round(stocksTotal)} [${stockList.join(", ")}
 Recent 15 Transactions: ${JSON.stringify((recentTxs || []).map((t: any) => `${t.date} ${t.type.toUpperCase()} ₹${t.amount} (${t.category}: ${t.description})`))}.
 Goals: ${JSON.stringify((goals || []).map((g: any) => `${g.name}: saved ₹${g.current_amount || 0} / target ₹${g.target_amount}`))}.
 Family: ${JSON.stringify((familyMembers || []).map((f: any) => `${f.name} (${f.relationship}): balance ₹${f.balance || 0}`))}.`;
-  } catch (err) {
+  } catch {
     return `User: ${profile.username || 'User'}. Net Worth: ₹${accounts.reduce((sum: number, a: any) => sum + (parseFloat(a.balance) || 0), 0)}. Accounts: ${JSON.stringify(accounts)}.`;
   }
 }

@@ -53,3 +53,8 @@ push_out*.txt
 /playwright-report/
 /test-results/
 .env
+
+# agent temp logs
+.agents/*
+!.agents/AGENTS.md
+

@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { toast } from "react-hot-toast";
 import useSWR from "swr";
@@ -882,6 +881,7 @@ export default function FamilyClient() {
             <div className="flex items-center gap-4 p-3 bg-white/5 border border-white/10 rounded-2xl">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 via-rose-500/15 to-purple-500/20 border border-pink-500/30 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-lg shadow-pink-500/10">
                 {memberForm.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={memberForm.avatar_url} alt="Profile preview" className="w-12 h-12 rounded-xl object-cover" />
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-700 flex items-center justify-center text-white font-black text-lg">

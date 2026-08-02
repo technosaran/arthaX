@@ -18,6 +18,7 @@ test.describe('AI Human-like App Tester', () => {
   test.setTimeout(120000);
 
   test('Log in and interact intelligently', async ({ page }) => {
+    test.skip(!process.env.GEMINI_API_KEY, 'Skipping AI test: GEMINI_API_KEY environment variable is not configured');
     console.log("Navigating to login page...");
     await page.goto('/login');
 

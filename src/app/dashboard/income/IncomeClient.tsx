@@ -25,56 +25,7 @@ function getColorByLabel(label: string | null | undefined) {
 }
 
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "@/components/ui/recharts";
-// Direct HQ logo URLs for known companies (logo.dev full-color logos — NOT monochrome icons)
-const COMPANY_LOGO_DOMAINS: Record<string, string> = {
-  samsung: "samsung.com",
-  tvs: "tvsmotor.com",
-  google: "google.com",
-  microsoft: "microsoft.com",
-  apple: "apple.com",
-  amazon: "amazon.com",
-  meta: "meta.com",
-  facebook: "facebook.com",
-  netflix: "netflix.com",
-  tcs: "tcs.com",
-  tata: "tata.com",
-  infosys: "infosys.com",
-  wipro: "wipro.com",
-  accenture: "accenture.com",
-  cognizant: "cognizant.com",
-  hcl: "hcltech.com",
-  techmahindra: "techmahindra.com",
-  capgemini: "capgemini.com",
-  ibm: "ibm.com",
-  oracle: "oracle.com",
-  salesforce: "salesforce.com",
-  adobe: "adobe.com",
-  uber: "uber.com",
-  swiggy: "swiggy.in",
-  zomato: "zomato.com",
-  flipkart: "flipkart.com",
-  razorpay: "razorpay.com",
-  stripe: "stripe.com",
-  upwork: "upwork.com",
-  fiverr: "fiverr.com",
-  toptal: "toptal.com",
-  linkedin: "linkedin.com",
-  atlassian: "atlassian.com",
-  github: "github.com",
-  gitlab: "gitlab.com",
-  zoom: "zoom.us",
-  slack: "slack.com",
-  shopify: "shopify.com",
-  twitter: "x.com",
-  snap: "snap.com",
-  spotify: "spotify.com",
-  airbnb: "airbnb.com",
-  paypal: "paypal.com",
-  paytm: "paytm.com",
-  phonepe: "phonepe.com",
-  fiver: "fiverr.com",
-  mrf: "mrftyres.com",
-};
+
 
 function getBrandMonogram(name: string): string {
   const cleaned = name
@@ -160,14 +111,13 @@ const CompanyLogo = memo(({ name, fallbackText = "I", className = "w-10 h-10" }:
 CompanyLogo.displayName = "CompanyLogo";
 
 const AccountBankLogo = memo(({ bankName, accountName, className = "w-10 h-10" }: { bankName?: string | null; accountName?: string; className?: string }) => {
-  const query = (bankName || accountName || "").trim().toLowerCase();
-  const isCash = query.includes("cash");
-  const isDirect = query.includes("direct") || query.includes("ledger");
-
   const sources = useMemo(() => {
-    if (isCash || isDirect) return [];
+    const q = (bankName || accountName || "").trim().toLowerCase();
+    const cash = q.includes("cash");
+    const direct = q.includes("direct") || q.includes("ledger");
+    if (cash || direct) return [];
     return getBankLogoSources(bankName || accountName || "");
-  }, [bankName, accountName, isCash, isDirect]);
+  }, [bankName, accountName]);
 
   const [srcIndex, setSrcIndex] = useState(0);
 
@@ -176,6 +126,10 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-10 h-10" }
     setPrevKey(`${bankName}-${accountName}`);
     setSrcIndex(0);
   }
+
+  const query = (bankName || accountName || "").trim().toLowerCase();
+  const isCash = query.includes("cash");
+  const isDirect = query.includes("direct") || query.includes("ledger");
 
   if (isCash) {
     return (
