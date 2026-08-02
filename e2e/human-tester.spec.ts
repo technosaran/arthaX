@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const EMAIL = 'tester@example.com';
-const PASSWORD = 'TesterPass!123';
+import { loginOrSignUp } from './auth-helper';
 
 const ROUTES = [
   '/dashboard',
@@ -46,23 +44,7 @@ test.describe('Human Tester Crawl', () => {
   });
 
   test('Log in and crawl all dashboard routes', async ({ page }) => {
-    console.log("Navigating to login page...");
-    await page.goto('http://localhost:3000/login');
-
-    console.log("Clicking Sign In tab...");
-    const signInTab = page.getByRole('button', { name: 'Sign In' });
-    await signInTab.click();
-
-    console.log("Filling credentials...");
-    await page.fill('input[name="email"]', EMAIL);
-    await page.fill('input[name="password"]', PASSWORD);
-
-    console.log("Submitting form...");
-    await page.getByRole('button', { name: 'Access Terminal' }).click();
-
-    console.log("Waiting for dashboard...");
-    await page.waitForURL('**/dashboard**', { timeout: 30000 });
-    
+    await loginOrSignUp(page);
     console.log("Logged in successfully. Starting crawl...");
     
     // 2. Crawl routes

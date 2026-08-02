@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase-browser";
 import type { RealtimeChannel, User } from "@supabase/supabase-js";
 
 type UserContextType = {
+  user: User | null;
   username: string;
   user_id: string | null;
   loading: boolean;
@@ -22,6 +23,7 @@ type UserContextType = {
 };
 
 const UserContext = createContext<UserContextType>({
+  user: null,
   username: "",
   user_id: null,
   loading: true,
@@ -32,6 +34,7 @@ const UserContext = createContext<UserContextType>({
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient());
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [username, setUsernameState] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -39,7 +42,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const applyUser = useCallback((user: User | null) => {
+    setCurrentUser(user);
     if (!user) {
       setUsernameState("");
       setCurrentUserId(null);
@@ -188,12 +200,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   const contextValue = useMemo(() => ({
+    user: currentUser,
     username,
     user_id: currentUserId,
     loading,
     isSyncing,
     setUsername
-  }), [username, currentUserId, loading, isSyncing, setUsername]);
+  }), [currentUser, username, currentUserId, loading, isSyncing, setUsername]);
 
   return (
     <UserContext.Provider value={contextValue}>

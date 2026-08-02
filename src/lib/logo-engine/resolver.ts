@@ -44,7 +44,7 @@ export class LogoResolver {
           memoryCache.set(cacheKey, cached as LogoRecord);
           return cached as LogoRecord;
         }
-      } catch (_e) {
+    } catch {
         // Continue if Redis fails
       }
     }
@@ -81,7 +81,7 @@ export class LogoResolver {
           await cacheService.set(cacheKey, rec, 86400 * 7); // Cache for 7 days in Redis
           return rec;
         }
-      } catch (_e) {
+    } catch {
         // Continue if DB check fails
       }
     }
@@ -151,7 +151,7 @@ export class LogoResolver {
         p_preferred_format: record.preferred_format,
         p_etag: record.etag,
       });
-    } catch (_e) {
+    } catch {
       // Ignore database write failures during background save
     }
   }

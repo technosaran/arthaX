@@ -470,7 +470,7 @@ export function getBankDomain(bankName: string): string | null {
   return null;
 }
 
-const INDIAN_BANK_CDNS: Record<string, string> = {
+export const INDIAN_BANK_CDNS: Record<string, string> = {
   // Correct path: @main branch, IFSC-based subdirectories, symbol.svg for compact icons
   "sbi.co.in": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/sbin/symbol.svg",
   "hdfcbank.com": "https://cdn.jsdelivr.net/gh/praveenpuglia/indian-banks@main/assets/logos/hdfc/symbol.svg",

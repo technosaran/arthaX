@@ -1,7 +1,7 @@
 "use client";
 
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { format, parseISO, subMonths } from "date-fns";
 import { useFinanceData } from "@/hooks/use-finance-data";
@@ -11,8 +11,6 @@ import DashboardDesktop from "./components/DashboardDesktop";
 import OnboardingWizard from "@/components/onboarding-wizard";
 import { useUser } from "@/context/user-context";
 import LoadingSkeleton from "./loading";
-import { fetchLiveStockPrice, updateInvestment } from "@/app/dashboard/stocks/actions";
-import { fetchLiveMFNAV, updateMFHolding, searchMFSchemes } from "@/app/dashboard/mutual-funds/actions";
 
 type TrendMapEntry = {
   name: string;

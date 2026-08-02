@@ -84,19 +84,20 @@ const getBankGradient = (name: string) => {
 };
 
 const BankLogo = memo(({ bankName, accountName, accountType: _accountType, className = "w-8 h-8" }: { bankName?: string | null; accountName?: string; accountType?: string; className?: string }) => {
-  const rawQuery = bankName || accountName || "";
-  const query = rawQuery.trim().toLowerCase();
-
-  const isCash = _accountType === "cash" || query.includes("cash");
-
   const brandProfile = useMemo(() => {
-    return Object.entries(BANK_BRAND_PROFILES).find(([k]) => query.includes(k))?.[1];
-  }, [query]);
+    const q = (bankName || accountName || "").trim().toLowerCase();
+    return Object.entries(BANK_BRAND_PROFILES).find(([k]) => q.includes(k))?.[1];
+  }, [bankName, accountName]);
 
   const sources = useMemo(() => {
-    if (isCash) return [];
-    return getBankLogoSources(rawQuery);
-  }, [rawQuery, isCash]);
+    const raw = bankName || accountName || "";
+    const q = raw.trim().toLowerCase();
+    const cash = _accountType === "cash" || q.includes("cash");
+    if (cash) return [];
+    return getBankLogoSources(raw);
+  }, [bankName, accountName, _accountType]);
+
+  const isCash = _accountType === "cash" || (bankName || accountName || "").trim().toLowerCase().includes("cash");
 
   const [srcIndex, setSrcIndex] = useState(0);
   const [showFallback, setShowFallback] = useState(false);

@@ -372,15 +372,69 @@ function normalizeCategory(cat: string): string {
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[--text-primary]">Budget Planner</h1>
           <p className="text-sm md:text-sm mt-1 text-[--text-secondary]">Fiscal strategy, category limits, and monthly controls.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <select className="btn-secondary !h-11 px-4" value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} aria-label="Select month" id="budget-month-select" name="month">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Desktop Month Switcher */}
+          <div className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/10 p-1.5 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedMonth === 1) {
+                  setSelectedMonth(12);
+                  setSelectedYear(prev => prev - 1);
+                } else {
+                  setSelectedMonth(prev => prev - 1);
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-black text-[--text-muted] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              aria-label="Previous month"
+            >
+              ◀
+            </button>
+            <div className="px-3 py-1.5 text-xs font-black uppercase tracking-wider text-cyan-400 select-none">
+              {format(new Date(selectedYear, selectedMonth - 1, 1), "MMM yyyy")}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedMonth === 12) {
+                  setSelectedMonth(1);
+                  setSelectedYear(prev => prev + 1);
+                } else {
+                  setSelectedMonth(prev => prev + 1);
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-black text-[--text-muted] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              aria-label="Next month"
+            >
+              ▶
+            </button>
+          </div>
+
+          {/* Mobile Fallback selects */}
+          <select 
+            className="btn-secondary !h-11 px-4 text-xs font-bold md:hidden" 
+            value={selectedMonth} 
+            onChange={e => setSelectedMonth(parseInt(e.target.value))}
+            aria-label="Select month"
+            id="budget-month-select"
+            name="month"
+          >
             {Array.from({ length: 12 }, (_, i) => (
-              <option key={i+1} value={i+1}>{format(new Date(2000, i), "MMMM")}</option>
+              <option key={i + 1} value={i + 1} className="bg-[--bg-surface]">
+                {format(new Date(2020, i, 1), "MMMM")}
+              </option>
             ))}
           </select>
-          <select className="btn-secondary !h-11 px-4" value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} aria-label="Select year" id="budget-year-select" name="year">
+          <select 
+            className="btn-secondary !h-11 px-4 text-xs font-bold md:hidden" 
+            value={selectedYear} 
+            onChange={e => setSelectedYear(parseInt(e.target.value))}
+            aria-label="Select year"
+            id="budget-year-select"
+            name="year"
+          >
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y} className="bg-[--bg-surface]">{y}</option>
             ))}
           </select>
         </div>

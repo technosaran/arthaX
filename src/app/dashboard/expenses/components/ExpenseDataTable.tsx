@@ -13,7 +13,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
-import { ArrowUpDown, ArrowUp, ArrowDown, Trash2, Pencil } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Pencil } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
 
@@ -45,9 +45,10 @@ interface ExpenseDataTableProps {
 }
 const columnHelper = createColumnHelper<Expense>();
 
-export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit, onAdd, categories }: ExpenseDataTableProps) {
+export default function ExpenseDataTable({ expenses, accounts, onDelete: _onDelete, onEdit, onAdd, categories }: ExpenseDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [pageSize, setPageSize] = useState(50);
 
   const getAccountCurrency = useCallback((accountId: string | null) => {
@@ -170,7 +171,7 @@ export default function ExpenseDataTable({ expenses, accounts, onDelete, onEdit,
         ),
       }),
     ],
-    [accounts, categories, getAccountCurrency, onDelete, onEdit]
+    [accounts, categories, getAccountCurrency, onEdit]
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library

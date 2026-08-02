@@ -25,6 +25,7 @@ export default function SystemStatusTab({
 
   useEffect(() => {
     if (diagnostics.length > 0 && !runningDiagnostics) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastChecked(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     }
   }, [diagnostics, runningDiagnostics]);

@@ -92,7 +92,7 @@ export async function parseCASTextAsync(text: string): Promise<CASParseResult> {
       };
 
       worker.postMessage({ id: msgId, text });
-    } catch (_err) {
+    } catch {
       resolve(parseCASText(text));
     }
   });

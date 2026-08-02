@@ -6,8 +6,7 @@ import { createClient } from "@/lib/supabase-browser";
 import type { Tables } from "@/lib/database.types";
 
 const EMPTY_ARRAY: never[] = [];
-
-const supabase = createClient();
+const getSupabase = () => createClient();
 
 type FinanceData = {
   profile: { 
@@ -50,13 +49,13 @@ export const OVERVIEW_KEY = "finance_overview";
 
 // Granular Fetcher functions corresponding to database vertical functions
 async function fetchSummary() {
-  const { data, error } = await supabase.rpc("get_summary_v1");
+  const { data, error } = await getSupabase().rpc("get_summary_v1");
   if (error) throw error;
   return data;
 }
 
 async function fetchInvestments() {
-  const { data, error } = await supabase.rpc("get_investments_v1");
+  const { data, error } = await getSupabase().rpc("get_investments_v1");
   if (error) throw error;
   return data as {
     investments: Tables<"investments">[];
@@ -71,13 +70,13 @@ async function fetchInvestments() {
 }
 
 async function fetchCashflow() {
-  const { data, error } = await supabase.rpc("get_cashflow_v1");
+  const { data, error } = await getSupabase().rpc("get_cashflow_v1");
   if (error) throw error;
   return data;
 }
 
 async function fetchForex() {
-  const { data, error } = await supabase.rpc("get_forex_v1");
+  const { data, error } = await getSupabase().rpc("get_forex_v1");
   if (error) throw error;
   return data;
 }

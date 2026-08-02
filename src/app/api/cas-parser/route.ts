@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 import { parseCASText } from "@/lib/cas-parser/cas-parser-engine";
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const contentType = request.headers.get("content-type") || "";
     let textContent = "";
     let password = "";

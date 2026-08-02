@@ -61,12 +61,14 @@ export async function GET(req: NextRequest) {
     
     logger.info("Reloading PostgREST schema cache...");
     await client.query("NOTIFY pgrst, 'reload schema';");
-    
-    await client.end();
 
     return NextResponse.json({ success: true, message: "Migrations completed and API schema cache refreshed successfully!" });
   } catch (error: any) {
     console.error("Migration endpoint error:", error);
     return NextResponse.json({ error: error.message || error }, { status: 500 });
+  } finally {
+    try {
+      await client.end();
+    } catch {}
   }
 }

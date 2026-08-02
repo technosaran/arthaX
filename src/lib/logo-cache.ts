@@ -41,7 +41,7 @@ function loadFromStorage() {
         }
       }
     }
-  } catch (_e) {
+  } catch {
     // Ignore storage read errors
   }
   isStorageLoaded = true;
@@ -56,7 +56,7 @@ function saveToStorage() {
       obj[k] = v;
     }
     localStorage.setItem(CACHE_KEY, JSON.stringify(obj));
-  } catch (_e) {
+  } catch {
     // Ignore storage quota errors
   }
 }

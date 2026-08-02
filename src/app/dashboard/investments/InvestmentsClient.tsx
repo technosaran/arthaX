@@ -5,11 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 import { getColorByLabel } from "@/lib/chart-colours";
-import { toast } from "react-hot-toast";
-import { RefreshCw } from "lucide-react";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
-import { triggerMarketAndDividendSync } from "./sync-actions";
 
 // Import sub-clients
 import StocksClient from "@/app/dashboard/stocks/StocksClient";
@@ -23,23 +20,9 @@ import CryptoClient from "@/app/dashboard/crypto/CryptoClient";
 export default function InvestmentsClient() {
   const searchParams = useSearchParams();
 
-  const { data: { investments, mutualFunds, bonds, forexAccounts, alternativeAssets, profile }, isLoading, mutate } = useFinanceData();
+  const { data: { investments, mutualFunds, bonds, forexAccounts, alternativeAssets, profile }, isLoading } = useFinanceData();
   const mounted = useHasMounted();
   const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  const handleSync = async () => {
-    setIsSyncing(true);
-    toast.loading("Syncing live market prices & detecting dividends...", { id: "market-sync" });
-    const res = await triggerMarketAndDividendSync();
-    setIsSyncing(false);
-    if (res.error) {
-      toast.error(res.error, { id: "market-sync" });
-    } else {
-      toast.success(res.message || "Market sync complete!", { id: "market-sync" });
-      mutate();
-    }
-  };
 
   // Dynamic modules check
   const enabledModules = useMemo(() => {

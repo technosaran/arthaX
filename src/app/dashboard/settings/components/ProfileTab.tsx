@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import type { User } from "@supabase/supabase-js";
 
 interface ProfileTabProps {
   input: string;
@@ -15,6 +15,7 @@ interface ProfileTabProps {
   timezone?: string;
   onSaveSetting?: (key: string, value: unknown, msg: string) => void;
   profile?: any;
+  user?: User | null;
 }
 
 export default function ProfileTab({
@@ -26,13 +27,15 @@ export default function ProfileTab({
   handleBlur,
   handleKeyDown,
   profile,
+  user,
 }: ProfileTabProps) {
-  const email = profile?.email || "saransci2006@gmail.com";
-  const fullName = profile?.full_name || profile?.username || username || "arthaX User";
-  const avatarUrl = profile?.avatar_url;
-  const userId = profile?.id || "usr_7382193";
-  const createdAt = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  const email = user?.email || profile?.email || (user_id => user_id ? `User (${user_id.slice(0, 8)})` : "Authenticated Session")(user?.id || profile?.id);
+  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.full_name || profile?.username || username || "arthaX User";
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || profile?.avatar_url;
+  const userId = user?.id || profile?.id || "N/A";
+  const rawCreatedAt = user?.created_at || profile?.created_at;
+  const createdAt = rawCreatedAt
+    ? new Date(rawCreatedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : "Active Session";
 
   return (
@@ -75,6 +78,7 @@ export default function ProfileTab({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-5 rounded-2xl bg-white/[0.03] border border-white/10">
           <div className="flex items-center gap-4">
             {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={avatarUrl}
                 alt={fullName}
