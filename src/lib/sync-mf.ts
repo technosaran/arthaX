@@ -61,12 +61,20 @@ export async function syncAllMutualFundPrices(): Promise<{ updatedCount: number;
   try {
     let updatedCount = 0;
 
+    const getValidSchemeCode = (val?: string | null): string | null => {
+      if (!val) return null;
+      const trimmed = val.trim();
+      if (/^\d{5,7}$/.test(trimmed)) return trimmed;
+      const digitsOnly = trimmed.replace(/[^0-9]/g, "");
+      return /^\d{5,7}$/.test(digitsOnly) ? digitsOnly : null;
+    };
+
     // 1. Sync dedicated mutual_funds table
     const { data: dedicatedMf } = await supabase.from("mutual_funds").select("*");
     if (dedicatedMf && dedicatedMf.length > 0) {
       for (const mf of dedicatedMf) {
-        const schemeCode = (mf.scheme_code || mf.fund_symbol || "").replace(/[^0-9]/g, "");
-        if (!schemeCode || schemeCode.length < 5) continue;
+        const schemeCode = getValidSchemeCode(mf.scheme_code) || getValidSchemeCode(mf.fund_symbol);
+        if (!schemeCode) continue;
 
         const navInfo = await fetchLiveMFNav(schemeCode);
         if (navInfo && navInfo.nav > 0) {
@@ -99,8 +107,8 @@ export async function syncAllMutualFundPrices(): Promise<{ updatedCount: number;
 
     if (mfList && mfList.length > 0) {
       for (const mf of mfList) {
-        const schemeCode = mf.symbol?.replace(/[^0-9]/g, "");
-        if (!schemeCode || schemeCode.length < 5) continue;
+        const schemeCode = getValidSchemeCode(mf.symbol) || getValidSchemeCode(mf.name);
+        if (!schemeCode) continue;
 
         const navInfo = await fetchLiveMFNav(schemeCode);
         if (navInfo && navInfo.nav > 0 && navInfo.nav !== mf.current_price) {

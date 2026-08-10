@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { computeTaxLossHarvesting, TaxHarvestingItem } from "@/lib/tax/india-tax-engine";
+import { computeTaxLossHarvesting } from "@/lib/tax/india-tax-engine";
 
 export async function GET(req: NextRequest) {
   return handleTaxHarvestingDigest(req);

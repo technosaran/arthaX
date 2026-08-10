@@ -12,15 +12,11 @@ import {
   Activity,
   Bot,
   Zap,
-  Lock,
   Layers,
   Database,
   ArrowLeft,
   Terminal,
-  Cpu,
-  CheckCircle2,
   Server,
-  Sparkles,
 } from "lucide-react";
 
 export default function AdminClient() {

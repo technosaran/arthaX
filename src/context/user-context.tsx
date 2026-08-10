@@ -50,7 +50,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const applyUser = useCallback((user: User | null) => {
+  const applyUser = useCallback((user: User | null, profileUsername?: string) => {
     setCurrentUser(user);
     if (!user) {
       setUsernameState("");
@@ -60,12 +60,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     setCurrentUserId(user.id);
 
-    if (user.user_metadata && "username" in user.user_metadata) {
-      setUsernameState(typeof user.user_metadata.username === "string" ? user.user_metadata.username : "");
+    if (profileUsername) {
+      setUsernameState(profileUsername);
       return;
     }
 
-    setUsernameState(user.email ? user.email.split("@")[0] : "");
+    if (user.user_metadata && typeof user.user_metadata.username === "string" && user.user_metadata.username.trim()) {
+      setUsernameState(user.user_metadata.username.trim());
+      return;
+    }
+
+    setUsernameState((prev) => prev || (user.email ? user.email.split("@")[0] : ""));
   }, []);
 
   const fetchUser = useCallback(async () => {
@@ -73,7 +78,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    applyUser(user);
+    let profileUsername: string | undefined;
+    if (user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.username) {
+        profileUsername = profile.username;
+      }
+    }
+
+    applyUser(user, profileUsername);
     setLoading(false);
   }, [applyUser, supabase]);
 

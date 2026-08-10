@@ -196,8 +196,9 @@ export function useNetWorth() {
       totalGrowthUSD += gainUSD;
     });
 
-    const totalGrowthPercent = totalInvestedINR > 0 ? (totalGrowthINR / totalInvestedINR) * 100 : 0;
+    const totalInvested = isUSD ? totalInvestedUSD : totalInvestedINR;
     const totalGrowth = isUSD ? totalGrowthUSD : totalGrowthINR;
+    const totalGrowthPercent = totalInvested > 0 ? (totalGrowth / totalInvested) * 100 : 0;
 
     return {
       netWorth,

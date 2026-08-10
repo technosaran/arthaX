@@ -10,12 +10,21 @@ FinanceOS is designed as a secure, local-first reporting interface for tracking 
 
 ```mermaid
 graph TD
-    Client[Next.js Client Components] -->|SWR Hooks| Cache[Client-side SWR Cache]
-    Client -->|Forms & Trades| Actions[Server Actions]
-    Actions -->|Supabase Auth Guard| RPC[Supabase Database RPC Engine]
-    RPC -->|PostgreSQL Operations| Tables[(Supabase PostgreSQL Database)]
-    Tables -->|Triggers| Ledger[Double-Entry Ledger Audit Trail]
-    Sync_Cron[Background Sync Route] -->|AMFI / Yahoo / Binance APIs| Tables
+    Client[Next.js Client UI] -->|HTTP / SWR Hooks| Gateway[Next.js Web Gateway / BFF]
+    
+    subgraph Microservices Workspace
+        Gateway -->|/api/accounts, /api/transactions| AccountSvc[apps/account-service :4001]
+        Gateway -->|/api/investments, /api/stocks, /api/mf| InvestSvc[apps/investment-service :4002]
+        Gateway -->|/api/budgets, /api/goals, /api/expenses| BudgetSvc[apps/budget-service :4003]
+        Gateway -->|/api/cas-parser, /api/bank-parser| ParserSvc[apps/parser-service :4004]
+        Gateway -->|/api/ai, /api/mcp| AISvc[apps/ai-mcp-service :4005]
+    end
+    
+    AccountSvc -->|Double-Entry Audit Logs| DB[(Supabase PostgreSQL Database)]
+    InvestSvc -->|Live Market Feeds (AMFI/Binance/Yahoo)| DB
+    BudgetSvc --> DB
+    ParserSvc -->|Async Queue| Redis[(Redis Caching & Queue)]
+    AISvc --> DB
 ```
 
 ---

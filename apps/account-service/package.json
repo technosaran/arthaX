@@ -1,0 +1,23 @@
+{
+  "name": "@finance-os/account-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@finance-os/db": "file:../../packages/db",
+    "@finance-os/logger": "file:../../packages/logger",
+    "@finance-os/shared-types": "file:../../packages/shared-types",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.1"
+  }
+}

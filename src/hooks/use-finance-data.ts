@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { Tables } from "@/lib/database.types";
 import { setOfflineCache } from "@/lib/offline-db";
@@ -177,9 +177,11 @@ export function useFinanceData(initialData?: FinanceData) {
   ]);
 
   // Sync to IndexedDB for 0ms instant offline loading
-  if (typeof window !== "undefined" && data.accounts.length > 0) {
-    void setOfflineCache("finance_data_cache", data);
-  }
+  useEffect(() => {
+    if (typeof window !== "undefined" && data.accounts.length > 0) {
+      void setOfflineCache("finance_data_cache", data);
+    }
+  }, [data]);
 
   const isLoading =
     (!summarySWR.data && !summarySWR.error) ||

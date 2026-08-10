@@ -54,13 +54,25 @@ export function calculatePortfolioAnalytics(params: {
     todayPnL += Number(mf.units || 0) * Number(mf.day_change || 0);
   });
 
+  let realCostBasis = 0;
+  investments.forEach((inv: any) => {
+    const qty = Number(inv.quantity || 0);
+    const buyPrice = Number(inv.buy_price || inv.current_price || 0);
+    realCostBasis += qty * buyPrice;
+  });
+  mutualFunds.forEach((mf: any) => {
+    const units = Number(mf.units || 0);
+    const avgNav = Number(mf.avg_nav || mf.current_nav || 0);
+    realCostBasis += units * avgNav;
+  });
+
   const totalInvValue = stockBalance + mfBalance + bondBalance + cryptoBalance;
   const todayPnLPct = totalInvValue > 0 ? (todayPnL / totalInvValue) * 100 : 0;
 
-  const estimatedCost = totalInvValue * 0.82;
-  const totalGain = Math.max(0, totalInvValue - estimatedCost);
-  const totalGainPct = estimatedCost > 0 ? (totalGain / estimatedCost) * 100 : 18.4;
-  const xirrPct = totalGainPct > 0 ? Math.min(totalGainPct, 25) : 18.4;
+  const costBasis = realCostBasis > 0 ? realCostBasis : totalInvValue;
+  const totalGain = Math.max(0, totalInvValue - costBasis);
+  const totalGainPct = costBasis > 0 ? (totalGain / costBasis) * 100 : 0;
+  const xirrPct = totalGainPct > 0 ? Number(totalGainPct.toFixed(2)) : 0;
 
   let bestPerformerName = "—";
   let bestPerformerGainPct = 0;
@@ -85,22 +97,14 @@ export function calculatePortfolioAnalytics(params: {
   }
 
   const denominator = Math.max(1, totalAssets);
-  const goldVal = Math.round(altBalance * 0.25);
-  const fdVal = Math.round(altBalance * 0.2);
-  const epfVal = Math.round(altBalance * 0.15);
-  const npsVal = Math.round(altBalance * 0.1);
-  const realEstateVal = Math.round(altBalance * 0.3);
 
   const rawClasses = [
     { key: "cash", name: "Cash & Savings", value: cashBalance, icon: "💵", color: "#10b981" },
     { key: "stocks", name: "Indian Stocks", value: stockBalance, icon: "📊", color: "#3b82f6" },
     { key: "mf", name: "Mutual Funds", value: mfBalance, icon: "📈", color: "#8b5cf6" },
-    { key: "gold", name: "Digital & Physical Gold", value: goldVal, icon: "🪙", color: "#eab308" },
     { key: "crypto", name: "Crypto Assets", value: cryptoBalance, icon: "⚡", color: "#f97316" },
-    { key: "fd", name: "Fixed Deposits", value: fdVal, icon: "🏛️", color: "#06b6d4" },
-    { key: "epf", name: "EPF / Provident Fund", value: epfVal, icon: "🛡️", color: "#6366f1" },
-    { key: "nps", name: "NPS Pension Fund", value: npsVal, icon: "🎓", color: "#a855f7" },
-    { key: "real_estate", name: "Real Estate", value: realEstateVal, icon: "🏠", color: "#ec4899" },
+    { key: "bonds", name: "Bonds & Debentures", value: bondBalance, icon: "🏛️", color: "#06b6d4" },
+    { key: "alt", name: "Alternative Assets", value: altBalance, icon: "🏠", color: "#ec4899" },
     { key: "forex", name: "Forex & International", value: forexBalance, icon: "🌍", color: "#14b8a6" },
   ];
 

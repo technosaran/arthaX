@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
-import { Sparkles, Bot, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Sparkles, Bot, CheckCircle, AlertCircle, X } from "lucide-react";
 
 interface Props {
   isOpen: boolean;

@@ -95,9 +95,16 @@ function fallsInFY(date: string | null | undefined, fyStartYear: number) {
   if (!date) return false;
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return false;
-  const start = new Date(Date.UTC(fyStartYear, 3, 1, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(fyStartYear + 1, 2, 31, 23, 59, 59, 999));
-  return d >= start && d <= end;
+  // Convert timestamp to IST (+05:30) date parts for precise FY boundary check
+  const istDate = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+  const year = istDate.getUTCFullYear();
+  const month = istDate.getUTCMonth(); // 0-indexed: 3 = April, 2 = March
+
+  if (month >= 3) {
+    return year === fyStartYear;
+  } else {
+    return year === fyStartYear + 1;
+  }
 }
 
 function pickRule(fyStartYear: number) {

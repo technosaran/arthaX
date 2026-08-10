@@ -18,7 +18,6 @@ import ExportsTab from "./components/ExportsTab";
 import IntegrationsTab from "./components/IntegrationsTab";
 import SystemStatusTab from "./components/SystemStatusTab";
 import DangerZoneTab from "./components/DangerZoneTab";
-import AdminClient from "../admin/AdminClient";
 import {
   User,
   Puzzle,

@@ -62,35 +62,34 @@ export function generateDashboardInsights(params: {
     const sorted = [...liabilities].sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
     const nearest = sorted[0];
     nextBillName = nearest.name || nearest.lender_name || "Loan EMI";
-    nextBillDueDate = nearest.due_date ? `Due ${nearest.due_date}` : "Due in 4 days";
+    nextBillDueDate = nearest.due_date ? `Due ${nearest.due_date}` : "Upcoming";
     nextBillAmount = Number(nearest.minimum_payment || nearest.emi_amount || nearest.balance || 0);
   } else {
-    nextBillName = "Electricity Bill";
-    nextBillDueDate = "Due in 3 days";
-    nextBillAmount = 2450;
+    nextBillName = "No upcoming bills";
+    nextBillDueDate = "—";
+    nextBillAmount = 0;
   }
 
-  let topExpenseCategory = "Food & Dining";
+  let topExpenseCategory = "General Spending";
   let topExpenseCategoryAmount = 0;
   if (pieData && pieData.length > 0) {
     topExpenseCategory = pieData[0].name;
     topExpenseCategoryAmount = pieData[0].value;
   } else {
-    topExpenseCategoryAmount = monthlySpend * 0.35;
+    topExpenseCategoryAmount = monthlySpend;
   }
 
   let actionItemToday = "Review your monthly budget targets";
   if (monthlySpend > monthlyIncome && monthlyIncome > 0) {
     actionItemToday = "Expenses exceed income. Pause non-essential shopping.";
   } else if (budgetRemainingAmount > 10000) {
-    actionItemToday = "Consider allocating excess ₹5,000 savings to your Emergency Goal.";
+    actionItemToday = "Consider allocating excess savings to your Emergency Goal.";
   } else {
-    actionItemToday = "SIP auto-debit coming up on the 1st of next month.";
+    actionItemToday = "Review portfolio asset allocations.";
   }
 
-  const totalGoals = goals.length || 1;
   const completedGoals = goals.filter((g: any) => Number(g.current_amount || 0) >= Number(g.target_amount || 1)).length;
-  const goalsOnTrackPct = Math.round((completedGoals / totalGoals) * 100) || 65;
+  const goalsOnTrackPct = goals.length > 0 ? Math.round((completedGoals / goals.length) * 100) : 100;
 
   const insightsBullets: AIInsightBullet[] = [
     {

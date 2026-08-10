@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: finance-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  account-service:
+    build:
+      context: ./apps/account-service
+    container_name: finance-account-service
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - NODE_ENV=production
+    restart: always
+
+  investment-service:
+    build:
+      context: ./apps/investment-service
+    container_name: finance-investment-service
+    ports:
+      - "4002:4002"
+    environment:
+      - PORT=4002
+      - NODE_ENV=production
+    restart: always
+
+  budget-service:
+    build:
+      context: ./apps/budget-service
+    container_name: finance-budget-service
+    ports:
+      - "4003:4003"
+    environment:
+      - PORT=4003
+      - NODE_ENV=production
+    restart: always
+
+  parser-service:
+    build:
+      context: ./apps/parser-service
+    container_name: finance-parser-service
+    ports:
+      - "4004:4004"
+    environment:
+      - PORT=4004
+      - NODE_ENV=production
+    restart: always
+
+  ai-mcp-service:
+    build:
+      context: ./apps/ai-mcp-service
+    container_name: finance-ai-mcp-service
+    ports:
+      - "4005:4005"
+    environment:
+      - PORT=4005
+      - NODE_ENV=production
+    restart: always

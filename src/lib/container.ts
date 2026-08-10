@@ -14,6 +14,11 @@ import { TransactionService } from "@/services/transaction-service";
 import { AccountService } from "@/services/account-service";
 import { BudgetService } from "@/services/budget-service";
 
+import { ProfileRepository } from "@/repositories/profile-repository";
+import { InvestmentService } from "@/services/investment-service";
+import { ProfileService } from "@/services/profile-service";
+import { domainEventBus } from "@/lib/domain-event-bus";
+
 export class Container {
   private singletons = new Map<string, any>();
   private factories = new Map<string, () => any>();
@@ -70,9 +75,10 @@ export class Container {
 export function createAppContainer(supabaseClient: SupabaseClient<Database>): Container {
   const container = new Container();
 
-  // 1. Register Core Infrastructure
+  // 1. Register Core Infrastructure & Event Bus
   container.singleton("supabase", () => supabaseClient);
   container.singleton("cacheService", () => new CacheService());
+  container.singleton("eventBus", () => domainEventBus);
 
   // 2. Register Repositories
   container.singleton("transactionRepo", () => 
@@ -86,6 +92,9 @@ export function createAppContainer(supabaseClient: SupabaseClient<Database>): Co
   );
   container.singleton("investmentRepo", () => 
     new InvestmentRepository(container.resolve("supabase"))
+  );
+  container.singleton("profileRepo", () =>
+    new ProfileRepository(container.resolve("supabase"))
   );
 
   // 3. Register Services
@@ -105,6 +114,19 @@ export function createAppContainer(supabaseClient: SupabaseClient<Database>): Co
     new BudgetService(
       container.resolve("budgetRepo"),
       container.resolve("transactionRepo"),
+      container.resolve("cacheService")
+    )
+  );
+  container.singleton("investmentService", () =>
+    new InvestmentService(
+      container.resolve("investmentRepo"),
+      container.resolve("cacheService"),
+      container.resolve("eventBus")
+    )
+  );
+  container.singleton("profileService", () =>
+    new ProfileService(
+      container.resolve("profileRepo"),
       container.resolve("cacheService")
     )
   );

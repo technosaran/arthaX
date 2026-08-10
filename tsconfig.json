@@ -25,6 +25,15 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@finance-os/shared-types": [
+        "./packages/shared-types/src/index.ts"
+      ],
+      "@finance-os/db": [
+        "./packages/db/src/index.ts"
+      ],
+      "@finance-os/logger": [
+        "./packages/logger/src/index.ts"
       ]
     }
   },
