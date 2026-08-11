@@ -50,14 +50,17 @@ export function ZerodhaConnectCard() {
     // Handle OAuth Callback Toast Notifications
     const syncSuccess = searchParams.get("zerodha_sync");
     const count = searchParams.get("count");
+    const stocksCount = searchParams.get("stocks");
+    const mfsCount = searchParams.get("mfs");
     const created = searchParams.get("created");
     const updated = searchParams.get("updated");
     const errorParam = searchParams.get("zerodha_error");
 
     if (syncSuccess === "success") {
       setSyncError(null);
+      const detailStr = stocksCount || mfsCount ? ` (${stocksCount ?? 0} Stocks, ${mfsCount ?? 0} Mutual Funds)` : "";
       toast.success(
-        `Zerodha Sync Complete! ${count ?? 0} holdings processed (${created ?? 0} new added, ${updated ?? 0} updated).`,
+        `Zerodha Sync Complete! ${count ?? 0} holdings synced${detailStr}.`,
         { duration: 6000 }
       );
       const newUrl = window.location.pathname;

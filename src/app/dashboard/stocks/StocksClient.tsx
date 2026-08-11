@@ -419,22 +419,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Equity Portfolio</h1>
                 <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">EQUITY PRO</span>
-                <span 
-                  className="text-[0.625rem] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border tracking-wider"
-                  style={{ 
-                    backgroundColor: `${marketStatus.badgeColor}15`, 
-                    color: marketStatus.badgeColor,
-                    borderColor: `${marketStatus.badgeColor}40`
-                  }}
-                  title={marketStatus.nextSessionText}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: marketStatus.badgeColor }} />
-                  {marketStatus.statusText} • {marketStatus.formattedTimeIST}
-                </span>
               </div>
-              <p className="text-[0.6875rem] text-[#848E9C] font-semibold flex items-center gap-1.5 mt-0.5">
-                NSE / BSE Spot Watch • {marketStatus.nextSessionText}
-              </p>
             </div>
           </div>
 

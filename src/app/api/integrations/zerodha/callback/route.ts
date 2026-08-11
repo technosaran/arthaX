@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     const syncResult = await syncService.syncHoldings(user.id, holdings);
 
     return NextResponse.redirect(
-      `${baseUrl}/dashboard/investments?zerodha_sync=success&count=${syncResult.syncedHoldingsCount}&created=${syncResult.createdCount}&updated=${syncResult.updatedCount}`
+      `${baseUrl}/dashboard/investments?zerodha_sync=success&count=${syncResult.syncedHoldingsCount}&stocks=${syncResult.stocksSynced}&mfs=${syncResult.mutualFundsSynced}&created=${syncResult.createdCount}&updated=${syncResult.updatedCount}`
     );
   } catch (err: any) {
     console.error("Zerodha OAuth Callback Error:", err);
