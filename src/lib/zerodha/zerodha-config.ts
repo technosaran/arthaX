@@ -57,8 +57,8 @@ export async function getZerodhaCredentialsForUser(
     };
   }
 
-  const globalApiKey = process.env.ZERODHA_API_KEY || "";
-  const globalApiSecret = process.env.ZERODHA_API_SECRET || "";
+  const globalApiKey = (process.env.ZERODHA_API_KEY || "").trim();
+  const globalApiSecret = (process.env.ZERODHA_API_SECRET || "").trim();
 
   if (globalApiKey && globalApiSecret) {
     return {
@@ -76,7 +76,7 @@ export async function getZerodhaCredentialsForUser(
 }
 
 export function getZerodhaGlobalCredentials() {
-  const apiKey = process.env.ZERODHA_API_KEY || "";
-  const apiSecret = process.env.ZERODHA_API_SECRET || "";
+  const apiKey = (process.env.ZERODHA_API_KEY || "").trim();
+  const apiSecret = (process.env.ZERODHA_API_SECRET || "").trim();
   return { apiKey, apiSecret };
 }

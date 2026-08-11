@@ -73,7 +73,10 @@ export class KiteClient {
    * Computes SHA-256 checksum: sha256(api_key + request_token + api_secret)
    */
   private generateChecksum(requestToken: string): string {
-    const data = this.apiKey + requestToken + this.apiSecret;
+    const cleanApiKey = (this.apiKey || "").trim();
+    const cleanToken = (requestToken || "").trim();
+    const cleanSecret = (this.apiSecret || "").trim();
+    const data = cleanApiKey + cleanToken + cleanSecret;
     return crypto.createHash("sha256").update(data).digest("hex");
   }
 
