@@ -17,6 +17,7 @@ import FnoClient from "@/app/dashboard/fno/FnoClient";
 import ForexClient from "@/app/dashboard/forex/ForexClient";
 import AlternativeAssetsClient from "@/app/dashboard/alternative-assets/AlternativeAssetsClient";
 import CryptoClient from "@/app/dashboard/crypto/CryptoClient";
+import { ZerodhaConnectCard } from "@/components/integrations/zerodha/ZerodhaConnectCard";
 
 export default function InvestmentsClient() {
   const searchParams = useSearchParams();
@@ -248,6 +249,9 @@ export default function InvestmentsClient() {
           </div>
         </div>
       </div>
+
+      {/* Zerodha Integration Card (Guarded by Feature Flag) */}
+      <ZerodhaConnectCard />
 
       {/* Segmented Navigation Bar */}
       <div className="flex flex-wrap gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1 max-w-fit">
