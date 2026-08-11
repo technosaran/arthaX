@@ -221,6 +221,8 @@ export async function fetchLiveMFNAV(schemeCode: string) {
   return null;
 }
 
+import { MutualFundInvestmentSchema } from "@/lib/validations";
+
 export async function recordMFInvestment(data: {
   fund_name: string;
   scheme_code: string;
@@ -239,21 +241,17 @@ export async function recordMFInvestment(data: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
-    if (!data.fund_name || data.fund_name.trim().length === 0) {
-      return { error: "Fund name is required" };
+    const validation = MutualFundInvestmentSchema.safeParse(data);
+    if (!validation.success) {
+      return { error: validation.error.issues[0]?.message || "Invalid mutual fund payload" };
     }
-    if (!data.units || data.units <= 0 || !Number.isFinite(data.units)) {
-      return { error: "Units must be a positive number" };
-    }
-    if (!data.nav || data.nav <= 0 || !Number.isFinite(data.nav)) {
-      return { error: "NAV must be a positive number" };
-    }
+    const validData = validation.data;
 
-    const cleanAccountId = data.account_id && 
-      data.account_id.trim().length > 0 && 
-      data.account_id !== "null" && 
-      data.account_id !== "undefined" 
-        ? data.account_id 
+    const cleanAccountId = validData.account_id && 
+      validData.account_id.trim().length > 0 && 
+      validData.account_id !== "null" && 
+      validData.account_id !== "undefined" 
+        ? validData.account_id 
         : null;
 
     const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -369,6 +367,8 @@ export async function importCASPortfolio(items: Array<{
         await supabase.from("mutual_funds").insert({
           user_id: user.id,
           fund_name: item.name,
+          scheme_code: item.symbolOrSchemeCode || null,
+          fund_symbol: item.symbolOrSchemeCode || null,
           units: item.unitsOrQuantity,
           avg_nav: item.currentNavOrPrice,
           current_nav: item.currentNavOrPrice,

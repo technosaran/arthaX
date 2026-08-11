@@ -256,28 +256,28 @@ export default function ExpensesClient({ initialData }: { initialData?: FinanceD
         <div className="border border-slate-800 bg-slate-900/60 p-5 md:p-6 rounded-2xl flex flex-col justify-between">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total Expenses</p>
           <div className="mt-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-mono font-bold text-rose-400 tabular-nums">
+            <h3 className="text-xl md:text-2xl font-sans font-bold text-rose-400 tracking-tight tabular-nums">
               -₹{stats.totalSpent.toLocaleString()}
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">All Time</span>
+            <span className="text-[10px] font-sans px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">All Time</span>
           </div>
         </div>
         <div className="border border-slate-800 bg-slate-900/60 p-5 md:p-6 rounded-2xl flex flex-col justify-between">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">This Month</p>
           <div className="mt-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-mono font-bold text-white tabular-nums">
+            <h3 className="text-xl md:text-2xl font-sans font-bold text-white tracking-tight tabular-nums">
               -₹{stats.monthlyTotal.toLocaleString()}
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20">{format(new Date(selectedYear, selectedMonth - 1, 1), "MMM")}</span>
+            <span className="text-[10px] font-sans px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20">{format(new Date(selectedYear, selectedMonth - 1, 1), "MMM")}</span>
           </div>
         </div>
         <div className="border border-slate-800 bg-slate-900/60 p-5 md:p-6 rounded-2xl flex flex-col justify-between">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Average Expense</p>
           <div className="mt-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-xl md:text-2xl font-mono font-bold text-slate-200 tabular-nums">
+            <h3 className="text-xl md:text-2xl font-sans font-bold text-slate-200 tracking-tight tabular-nums">
               -₹{(expenses.length ? stats.totalSpent / expenses.length : 0).toLocaleString(undefined, {maximumFractionDigits: 0})}
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">{expenses.length} entries</span>
+            <span className="text-[10px] font-sans text-slate-500">{expenses.length} entries</span>
           </div>
         </div>
         <div className="border border-slate-800 bg-slate-900/60 p-5 md:p-6 rounded-2xl flex flex-col justify-between">

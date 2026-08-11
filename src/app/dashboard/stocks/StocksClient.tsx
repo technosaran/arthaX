@@ -59,17 +59,21 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
 
   const [formData, setFormData] = useState({
     name: "", symbol: "", quantity: "", buy_price: "", current_price: "",
-    currency: "INR", notes: "", bought_at: "",
+    currency: showUSD ? "USD" : "INR", notes: "", bought_at: "",
     deduct_from_account: "",
     trade_type: "buy" as "buy" | "sell"
   });
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFormData(prev => ({ ...prev, bought_at: new Date().toISOString().split("T")[0] }));
+      setFormData(prev => ({ 
+        ...prev, 
+        currency: showUSD ? "USD" : "INR",
+        bought_at: new Date().toISOString().split("T")[0] 
+      }));
     }, 0);
     return () => clearTimeout(timer);
-  }, []);
+  }, [showUSD]);
 
   const [selectedExchange, setSelectedExchange] = useState<"NSE" | "BSE">("NSE");
   const [searchQuery, setSearchQuery] = useState("");
@@ -178,11 +182,14 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
     const totalCurrent = activeStocks.reduce((s, i) => s + (Number(i.quantity) * Number(i.current_price)), 0);
     const unrealizedPnL = totalCurrent - totalInvested;
     
-    // Include realized P&L from all stocks (partial sells on active + fully sold holdings) matching active currency
+    // Include realized P&L from all stocks matching active currency
     const currencyStocks = stocks.filter(s => showUSD ? s.currency === "USD" : s.currency !== "USD");
     const totalRealizedPnL = currencyStocks.reduce((s, i) => s + Number(i.realized_pnl || 0), 0);
     const totalPnL = unrealizedPnL + totalRealizedPnL;
-    const totalPnLPercent = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
+    
+    // Open Holding ROI % (Unrealized P&L / Active Open Cost Basis)
+    const openHoldingROI = totalInvested > 0 ? (unrealizedPnL / totalInvested) * 100 : 0;
+    const totalPnLPercent = Number.isFinite(openHoldingROI) ? openHoldingROI : 0;
     
     const dayPnL = activeStocks.reduce((s, i) => s + (Number(i.day_change || 0) * Number(i.quantity || 0)), 0);
     const prevDayValue = totalCurrent - dayPnL;

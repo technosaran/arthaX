@@ -198,6 +198,9 @@ export async function fetchLiveStockPrice(symbol: string, exchange: string = "NS
   }, 60);
 }
 
+import { StockInvestmentSchema } from "@/lib/validations";
+import { safeMul, safeSub } from "@/lib/money-math";
+
 export async function createInvestment(data: {
   name: string; symbol?: string; quantity: number;
   buy_price: number; current_price: number; currency?: string;
@@ -210,36 +213,29 @@ export async function createInvestment(data: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
-    // Input validation with fallbacks
-    const name = data.name ? data.name.trim() : (data.symbol ? data.symbol.trim() : "");
-    if (!name) {
-      return { error: "Stock name or symbol is required" };
+    // Zod Schema Validation
+    const validation = StockInvestmentSchema.safeParse(data);
+    if (!validation.success) {
+      return { error: validation.error.issues[0]?.message || "Invalid stock payload" };
     }
-    if (!data.quantity || data.quantity <= 0 || !Number.isFinite(data.quantity)) {
-      return { error: "Quantity must be a positive number" };
-    }
-    if (!data.buy_price || data.buy_price <= 0 || !Number.isFinite(data.buy_price)) {
-      return { error: "Buy price must be a positive number" };
-    }
-    const currentPrice = (data.current_price && data.current_price > 0 && Number.isFinite(data.current_price)) 
-      ? data.current_price 
-      : data.buy_price;
+    const validData = validation.data;
 
-    // Harden input parameters to prevent empty string UUID and null string database crashes
-    const cleanAccountId = data.deduct_account_id && 
-      data.deduct_account_id.trim().length > 0 && 
-      data.deduct_account_id !== "null" && 
-      data.deduct_account_id !== "undefined" 
-        ? data.deduct_account_id 
+    const currentPrice = validData.current_price || validData.buy_price;
+
+    const cleanAccountId = validData.deduct_account_id && 
+      validData.deduct_account_id.trim().length > 0 && 
+      validData.deduct_account_id !== "null" && 
+      validData.deduct_account_id !== "undefined" 
+        ? validData.deduct_account_id 
         : null;
 
-    const cleanSymbol = data.symbol && data.symbol.trim().length > 0 ? data.symbol.trim() : "";
-    const cleanNotes = data.notes && data.notes.trim().length > 0 ? data.notes.trim() : null;
+    const cleanSymbol = validData.symbol || "";
+    const cleanNotes = validData.notes || null;
 
-    const tradeDate = parseToISODate(data.bought_at);
-    const turnover = data.quantity * data.buy_price;
-    const totalCost = data.total_cost_with_charges ?? turnover;
-    const charges = Math.abs(totalCost - turnover);
+    const tradeDate = parseToISODate(validData.bought_at);
+    const turnover = safeMul(validData.quantity, validData.buy_price);
+    const totalCost = validData.total_cost_with_charges ?? turnover;
+    const charges = Math.abs(safeSub(totalCost, turnover));
 
     const rpc = supabase.rpc.bind(supabase) as unknown as (
       fn: "record_investment",
@@ -263,18 +259,18 @@ export async function createInvestment(data: {
 
     const { data: rpcRes, error: rpcErr } = await rpc("record_investment", {
       p_user_id: user.id,
-      p_name: name,
+      p_name: validData.name,
       p_type: "stock",
       p_symbol: cleanSymbol,
-      p_quantity: data.quantity,
-      p_buy_price: data.buy_price,
+      p_quantity: validData.quantity,
+      p_buy_price: validData.buy_price,
       p_current_price: currentPrice,
-      p_currency: data.currency || "INR",
+      p_currency: validData.currency || "INR",
       p_notes: cleanNotes,
       p_date: tradeDate,
       p_account_id: cleanAccountId,
       p_total_cost: totalCost,
-      p_trade_type: data.trade_type || "buy",
+      p_trade_type: validData.trade_type || "buy",
       p_charges: charges
     });
 

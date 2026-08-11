@@ -271,27 +271,27 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="border border-slate-800 bg-slate-900/60 p-5 rounded-2xl">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-2">Total Target</p>
-            <p className="text-2xl font-mono font-bold text-white tabular-nums">₹{stats.totalTarget.toLocaleString()}</p>
+            <p className="text-2xl font-sans font-bold text-white tracking-tight tabular-nums">₹{stats.totalTarget.toLocaleString()}</p>
             <p className="text-[11px] text-slate-500 mt-1 font-sans">Target capital sum</p>
           </div>
           <div className="border border-slate-800 bg-slate-900/60 p-5 rounded-2xl">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-2">Total Saved</p>
-            <p className="text-2xl font-mono font-bold text-white tabular-nums">₹{stats.totalCurrent.toLocaleString()}</p>
+            <p className="text-2xl font-sans font-bold text-white tracking-tight tabular-nums">₹{stats.totalCurrent.toLocaleString()}</p>
             <p className="text-[11px] text-slate-500 mt-1 font-sans">Accumulated savings</p>
           </div>
           <div className="border border-slate-800 bg-slate-900/60 p-5 rounded-2xl">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-2">Overall Progress</p>
-            <p className="text-2xl font-mono font-bold text-emerald-400 tabular-nums">{stats.overallProgress.toFixed(1)}%</p>
+            <p className="text-2xl font-sans font-bold text-emerald-400 tracking-tight tabular-nums">{stats.overallProgress.toFixed(1)}%</p>
             <p className="text-[11px] text-slate-500 mt-1 font-sans">Completion rate</p>
           </div>
           <div className="border border-slate-800 bg-slate-900/60 p-5 rounded-2xl">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-2">Active Goals</p>
-            <p className="text-2xl font-mono font-bold text-slate-200 tabular-nums">{stats.activeCount}</p>
+            <p className="text-2xl font-sans font-bold text-slate-200 tracking-tight tabular-nums">{stats.activeCount}</p>
             <p className="text-[11px] text-slate-500 mt-1 font-sans">Milestones in progress</p>
           </div>
           <div className="border border-slate-800 bg-slate-900/60 p-5 rounded-2xl">
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-2">Next Horizon</p>
-            <p className={`text-2xl font-mono font-bold tabular-nums ${stats.closestDays <= 30 ? 'text-white' : 'text-emerald-400'}`}>
+            <p className={`text-2xl font-sans font-bold tracking-tight tabular-nums ${stats.closestDays <= 30 ? 'text-white' : 'text-emerald-400'}`}>
               {stats.closestDays === Infinity ? 'None' : `${stats.closestDays}d`}
             </p>
             <p className="text-[11px] text-slate-500 mt-1 font-sans">

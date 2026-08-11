@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  deploy:
+  verify_and_deploy:
     name: Production Deploy
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +21,17 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Run Type Check & Lint
+        run: |
+          npx tsc --noEmit
+          npm run lint
+
+      - name: Run Unit Tests
+        run: npm run test:coverage
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+
       - name: Build Next.js Application
         run: npm run build
         env:
@@ -34,3 +45,4 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
+

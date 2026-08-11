@@ -97,5 +97,19 @@ CRON_SECRET=super_secret_bearer_token
 ### Build and Test Scripts
 * **Development Server**: `npm run dev`
 * **Production Compilation**: `npm run build`
-* **Unit Verification**: `npm run test` (uses Vitest)
+* **Unit Verification**: `npm run test` (uses Vitest / Jest)
 * **E2E Visual Audits**: `npx playwright test`
+
+---
+
+## 6. CI/CD & Scaling Guardrails
+
+### Continuous Integration & Deployment Pipeline
+* **Unified Validation (`main.yml`)**: Triggered on pushes/PRs to `main`. Executes TypeScript verification (`tsc`), ESLint checks, Jest unit test suites with coverage, environment validation, microservices container build validation, and Next.js production compilation.
+* **Production Gating (`deploy.yml`)**: Vercel deployment occurs only after lint, typecheck, and unit test suites pass successfully.
+* **Database Migrations (`deploy-migrations.yml`)**: Automatically syncs database migrations using Supabase CLI (`supabase db push`) whenever files under `supabase/migrations/` change.
+
+### Scaling & Container Resilience
+* **Vertical Scaling Limits**: Microservice containers in `docker-compose.yml` enforce explicit CPU and memory bounds (`deploy.resources.limits`) to prevent single-service memory spikes from impacting host stability.
+* **Healthcheck & Dependencies**: Microservices specify `healthcheck` dependencies on Redis (`service_healthy`) to guarantee reliable startup ordering and service discovery.
+

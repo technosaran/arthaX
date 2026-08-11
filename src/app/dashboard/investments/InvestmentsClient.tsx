@@ -109,10 +109,11 @@ export default function InvestmentsClient() {
 
     const totalInvestedINR = stocksInvested + mfInvested + bondsInvested + altInvested;
     const totalCurrentINR = stocksCurrent + mfCurrent + bondsCurrent + altCurrent;
+    const unrealizedPnLINR = totalCurrentINR - totalInvestedINR;
     const totalRealizedINR = stocksRealized + mfRealized;
-    const totalPnLINR = (totalCurrentINR - totalInvestedINR) + totalRealizedINR;
-    const rawPnLPercentINR = totalInvestedINR > 0 ? (totalPnLINR / totalInvestedINR) * 100 : 0;
-    const totalPnLPercentINR = Number.isFinite(rawPnLPercentINR) ? rawPnLPercentINR : 0;
+    const totalPnLINR = unrealizedPnLINR + totalRealizedINR;
+    const openHoldingROIINR = totalInvestedINR > 0 ? (unrealizedPnLINR / totalInvestedINR) * 100 : 0;
+    const totalPnLPercentINR = Number.isFinite(openHoldingROIINR) ? openHoldingROIINR : 0;
 
     // 6. Forex & USD Stocks & Crypto (Unified USD Portfolio)
     const activeForex = forexAccounts.filter(f => Number(f.balance) > 0);
@@ -130,10 +131,11 @@ export default function InvestmentsClient() {
 
     const totalInvestedUSDCombined = forexInvestedUSD + usdStocksInvested + cryptoInvestedUSD;
     const totalCurrentUSDCombined = forexCurrentUSD + usdStocksCurrent + cryptoCurrentUSD;
+    const unrealizedPnLUSD = totalCurrentUSDCombined - totalInvestedUSDCombined;
     const totalRealizedUSDCombined = forexRealizedUSD + usdStocksRealized;
-    const totalPnLUSDCombined = (totalCurrentUSDCombined - totalInvestedUSDCombined) + totalRealizedUSDCombined;
-    const rawPnLPercentUSDCombined = totalInvestedUSDCombined > 0 ? (totalPnLUSDCombined / totalInvestedUSDCombined) * 100 : 0;
-    const totalPnLPercentUSDCombined = Number.isFinite(rawPnLPercentUSDCombined) ? rawPnLPercentUSDCombined : 0;
+    const totalPnLUSDCombined = unrealizedPnLUSD + totalRealizedUSDCombined;
+    const openHoldingROIUSD = totalInvestedUSDCombined > 0 ? (unrealizedPnLUSD / totalInvestedUSDCombined) * 100 : 0;
+    const totalPnLPercentUSDCombined = Number.isFinite(openHoldingROIUSD) ? openHoldingROIUSD : 0;
 
     return {
       inr: {
@@ -143,6 +145,8 @@ export default function InvestmentsClient() {
         altValue: altCurrent,
         totalInvested: totalInvestedINR,
         totalCurrent: totalCurrentINR,
+        unrealizedPnL: unrealizedPnLINR,
+        totalRealized: totalRealizedINR,
         totalPnL: totalPnLINR,
         totalPnLPercent: totalPnLPercentINR,
         hasData: totalCurrentINR > 0 || totalInvestedINR > 0
@@ -153,6 +157,8 @@ export default function InvestmentsClient() {
         cryptoValue: cryptoCurrentUSD,
         totalInvested: totalInvestedUSDCombined,
         totalCurrent: totalCurrentUSDCombined,
+        unrealizedPnL: unrealizedPnLUSD,
+        totalRealized: totalRealizedUSDCombined,
         totalPnL: totalPnLUSDCombined,
         totalPnLPercent: totalPnLPercentUSDCombined,
         hasData: totalCurrentUSDCombined > 0 || totalInvestedUSDCombined > 0

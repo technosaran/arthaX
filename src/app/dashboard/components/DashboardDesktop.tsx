@@ -334,7 +334,7 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -15 }}
                       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                      className="absolute left-0 text-4xl sm:text-5xl md:text-6xl font-mono font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden"
+                      className="absolute left-0 text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden"
                     >
                     {showUSD 
                       ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 

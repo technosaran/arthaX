@@ -149,7 +149,7 @@ export async function GET(request: Request) {
     }
 
     // -------------------------------------------------------------
-    // 2. UPDATE STOCKS & INVESTMENT PRICES
+    // 2. UPDATE STOCKS & INVESTMENT PRICES (Batched Concurrency)
     // -------------------------------------------------------------
     let stockUpdatedCount = 0;
 
@@ -159,29 +159,34 @@ export async function GET(request: Request) {
       .eq("type", "stock");
 
     if (!invError && investments && investments.length > 0) {
-      for (const inv of investments) {
-        const symbol = inv.symbol || inv.name;
-        if (symbol) {
-          const quote = await fetchStockQuote(symbol);
-          if (quote) {
-            const dayChange = quote.currentPrice - quote.previousClose;
-            const dayChangePct = quote.previousClose > 0 ? (dayChange / quote.previousClose) * 100 : 0;
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < investments.length; i += BATCH_SIZE) {
+        const batch = investments.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(
+          batch.map(async (inv) => {
+            const symbol = inv.symbol || inv.name;
+            if (!symbol) return;
+            const quote = await fetchStockQuote(symbol);
+            if (quote) {
+              const dayChange = quote.currentPrice - quote.previousClose;
+              const dayChangePct = quote.previousClose > 0 ? (dayChange / quote.previousClose) * 100 : 0;
 
-            const { error: updateErr } = await supabase
-              .from("investments")
-              .update({
-                previous_close: quote.previousClose,
-                current_price: quote.currentPrice,
-                day_change: Number(dayChange.toFixed(4)),
-                day_change_percent: Number(dayChangePct.toFixed(2)),
-                last_fetch_at: nowIso,
-                updated_at: nowIso,
-              })
-              .eq("id", inv.id);
+              const { error: updateErr } = await supabase
+                .from("investments")
+                .update({
+                  previous_close: quote.previousClose,
+                  current_price: quote.currentPrice,
+                  day_change: Number(dayChange.toFixed(4)),
+                  day_change_percent: Number(dayChangePct.toFixed(2)),
+                  last_fetch_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", inv.id);
 
-            if (!updateErr) stockUpdatedCount++;
-          }
-        }
+              if (!updateErr) stockUpdatedCount++;
+            }
+          })
+        );
       }
     }
 

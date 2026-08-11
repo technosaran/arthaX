@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Error({
   error,
@@ -10,130 +11,40 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Application error:", error);
+    // Log error to monitoring service (Sentry / internal security log)
+    console.error("Global Route Error Caught:", error);
   }, [error]);
 
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        background: "var(--bg-base, #06080f)",
-        fontFamily: "var(--font-inter, sans-serif)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "460px",
-          width: "100%",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: "64px",
-            height: "64px",
-            margin: "0 auto 24px",
-            borderRadius: "20px",
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg
-            width="28"
-            height="28"
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
+    <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+      <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-6 text-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+        <AlertTriangle className="w-8 h-8" />
+      </div>
 
-        <h1
-          style={{
-            fontSize: "1.75rem",
-            fontWeight: 900,
-            letterSpacing: "-0.04em",
-            color: "var(--text-primary, #f1f5f9)",
-            marginBottom: "8px",
-          }}
-        >
-          Something went wrong
-        </h1>
-        <p
-          style={{
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            color: "var(--text-secondary, #94a3b8)",
-            marginBottom: "32px",
-            lineHeight: 1.6,
-          }}
-        >
-          An unexpected error occurred. Your data is safe — try refreshing or
-          return to the dashboard.
-        </p>
+      <span className="text-xs font-black uppercase tracking-[0.25em] text-rose-400 mb-2">
+        System Recovery Mode
+      </span>
+      <h1 className="text-3xl font-serif text-white tracking-tight mb-3">
+        Unexpected Error Occurred
+      </h1>
+      <p className="text-sm text-slate-400 max-w-md mb-8 leading-relaxed">
+        {error.message || "An isolated runtime issue occurred. Your financial data remains secure."}
+      </p>
 
-        {error.digest && (
-          <p
-            style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              color: "var(--text-muted, #475569)",
-              marginBottom: "24px",
-              fontFamily: "monospace",
-            }}
-          >
-            Error ID: {error.digest}
-          </p>
-        )}
-
-        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-          <button type="button"
-            onClick={reset}
-            style={{
-              height: "48px",
-              padding: "0 28px",
-              borderRadius: "14px",
-              border: "none",
-              background: "var(--gradient-primary, linear-gradient(135deg, #0ea5e9, #38bdf8))",
-              color: "white",
-              fontSize: "0.875rem",
-              fontWeight: 800,
-              cursor: "pointer",
-              letterSpacing: "0.01em",
-              boxShadow: "0 6px 20px rgba(14, 165, 233, 0.25)",
-            }}
-          >
-            Try again
-          </button>
-          <a
-            href="/dashboard"
-            style={{
-              height: "48px",
-              padding: "0 28px",
-              borderRadius: "14px",
-              border: "1px solid var(--border-default, rgba(255,255,255,0.08))",
-              background: "var(--bg-surface, rgba(15,23,42,0.6))",
-              color: "var(--text-primary, #f1f5f9)",
-              fontSize: "0.875rem",
-              fontWeight: 700,
-              textDecoration: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            Dashboard
-          </a>
-        </div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs tracking-wider uppercase hover:bg-emerald-400 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
+        >
+          <RefreshCw className="w-4 h-4 animate-spin-reverse" /> Re-initialize App
+        </button>
+        <a
+          href="/dashboard"
+          className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-bold text-xs tracking-wider uppercase hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+        >
+          Return to Dashboard
+        </a>
       </div>
     </div>
   );

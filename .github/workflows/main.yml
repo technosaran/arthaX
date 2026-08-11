@@ -45,7 +45,7 @@ jobs:
       - name: Lint Code
         run: npm run lint
 
-      - name: Run Unit Tests (Vitest)
+      - name: Run Unit Tests
         run: npm run test:coverage
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://test-project.supabase.co
@@ -54,10 +54,25 @@ jobs:
       - name: Security Audit Dependencies
         run: npm audit --audit-level=high
 
+  microservices_check:
+    name: Validate Microservice Container Builds
+    runs-on: ubuntu-latest
+    needs: test_and_lint
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify Docker Compose Config
+        run: docker compose config
+
+      - name: Build Microservice Images
+        run: docker compose build
+
   build:
     name: Build Verification
     runs-on: ubuntu-latest
-    needs: test_and_lint
+    needs: [test_and_lint, microservices_check]
 
     steps:
       - name: Checkout Code
@@ -77,3 +92,4 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://test-project.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-pub-key
+

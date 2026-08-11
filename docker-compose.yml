@@ -7,6 +7,19 @@ services:
     ports:
       - "6379:6379"
     restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
 
   account-service:
     build:
@@ -17,7 +30,19 @@ services:
     environment:
       - PORT=4001
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
 
   investment-service:
     build:
@@ -28,7 +53,19 @@ services:
     environment:
       - PORT=4002
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
 
   budget-service:
     build:
@@ -39,7 +76,19 @@ services:
     environment:
       - PORT=4003
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
 
   parser-service:
     build:
@@ -50,7 +99,19 @@ services:
     environment:
       - PORT=4004
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
 
   ai-mcp-service:
     build:
@@ -61,4 +122,16 @@ services:
     environment:
       - PORT=4005
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
     restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M

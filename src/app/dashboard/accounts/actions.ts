@@ -421,26 +421,33 @@ export async function importParsedTransactions(
 
     for (const tx of transactions) {
       const safeDateStr = parseToISODate(tx.date);
+      let sourceId: string | null = null;
+      let sourceType: string = tx.type;
+
       if (tx.type === "expense") {
         currentBalance -= tx.amount;
-        await supabase.from("expenses").insert({
+        const { data: expData } = await supabase.from("expenses").insert({
           user_id: user.id,
           account_id: accountId,
           description: tx.description,
           amount: tx.amount,
           category: tx.category,
           date: safeDateStr,
-        });
+        }).select("id").single();
+        sourceId = expData?.id || null;
+        sourceType = "expense";
       } else {
         currentBalance += tx.amount;
-        await supabase.from("incomes").insert({
+        const { data: incData } = await supabase.from("incomes").insert({
           user_id: user.id,
           account_id: accountId,
           description: tx.description,
           amount: tx.amount,
           category: tx.category,
           date: safeDateStr,
-        });
+        }).select("id").single();
+        sourceId = incData?.id || null;
+        sourceType = "income";
       }
 
       await supabase.from("transactions").insert({
@@ -451,6 +458,8 @@ export async function importParsedTransactions(
         description: tx.description,
         category: tx.category,
         date: safeDateStr,
+        source_id: sourceId,
+        source_type: sourceType,
       });
 
       importedCount++;
