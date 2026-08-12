@@ -161,11 +161,8 @@ export function ZerodhaConnectCard() {
     }
   };
 
-  // Show BYOK / Settings button ONLY IF:
-  // 1. There is an active sync error, OR
-  // 2. System keys are missing, OR
-  // 3. User has already set up custom keys
-  const showByokButton = syncError || !status.configured || status.hasCustomKeys;
+  // Always show BYOK button so any user can configure or manage custom keys
+  const showByokButton = true;
 
   return (
     <>
