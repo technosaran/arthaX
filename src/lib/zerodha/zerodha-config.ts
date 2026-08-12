@@ -19,6 +19,11 @@ export interface ZerodhaCredentialsResult {
   source: "user" | "global" | "none";
 }
 
+function cleanKey(val?: string): string {
+  if (!val) return "";
+  return val.replace(/^["']|["']$/g, "").trim();
+}
+
 /**
  * Retrieves Zerodha credentials using the Hybrid Approach:
  * 1. Check if user saved custom API keys in their profile settings.
@@ -41,8 +46,8 @@ export async function getZerodhaCredentialsForUser(
 
       const defaultAccounts = profile?.default_accounts as Record<string, any> | null;
       if (defaultAccounts && defaultAccounts.zerodha) {
-        userApiKey = defaultAccounts.zerodha.apiKey || "";
-        userApiSecret = defaultAccounts.zerodha.apiSecret || "";
+        userApiKey = cleanKey(defaultAccounts.zerodha.apiKey);
+        userApiSecret = cleanKey(defaultAccounts.zerodha.apiSecret);
       }
     } catch {
       // Ignore lookup errors and fallback to global keys
@@ -57,8 +62,8 @@ export async function getZerodhaCredentialsForUser(
     };
   }
 
-  const globalApiKey = (process.env.ZERODHA_API_KEY || "").trim();
-  const globalApiSecret = (process.env.ZERODHA_API_SECRET || "").trim();
+  const globalApiKey = cleanKey(process.env.ZERODHA_API_KEY || process.env.KITE_API_KEY);
+  const globalApiSecret = cleanKey(process.env.ZERODHA_API_SECRET || process.env.KITE_API_SECRET);
 
   if (globalApiKey && globalApiSecret) {
     return {
@@ -76,7 +81,8 @@ export async function getZerodhaCredentialsForUser(
 }
 
 export function getZerodhaGlobalCredentials() {
-  const apiKey = (process.env.ZERODHA_API_KEY || "").trim();
-  const apiSecret = (process.env.ZERODHA_API_SECRET || "").trim();
+  const apiKey = cleanKey(process.env.ZERODHA_API_KEY || process.env.KITE_API_KEY);
+  const apiSecret = cleanKey(process.env.ZERODHA_API_SECRET || process.env.KITE_API_SECRET);
   return { apiKey, apiSecret };
 }
+

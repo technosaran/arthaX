@@ -54,9 +54,9 @@ export class KiteClient {
   private baseUrl = "https://api.kite.trade";
 
   constructor(apiKey: string, apiSecret: string) {
-    // Trim on construction so all internal usage is clean
-    this.apiKey = (apiKey || "").trim();
-    this.apiSecret = (apiSecret || "").trim();
+    // Strip surrounding quotes and whitespace on construction so all internal usage is clean
+    this.apiKey = (apiKey || "").replace(/^["']|["']$/g, "").trim();
+    this.apiSecret = (apiSecret || "").replace(/^["']|["']$/g, "").trim();
   }
 
   /**
