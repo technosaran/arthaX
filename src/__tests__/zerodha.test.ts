@@ -40,10 +40,30 @@ describe("Zerodha Integration Unit Tests", () => {
   });
 
   describe("KiteClient", () => {
-    it("should construct valid login URL", () => {
+    it("should construct valid login URL without redirect_params", () => {
       const client = new KiteClient("test_key", "test_secret");
       const url = client.getLoginUrl();
-      expect(url).toContain("https://kite.zerodha.com/connect/login?v=3&api_key=test_key");
+      expect(url).toBe("https://kite.zerodha.com/connect/login?v=3&api_key=test_key");
+      expect(url).not.toContain("redirect_params");
+    });
+
+    it("should trim whitespace from API key and secret in constructor", () => {
+      const client = new KiteClient("  test_key  ", "  test_secret  ");
+      const url = client.getLoginUrl();
+      expect(url).toContain("api_key=test_key");
+      expect(url).not.toContain("api_key=+");
+      expect(url).not.toContain("api_key=%20");
+    });
+
+    it("should throw error for empty request token", async () => {
+      const client = new KiteClient("test_key", "test_secret");
+      await expect(client.generateSession("")).rejects.toThrow("Request token is empty");
+      await expect(client.generateSession("   ")).rejects.toThrow("Request token is empty");
+    });
+
+    it("should throw error when API key/secret is missing", async () => {
+      const client = new KiteClient("", "test_secret");
+      await expect(client.generateSession("some_token")).rejects.toThrow("API key or secret is missing");
     });
   });
 
