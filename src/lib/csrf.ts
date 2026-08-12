@@ -95,7 +95,8 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
     pathname.startsWith("/api/ai/") ||
     pathname.startsWith("/api/mcp") ||
     pathname.startsWith("/api/bank-parser") ||
-    pathname.startsWith("/api/cas-parser")
+    pathname.startsWith("/api/cas-parser") ||
+    pathname.startsWith("/api/integrations/")
   ) {
     // Sync, accounts, bots, cron, transactions, AI, MCP, and statement parser endpoints use session/auth tokens or standalone webhooks
     return null;

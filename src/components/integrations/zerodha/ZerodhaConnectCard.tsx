@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { RefreshCw, ExternalLink, ShieldCheck, AlertCircle, Key, X, AlertTriangle } from "lucide-react";
+import { getClientCsrfToken } from "@/lib/csrf-client";
 
 export function ZerodhaConnectCard() {
   const searchParams = useSearchParams();
@@ -100,9 +101,13 @@ export function ZerodhaConnectCard() {
     e.preventDefault();
     setSavingSettings(true);
     try {
+      const csrfToken = getClientCsrfToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+
       const res = await fetch("/api/integrations/zerodha/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           apiKey: customApiKey,
           apiSecret: customApiSecret,
@@ -129,9 +134,13 @@ export function ZerodhaConnectCard() {
   const handleClearCustomKeys = async () => {
     setSavingSettings(true);
     try {
+      const csrfToken = getClientCsrfToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+
       const res = await fetch("/api/integrations/zerodha/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ action: "clear" }),
       });
       const data = await res.json();
