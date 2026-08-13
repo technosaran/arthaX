@@ -12,7 +12,7 @@ export interface BinanceSettingsStatus {
 
 export function useBinanceSettings() {
   const [status, setStatus] = useState<BinanceSettingsStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 

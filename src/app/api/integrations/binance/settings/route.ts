@@ -64,15 +64,26 @@ export async function POST(request: Request) {
   if (action === "clear") {
     delete defaultAccounts.binance;
   } else {
-    if (!apiKey || !apiSecret) {
+    const cleanApiKey = (apiKey || "").toString().trim().replace(/^["']|["']$/g, "");
+    const cleanApiSecret = (apiSecret || "").toString().trim().replace(/^["']|["']$/g, "");
+
+    if (!cleanApiKey || !cleanApiSecret) {
       return NextResponse.json(
         { error: "Both Binance API Key and API Secret are required." },
         { status: 400 }
       );
     }
+
+    if (cleanApiKey.length < 16 || cleanApiSecret.length < 16) {
+      return NextResponse.json(
+        { error: "Invalid Binance API Key or Secret format. Please double check your credentials." },
+        { status: 400 }
+      );
+    }
+
     defaultAccounts.binance = {
-      apiKey: apiKey.trim(),
-      apiSecret: encryptSecret(apiSecret.trim()),
+      apiKey: cleanApiKey,
+      apiSecret: encryptSecret(cleanApiSecret),
       updatedAt: new Date().toISOString(),
     };
   }
