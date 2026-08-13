@@ -17,6 +17,7 @@ import {
 } from "./actions";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
+import { useBinanceSettings } from "@/hooks/use-binance-settings";
 
 type CryptoAsset = {
   id: string;
@@ -50,6 +51,7 @@ const POPULAR_COINS = [
 export default function CryptoClient() {
   const { data: { investments, accounts }, mutate } = useFinanceData();
   const [submitting, withLock] = useSubmitLock();
+  const { isSyncing: isSyncingBinance, syncHoldings: syncBinanceHoldings } = useBinanceSettings();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -408,6 +410,23 @@ export default function CryptoClient() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  const res = await syncBinanceHoldings();
+                  if (res.success) mutate();
+                }}
+                disabled={isSyncingBinance}
+                className="bg-[#F0B90B]/10 hover:bg-[#F0B90B]/20 border border-[#F0B90B]/30 text-[#F0B90B] px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                title="Sync spot balances directly from Binance API"
+              >
+                {isSyncingBinance ? (
+                  <svg className="w-3.5 h-3.5 animate-spin text-[#F0B90B]" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="32" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg>
+                ) : (
+                  <span className="font-black">B</span>
+                )}
+                {isSyncingBinance ? "Syncing..." : "Sync Binance"}
+              </button>
+
               <button
                 onClick={handleRefreshPrices}
                 disabled={isRefreshing || activeHoldings.length === 0}

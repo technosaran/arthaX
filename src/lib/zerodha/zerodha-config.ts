@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { decryptSecret } from "@/lib/crypto";
 
 /**
  * Zerodha Integration Configuration
@@ -47,7 +48,7 @@ export async function getZerodhaCredentialsForUser(
       const defaultAccounts = profile?.default_accounts as Record<string, any> | null;
       if (defaultAccounts && defaultAccounts.zerodha) {
         userApiKey = cleanKey(defaultAccounts.zerodha.apiKey);
-        userApiSecret = cleanKey(defaultAccounts.zerodha.apiSecret);
+        userApiSecret = cleanKey(decryptSecret(defaultAccounts.zerodha.apiSecret));
       }
     } catch {
       // Ignore lookup errors and fallback to global keys

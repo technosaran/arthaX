@@ -13,8 +13,7 @@ export default function PWAInstallPrompt() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
-        // eslint-disable-next-line no-console
-        .then((reg) => console.log("Service Worker registered:", reg.scope))
+        .then(() => { /* Service Worker registered */ })
         .catch((err) => console.error("Service Worker registration failed:", err));
     }
 

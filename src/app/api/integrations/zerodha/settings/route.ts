@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isZerodhaEnabled, getZerodhaGlobalCredentials } from "@/lib/zerodha/zerodha-config";
 import { createClient } from "@/lib/supabase-server";
+import { encryptSecret } from "@/lib/crypto";
 
 export async function GET() {
   if (!isZerodhaEnabled()) {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     }
     defaultAccounts.zerodha = {
       apiKey: apiKey.trim(),
-      apiSecret: apiSecret.trim(),
+      apiSecret: encryptSecret(apiSecret.trim()),
       updatedAt: new Date().toISOString(),
     };
   }

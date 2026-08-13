@@ -19,6 +19,10 @@ export type TaxRuleVersion = {
   standardDeductionOld: number;
   standardDeductionNew: number;
   cessRate: number;
+  sec87aThresholdNew?: number;
+  sec87aMaxRebateNew?: number;
+  sec87aThresholdOld?: number;
+  sec87aMaxRebateOld?: number;
   oldRegimeSlabs: Array<{ upto: number | null; rate: number }>;
   newRegimeSlabs: Array<{ upto: number | null; rate: number }>;
   deductionLimits: Record<string, number>;
@@ -26,11 +30,45 @@ export type TaxRuleVersion = {
 
 export const INDIA_TAX_RULES: TaxRuleVersion[] = [
   {
+    version: "FY2024-25-v1",
+    fyStartYear: 2024,
+    standardDeductionOld: 50000,
+    standardDeductionNew: 75000,
+    cessRate: 0.04,
+    sec87aThresholdNew: 700000,
+    sec87aMaxRebateNew: 25000,
+    sec87aThresholdOld: 500000,
+    sec87aMaxRebateOld: 12500,
+    oldRegimeSlabs: [
+      { upto: 250000, rate: 0 },
+      { upto: 500000, rate: 0.05 },
+      { upto: 1000000, rate: 0.2 },
+      { upto: null, rate: 0.3 },
+    ],
+    newRegimeSlabs: [
+      { upto: 300000, rate: 0 },
+      { upto: 600000, rate: 0.05 },
+      { upto: 900000, rate: 0.1 },
+      { upto: 1200000, rate: 0.15 },
+      { upto: 1500000, rate: 0.2 },
+      { upto: null, rate: 0.3 },
+    ],
+    deductionLimits: {
+      "80C": 150000,
+      "80D": 25000,
+      "80CCD(1B)": 50000,
+    },
+  },
+  {
     version: "FY2025-26-v1",
     fyStartYear: 2025,
     standardDeductionOld: 50000,
     standardDeductionNew: 75000,
     cessRate: 0.04,
+    sec87aThresholdNew: 1200000,
+    sec87aMaxRebateNew: 60000,
+    sec87aThresholdOld: 500000,
+    sec87aMaxRebateOld: 12500,
     oldRegimeSlabs: [
       { upto: 250000, rate: 0 },
       { upto: 500000, rate: 0.05 },
@@ -55,15 +93,16 @@ export const INDIA_TAX_RULES: TaxRuleVersion[] = [
 ];
 
 const INCOME_CATEGORY_MATCHERS = {
-  salary: ["salary", "payroll", "bonus"],
+  salary: ["salary", "payroll", "bonus", "stipend"],
   houseProperty: ["rent", "house", "property"],
-  otherSources: ["interest", "dividend", "gift", "misc"],
+  otherSources: ["interest", "dividend", "gift", "misc", "freelance"],
 };
 
 const DEDUCTION_CATEGORY_MAP: Record<string, string[]> = {
-  "80C": ["epf", "ppf", "elss", "lic", "tuition", "principal"],
-  "80D": ["health insurance", "medical insurance", "80d"],
-  "80CCD(1B)": ["nps", "80ccd"],
+  "80C": ["epf", "ppf", "elss", "lic", "life insurance", "tuition", "principal", "home loan principal", "ssy", "sukanya", "nsc", "tax saver fd", "80c"],
+  "80D": ["health insurance", "medical insurance", "mediclaim", "80d"],
+  "80CCD(1B)": ["nps", "pension", "80ccd"],
+  "10(13A)": ["hra", "house rent", "rent paid"],
 };
 
 const TAX_PAID_CATEGORY_MAP = {
@@ -304,11 +343,33 @@ export function computeIndiaTaxReport(input: TaxEngineInput) {
   const oldTaxBeforeRebate = calcSlabTax(taxableOld, rule.oldRegimeSlabs);
   const newTaxBeforeRebate = calcSlabTax(taxableNew, rule.newRegimeSlabs);
 
-  // Section 87A Tax Rebate
-  const oldRebate = taxableOld <= 500000 ? Math.min(oldTaxBeforeRebate, 12500) : 0;
-  const newRebateLimit = fyStartYear >= 2025 ? 60000 : 25000;
-  const newRebateThreshold = fyStartYear >= 2025 ? 1200000 : 700000;
-  const newRebate = taxableNew <= newRebateThreshold ? Math.min(newTaxBeforeRebate, newRebateLimit) : 0;
+  // Section 87A Tax Rebate with Marginal Relief
+  const compute87ARebateWithMarginalRelief = (
+    taxableIncome: number,
+    taxBeforeRebate: number,
+    threshold: number,
+    maxRebate: number
+  ): number => {
+    if (taxableIncome <= 0 || taxBeforeRebate <= 0) return 0;
+    if (taxableIncome <= threshold) {
+      return Math.min(taxBeforeRebate, maxRebate);
+    }
+    const excessIncome = taxableIncome - threshold;
+    if (taxBeforeRebate > excessIncome) {
+      const marginalTaxPayable = excessIncome;
+      const rebateAmount = taxBeforeRebate - marginalTaxPayable;
+      return Math.max(0, Math.min(rebateAmount, maxRebate));
+    }
+    return 0;
+  };
+
+  const sec87aThresholdNew = rule.sec87aThresholdNew ?? (fyStartYear >= 2025 ? 1200000 : 700000);
+  const sec87aMaxRebateNew = rule.sec87aMaxRebateNew ?? (fyStartYear >= 2025 ? 60000 : 25000);
+  const sec87aThresholdOld = rule.sec87aThresholdOld ?? 500000;
+  const sec87aMaxRebateOld = rule.sec87aMaxRebateOld ?? 12500;
+
+  const oldRebate = compute87ARebateWithMarginalRelief(taxableOld, oldTaxBeforeRebate, sec87aThresholdOld, sec87aMaxRebateOld);
+  const newRebate = compute87ARebateWithMarginalRelief(taxableNew, newTaxBeforeRebate, sec87aThresholdNew, sec87aMaxRebateNew);
 
   const oldTax = Math.max(0, oldTaxBeforeRebate - oldRebate);
   const newTax = Math.max(0, newTaxBeforeRebate - newRebate);

@@ -53,3 +53,44 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+interface WidgetProps {
+  children: ReactNode;
+  title?: string;
+}
+
+export class WidgetErrorBoundary extends Component<WidgetProps, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
+  };
+
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("WidgetErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-200 text-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-semibold">{this.props.title || "Widget unavailable"}</span>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-500/30"
+            >
+              Retry
+            </button>
+          </div>
+          <p className="text-[11px] opacity-70 truncate">{this.state.error?.message || "Error rendering component"}</p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}

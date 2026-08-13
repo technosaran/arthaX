@@ -45,5 +45,6 @@ app.post("/accounts", async (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`Account Microservice running on port ${PORT}`);
 });

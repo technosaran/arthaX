@@ -3,9 +3,11 @@
  * Implements requirement 2.5: dependency injection for external service dependencies.
  */
 
+import { cache } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
 import { CacheService } from "@/lib/cache-service";
+import { createClient } from "@/lib/supabase-server";
 import { TransactionRepository } from "@/repositories/transaction-repository";
 import { AccountRepository } from "@/repositories/account-repository";
 import { BudgetRepository } from "@/repositories/budget-repository";
@@ -133,3 +135,11 @@ export function createAppContainer(supabaseClient: SupabaseClient<Database>): Co
 
   return container;
 }
+
+/**
+ * Returns a request-memoized container instance using the current request's Supabase client.
+ */
+export const getAppContainer = cache(async (): Promise<Container> => {
+  const supabase = await createClient();
+  return createAppContainer(supabase);
+});

@@ -106,7 +106,7 @@ function normalizeDate(raw: string): string {
       const iso = `${year}-${month}-${day}`;
       if (!isNaN(new Date(iso).getTime())) return iso;
     }
-  } catch {}
+  } catch { /* Date parsing fallback — non-critical */ }
   return parseToISODate(raw);
 }
 

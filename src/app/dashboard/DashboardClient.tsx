@@ -328,7 +328,7 @@ export default function DashboardClient() {
       cryptoBalanceUSD,
       monthlySpend, 
       monthlyIncome, 
-      expenseTrend: expenseTrend.reverse(), 
+      expenseTrend: [...expenseTrend].reverse(), 
       pieData, 
       stockCount, 
       mfCount, 

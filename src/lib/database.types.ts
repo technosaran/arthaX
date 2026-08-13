@@ -781,6 +781,8 @@ export type Database = {
           timezone: string
           enabled_modules: Json
           default_accounts: Json
+          gemini_api_key: string | null
+          gemini_enabled: boolean | null
           sms_sync_token: string | null
           gmail_refresh_token: string | null
           telegram_chat_id: string | null
@@ -796,6 +798,8 @@ export type Database = {
           timezone?: string
           enabled_modules?: Json
           default_accounts?: Json
+          gemini_api_key?: string | null
+          gemini_enabled?: boolean | null
           sms_sync_token?: string | null
           gmail_refresh_token?: string | null
           telegram_chat_id?: string | null
@@ -811,6 +815,8 @@ export type Database = {
           timezone?: string
           enabled_modules?: Json
           default_accounts?: Json
+          gemini_api_key?: string | null
+          gemini_enabled?: boolean | null
           sms_sync_token?: string | null
           gmail_refresh_token?: string | null
           telegram_chat_id?: string | null

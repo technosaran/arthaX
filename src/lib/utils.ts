@@ -17,33 +17,39 @@ export function parseToISODate(dateStr: string | null | undefined): string {
     return trimmed;
   }
   
+  // Helper to validate and return YYYY-MM-DD
+  const formatValidDate = (y: number, m: number, d: number): string | null => {
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+    if (y < 1900 || y > 2100) return null;
+    if (m < 1 || m > 12) return null;
+    if (d < 1 || d > 31) return null;
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  };
+
   // Try parsing DD-MM-YYYY / MM-DD-YYYY or DD/MM/YYYY / MM/DD/YYYY
   const parts = trimmed.split(/[-/]/);
   if (parts.length === 3) {
     // If first part is 4 digits (YYYY-MM-DD or YYYY/MM/DD)
     if (parts[0].length === 4) {
+      const year = Number(parts[0]);
       const p1 = Number(parts[1]);
-      if (p1 > 12) {
-        // YYYY-DD-MM (fallback swap)
-        return `${parts[0]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-      }
-      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      const p2 = Number(parts[2]);
+      const formatted = p1 > 12
+        ? formatValidDate(year, p2, p1)
+        : formatValidDate(year, p1, p2);
+      if (formatted) return formatted;
     }
     // If third part is 4 or 2 digits (DD-MM-YYYY / DD-MM-YY or MM-DD-YYYY / MM-DD-YY)
     if (parts[2].length === 4 || parts[2].length === 2) {
-      const yearStr = parts[2].length === 2 ? String(2000 + Number(parts[2])) : parts[2];
+      const year = parts[2].length === 2 ? 2000 + Number(parts[2]) : Number(parts[2]);
       const p0 = Number(parts[0]);
       const p1 = Number(parts[1]);
-      if (p0 > 12) {
-        // First part is day, second is month (DD-MM-YYYY / DD-MM-YY)
-        return `${yearStr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      } else if (p1 > 12) {
-        // Second part is day, first is month (MM-DD-YYYY / MM-DD-YY)
-        return `${yearStr}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-      } else {
-        // Ambiguous (both <= 12), default to DD-MM-YYYY
-        return `${yearStr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      }
+      const formatted = p0 > 12
+        ? formatValidDate(year, p1, p0)
+        : p1 > 12
+        ? formatValidDate(year, p0, p1)
+        : formatValidDate(year, p1, p0); // Ambiguous, default to DD-MM-YYYY
+      if (formatted) return formatted;
     }
   }
 
@@ -51,19 +57,14 @@ export function parseToISODate(dateStr: string | null | undefined): string {
   try {
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
-      const y = parsed.getFullYear();
-      const m = String(parsed.getMonth() + 1).padStart(2, '0');
-      const d = String(parsed.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+      const formatted = formatValidDate(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
+      if (formatted) return formatted;
     }
-  } catch {}
+  } catch { /* Date constructor fallback — using today's date below */ }
 
   // Final fallback
   const now = new Date();
-  const fy = now.getFullYear();
-  const fm = String(now.getMonth() + 1).padStart(2, '0');
-  const fd = String(now.getDate()).padStart(2, '0');
-  return `${fy}-${fm}-${fd}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 export function getCurrencySymbol(currency?: string | null): string {

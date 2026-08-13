@@ -9,12 +9,10 @@ export async function GET(req: NextRequest) {
     const state = searchParams.get("state") || "";
     const storedState = req.cookies.get("gmail_oauth_state")?.value;
 
-    // Helper to build redirect response preserving cookies
+    // Helper to build redirect response clearing temporary state cookie
     const makeRedirect = (url: URL) => {
       const res = NextResponse.redirect(url);
-      req.cookies.getAll().forEach((c) => {
-        res.cookies.set(c.name, c.value, { path: "/", sameSite: "lax" });
-      });
+      res.cookies.set("gmail_oauth_state", "", { path: "/", maxAge: 0 });
       return res;
     };
 

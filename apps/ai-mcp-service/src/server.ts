@@ -42,5 +42,6 @@ app.all("/mcp*", (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`AI & MCP Microservice running on port ${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`AI-MCP Microservice running on port ${PORT}`);
 });

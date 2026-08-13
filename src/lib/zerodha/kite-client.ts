@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import logger from "@/lib/logger";
 
 export interface ZerodhaHolding {
   tradingsymbol: string;
@@ -112,11 +113,11 @@ export class KiteClient {
       checksum: checksum,
     });
 
-    console.log(
-      `[Zerodha] Generating session — api_key: ${this.apiKey.substring(0, 4)}****, ` +
-      `request_token: ${cleanRequestToken.substring(0, 6)}****, ` +
-      `checksum: ${checksum.substring(0, 12)}...`
-    );
+    logger.info("Zerodha: Generating session", {
+      api_key: `${this.apiKey.substring(0, 4)}****`,
+      request_token: `${cleanRequestToken.substring(0, 6)}****`,
+      checksum: `${checksum.substring(0, 12)}...`
+    });
 
     const response = await fetch(`${this.baseUrl}/session/token`, {
       method: "POST",
@@ -133,10 +134,11 @@ export class KiteClient {
       const errorType = result.error_type || "UnknownError";
       const errorMessage = result.message || "Failed to generate Zerodha session token.";
 
-      console.error(
-        `[Zerodha] Session generation failed — ` +
-        `HTTP ${response.status}, error_type: ${errorType}, message: ${errorMessage}`
-      );
+      logger.error("Zerodha: Session generation failed", {
+        status: response.status,
+        error_type: errorType,
+        message: errorMessage
+      });
 
       // Provide user-friendly error messages for known Kite error types
       if (errorType === "InputException" && errorMessage.toLowerCase().includes("checksum")) {
@@ -165,7 +167,7 @@ export class KiteClient {
       throw new Error(`Zerodha ${errorType}: ${errorMessage}`);
     }
 
-    console.log(`[Zerodha] Session generated successfully for user: ${result.data.user_id}`);
+    logger.info("Zerodha: Session generated successfully", { userId: result.data.user_id });
 
     return {
       access_token: result.data.access_token,

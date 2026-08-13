@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
 import Redis, { RedisOptions } from 'ioredis';
+import logger from '@/lib/logger';
 
 /**
  * Redis client wrapper for distributed caching and rate limiting
@@ -25,7 +25,7 @@ export function getRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
   
   if (!redisUrl) {
-    console.warn('[Redis] REDIS_URL not configured. Using in-memory fallback for rate limiting.');
+    logger.warn('Redis: REDIS_URL not configured. Using in-memory fallback for rate limiting.');
     return null;
   }
 
@@ -43,28 +43,28 @@ export function getRedisClient(): Redis | null {
     redisClient = new Redis(redisUrl, options);
 
     redisClient.on('connect', () => {
-      console.log('[Redis] Connected successfully');
+      logger.info('Redis: Connected successfully');
       isRedisAvailable = true;
     });
 
     redisClient.on('ready', () => {
-      console.log('[Redis] Ready to accept commands');
+      logger.info('Redis: Ready to accept commands');
       isRedisAvailable = true;
     });
 
     redisClient.on('error', (err) => {
-      console.error('[Redis] Connection error:', err.message);
+      logger.error('Redis: Connection error', { message: err.message });
       isRedisAvailable = false;
     });
 
     redisClient.on('close', () => {
-      console.warn('[Redis] Connection closed');
+      logger.warn('Redis: Connection closed');
       isRedisAvailable = false;
     });
 
     return redisClient;
   } catch (error) {
-    console.error('[Redis] Failed to initialize client:', error);
+    logger.error('Redis: Failed to initialize client', { error });
     return null;
   }
 }
@@ -74,7 +74,7 @@ let hasLoggedRedisWarning = false;
 export function isRedisConfigured(): boolean {
   const isConfigured = Boolean(process.env.REDIS_URL && process.env.REDIS_URL.trim() !== '');
   if (!isConfigured && !hasLoggedRedisWarning) {
-    console.warn('[Redis] REDIS_URL not configured. Multi-step pending-state Telegram flows and distributed rate limiting will not work reliably across Vercel serverless instances.');
+    logger.warn('Redis: REDIS_URL not configured. Multi-step pending-state Telegram flows and distributed rate limiting will not work reliably across Vercel serverless instances.');
     hasLoggedRedisWarning = true;
   }
   return isConfigured;
@@ -94,7 +94,7 @@ export async function redisGet(key: string): Promise<string | null> {
     try {
       return await client.get(key);
     } catch (error) {
-      console.error('[Redis] GET error:', error);
+      logger.error('Redis: GET error', { error });
       // Fall through to in-memory fallback
     }
   }
@@ -130,7 +130,7 @@ export async function redisSet(
       }
       return true;
     } catch (error) {
-      console.error('[Redis] SET error:', error);
+      logger.error('Redis: SET error', { error });
       // Fall through to in-memory fallback
     }
   }
@@ -152,7 +152,7 @@ export async function redisDel(key: string): Promise<boolean> {
       await client.del(key);
       return true;
     } catch (error) {
-      console.error('[Redis] DEL error:', error);
+      logger.error('Redis: DEL error', { error });
       // Fall through to in-memory fallback
     }
   }
@@ -172,7 +172,7 @@ export async function redisIncr(key: string): Promise<number> {
     try {
       return await client.incr(key);
     } catch (error) {
-      console.error('[Redis] INCR error:', error);
+      logger.error('Redis: INCR error', { error });
       // Fall through to in-memory fallback
     }
   }
@@ -201,7 +201,7 @@ export async function redisExpire(key: string, ttlSeconds: number): Promise<bool
       await client.expire(key, ttlSeconds);
       return true;
     } catch (error) {
-      console.error('[Redis] EXPIRE error:', error);
+      logger.error('Redis: EXPIRE error', { error });
       // Fall through to in-memory fallback
     }
   }
@@ -251,9 +251,9 @@ export async function closeRedis(): Promise<void> {
       await redisClient.quit();
       redisClient = null;
       isRedisAvailable = false;
-      console.log('[Redis] Connection closed gracefully');
+      logger.info('Redis: Connection closed gracefully');
     } catch (error) {
-      console.error('[Redis] Error closing connection:', error);
+      logger.error('Redis: Error closing connection', { error });
     }
   }
 }

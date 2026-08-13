@@ -45,5 +45,6 @@ app.post("/investments", async (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`Investment Microservice running on port ${PORT}`);
 });

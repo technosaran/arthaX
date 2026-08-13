@@ -42,14 +42,9 @@ export async function GET(request: NextRequest) {
               const opts = {
                 ...options,
                 maxAge: isDeleting ? 0 : (options?.maxAge ?? THIRTY_DAYS_IN_SECONDS),
-                sameSite: "lax" as const,
-                path: "/",
+                sameSite: options?.sameSite ?? ("lax" as const),
+                path: options?.path ?? "/",
               };
-              try {
-                cookieStore.set(name, value, opts);
-              } catch {
-                // Ignore if called in immutable context
-              }
               response.cookies.set(name, value, opts);
             });
           },
@@ -60,6 +55,14 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      const AUTHORIZED_EMAIL = "iamsaran.ai@gmail.com";
+      const ACCESS_RESTRICTED_MSG = "Access Restricted. arthaX is operating in private single-user mode for authorized accounts only.";
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.email?.trim().toLowerCase() !== AUTHORIZED_EMAIL) {
+        await supabase.auth.signOut();
+        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(ACCESS_RESTRICTED_MSG)}`);
+      }
       return response;
     } else {
       console.error("OAuth callback exchangeCodeForSession error:", error);

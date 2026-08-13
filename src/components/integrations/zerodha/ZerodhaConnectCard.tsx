@@ -3,47 +3,23 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { RefreshCw, ExternalLink, ShieldCheck, AlertCircle, Key, X, AlertTriangle } from "lucide-react";
-import { getClientCsrfToken } from "@/lib/csrf-client";
+import { RefreshCw, ShieldCheck, AlertCircle, Key, X, AlertTriangle } from "lucide-react";
+import { mutate as globalMutate } from "swr";
+import { useZerodhaSettings } from "@/hooks/use-zerodha-settings";
 
 export function ZerodhaConnectCard() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [status, setStatus] = useState<{
-    enabled: boolean;
-    configured: boolean;
-    activeSource?: string;
-    hasCustomKeys?: boolean;
-    userApiKey?: string;
-  } | null>(null);
+  const { status, isSaving, fetchStatus, saveCustomKeys, clearCustomKeys } = useZerodhaSettings();
 
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // Settings form state
-  const [customApiKey, setCustomApiKey] = useState("");
+  const [customApiKey, setCustomApiKey] = useState(status?.userApiKey ?? "");
   const [customApiSecret, setCustomApiSecret] = useState("");
-  const [savingSettings, setSavingSettings] = useState(false);
-
-  const fetchStatus = () => {
-    fetch("/api/integrations/zerodha/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        setStatus({
-          enabled: data.enabled ?? false,
-          configured: data.activeSource !== "none",
-          activeSource: data.activeSource,
-          hasCustomKeys: data.hasCustomKeys,
-          userApiKey: data.userApiKey,
-        });
-        if (data.userApiKey) {
-          setCustomApiKey(data.userApiKey);
-        }
-      })
-      .catch(() => setStatus({ enabled: false, configured: false }));
-  };
 
   useEffect(() => {
     fetchStatus();
@@ -53,17 +29,20 @@ export function ZerodhaConnectCard() {
     const count = searchParams.get("count");
     const stocksCount = searchParams.get("stocks");
     const mfsCount = searchParams.get("mfs");
-    const created = searchParams.get("created");
-    const updated = searchParams.get("updated");
     const errorParam = searchParams.get("zerodha_error");
 
     if (syncSuccess === "success") {
-      setSyncError(null);
       const detailStr = stocksCount || mfsCount ? ` (${stocksCount ?? 0} Stocks, ${mfsCount ?? 0} Mutual Funds)` : "";
       toast.success(
         `Zerodha Sync Complete! ${count ?? 0} holdings synced${detailStr}.`,
         { duration: 6000 }
       );
+
+      // Force immediate client SWR cache revalidation for instant UI update
+      void globalMutate("finance_investments");
+      void globalMutate("finance_summary");
+      void globalMutate("finance_cashflow");
+
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
       router.refresh();
@@ -79,13 +58,13 @@ export function ZerodhaConnectCard() {
         friendlyErr = decodeURIComponent(errorParam);
       }
 
-      setSyncError(friendlyErr);
+      setTimeout(() => setSyncError(friendlyErr), 0);
       toast.error(`Sync error: ${friendlyErr}`);
 
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, fetchStatus]);
 
   if (!status || !status.enabled) {
     return null; // Unmounts if feature flag is disabled
@@ -94,70 +73,27 @@ export function ZerodhaConnectCard() {
   const handleConnect = () => {
     setLoading(true);
     setSyncError(null);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/integrations/zerodha/login";
   };
 
   const handleSaveCustomKeys = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavingSettings(true);
-    try {
-      const csrfToken = getClientCsrfToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (csrfToken) headers["x-csrf-token"] = csrfToken;
-
-      const res = await fetch("/api/integrations/zerodha/settings", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          apiKey: customApiKey,
-          apiSecret: customApiSecret,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Saved custom Zerodha API keys!");
-        setShowSettingsModal(false);
-        setSyncError(null);
-        setCustomApiSecret("");
-        fetchStatus();
-      } else {
-        toast.error(data.error || "Failed to save keys");
-      }
-    } catch {
-      toast.error("Failed to update Zerodha settings.");
-    } finally {
-      setSavingSettings(false);
+    const success = await saveCustomKeys(customApiKey, customApiSecret);
+    if (success) {
+      setShowSettingsModal(false);
+      setSyncError(null);
+      setCustomApiSecret("");
     }
   };
 
   const handleClearCustomKeys = async () => {
-    setSavingSettings(true);
-    try {
-      const csrfToken = getClientCsrfToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (csrfToken) headers["x-csrf-token"] = csrfToken;
-
-      const res = await fetch("/api/integrations/zerodha/settings", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ action: "clear" }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Cleared custom keys. Reverted to system keys.");
-        setCustomApiKey("");
-        setCustomApiSecret("");
-        setShowSettingsModal(false);
-        setSyncError(null);
-        fetchStatus();
-      } else {
-        toast.error(data.error || "Failed to clear keys");
-      }
-    } catch {
-      toast.error("Failed to clear settings.");
-    } finally {
-      setSavingSettings(false);
+    const success = await clearCustomKeys();
+    if (success) {
+      setCustomApiKey("");
+      setCustomApiSecret("");
+      setShowSettingsModal(false);
+      setSyncError(null);
     }
   };
 
@@ -295,7 +231,7 @@ export function ZerodhaConnectCard() {
                   <button
                     type="button"
                     onClick={handleClearCustomKeys}
-                    disabled={savingSettings}
+                    disabled={isSaving}
                     className="text-xs text-red-400 hover:underline"
                   >
                     Clear Custom Key
@@ -312,10 +248,10 @@ export function ZerodhaConnectCard() {
                   </button>
                   <button
                     type="submit"
-                    disabled={savingSettings}
+                    disabled={isSaving}
                     className="rounded-lg bg-orange-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-orange-500 disabled:opacity-50"
                   >
-                    {savingSettings ? "Saving..." : "Save Custom Key"}
+                    {isSaving ? "Saving..." : "Save Custom Key"}
                   </button>
                 </div>
               </div>

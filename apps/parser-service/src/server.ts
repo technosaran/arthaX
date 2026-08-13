@@ -43,5 +43,6 @@ app.post("/parse-cas", async (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Document Parser Microservice running on port ${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`Parser Microservice running on port ${PORT}`);
 });

@@ -200,11 +200,30 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const AUTHORIZED_EMAIL = "iamsaran.ai@gmail.com";
+  const ACCESS_RESTRICTED_MSG = "Access Restricted. arthaX is operating in private single-user mode for authorized accounts only.";
+
   const isPublicRoute = PUBLIC_ROUTES.has(pathname) || pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/google") || pathname.startsWith("/api/bots/") || pathname === "/api/transactions/telegram-sync" || pathname === "/api/transactions/sms-sync" || pathname.startsWith("/api/cron/");
 
   let finalResponse: NextResponse;
 
-  if (!user && !isPublicRoute) {
+  // Enforce single-user authorization check for iamsaran.ai@gmail.com
+  if (user && user.email?.trim().toLowerCase() !== AUTHORIZED_EMAIL) {
+    SecurityLogger.logEvent({
+      type: "authorization_failure",
+      ip,
+      path: pathname,
+      details: { email: user.email },
+    });
+
+    await supabase.auth.signOut();
+
+    if (pathname.startsWith("/api/")) {
+      finalResponse = NextResponse.json({ error: ACCESS_RESTRICTED_MSG }, { status: 403 });
+    } else {
+      finalResponse = NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(ACCESS_RESTRICTED_MSG)}`, request.url));
+    }
+  } else if (!user && !isPublicRoute) {
     if (pathname.startsWith("/api/")) {
       finalResponse = NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     } else {

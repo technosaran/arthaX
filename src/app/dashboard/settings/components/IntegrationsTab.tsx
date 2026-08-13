@@ -6,6 +6,9 @@ import { toast } from "react-hot-toast";
 import { updateSettings, generateTelegramLinkCode } from "../actions";
 import type { FinanceData } from "@/hooks/use-finance-data";
 import { Bot, Key, Send, AlertTriangle, ExternalLink } from "lucide-react";
+import { useZerodhaSettings } from "@/hooks/use-zerodha-settings";
+import { useBinanceSettings } from "@/hooks/use-binance-settings";
+import { AccountAggregatorModal } from "@/components/integrations/aa/AccountAggregatorModal";
 
 interface IntegrationsTabProps {
   profile: FinanceData["profile"] | undefined;
@@ -17,37 +20,28 @@ export default function IntegrationsTab({
   mutate,
 }: IntegrationsTabProps) {
   const [showTelegramCommands, setShowTelegramCommands] = useState(false);
-  const [geminiKeyInput, setGeminiKeyInput] = useState((profile as any)?.gemini_api_key || "");
+  const [geminiKeyInput, setGeminiKeyInput] = useState(profile?.gemini_api_key || "");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingGemini, setIsSavingGemini] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [showAAModal, setShowAAModal] = useState(false);
 
   // Zerodha BYOK state
-  const [zerodhaApiKey, setZerodhaApiKey] = useState("");
+  const { status: zerodhaStatus, isSaving: isSavingZerodha, fetchStatus: fetchZerodhaStatus, saveCustomKeys: saveZerodhaKeys, clearCustomKeys: clearZerodhaKeys } = useZerodhaSettings();
+  const [zerodhaApiKey, setZerodhaApiKey] = useState(zerodhaStatus?.userApiKey ?? "");
   const [zerodhaApiSecret, setZerodhaApiSecret] = useState("");
   const [showZerodhaSecret, setShowZerodhaSecret] = useState(false);
-  const [hasCustomZerodhaKeys, setHasCustomZerodhaKeys] = useState(false);
-  const [activeZerodhaSource, setActiveZerodhaSource] = useState<string>("none");
-  const [isSavingZerodha, setIsSavingZerodha] = useState(false);
-  const [zerodhaEnabled, setZerodhaEnabled] = useState(true);
 
-  const fetchZerodhaStatus = React.useCallback(() => {
-    fetch("/api/integrations/zerodha/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        setZerodhaEnabled(data.enabled ?? true);
-        setHasCustomZerodhaKeys(data.hasCustomKeys ?? false);
-        setActiveZerodhaSource(data.activeSource || "none");
-        if (data.userApiKey) {
-          setZerodhaApiKey(data.userApiKey);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  // Binance API Key state
+  const { status: binanceStatus, isSaving: isSavingBinance, isSyncing: isSyncingBinance, fetchStatus: fetchBinanceStatus, saveCustomKeys: saveBinanceKeys, clearCustomKeys: clearBinanceKeys, syncHoldings: syncBinanceHoldings } = useBinanceSettings();
+  const [binanceApiKey, setBinanceApiKey] = useState(binanceStatus?.userApiKey ?? "");
+  const [binanceApiSecret, setBinanceApiSecret] = useState("");
+  const [showBinanceSecret, setShowBinanceSecret] = useState(false);
 
   React.useEffect(() => {
     fetchZerodhaStatus();
-  }, [fetchZerodhaStatus]);
+    fetchBinanceStatus();
+  }, [fetchZerodhaStatus, fetchBinanceStatus]);
 
   const handleDisconnectTelegram = async () => {
     const res = await updateSettings({ telegram_chat_id: null });
@@ -56,78 +50,48 @@ export default function IntegrationsTab({
   };
 
   const telegramActive = !!profile?.telegram_chat_id;
-  const geminiEnabled = (profile as any)?.gemini_enabled !== false;
-  const hasGeminiKey = !!(profile as any)?.gemini_api_key;
+  const geminiEnabled = profile?.gemini_enabled !== false;
+  const hasGeminiKey = !!profile?.gemini_api_key;
 
   const [prevProfile, setPrevProfile] = useState(profile);
   if (profile !== prevProfile) {
     setPrevProfile(profile);
-    if (profile && (profile as any).gemini_api_key !== undefined) {
-      setGeminiKeyInput((profile as any).gemini_api_key || "");
+    if (profile && profile.gemini_api_key !== undefined) {
+      setGeminiKeyInput(profile.gemini_api_key || "");
     }
   }
 
   const handleSaveZerodhaKeys = async () => {
-    if (!zerodhaApiKey.trim() || !zerodhaApiSecret.trim()) {
-      toast.error("Both API Key and API Secret are required.");
-      return;
-    }
-    setIsSavingZerodha(true);
-    try {
-      const csrfToken = (await import("@/lib/csrf-client")).getClientCsrfToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (csrfToken) headers["x-csrf-token"] = csrfToken;
-
-      const res = await fetch("/api/integrations/zerodha/settings", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          apiKey: zerodhaApiKey,
-          apiSecret: zerodhaApiSecret,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Custom Zerodha API keys saved successfully!");
-        setZerodhaApiSecret("");
-        fetchZerodhaStatus();
-        mutate();
-      } else {
-        toast.error(data.error || "Failed to save Zerodha keys");
-      }
-    } catch {
-      toast.error("Failed to update Zerodha settings");
-    } finally {
-      setIsSavingZerodha(false);
+    const success = await saveZerodhaKeys(zerodhaApiKey, zerodhaApiSecret);
+    if (success) {
+      setZerodhaApiSecret("");
+      mutate();
     }
   };
 
   const handleClearZerodhaKeys = async () => {
-    setIsSavingZerodha(true);
-    try {
-      const csrfToken = (await import("@/lib/csrf-client")).getClientCsrfToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+    const success = await clearZerodhaKeys();
+    if (success) {
+      setZerodhaApiKey("");
+      setZerodhaApiSecret("");
+      mutate();
+    }
+  };
 
-      const res = await fetch("/api/integrations/zerodha/settings", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ action: "clear" }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Cleared custom Zerodha keys. Reverted to system keys.");
-        setZerodhaApiKey("");
-        setZerodhaApiSecret("");
-        fetchZerodhaStatus();
-        mutate();
-      } else {
-        toast.error(data.error || "Failed to clear Zerodha keys");
-      }
-    } catch {
-      toast.error("Failed to clear Zerodha settings");
-    } finally {
-      setIsSavingZerodha(false);
+  const handleSaveBinanceKeys = async () => {
+    const success = await saveBinanceKeys(binanceApiKey, binanceApiSecret);
+    if (success) {
+      setBinanceApiSecret("");
+      mutate();
+    }
+  };
+
+  const handleClearBinanceKeys = async () => {
+    const success = await clearBinanceKeys();
+    if (success) {
+      setBinanceApiKey("");
+      setBinanceApiSecret("");
+      mutate();
     }
   };
 
@@ -382,13 +346,13 @@ export default function IntegrationsTab({
               </div>
 
               <span className={`px-2.5 py-0.5 rounded-full text-[0.625rem] font-bold uppercase tracking-wider border ${
-                hasCustomZerodhaKeys
+                zerodhaStatus?.hasCustomKeys
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : activeZerodhaSource === "global"
+                  : (zerodhaStatus?.activeSource || "none") === "global"
                   ? "bg-sky-500/10 border-sky-500/30 text-sky-400"
                   : "bg-amber-500/10 border-amber-500/30 text-amber-400"
               }`}>
-                {hasCustomZerodhaKeys ? "Custom Key Active" : activeZerodhaSource === "global" ? "System Key Active" : "Not Configured"}
+                {zerodhaStatus?.hasCustomKeys ? "Custom Key Active" : (zerodhaStatus?.activeSource || "none") === "global" ? "System Key Active" : "Not Configured"}
               </span>
             </div>
 
@@ -456,7 +420,7 @@ export default function IntegrationsTab({
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                {hasCustomZerodhaKeys ? (
+                {zerodhaStatus?.hasCustomKeys ? (
                   <button
                     type="button"
                     onClick={handleClearZerodhaKeys}
@@ -467,7 +431,7 @@ export default function IntegrationsTab({
                   </button>
                 ) : (
                   <span className="text-[11px] text-gray-500">
-                    Status: <strong className="text-gray-400">{activeZerodhaSource === "global" ? "Using System Fallback Key" : "No Keys Set"}</strong>
+                    Status: <strong className="text-gray-400">{(zerodhaStatus?.activeSource || "none") === "global" ? "Using System Fallback Key" : "No Keys Set"}</strong>
                   </span>
                 )}
 
@@ -483,7 +447,196 @@ export default function IntegrationsTab({
             </div>
           </div>
         </div>
+
+        {/* ─── 4. Binance Exchange (Read-Only API) Card ─── */}
+        <div className="rounded-2xl border border-white/10 bg-[#121620] p-5 flex flex-col justify-between hover:border-yellow-500/30 transition-all duration-300 relative overflow-hidden group shadow-xl col-span-1 md:col-span-2">
+          <div className="space-y-4">
+            {/* Card Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shadow-inner text-yellow-400 font-bold text-lg">
+                  B
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    Binance Exchange API
+                  </h3>
+                  <span className="text-[0.625rem] text-yellow-400 font-bold uppercase tracking-wider">
+                    Crypto Spot Balances & Market Price Sync
+                  </span>
+                </div>
+              </div>
+
+              <span className={`px-2.5 py-0.5 rounded-full text-[0.625rem] font-bold uppercase tracking-wider border ${
+                binanceStatus?.hasCustomKeys
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : (binanceStatus?.activeSource || "none") === "global"
+                  ? "bg-sky-500/10 border-sky-500/30 text-sky-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              }`}>
+                {binanceStatus?.hasCustomKeys ? "Custom Key Active" : (binanceStatus?.activeSource || "none") === "global" ? "System Key Active" : "Not Configured"}
+              </span>
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Connect your Binance account using a read-only API Key to automatically sync your spot crypto holdings and live prices into your dashboard.
+            </p>
+
+            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-xs leading-relaxed space-y-1">
+              <p className="font-semibold text-yellow-200">🔒 Security Best Practice</p>
+              <p className="text-yellow-300/90 text-[11px]">
+                Create a <strong>Read-Only</strong> API key in your Binance Account settings. Leave Trade and Withdrawal options unchecked for maximum security.
+              </p>
+            </div>
+
+            {/* API Key & Secret Form */}
+            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-yellow-400 shrink-0" /> Binance API Credentials
+                </label>
+                <a
+                  href="https://www.binance.com/en/my/settings/api-management"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[0.6875rem] font-bold text-yellow-400 hover:underline flex items-center gap-1"
+                >
+                  Binance API Management <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="binance-api-key-input" className="block text-[11px] text-gray-400 font-medium mb-1">API Key</label>
+                  <input
+                    id="binance-api-key-input"
+                    type="text"
+                    placeholder="e.g. vmPU2v483n..."
+                    value={binanceApiKey}
+                    onChange={(e) => setBinanceApiKey(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-yellow-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="binance-api-secret-input" className="block text-[11px] text-gray-400 font-medium mb-1">API Secret</label>
+                  <div className="relative">
+                    <input
+                      id="binance-api-secret-input"
+                      type={showBinanceSecret ? "text" : "password"}
+                      placeholder="e.g. nhKw4v..."
+                      value={binanceApiSecret}
+                      onChange={(e) => setBinanceApiSecret(e.target.value)}
+                      className="w-full bg-black/50 border border-white/10 rounded-xl pl-3 pr-12 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-yellow-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowBinanceSecret(!showBinanceSecret)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.6875rem] text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      {showBinanceSecret ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                {binanceStatus?.hasCustomKeys ? (
+                  <button
+                    type="button"
+                    onClick={handleClearBinanceKeys}
+                    disabled={isSavingBinance}
+                    className="text-xs text-rose-400 hover:underline cursor-pointer font-medium"
+                  >
+                    Clear Custom Keys
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-gray-500">
+                    Status: <strong className="text-gray-400">{(binanceStatus?.activeSource || "none") === "global" ? "Using System Fallback Key" : "No Keys Set"}</strong>
+                  </span>
+                )}
+
+                <div className="flex gap-2">
+                  {binanceStatus?.configured && (
+                    <button
+                      type="button"
+                      disabled={isSyncingBinance}
+                      onClick={async () => {
+                        const res = await syncBinanceHoldings();
+                        if (res.success) mutate();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-yellow-600/20 border border-yellow-500/30 hover:bg-yellow-600/30 text-yellow-300 text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {isSyncingBinance ? "Syncing..." : "Sync Now"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isSavingBinance}
+                    onClick={handleSaveBinanceKeys}
+                    className="px-4 py-2 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingBinance ? "Saving..." : "Save Binance Keys"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── 5. RBI Account Aggregator (Direct Bank Sync) Card ─── */}
+        <div className="rounded-2xl border border-white/10 bg-[#121620] p-5 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 relative overflow-hidden group shadow-xl col-span-1 md:col-span-2">
+          <div className="space-y-4">
+            {/* Card Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-inner text-emerald-400 font-bold text-lg">
+                  🏦
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    RBI Account Aggregator (Direct Bank Sync)
+                  </h3>
+                  <span className="text-[0.625rem] text-emerald-400 font-bold uppercase tracking-wider">
+                    HDFC • ICICI • SBI • Axis • Kotak • IDFC & 100+ Banks
+                  </span>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-0.5 rounded-full text-[0.625rem] font-bold uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                RBI Regulated
+              </span>
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Auto-sync bank balances, savings accounts, FDs, and bank statement records directly via OTP consent. Zero password sharing required.
+            </p>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] text-gray-500">
+                Framework: <strong className="text-emerald-400">ReBIT Encrypted E2EE Network</strong>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setShowAAModal(true)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+              >
+                <span>Connect Indian Bank (AA)</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <AccountAggregatorModal
+        isOpen={showAAModal}
+        onClose={() => setShowAAModal(false)}
+        onSuccess={() => {
+          setShowAAModal(false);
+          mutate();
+        }}
+      />
 
       {/* Disconnect Telegram Custom Modal */}
       {showDisconnectModal && (

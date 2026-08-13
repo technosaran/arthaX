@@ -83,8 +83,8 @@ export async function callGeminiApi(
     };
   }
 
-  // Model fallback list for maximum reliability across API keys
-  const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
+  // Model fallback list for maximum performance & reliability (Gemini 2.5 Flash -> 2.5 Pro -> 2.0 Flash -> 1.5 Flash)
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"];
   let lastError = "";
 
   for (const model of models) {

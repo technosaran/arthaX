@@ -75,10 +75,10 @@ export default function TaxReportsClient() {
 
   const report = useMemo(() => computeIndiaTaxReport(taxInput), [taxInput]);
 
-  const stdDeduction = regime === "new" ? 75000 : 50000;
-  const taxableNet = Math.max(0, report.taxHeads.grossIncome - stdDeduction);
-  const isTaxFree87A = regime === "new" ? taxableNet <= 1200000 : taxableNet <= 500000;
-  const rebatedTax = isTaxFree87A ? 0 : report.taxPayment.taxPayable;
+  const stdDeduction = regime === "new" ? (fyStartYear >= 2024 ? 75000 : 50000) : 50000;
+  const taxableNet = Math.max(0, report.taxHeads.grossIncome - stdDeduction - (regime === "old" ? report.deductions.totalEligible : 0));
+  const rebatedTax = report.taxPayment.taxPayable;
+  const isTaxFree87A = rebatedTax === 0 && report.taxHeads.grossIncome > 0;
 
   const handleSyncPrices = async () => {
     setIsSyncingPrices(true);
@@ -109,7 +109,7 @@ export default function TaxReportsClient() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-black uppercase tracking-wider mb-3">
                 <Receipt className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Verified Income Tax Engine • FY 2025–26</span>
+                <span>Verified Income Tax Engine • {report.fiscal.label}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
                 India Tax Calculation Studio

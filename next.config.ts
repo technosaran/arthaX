@@ -16,15 +16,6 @@ const nextConfig: NextConfig = {
 
   serverExternalPackages: ["@react-pdf/renderer"],
 
-  // Static redirect: root → dashboard (no force-dynamic needed)
-  redirects: async () => [
-    {
-      source: "/",
-      destination: "/dashboard",
-      permanent: false,
-    },
-  ],
-
   experimental: {
     staleTimes: {
       dynamic: 0,

@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ZerodhaHolding } from "./kite-client";
+import { CacheService } from "@/lib/cache-service";
 
 export interface SyncResult {
   syncedHoldingsCount: number;
@@ -11,7 +12,10 @@ export interface SyncResult {
 }
 
 export class ZerodhaSyncService {
-  constructor(private supabase: SupabaseClient) {}
+  constructor(
+    private supabase: SupabaseClient,
+    private cacheService?: CacheService
+  ) {}
 
   /**
    * Syncs Zerodha holdings array into the user's database in Supabase.
@@ -190,6 +194,10 @@ export class ZerodhaSyncService {
       } catch (err: any) {
         errors.push(`Error processing ${h.tradingsymbol}: ${err.message || String(err)}`);
       }
+    }
+
+    if (this.cacheService) {
+      await this.cacheService.clearUserCache(userId);
     }
 
     return {

@@ -2,11 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { login, signup } from "./actions";
+import { login } from "./actions";
 import { createClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import zxcvbn from "zxcvbn";
 import "./login.css";
 
 const MAX_ATTEMPTS = 3;
@@ -60,12 +59,9 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
 
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -158,14 +154,11 @@ export default function LoginPage() {
     if (lockoutUntil && Date.now() < lockoutUntil) return;
 
     setError("");
-    setSuccessMessage("");
     setLoading(true);
     
     try {
       const formData = new FormData(e.currentTarget);
-      const result = isSignUp 
-        ? await signup(formData)
-        : await login(formData);
+      const result = await login(formData);
         
       if (result?.error) {
         failCountRef.current += 1;
@@ -177,11 +170,6 @@ export default function LoginPage() {
           const multiplier = Math.pow(2, failCountRef.current - MAX_ATTEMPTS);
           startLockout(LOCKOUT_DURATION_MS * multiplier);
         }
-      } else if (result?.requiresVerification) {
-        setLoading(false);
-        setError("");
-        setSuccessMessage(result.message || "Account created! Please check your email or sign in.");
-        setIsSignUp(false);
       } else {
         failCountRef.current = 0;
         localStorage.removeItem("failCount");
@@ -196,7 +184,6 @@ export default function LoginPage() {
   }
 
   const isLockedOut = lockoutSeconds > 0;
-  const passwordStrength = zxcvbn(passwordInput);
 
   return (
     <div className="login-wrapper relative min-h-screen w-full flex flex-col lg:flex-row bg-[#030712] font-sans selection:bg-sky-500/30 overflow-x-hidden">
@@ -301,39 +288,14 @@ export default function LoginPage() {
 
           <motion.div variants={itemVariants} className="mb-6 text-center">
             <h2 className="text-2xl font-bold text-white mb-1.5 tracking-tight">
-              {isSignUp ? "Create Account" : "Welcome Back"}
+              Sign In to Terminal
             </h2>
             <p className="text-slate-400 text-xs font-medium">
-              {isSignUp ? "Secure your wealth management profile today." : "Authenticate to access your terminal."}
+              Authenticate to access your private wealth terminal.
             </p>
-          </motion.div>
-
-          {/* Toggle Switch */}
-          <motion.div variants={itemVariants} className="relative flex bg-black/40 p-1.5 rounded-xl mb-6 w-full border border-white/10 shadow-inner">
-            <motion.div 
-              className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-lg z-0 shadow-lg"
-              initial={false}
-              animate={{ 
-                x: isSignUp ? "100%" : "0%",
-                backgroundColor: isSignUp ? "rgba(16, 185, 129, 0.2)" : "rgba(14, 165, 233, 0.2)",
-                border: isSignUp ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid rgba(14, 165, 233, 0.4)"
-              }}
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            />
-            <button 
-              type="button" 
-              onClick={() => { setIsSignUp(false); setError(""); }}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${!isSignUp ? "text-white" : "text-slate-400 hover:text-white"}`}
-            >
-              Sign In
-            </button>
-            <button 
-              type="button" 
-              onClick={() => { setIsSignUp(true); setError(""); }}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-[0.1em] rounded-lg z-10 transition-colors ${isSignUp ? "text-white" : "text-slate-400 hover:text-white"}`}
-            >
-              Sign Up
-            </button>
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] font-semibold">
+              🔒 Private Authorized Instance
+            </div>
           </motion.div>
 
           <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -408,92 +370,10 @@ export default function LoginPage() {
                   )}
                 </button>
               </motion.div>
-
-              {/* Password Strength Meter (Sign Up Only) */}
-              {isSignUp && passwordInput ? (
-                <motion.div 
-                  key="password-strength"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="text-xs pt-1 px-1">
-                    <div className="flex justify-between mb-1.5 font-medium">
-                      <span className="text-slate-400 text-[0.7rem]">Password Strength</span>
-                      <span className={
-                        passwordStrength.score === 0 ? "text-rose-400 font-bold" :
-                        passwordStrength.score === 1 ? "text-rose-300 font-bold" :
-                        passwordStrength.score === 2 ? "text-amber-400 font-bold" :
-                        passwordStrength.score === 3 ? "text-emerald-400 font-bold" :
-                        "text-emerald-400 font-bold"
-                      }>
-                        {["Very Weak", "Weak", "Fair", "Strong", "Very Strong"][passwordStrength.score]}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5 h-1.5 rounded-full overflow-hidden bg-white/5">
-                      {[0, 1, 2, 3].map((idx) => (
-                        <div 
-                          key={idx}
-                          className={`flex-1 transition-all duration-300 ${
-                            passwordStrength.score > idx 
-                              ? (passwordStrength.score < 3 ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]" : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]") 
-                              : (passwordStrength.score === 0 && idx === 0 ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" : "bg-transparent")
-                          }`} 
-                        />
-                      ))}
-                    </div>
-                    {passwordStrength.feedback.warning && (
-                      <p className="text-rose-400 mt-1.5 text-[0.7rem] font-medium">{passwordStrength.feedback.warning}</p>
-                    )}
-                    {passwordInput.length > 0 && passwordInput.length < 6 && (
-                      <p className="text-rose-400 mt-1.5 text-[0.7rem] font-medium">At least 6 characters required.</p>
-                    )}
-                  </div>
-                </motion.div>
-              ) : null}
-
-              {/* Remember me & Forgot password */}
-              {!isSignUp && (
-                <motion.div variants={itemVariants} layout key="extras" className="flex items-center justify-between mt-1 px-1">
-                  <label className="flex items-center gap-2.5 cursor-pointer group">
-                    <div className={`w-4 h-4 rounded-md flex items-center justify-center transition-all ${rememberMe ? 'bg-sky-500 border-sky-400 shadow-[0_0_10px_rgba(14,165,233,0.4)]' : 'bg-white/5 border-white/20 group-hover:border-white/40'} border`}>
-                      {rememberMe && (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors select-none">Remember me</span>
-                    <input type="checkbox" className="hidden" checked={rememberMe} onChange={() => setRememberMe(!rememberMe)} />
-                  </label>
-                  
-                  <Link href="/reset-password" className="text-xs font-semibold text-sky-400 hover:text-sky-300 hover:underline transition-colors">
-                    Forgot password?
-                  </Link>
-                </motion.div>
-              )}
             </AnimatePresence>
 
             {/* Error / Success Feedback Banners */}
             <AnimatePresence>
-              {successMessage ? (
-                <motion.div 
-                  key="success-message"
-                  initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, height: "auto", scale: 1 }}
-                  exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex items-center gap-2.5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-medium">
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                    <span>{successMessage}</span>
-                  </div>
-                </motion.div>
-              ) : null}
-
               {error ? (
                 <motion.div 
                   key="error-message"
@@ -535,7 +415,7 @@ export default function LoginPage() {
               whileTap={{ scale: (loading || isLockedOut) ? 1 : 0.98 }}
               className="relative w-full h-12 mt-2 rounded-xl text-white text-sm font-bold tracking-wide overflow-hidden transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed group"
             >
-              <div className={`absolute inset-0 transition-colors duration-300 ${isSignUp ? 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.3)]' : 'bg-sky-500 hover:bg-sky-400 shadow-[0_0_25px_rgba(14,165,233,0.3)]'}`} />
+              <div className="absolute inset-0 transition-colors duration-300 bg-sky-500 hover:bg-sky-400 shadow-[0_0_25px_rgba(14,165,233,0.3)]" />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)] -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
               
               <div className="relative flex items-center justify-center gap-2 h-full">
@@ -545,11 +425,11 @@ export default function LoginPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                     </svg>
-                    {isSignUp ? "Creating Account..." : "Authenticating..."}
+                    Authenticating...
                   </>
                 ) : (
                   <>
-                    <span>{isSignUp ? "Create Account" : "Access Terminal"}</span>
+                    <span>Access Terminal</span>
                     <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                     </svg>

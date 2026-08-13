@@ -2,9 +2,16 @@
 
 import { useState } from "react";
 import { FileText, FileCheck, ArrowRight, ShieldCheck, Download } from "lucide-react";
-import BankStatementParserModal from "@/components/BankStatementParserModal";
-import CASImportModal from "@/components/CASImportModal";
+import dynamic from "next/dynamic";
 import type { Tables } from "@/lib/database.types";
+
+const BankStatementParserModal = dynamic(() => import("@/components/BankStatementParserModal"), {
+  ssr: false,
+});
+
+const CASImportModal = dynamic(() => import("@/components/CASImportModal"), {
+  ssr: false,
+});
 
 type Account = Tables<"accounts">;
 

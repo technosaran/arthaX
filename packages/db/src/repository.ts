@@ -1,5 +1,3 @@
-import { pgTable } from "drizzle-orm/pg-core";
-
 export interface RepositoryFilters {
   limit?: number;
   offset?: number;

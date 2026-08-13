@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 import { getFriendlyErrorMessage } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 import { Client } from "pg";
+import { EXTERNAL_APIS, probeExternalApi } from "@/lib/external-apis";
 
 export async function resetUserData() {
   try {
@@ -243,43 +244,9 @@ export async function checkApiHealth() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const apis = [
-    { name: "AMFI Mutual Funds API (mfapi.in)", url: "https://api.mfapi.in/mf/122639" },
-    { name: "AMFI India Official NAV (amfiindia.com)", url: "https://www.amfiindia.com/spages/NAVAll.txt" },
-    { name: "Groww Mutual Funds API", url: "https://groww.in/v1/api/search/v1/derived/scheme?availableForInvestment=true&docType=scheme&plan_type=Direct&q=HDFC" },
-    { name: "Yahoo Finance Chart API (v8)", url: "https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS" },
-    { name: "Yahoo Finance Search API", url: "https://query2.finance.yahoo.com/v1/finance/search?q=RELIANCE" },
-    { name: "Tickertape Stocks API", url: "https://api.tickertape.in/search?text=RELIANCE" }
-  ];
-
-  const results = [];
-  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-  for (const api of apis) {
-    try {
-      const start = Date.now();
-      const res = await fetch(api.url, {
-        method: "GET",
-        headers: { 
-          "User-Agent": userAgent,
-          "Accept": "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9"
-        },
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000)
-      });
-      const latency = Date.now() - start;
-      if (res.status === 200) {
-        results.push({ name: api.name, status: "Healthy", latency: `${latency}ms`, code: 200 });
-      } else if (res.status === 429) {
-        results.push({ name: api.name, status: "Rate Limited", latency: `${latency}ms`, code: 429 });
-      } else {
-        results.push({ name: api.name, status: "Degraded", latency: `${latency}ms`, code: res.status });
-      }
-    } catch (err) {
-      results.push({ name: api.name, status: "Offline", latency: "—", code: 504, error: err instanceof Error ? err.message : "Timeout / Connection Failed" });
-    }
-  }
+  const results = await Promise.all(
+    Object.values(EXTERNAL_APIS).map((api) => probeExternalApi(api))
+  );
 
   // Also include Supabase connection check
   try {

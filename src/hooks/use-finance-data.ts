@@ -1,6 +1,18 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
+
+/**
+ * Utility function to trigger immediate client SWR cache revalidation across any module.
+ */
+export async function invalidateFinanceData(target: "summary" | "investments" | "cashflow" | "forex" | "all" = "all") {
+  const tasks = [];
+  if (target === "all" || target === "summary") tasks.push(globalMutate("finance_summary"));
+  if (target === "all" || target === "investments") tasks.push(globalMutate("finance_investments"));
+  if (target === "all" || target === "cashflow") tasks.push(globalMutate("finance_cashflow"));
+  if (target === "all" || target === "forex") tasks.push(globalMutate("finance_forex"));
+  await Promise.all(tasks);
+}
 import { useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { Tables } from "@/lib/database.types";
@@ -22,6 +34,8 @@ type FinanceData = {
     is_gmail_linked?: boolean;
     telegram_chat_id?: string | null;
     telegram_link_code?: string | null;
+    gemini_api_key?: string | null;
+    gemini_enabled?: boolean;
   } | null;
   accounts: Tables<"accounts">[];
   transactions: Tables<"transactions">[];

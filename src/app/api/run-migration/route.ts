@@ -77,7 +77,9 @@ export async function GET(req: NextRequest) {
   } finally {
     try {
       await client.end();
-    } catch {}
+    } catch (e) {
+      logger.warn("Migration DB client disconnect warning", { err: e instanceof Error ? e.message : String(e) });
+    }
   }
 }
 
