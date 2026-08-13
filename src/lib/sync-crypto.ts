@@ -31,7 +31,7 @@ const CRYPTO_ID_MAP: Record<string, string> = {
 /**
  * Fetch live price for a crypto coin symbol from CoinGecko free API
  */
-export async function fetchLiveCryptoPrice(symbol: string, vsCurrency = "inr"): Promise<number | null> {
+export async function fetchLiveCryptoPrice(symbol: string, vsCurrency = "usd"): Promise<number | null> {
   if (!symbol) return null;
   const cleanSymbol = symbol.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   const coinId = CRYPTO_ID_MAP[cleanSymbol] || cleanSymbol;
@@ -86,7 +86,7 @@ export async function syncAllCryptoPrices(): Promise<{ updatedCount: number; err
       const symbol = item.symbol || item.name;
       if (!symbol) continue;
 
-      const vsCurrency = item.currency?.toLowerCase() === "usd" ? "usd" : "inr";
+      const vsCurrency = item.currency?.toLowerCase() === "inr" ? "inr" : "usd";
       const livePrice = await fetchLiveCryptoPrice(symbol, vsCurrency);
 
       if (livePrice && livePrice > 0 && livePrice !== item.current_price) {

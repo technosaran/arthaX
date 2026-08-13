@@ -14,7 +14,7 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { getChartColour } from "@/lib/chart-colours";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { getCurrencySymbol, hexToRgba, getHistoryCutoff } from "@/lib/utils";
-import { AccountAggregatorModal } from "@/components/integrations/aa/AccountAggregatorModal";
+
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "@/components/ui/recharts";
 
@@ -170,7 +170,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
   const { data: { accounts, ledgerLogs }, isValidating, mutate } = useFinanceData(initialData);
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(searchParams.get("action") === "new");
-  const [showAAModal, setShowAAModal] = useState(false);
+
   const [activeTab, setActiveTab] = useState<"accounts" | "history">(searchParams.get("tab") === "history" ? "history" : "accounts");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -486,15 +486,6 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           <div className={`status-dot scale-90 ${isValidating ? 'animate-pulse bg-yellow-400' : 'bg-emerald-400 opacity-50'}`} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowAAModal(true)}
-            className="!h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-md"
-            title="Auto-sync HDFC, ICICI, SBI, Axis bank balances via RBI Account Aggregator"
-          >
-            <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-            <span>Connect Bank (RBI AA)</span>
-          </button>
           <button type="button" onClick={() => { setTransferFromId(null); setShowTransferModal(true); }} className="btn-secondary !h-11 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer">
             <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
             <span>Transfer</span>
@@ -505,15 +496,6 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
           </button>
         </div>
       </div>
-
-      <AccountAggregatorModal
-        isOpen={showAAModal}
-        onClose={() => setShowAAModal(false)}
-        onSuccess={() => {
-          setShowAAModal(false);
-          mutate();
-        }}
-      />
 
       {accounts.length === 0 ? (
           <div className="glass-card-static rich-border relative overflow-hidden p-8 md:p-16 text-center flex flex-col items-center justify-center min-h-[450px]">

@@ -8,7 +8,7 @@ import type { FinanceData } from "@/hooks/use-finance-data";
 import { Bot, Key, Send, AlertTriangle, ExternalLink } from "lucide-react";
 import { useZerodhaSettings } from "@/hooks/use-zerodha-settings";
 import { useBinanceSettings } from "@/hooks/use-binance-settings";
-import { AccountAggregatorModal } from "@/components/integrations/aa/AccountAggregatorModal";
+
 
 interface IntegrationsTabProps {
   profile: FinanceData["profile"] | undefined;
@@ -24,7 +24,7 @@ export default function IntegrationsTab({
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingGemini, setIsSavingGemini] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
-  const [showAAModal, setShowAAModal] = useState(false);
+
 
   // Zerodha BYOK state
   const { status: zerodhaStatus, isSaving: isSavingZerodha, fetchStatus: fetchZerodhaStatus, saveCustomKeys: saveZerodhaKeys, clearCustomKeys: clearZerodhaKeys } = useZerodhaSettings();
@@ -584,59 +584,7 @@ export default function IntegrationsTab({
           </div>
         </div>
 
-        {/* ─── 5. RBI Account Aggregator (Direct Bank Sync) Card ─── */}
-        <div className="rounded-2xl border border-white/10 bg-[#121620] p-5 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 relative overflow-hidden group shadow-xl col-span-1 md:col-span-2">
-          <div className="space-y-4">
-            {/* Card Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-inner text-emerald-400 font-bold text-lg">
-                  🏦
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    RBI Account Aggregator (Direct Bank Sync)
-                  </h3>
-                  <span className="text-[0.625rem] text-emerald-400 font-bold uppercase tracking-wider">
-                    HDFC • ICICI • SBI • Axis • Kotak • IDFC & 100+ Banks
-                  </span>
-                </div>
-              </div>
-
-              <span className="px-2.5 py-0.5 rounded-full text-[0.625rem] font-bold uppercase tracking-wider border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-                RBI Regulated
-              </span>
-            </div>
-
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Auto-sync bank balances, savings accounts, FDs, and bank statement records directly via OTP consent. Zero password sharing required.
-            </p>
-
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-[11px] text-gray-500">
-                Framework: <strong className="text-emerald-400">ReBIT Encrypted E2EE Network</strong>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setShowAAModal(true)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
-              >
-                <span>Connect Indian Bank (AA)</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <AccountAggregatorModal
-        isOpen={showAAModal}
-        onClose={() => setShowAAModal(false)}
-        onSuccess={() => {
-          setShowAAModal(false);
-          mutate();
-        }}
-      />
 
       {/* Disconnect Telegram Custom Modal */}
       {showDisconnectModal && (
