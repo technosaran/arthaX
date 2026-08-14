@@ -1,5 +1,0 @@
-;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="fcd9445d-cba7-3c5d-f979-6527dfbaab8b")}catch(e){}}();
-module.exports=[96730,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function({children:a}){return(0,b.jsx)(b.Fragment,{children:a})},"metadata",0,{title:"Reset Password",description:"Securely reset your password to regain access to your financial dashboard.",alternates:{canonical:"/reset-password"},openGraph:{title:"Reset Password",description:"Securely reset your password.",url:"https://technosaranfin.vercel.app/reset-password"}}])},48649,function(a){a.n(a.i(96730))}];
-
-//# debugId=fcd9445d-cba7-3c5d-f979-6527dfbaab8b
-//# sourceMappingURL=apps_web_src_app_reset-password_layout_tsx_0eej8q-._.js.map

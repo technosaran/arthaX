@@ -1,5 +1,0 @@
-;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="5edff83a-f679-66b2-1a74-524cacce83d7")}catch(e){}}();
-module.exports=[16300,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function({children:a}){return(0,b.jsx)("div",{className:"min-h-screen bg-[#07090e] text-white selection:bg-amber-500/30 selection:text-amber-200",children:a})},"metadata",0,{title:"Super Admin Command Console | FinanceOS",description:"Standalone Super Admin Control Studio for System Health, AI Tax Laws, and Security Audit"}])},29124,function(a){a.n(a.i(16300))}];
-
-//# debugId=5edff83a-f679-66b2-1a74-524cacce83d7
-//# sourceMappingURL=apps_web_src_app_dashboard_admin_layout_tsx_1n99tsa._.js.map

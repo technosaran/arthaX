@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "debugId": "8449d5a3-718a-7385-fb37-fa209fce74ef",
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/dashboard/%40modal/default.tsx"],"sourcesContent":["export default function DefaultModal() {\n  return null;\n}\n"],"names":["DefaultModal"],"mappings":"wDAAe,SAASA,EACtB,OAAO,IACT"}}]
-}

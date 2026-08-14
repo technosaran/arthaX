@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "debugId": "37e89592-168a-2d79-6d12-4f6fcf9f4fbe",
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/dashboard/bonds/loading.tsx"],"sourcesContent":["export default function Loading() {\r\n  return (\r\n    <div className=\"flex flex-col gap-6 animate-pulse\">\r\n      <div className=\"flex justify-between items-center\">\r\n        <div className=\"h-10 w-48 bg-white/5 rounded-xl\" />\r\n        <div className=\"h-10 w-32 bg-white/5 rounded-xl\" />\r\n      </div>\r\n      \r\n      <div className=\"grid grid-cols-1 md:grid-cols-4 gap-4\">\r\n        {[1, 2, 3, 4].map((i) => (\r\n          <div key={i} className=\"glass-card-static p-6 h-24\" />\r\n        ))}\r\n      </div>\r\n      \r\n      <div className=\"glass-card-static p-6 h-96\" />\r\n    </div>\r\n  );\r\n}\r\n"],"names":["Loading","className","map","i"],"mappings":"wEAAe,SAASA,EACtB,MACE,CAAA,EAAA,EAAA,IAAA,EAAC,MAAA,CAAIC,UAAU,8CACb,CAAA,EAAA,EAAA,IAAA,EAAC,MAAA,CAAIA,UAAU,8CACb,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAIA,UAAU,oCACf,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAIA,UAAU,uCAGjB,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAIA,UAAU,iDACZ,CAAC,EAAG,EAAG,EAAG,EAAE,CAACC,GAAG,CAAC,AAACC,GACjB,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAYF,UAAU,8BAAbE,MAId,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAIF,UAAU,iCAGrB"}}]
-}

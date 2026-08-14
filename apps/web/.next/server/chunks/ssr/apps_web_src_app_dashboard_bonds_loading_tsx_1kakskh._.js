@@ -1,5 +1,0 @@
-;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="37e89592-168a-2d79-6d12-4f6fcf9f4fbe")}catch(e){}}();
-module.exports=[76924,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"flex flex-col gap-6 animate-pulse",children:[(0,b.jsxs)("div",{className:"flex justify-between items-center",children:[(0,b.jsx)("div",{className:"h-10 w-48 bg-white/5 rounded-xl"}),(0,b.jsx)("div",{className:"h-10 w-32 bg-white/5 rounded-xl"})]}),(0,b.jsx)("div",{className:"grid grid-cols-1 md:grid-cols-4 gap-4",children:[1,2,3,4].map(a=>(0,b.jsx)("div",{className:"glass-card-static p-6 h-24"},a))}),(0,b.jsx)("div",{className:"glass-card-static p-6 h-96"})]})}])},15127,function(a){a.n(a.i(76924))}];
-
-//# debugId=37e89592-168a-2d79-6d12-4f6fcf9f4fbe
-//# sourceMappingURL=apps_web_src_app_dashboard_bonds_loading_tsx_1kakskh._.js.map

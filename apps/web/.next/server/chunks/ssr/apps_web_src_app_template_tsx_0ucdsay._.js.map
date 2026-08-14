@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "debugId": "ad213866-fc6f-0c23-367d-ba533e51f26e",
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/template.tsx"],"sourcesContent":["\"use client\";\r\n\r\nimport { motion } from \"framer-motion\";\r\n\r\nexport default function Template({ children }: { children: React.ReactNode }) {\r\n  return (\r\n    <motion.div\r\n      initial={{ opacity: 0, y: 12, filter: \"blur(4px)\" }}\r\n      animate={{ opacity: 1, y: 0, filter: \"blur(0px)\" }}\r\n      transition={{ \r\n        duration: 0.4, \r\n        ease: [0.25, 0.1, 0.25, 1.0], // custom smooth cubic bezier\r\n        staggerChildren: 0.1 \r\n      }}\r\n      className=\"w-full h-full flex flex-col flex-1\"\r\n    >\r\n      {children}\r\n    </motion.div>\r\n  );\r\n}\r\n"],"names":["Template","children","div","initial","opacity","y","filter","animate","transition","duration","ease","staggerChildren","className"],"mappings":"wDAEA,EAAA,EAAA,CAAA,CAAA,wBAEe,SAASA,AAAS,UAAEC,CAAQ,CAAiC,EAC1E,MACE,CAAA,EAAA,EAAA,GAAA,EAAC,EAAA,MAAM,CAACC,GAAG,CAAA,CACTC,QAAS,CAAEC,QAAS,EAAGC,EAAG,GAAIC,OAAQ,WAAY,EAClDC,QAAS,CAAEH,QAAS,EAAGC,EAAG,EAAGC,OAAQ,WAAY,EACjDE,WAAY,CACVC,SAAU,GACVC,KAAM,CAAC,IAAM,GAAK,IAAM,EAAI,CAC5BC,gBAAiB,EACnB,EACAC,UAAU,8CAETX,GAGP"}}]
-}
