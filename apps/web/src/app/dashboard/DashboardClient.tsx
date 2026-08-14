@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useHasMounted } from "@/hooks/use-has-mounted";
-import { format, parseISO, subMonths } from "date-fns";
+import { format, parseISO, subMonths, isValid } from "date-fns";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useNetWorth } from "@/hooks/use-net-worth";
 import { getChartColour } from "@/lib/chart-colours";
@@ -50,20 +50,28 @@ export default function DashboardClient() {
   useEffect(() => {
     if (!user_id) return;
     
-    const storageKey = `onboarding_completed_${user_id}`;
-    const completed = localStorage.getItem(storageKey);
-    const hasData = accounts.length > 0 || incomes.length > 0 || expenses.length > 0;
-    
-    if (!completed && !hasData && !isLoading) {
-      // Small delay to let the page load first
-      const timer = setTimeout(() => setShowOnboarding(true), 1000);
-      return () => clearTimeout(timer);
+    try {
+      const storageKey = `onboarding_completed_${user_id}`;
+      const completed = localStorage.getItem(storageKey);
+      const hasData = accounts.length > 0 || incomes.length > 0 || expenses.length > 0;
+      
+      if (!completed && !hasData && !isLoading) {
+        // Small delay to let the page load first
+        const timer = setTimeout(() => setShowOnboarding(true), 1000);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {
+      console.warn("localStorage access denied", e);
     }
   }, [accounts.length, incomes.length, expenses.length, isLoading, user_id]);
 
   const handleOnboardingComplete = () => {
     if (user_id) {
-      localStorage.setItem(`onboarding_completed_${user_id}`, "true");
+      try {
+        localStorage.setItem(`onboarding_completed_${user_id}`, "true");
+      } catch (e) {
+        console.warn("localStorage access denied", e);
+      }
     }
     setShowOnboarding(false);
   };
@@ -142,6 +150,8 @@ export default function DashboardClient() {
       if (!t.date) continue;
       
       const tDate = parseISO(t.date);
+      if (!isValid(tDate)) continue;
+
       const tAmount = Number(t.amount);
       const tType = t.type;
       const isRealExpense = tType === "expense" && EXPENSE_SOURCE_TYPES.has(t.source_type);
