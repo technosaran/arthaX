@@ -68,12 +68,13 @@ export function useNetWorth() {
     if (hasStocks) {
       investments.forEach(inv => {
         const val = Number(inv.quantity || 0) * Number(inv.current_price || 0);
-        const { inr, usd } = getInvestmentValues(val, inv.currency);
-
         if (isCryptoAsset(inv)) {
-          cryptoBalanceINR += inr;
-          cryptoBalanceUSD += usd;
+          const isUSD = inv.currency === "USD";
+          const amountInUSD = isUSD ? val : val / 85.0; // Fixed conversion to USD
+          cryptoBalanceUSD += amountInUSD;
+          cryptoBalanceINR += 0; // Exclude from INR natively
         } else {
+          const { inr, usd } = getInvestmentValues(val, inv.currency);
           stockBalanceINR += inr;
           stockBalanceUSD += usd;
         }
