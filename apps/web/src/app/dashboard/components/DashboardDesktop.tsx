@@ -285,63 +285,56 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10 relative z-10">
             <div className="relative z-10 w-full lg:w-auto">
               <div 
-                role="button"
-                tabIndex={0}
-                aria-label="Toggle currency between INR and USD"
-                className="flex flex-col select-none cursor-pointer group/nw outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-2xl p-1 -m-1"
-                onClick={() => setShowUSD(prev => !prev)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setShowUSD(prev => !prev);
-                  }
-                }}
-                title="Click or press Space/Enter to toggle currency (INR / USD)"
+                className="flex flex-col gap-6"
               >
-                <div className="flex flex-wrap items-center gap-3 mb-3">
-                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400 group-hover/nw:text-slate-200 transition-colors flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md">
-                    <span>Portfolio Net Worth</span>
-                    <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
-                      {showUSD ? 'USD $' : 'INR ₹'}
+                {/* INR Net Worth */}
+                <div className="flex flex-col">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md">
+                      <span>INR Net Worth</span>
+                      <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
+                        INR ₹
+                      </span>
                     </span>
-                    <svg className="w-3.5 h-3.5 text-amber-400 group-hover/nw:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                  </span>
-
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-tight border transition-all ${
-                    stats.totalDayPnL >= 0 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                  }`}>
-                    <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
-                    <span className="font-mono tabular-nums">
-                      {showUSD 
-                        ? `$${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                        : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                      }
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-tight border ${
+                      stats.totalDayPnLINR >= 0 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      <span>Today: {stats.totalDayPnLINR >= 0 ? "+" : "-"}</span>
+                      <span className="font-mono tabular-nums">
+                        ₹{Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </span>
                     </span>
-                    <span className="opacity-80 font-mono tabular-nums">
-                      ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(2)}%)
-                    </span>
-                  </span>
+                  </div>
+                  <h2 className="text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden">
+                    ₹{stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </h2>
                 </div>
-                <div className="relative flex items-center justify-start h-[3.5rem] md:h-[4rem] w-[280px] sm:w-[450px]">
-                  <AnimatePresence>
-                    <motion.h2 
-                      key={showUSD ? 'usd' : 'inr'} 
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                      className="absolute left-0 text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden"
-                    >
-                    {showUSD 
-                      ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` 
-                      : `₹${stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                    }
-                  </motion.h2>
-                  </AnimatePresence>
+                
+                {/* USD Net Worth */}
+                <div className="flex flex-col mt-4">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md">
+                      <span>USD Net Worth</span>
+                      <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
+                        USD $
+                      </span>
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-tight border ${
+                      stats.totalDayPnLUSD >= 0 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      <span>Today: {stats.totalDayPnLUSD >= 0 ? "+" : "-"}</span>
+                      <span className="font-mono tabular-nums">
+                        ${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </span>
+                    </span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden">
+                    ${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </h2>
                 </div>
               </div>
 

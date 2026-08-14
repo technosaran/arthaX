@@ -53,7 +53,6 @@ export default function InvestmentsClient() {
       if (hasBonds) list.push({ key: "bonds", label: "Bonds" });
       if (hasFnO) list.push({ key: "fno", label: "FnO Trading" });
       if (hasAltAssets) list.push({ key: "alt-assets", label: "Alternative Assets" });
-      list.push({ key: "crypto", label: "Crypto ($ USDT)" });
     }
     return list;
   }, [hasStocks, hasMF, hasBonds, hasFnO, hasForex, hasAltAssets, currencyMode]);

@@ -10,123 +10,14 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
 import { getColorByLabel } from "@/lib/chart-colours";
-
+import { calculateAccruedInterest, generateRepaymentSchedule, type InterestFrequency } from "@/lib/bond-math";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
-
 import BondsDataTable from "./components/BondsDataTable";
 
 import type { Tables } from "@/lib/database.types";
 type Bond = Tables<"bonds">;
 
-const MOCK_BOND_DB: Record<string, {
-  bond_name: string;
-  issuer: string;
-  bond_type: "Government" | "Corporate" | "Tax-Free" | "Infrastructure" | "PSU";
-  face_value: number;
-  coupon_rate: number;
-  ytm: number;
-  interest_frequency: "Monthly" | "Quarterly" | "Semi-Annual" | "Annual";
-  credit_rating: string;
-  current_price: number;
-  maturity_date: string;
-}> = {
-  "IN0020230085": {
-    bond_name: "7.18% GS 2033",
-    issuer: "Government of India",
-    bond_type: "Government",
-    face_value: 1000,
-    coupon_rate: 7.18,
-    ytm: 7.18,
-    interest_frequency: "Semi-Annual",
-    credit_rating: "Sovereign",
-    current_price: 1005.50,
-    maturity_date: "2033-08-14"
-  },
-  "IN0020210244": {
-    bond_name: "6.10% GS 2031",
-    issuer: "Government of India",
-    bond_type: "Government",
-    face_value: 1000,
-    coupon_rate: 6.10,
-    ytm: 6.85,
-    interest_frequency: "Semi-Annual",
-    credit_rating: "Sovereign",
-    current_price: 955.20,
-    maturity_date: "2031-07-12"
-  },
-  "INE901L07347": {
-    bond_name: "8.30% NHAI Tax Free 2034",
-    issuer: "National Highways Authority of India",
-    bond_type: "Tax-Free",
-    face_value: 1000,
-    coupon_rate: 8.30,
-    ytm: 5.60,
-    interest_frequency: "Annual",
-    credit_rating: "AAA",
-    current_price: 1250.00,
-    maturity_date: "2034-01-25"
-  },
-  "INE020B07355": {
-    bond_name: "8.71% REC Tax Free 2029",
-    issuer: "REC Limited",
-    bond_type: "Tax-Free",
-    face_value: 1000,
-    coupon_rate: 8.71,
-    ytm: 5.45,
-    interest_frequency: "Annual",
-    credit_rating: "AAA",
-    current_price: 1195.00,
-    maturity_date: "2029-09-24"
-  },
-  "INE134E07567": {
-    bond_name: "8.20% PFC Tax Free 2030",
-    issuer: "Power Finance Corporation",
-    bond_type: "Tax-Free",
-    face_value: 1000,
-    coupon_rate: 8.20,
-    ytm: 5.50,
-    interest_frequency: "Annual",
-    credit_rating: "AAA",
-    current_price: 1160.00,
-    maturity_date: "2030-11-16"
-  },
-  "INE516F07409": {
-    bond_name: "9.25% Piramal NCD 2027",
-    issuer: "Piramal Enterprises Limited",
-    bond_type: "Corporate",
-    face_value: 1000,
-    coupon_rate: 9.25,
-    ytm: 9.50,
-    interest_frequency: "Monthly",
-    credit_rating: "AA",
-    current_price: 990.00,
-    maturity_date: "2027-06-18"
-  },
-  "INE895D07849": {
-    bond_name: "8.75% Muthoot Finance NCD 2028",
-    issuer: "Muthoot Finance Limited",
-    bond_type: "Corporate",
-    face_value: 1000,
-    coupon_rate: 8.75,
-    ytm: 8.90,
-    interest_frequency: "Annual",
-    credit_rating: "AA+",
-    current_price: 1002.00,
-    maturity_date: "2028-12-15"
-  },
-  "INE121A07QD6": {
-    bond_name: "9.05% Shriram Finance NCD 2027",
-    issuer: "Shriram Finance Limited",
-    bond_type: "Corporate",
-    face_value: 1000,
-    coupon_rate: 9.05,
-    ytm: 9.20,
-    interest_frequency: "Monthly",
-    credit_rating: "AA+",
-    current_price: 1010.00,
-    maturity_date: "2027-04-20"
-  }
-};
+// Removed MOCK_BOND_DB, now using real API from search route
 
 export default function BondsClient({ initialData }: { initialData?: FinanceData }) {
   const { data: { bonds: bondsData, accounts, profile }, mutate } = useFinanceData(initialData);
@@ -148,20 +39,22 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
 
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) {
-      const timer = setTimeout(() => {
-        setSearchResults([]);
-        setShowSearchDropdown(false);
-      }, 0);
-      return () => clearTimeout(timer);
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
     }
-    const q = searchQuery.toLowerCase();
-    const results = Object.entries(MOCK_BOND_DB).filter(([isin, data]) => 
-      isin.toLowerCase().includes(q) || data.bond_name.toLowerCase().includes(q) || data.issuer.toLowerCase().includes(q)
-    ).map(([isin, data]) => ({ isin, data }));
-    const timer = setTimeout(() => {
-      setSearchResults(results);
-      setShowSearchDropdown(true);
-    }, 0);
+    const fetchBonds = async () => {
+      try {
+        const res = await fetch(`/api/integrations/bonds/search?q=${encodeURIComponent(searchQuery)}`);
+        const data = await res.json();
+        setSearchResults(data.results || []);
+        setShowSearchDropdown(true);
+      } catch (err) {
+        console.error("Failed to search bonds", err);
+      }
+    };
+    
+    const timer = setTimeout(fetchBonds, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -196,7 +89,13 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
     const totalInvested = bonds.reduce((s, b) => s + Number(b.total_invested), 0);
     const currentValue = bonds.reduce((s, b) => s + Number(b.current_value), 0);
     const totalInterest = bonds.reduce((s, b) => s + Number(b.total_interest_earned || 0), 0);
-    const accruedInterest = bonds.reduce((s, b) => s + Number(b.accrued_interest || 0), 0);
+    const accruedInterest = bonds.reduce((s, b) => {
+      if (b.status === "Active") {
+        const liveAccrued = calculateAccruedInterest(Number(b.face_value || 1000), Number(b.quantity || 1), Number(b.coupon_rate || 0), b.purchase_date);
+        return s + liveAccrued;
+      }
+      return s + Number(b.accrued_interest || 0);
+    }, 0);
     const totalPnL = currentValue - totalInvested;
     const avgYTM = bonds.length > 0 ? bonds.reduce((s, b) => s + Number(b.ytm || 0), 0) / bonds.length : 0;
     
@@ -658,20 +557,42 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                       </div>
                     </div>
 
-                    {/* Wint Wealth Live Interest Payout Calculator Preview Box */}
-                    {Boolean(formData.quantity) && Boolean(formData.purchase_price) && (
-                      <div className="bg-[#0A0F1D] border border-[#00D09C]/40 p-3.5 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between text-xs border-b border-[#1F293D] pb-2">
-                          <span className="text-[#848E9C] font-semibold">Total Capital Investment</span>
-                          <span className="font-extrabold text-white">₹{(Number(formData.quantity) * Number(formData.purchase_price)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    {/* Wint Wealth Live Interest Payout Calculator Preview Box & Expected Cashflows */}
+                    {Boolean(formData.quantity) && Boolean(formData.purchase_price) && formData.maturity_date && (
+                      <div className="bg-[#0A0F1D] border border-[#00D09C]/40 p-3.5 rounded-xl space-y-4 mb-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs border-b border-[#1F293D] pb-2">
+                            <span className="text-[#848E9C] font-semibold">Total Capital Investment</span>
+                            <span className="font-extrabold text-white">₹{(Number(formData.quantity) * Number(formData.purchase_price)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#848E9C] font-semibold">Expected Annual Interest ({formData.coupon_rate || "10.5"}%)</span>
+                            <span className="font-extrabold text-[#00D09C]">₹{((Number(formData.quantity) * (Number(formData.face_value)||1000) * (Number(formData.coupon_rate || 10.5) / 100))).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / year</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-[#848E9C] font-semibold">Expected Annual Interest ({formData.coupon_rate || "10.5"}%)</span>
-                          <span className="font-extrabold text-[#00D09C]">₹{((Number(formData.quantity) * Number(formData.purchase_price) * (Number(formData.coupon_rate || 10.5) / 100))).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / year</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-[#848E9C] font-semibold">Monthly Interest Payout</span>
-                          <span className="font-extrabold text-[#00D09C]">₹{(((Number(formData.quantity) * Number(formData.purchase_price) * (Number(formData.coupon_rate || 10.5) / 100))) / 12).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / month</span>
+                        
+                        <div className="mt-4">
+                          <p className="text-[0.6875rem] font-bold text-[#848E9C] uppercase tracking-wider mb-2">Expected Cashflows</p>
+                          <div className="max-h-32 overflow-y-auto no-scrollbar space-y-1">
+                            {generateRepaymentSchedule(
+                              formData.purchase_date || new Date().toISOString().split("T")[0],
+                              formData.maturity_date,
+                              Number(formData.face_value) || 1000,
+                              Number(formData.quantity) || 1,
+                              Number(formData.coupon_rate) || 0,
+                              formData.interest_frequency as InterestFrequency
+                            ).map((cf, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-[0.6875rem] py-1 border-b border-[#1F293D]/30 last:border-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${cf.type === 'Interest' ? 'bg-[#00D09C]' : 'bg-[#3B82F6]'}`} />
+                                  <span className="text-white">{new Date(cf.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', day: 'numeric' })}</span>
+                                </div>
+                                <span className={`font-bold ${cf.type === 'Interest' ? 'text-[#00D09C]' : 'text-[#3B82F6]'}`}>
+                                  +₹{cf.amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })} {cf.type}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

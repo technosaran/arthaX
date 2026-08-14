@@ -30,7 +30,6 @@ const columnHelper = createColumnHelper<Bond>();
 export default function BondsDataTable({ bonds, onEdit, onAdd }: BondsDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const getRatingBadgeClass = (rating: string | null) => {
     if (!rating) return "bg-gray-500/10 text-gray-400 border-gray-500/20";
@@ -199,156 +198,10 @@ export default function BondsDataTable({ bonds, onEdit, onAdd }: BondsDataTableP
             className="input-premium pl-9 py-2 text-sm w-full !bg-black/20"
           />
         </div>
-        
-        {/* View Mode Toggle */}
-        <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/10 shrink-0 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setViewMode("cards")}
-            className={`p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-bold ${
-              viewMode === "cards" ? "bg-[--accent-primary] text-white shadow-md" : "text-[--text-muted] hover:text-white"
-            }`}
-            title="Wint Cards view"
-          >
-            <Grid className="w-4 h-4" />
-            Wint Cards
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("table")}
-            className={`p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-bold ${
-              viewMode === "table" ? "bg-[--accent-primary] text-white shadow-md" : "text-[--text-muted] hover:text-white"
-            }`}
-            title="List Table view"
-          >
-            <List className="w-4 h-4" />
-            Statement Table
-          </button>
-        </div>
       </div>
-
-      {viewMode === "cards" ? (
-        /* Wint Wealth Style Card Grid Layout */
-        filteredBonds.length === 0 ? (
-          <div className="px-5 py-12 text-center text-[--text-muted] text-sm bg-black/10">No bonds match your search.</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 bg-black/10">
-            {filteredBonds.map((bond) => {
-              const invested = Number(bond.total_invested);
-              const current = Number(bond.current_value);
-              const returns = current - invested;
-              const initials = bond.bond_name.replace(/[^a-zA-Z0-9]/g, "").substring(0, 2).toUpperCase() || "BD";
-              
-              // Term progress calculation
-              const purchase = bond.purchase_date ? new Date(bond.purchase_date).getTime() : 0;
-              const maturity = bond.maturity_date ? new Date(bond.maturity_date).getTime() : 0;
-              const today = Date.now();
-              let progress = 0;
-              let daysLeft = 0;
-              if (maturity > purchase) {
-                progress = Math.min(100, Math.max(0, ((today - purchase) / (maturity - purchase)) * 100));
-                daysLeft = Math.max(0, Math.ceil((maturity - today) / (1000 * 60 * 60 * 24)));
-              }
-
-              return (
-                <div 
-                  key={bond.id} 
-                  className="p-5 rounded-2xl border border-white/10 bg-gradient-to-b from-[#18181e] to-[#121216] hover:border-purple-500/40 hover:shadow-[0_0_30px_-5px_rgba(139,92,246,0.25)] hover:scale-[1.02] transition-all duration-300 flex flex-col justify-between min-h-[320px] shadow-lg relative group"
-                >
-                  <div>
-                    {/* Top Segment: Issuer Avatar, Name, Rating */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/10 to-indigo-600/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-black text-xs shrink-0 shadow-[0_0_15px_rgba(139,92,246,0.1)]">
-                          {initials}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-white leading-tight truncate group-hover:text-purple-400 transition-colors" title={bond.bond_name}>
-                            {bond.bond_name}
-                          </h3>
-                          <p className="text-xs text-[--text-muted] mt-1 font-semibold truncate">
-                            {bond.issuer}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`shrink-0 px-2 py-0.5 rounded text-[0.5rem] font-black uppercase tracking-wider border ${getRatingBadgeClass(bond.credit_rating)}`}>
-                        {bond.credit_rating || "Unrated"}
-                      </span>
-                    </div>
-
-                    {/* Yield Banner (Wint App returns focus) */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5 flex justify-between items-center my-4">
-                      <div>
-                        <p className="text-[0.5rem] font-black uppercase tracking-widest text-gray-500">Yield to Maturity</p>
-                        <p className="text-lg font-black text-purple-400 mt-0.5">
-                          {bond.ytm ? `${Number(bond.ytm).toFixed(2)}% p.a.` : `${Number(bond.coupon_rate).toFixed(2)}% p.a.`}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[0.5rem] font-black uppercase tracking-widest text-gray-500">Payout</p>
-                        <p className="text-xs font-bold text-white mt-1">
-                          {bond.interest_frequency}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Middle Segment: Stats Grid */}
-                    <div className="grid grid-cols-3 gap-2 py-2 text-left">
-                      <div>
-                        <p className="text-[0.5rem] font-bold uppercase tracking-wider text-gray-500">Invested</p>
-                        <p className="text-xs font-bold text-white mt-1">{fmt.format(invested)}</p>
-                        <p className="text-[0.5rem] text-gray-500 mt-0.5">{bond.quantity} Units</p>
-                      </div>
-                      <div>
-                        <p className="text-[0.5rem] font-bold uppercase tracking-wider text-gray-500">Current</p>
-                        <p className="text-xs font-bold text-white mt-1">{fmt.format(current)}</p>
-                        <p className="text-[0.5rem] text-gray-500 mt-0.5">LTP: ₹{Number(bond.current_price).toFixed(0)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[0.5rem] font-bold uppercase tracking-wider text-gray-500">Returns</p>
-                        <div className="mt-1">
-                          <PnLValue value={returns} size="sm" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom Segment: Maturity progress and Edit button */}
-                  <div className="mt-4 pt-3 border-t border-white/5">
-                    <div className="flex justify-between items-center text-[0.5625rem] text-gray-500 font-bold uppercase tracking-wider">
-                      <span>Matures: {bond.maturity_date ? format(parseISO(bond.maturity_date), "dd MMM yyyy") : "N/A"}</span>
-                      <span className={daysLeft > 0 ? "text-indigo-400" : "text-emerald-400"}>
-                        {daysLeft > 0 ? `${daysLeft} days left` : "Matured"}
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all ${
-                          daysLeft > 0 ? "bg-gradient-to-r from-purple-500 via-indigo-500 to-[--accent-primary]" : "bg-gradient-to-r from-emerald-500 to-teal-500"
-                        }`}
-                        style={{ width: `${progress}%` }} 
-                      />
-                    </div>
-
-                    {/* Hover edit layout */}
-                    <div className="flex justify-between items-center mt-4 pt-3 border-t border-white/5">
-                      <span className="text-[0.5625rem] font-bold text-gray-500 uppercase tracking-widest">ISIN: {bond.isin}</span>
-                      <button 
-                        onClick={() => onEdit(bond)} 
-                        className="bg-white/5 px-3 py-1 rounded text-xs font-bold border border-white/10 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Edit className="w-3.5 h-3.5" /> Edit
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : (
-        /* Detailed Statement Table View */
-        <div className="overflow-x-auto">
+      
+      {/* Detailed Statement Table View */}
+      <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -381,7 +234,6 @@ export default function BondsDataTable({ bonds, onEdit, onAdd }: BondsDataTableP
             </tbody>
           </table>
         </div>
-      )}
 
       {table.getPageCount() > 1 && (
         <div className="p-4 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">

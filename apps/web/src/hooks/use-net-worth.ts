@@ -25,22 +25,20 @@ export function useNetWorth() {
     const hasAlt = enabledModules.includes("Alt Assets");
     const hasLiabilities = enabledModules.includes("Liabilities");
 
+    // @USER-CRITICAL-INSTRUCTION: NEVER CONVERT CURRENCY!
+    // Keep INR assets ONLY in INR, and USD assets ONLY in USD. 
+    // Do not use any exchange rate multipliers here or anywhere else.
     const getConvertedValues = (val: number, currency?: string) => {
       const amount = Number(val || 0);
       const isUSD = currency === "USD";
-      const inr = isUSD ? amount * 85.0 : amount;
-      const usd = isUSD ? amount : amount / 85.0;
-      return { inr, usd };
+      return { 
+        inr: isUSD ? 0 : amount, 
+        usd: isUSD ? amount : 0 
+      };
     };
 
-    // For investment categories, provide unified INR and USD totals using exchange conversion
-    const getInvestmentValues = (val: number, currency?: string) => {
-      const amount = Number(val || 0);
-      const isUSD = currency === "USD";
-      const inr = isUSD ? amount * 85.0 : amount;
-      const usd = isUSD ? amount : amount / 85.0;
-      return { inr, usd };
-    };
+    // For investment categories, same strict isolation
+    const getInvestmentValues = getConvertedValues;
 
     // Accounts / Cash
     let cashBalanceINR = 0;
@@ -71,7 +69,7 @@ export function useNetWorth() {
         if (isCryptoAsset(inv)) {
           const amountInUSD = val; 
           cryptoBalanceUSD += amountInUSD;
-          cryptoBalanceINR += amountInUSD * 85.0; // Automatically convert to INR using 85.0 fx
+          cryptoBalanceINR += 0; // @USER-CRITICAL-INSTRUCTION: NO CONVERSION
         } else {
           const { inr, usd } = getInvestmentValues(val, inv.currency);
           stockBalanceINR += inr;

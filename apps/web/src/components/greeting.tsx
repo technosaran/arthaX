@@ -49,9 +49,17 @@ function subscribeHour(_callback: () => void) {
   return () => {};
 }
 
+let cachedHour: number | null = null;
+let cachedGreeting: typeof DEFAULT_GREETING | null = null;
+
 function getClientGreeting() {
   if (typeof window === "undefined") return DEFAULT_GREETING;
-  return getGreetingInfo(new Date().getHours());
+  const currentHour = new Date().getHours();
+  if (cachedHour !== currentHour || !cachedGreeting) {
+    cachedHour = currentHour;
+    cachedGreeting = getGreetingInfo(currentHour);
+  }
+  return cachedGreeting;
 }
 
 function getServerGreeting() {

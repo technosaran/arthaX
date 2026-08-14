@@ -37,10 +37,6 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
     return getCanonicalEnabledModules(profile?.enabled_modules);
   }, [profile]);
 
-  const [isToggled, setIsToggled] = useState(false);
-  const baseIsUSD = profile?.base_currency === "USD";
-  const showUSD = isToggled ? !baseIsUSD : baseIsUSD;
-
   const getAccountCurrency = (accountId: string | null) => {
     if (!accountId) return "INR";
     const acc = accounts.find(a => a.id === accountId);
@@ -72,74 +68,89 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
         <div className="absolute -right-16 -top-16 w-36 h-36 bg-[--accent-primary]/10 blur-3xl rounded-full" />
         <div className="absolute -left-16 -bottom-16 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full" />
         
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
-            <span>Net Worth</span>
-            <span className="text-[0.625rem] font-bold text-sky-400">({showUSD ? 'USD $' : 'INR ₹'})</span>
-          </span>
-          <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>Live</span>
-          </span>
-        </div>
-        
-        <div 
-          className="flex flex-col cursor-pointer group/nw select-none"
-          onClick={() => setIsToggled(prev => !prev)}
-          title="Click to toggle currency"
-        >
-          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-              stats.totalDayPnL >= 0 
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
-                : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
-            }`}>
-              <span>Today: {stats.totalDayPnL >= 0 ? "+" : "-"}</span>
-              <span>
-                {showUSD 
-                  ? `$${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                  : `₹${Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                }
+        <div className="flex flex-col gap-4">
+          {/* INR Net Worth */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
+                <span>INR Net Worth</span>
+                <span className="text-[0.625rem] font-bold text-sky-400">(INR ₹)</span>
               </span>
-              <span className="opacity-75">
-                ({stats.totalDayPnLPercent >= 0 ? "+" : ""}{(stats.totalDayPnLPercent || 0).toFixed(1)}%)
+              <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Live</span>
               </span>
-            </span>
-
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-              (stats.totalGrowthINR || 0) >= 0 
-                ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
-                : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
-            }`}>
-              <span>Growth: {(stats.totalGrowthINR || 0) >= 0 ? "+" : "-"}</span>
-              <span>
-                {showUSD 
-                  ? `$${Math.abs(stats.totalGrowthUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                  : `₹${Math.abs(stats.totalGrowthINR || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                }
-              </span>
-              <span className="opacity-75">
-                ({(stats.totalGrowthPercent || 0) >= 0 ? "+" : ""}{(stats.totalGrowthPercent || 0).toFixed(1)}%)
-              </span>
-            </span>
+            </div>
+            
+            <div className="flex flex-col">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                  stats.totalDayPnLINR >= 0 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
+                }`}>
+                  <span>Today: {stats.totalDayPnLINR >= 0 ? "+" : "-"}</span>
+                  <span>
+                    ₹{Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </span>
+                
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                  (stats.totalGrowthINR || 0) >= 0 
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
+                }`}>
+                  <span>Growth: {(stats.totalGrowthINR || 0) >= 0 ? "+" : "-"}</span>
+                  <span>
+                    ₹{Math.abs(stats.totalGrowthINR || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </span>
+              </div>
+              <h1 className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap">
+                ₹{stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </h1>
+            </div>
           </div>
 
-          <div className="relative flex items-center justify-start h-[2.5rem] mt-1 w-[300px]">
-            <AnimatePresence>
-              <motion.h1 
-                key={showUSD ? 'usd' : 'inr'}
-                initial={{ opacity: 0, y: 15, filter: "blur(4px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute left-0 text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap"
-              >
-                {showUSD 
-                  ? `$${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                  : `₹${stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                }
-              </motion.h1>
-            </AnimatePresence>
+          <div className="w-full h-[1px] bg-white/5 my-2" />
+
+          {/* USD Net Worth */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
+                <span>USD Net Worth</span>
+                <span className="text-[0.625rem] font-bold text-sky-400">(USD $)</span>
+              </span>
+            </div>
+            
+            <div className="flex flex-col">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                  stats.totalDayPnLUSD >= 0 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
+                }`}>
+                  <span>Today: {stats.totalDayPnLUSD >= 0 ? "+" : "-"}</span>
+                  <span>
+                    ${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </span>
+                
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
+                  (stats.totalGrowthUSD || 0) >= 0 
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
+                }`}>
+                  <span>Growth: {(stats.totalGrowthUSD || 0) >= 0 ? "+" : "-"}</span>
+                  <span>
+                    ${Math.abs(stats.totalGrowthUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </span>
+              </div>
+              <h1 className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap">
+                ${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </h1>
+            </div>
           </div>
         </div>
 
@@ -148,19 +159,13 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
           <div>
             <span className="text-xs font-semibold text-[--text-muted] block mb-0.5">Month inflow</span>
             <span className="text-sm font-extrabold text-emerald-400">
-              {showUSD 
-                ? `+$${(stats.monthlyIncome / 85).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                : `+₹${stats.monthlyIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-              }
+              +₹{stats.monthlyIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </span>
           </div>
           <div>
             <span className="text-[0.5625rem] font-black uppercase tracking-wider text-[--text-muted] block mb-0.5">Month Outflow</span>
             <span className="text-sm font-extrabold text-rose-400">
-              {showUSD
-                ? `-$${(stats.monthlySpend / 85).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                : `-₹${stats.monthlySpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-              }
+              -₹{stats.monthlySpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>
