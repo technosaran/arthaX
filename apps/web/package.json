@@ -31,7 +31,11 @@
     "zod": "^4.4.3",
     "zxcvbn": "^4.4.2",
     "@finance-os/db": "*",
-    "@finance-os/shared-types": "*"
+    "@finance-os/shared-types": "*",
+    "drizzle-orm": "^0.45.2",
+    "ioredis": "^6.0.0",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -40,6 +44,7 @@
     "@types/zxcvbn": "^4.4.5",
     "eslint": "^9",
     "eslint-config-next": "^16.2.3",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "shadcn": "^4.16.2"
   }
 }
