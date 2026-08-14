@@ -71,6 +71,15 @@ const nav = [
     ),
   },
   {
+    label: "Crypto",
+    href: "/dashboard/crypto",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+      </svg>
+    ),
+  },
+  {
     label: "Tax",
     href: "/dashboard/tax-reports",
     icon: (
@@ -162,6 +171,7 @@ const quickActions = [
   { label: "Income", href: "/dashboard/income?action=new", icon: "🟢", color: "var(--success)" },
   { label: "Transfer", href: "/dashboard/accounts?action=transfer", icon: "🔄", color: "var(--accent-primary-light)" },
   { label: "Trade", href: "/dashboard/stocks?action=new", icon: "📈", color: "#3b82f6" },
+  { label: "Crypto", href: "/dashboard/crypto?action=new", icon: "🪙", color: "#f59e0b" },
   { label: "FnO", href: "/dashboard/fno?action=new", icon: "📊", color: "#10b981" },
   { label: "Funds", href: "/dashboard/mutual-funds?action=new", icon: "🏦", color: "#a855f7" },
   { label: "Bonds", href: "/dashboard/bonds?action=new", icon: "🔏", color: "#eab308" },
@@ -175,6 +185,7 @@ const actionModuleMap: Record<string, string> = {
   "Expense": "Expenses",
   "Income": "Income",
   "Trade": "Stocks",
+  "Crypto": "Crypto",
   "FnO": "FnO",
   "Funds": "Mutual Funds",
   "Bonds": "Bonds",
@@ -223,7 +234,7 @@ export default function Sidebar() {
         return isSuperAdminEmail;
       }
 
-      if (["Dashboard", "Accounts", "Settings"].includes(item.label)) return true;
+      if (["Dashboard", "Accounts", "Settings", "Crypto"].includes(item.label)) return true;
 
       const dbLabel: ModuleKey | string =
         item.label === "Income" || item.label === "Expenses"

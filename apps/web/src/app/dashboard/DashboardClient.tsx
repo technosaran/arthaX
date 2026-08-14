@@ -210,6 +210,14 @@ export default function DashboardClient() {
     let totalDayPnLINR = 0;
     let totalDayPnLUSD = 0;
 
+    const isCryptoAsset = (inv: any) => {
+      if (inv.type === "crypto") return true;
+      const s = (inv.symbol || "").toUpperCase();
+      const n = (inv.name || "").toLowerCase();
+      const cryptoKeywords = /^(btc|eth|sol|usdt|bnb|xrp|ada|doge|shib|dot|link|matic|avax|uni|ltc|crypto|bitcoin|ethereum|tether|cardano|solana|pepe|wif|bonk|sui|arb|op|ord|rndr|inj|near|atom|ftm)$/i;
+      return cryptoKeywords.test(s) || /crypto|bitcoin|ethereum|tether|cardano|solana/i.test(n);
+    };
+
     investments.forEach((inv) => {
       const quantity = Number(inv.quantity || 0);
       const currentPrice = Number(inv.current_price || inv.buy_price || 0);
@@ -218,7 +226,7 @@ export default function DashboardClient() {
         ? Number(inv.day_change)
         : (prevClose > 0 ? currentPrice - prevClose : currentPrice - Number(inv.buy_price || 0));
       const rawPnL = dayChangePerUnit * quantity;
-      const isUSD = inv.currency === "USD";
+      const isUSD = isCryptoAsset(inv) || inv.currency === "USD";
       totalDayPnLINR += isUSD ? rawPnL * 85.0 : rawPnL;
       totalDayPnLUSD += isUSD ? rawPnL : rawPnL / 85.0;
     });
@@ -249,7 +257,7 @@ export default function DashboardClient() {
       const quantity = Number(inv.quantity || 0);
       const buyPrice = Number(inv.buy_price || 0);
       const currentPrice = Number(inv.current_price || buyPrice);
-      const isUSD = inv.currency === "USD";
+      const isUSD = isCryptoAsset(inv) || inv.currency === "USD";
       const fx = isUSD ? 85.0 : 1.0;
 
       const invested = quantity * buyPrice * fx;

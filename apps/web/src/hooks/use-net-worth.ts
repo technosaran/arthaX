@@ -28,17 +28,17 @@ export function useNetWorth() {
     const getConvertedValues = (val: number, currency?: string) => {
       const amount = Number(val || 0);
       const isUSD = currency === "USD";
-      const inr = isUSD ? 0 : amount;
-      const usd = isUSD ? amount : 0;
+      const inr = isUSD ? amount * 85.0 : amount;
+      const usd = isUSD ? amount : amount / 85.0;
       return { inr, usd };
     };
 
-    // For investment categories, separate INR and USD totals without exchange conversion
+    // For investment categories, provide unified INR and USD totals using exchange conversion
     const getInvestmentValues = (val: number, currency?: string) => {
       const amount = Number(val || 0);
       const isUSD = currency === "USD";
-      const inr = isUSD ? 0 : amount;
-      const usd = isUSD ? amount : 0;
+      const inr = isUSD ? amount * 85.0 : amount;
+      const usd = isUSD ? amount : amount / 85.0;
       return { inr, usd };
     };
 
@@ -69,10 +69,9 @@ export function useNetWorth() {
       investments.forEach(inv => {
         const val = Number(inv.quantity || 0) * Number(inv.current_price || 0);
         if (isCryptoAsset(inv)) {
-          const isUSD = inv.currency === "USD";
-          const amountInUSD = isUSD ? val : val / 85.0; // Fixed conversion to USD
+          const amountInUSD = val; 
           cryptoBalanceUSD += amountInUSD;
-          cryptoBalanceINR += 0; // Exclude from INR natively
+          cryptoBalanceINR += amountInUSD * 85.0; // Automatically convert to INR using 85.0 fx
         } else {
           const { inr, usd } = getInvestmentValues(val, inv.currency);
           stockBalanceINR += inr;
@@ -173,12 +172,19 @@ export function useNetWorth() {
       const currentVal = qty * currPrice;
       const gain = currentVal - cost;
 
-      const { inr: costINR, usd: costUSD } = getInvestmentValues(cost, inv.currency);
-      const { inr: gainINR, usd: gainUSD } = getInvestmentValues(gain, inv.currency);
-      totalInvestedINR += costINR;
-      totalInvestedUSD += costUSD;
-      totalGrowthINR += gainINR;
-      totalGrowthUSD += gainUSD;
+      if (isCryptoAsset(inv)) {
+        totalInvestedUSD += cost;
+        totalInvestedINR += cost * 85.0;
+        totalGrowthUSD += gain;
+        totalGrowthINR += gain * 85.0;
+      } else {
+        const { inr: costINR, usd: costUSD } = getInvestmentValues(cost, inv.currency);
+        const { inr: gainINR, usd: gainUSD } = getInvestmentValues(gain, inv.currency);
+        totalInvestedINR += costINR;
+        totalInvestedUSD += costUSD;
+        totalGrowthINR += gainINR;
+        totalGrowthUSD += gainUSD;
+      }
     });
 
     mutualFunds.forEach(mf => {
