@@ -1,0 +1,3 @@
+{
+  "/api/cron/recurring-transactions/route": "app/api/cron/recurring-transactions/route.js"
+}

@@ -1,0 +1,3 @@
+{
+  "/api/transactions/gmail-sync/route": "app/api/transactions/gmail-sync/route.js"
+}

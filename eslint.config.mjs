@@ -23,6 +23,13 @@ const eslintConfig = defineConfig([
       "no-console": "off"
     }
   },
+  {
+    settings: {
+      next: {
+        rootDir: "apps/web/"
+      }
+    }
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

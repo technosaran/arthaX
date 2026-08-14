@@ -1,0 +1,3 @@
+{
+  "/api/integrations/zerodha/callback/route": "app/api/integrations/zerodha/callback/route.js"
+}

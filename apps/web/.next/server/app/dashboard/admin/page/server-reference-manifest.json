@@ -1,0 +1,16 @@
+{
+  "node": {
+    "00a931384d0fa679e7f208173a9d64db8106ac9080": {
+      "workers": {
+        "app/dashboard/admin/page": {
+          "moduleId": 31023,
+          "async": true,
+          "codeHash": null
+        }
+      },
+      "exportedName": "triggerAllMarketSync",
+      "filename": "apps/web/src/app/dashboard/settings/actions.ts"
+    }
+  },
+  "edge": {}
+}

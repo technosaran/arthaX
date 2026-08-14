@@ -23,7 +23,8 @@ services:
 
   account-service:
     build:
-      context: ./apps/account-service
+      context: .
+      dockerfile: ./apps/account-service/Dockerfile
     container_name: finance-account-service
     ports:
       - "4001:4001"
@@ -46,7 +47,8 @@ services:
 
   investment-service:
     build:
-      context: ./apps/investment-service
+      context: .
+      dockerfile: ./apps/investment-service/Dockerfile
     container_name: finance-investment-service
     ports:
       - "4002:4002"
@@ -69,7 +71,8 @@ services:
 
   budget-service:
     build:
-      context: ./apps/budget-service
+      context: .
+      dockerfile: ./apps/budget-service/Dockerfile
     container_name: finance-budget-service
     ports:
       - "4003:4003"
@@ -92,7 +95,8 @@ services:
 
   parser-service:
     build:
-      context: ./apps/parser-service
+      context: .
+      dockerfile: ./apps/parser-service/Dockerfile
     container_name: finance-parser-service
     ports:
       - "4004:4004"
@@ -115,7 +119,8 @@ services:
 
   ai-mcp-service:
     build:
-      context: ./apps/ai-mcp-service
+      context: .
+      dockerfile: ./apps/ai-mcp-service/Dockerfile
     container_name: finance-ai-mcp-service
     ports:
       - "4005:4005"

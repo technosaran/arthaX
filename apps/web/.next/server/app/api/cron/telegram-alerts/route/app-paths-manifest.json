@@ -1,0 +1,3 @@
+{
+  "/api/cron/telegram-alerts/route": "app/api/cron/telegram-alerts/route.js"
+}

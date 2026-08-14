@@ -1,0 +1,49 @@
+{
+  "node": {
+    "4039c38445d8ff6d0b9956bd17559d30135bbcb4c8": {
+      "workers": {
+        "app/dashboard/budget/page": {
+          "moduleId": 95709,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "upsertBudget",
+      "filename": "apps/web/src/app/dashboard/budget/actions.ts"
+    },
+    "405ea206914274169483f5cc363b9c9ee2c409fc0e": {
+      "workers": {
+        "app/dashboard/budget/page": {
+          "moduleId": 95709,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "deleteBudget",
+      "filename": "apps/web/src/app/dashboard/budget/actions.ts"
+    },
+    "7820b47fa63c898870d058e1e2e5c54f575170abaa": {
+      "workers": {
+        "app/dashboard/budget/page": {
+          "moduleId": 95709,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "copyPreviousMonthBudgets",
+      "filename": "apps/web/src/app/dashboard/budget/actions.ts"
+    },
+    "60499b8c104715b0c98e089bfdcea5285926a7d80f": {
+      "workers": {
+        "app/dashboard/budget/page": {
+          "moduleId": 95709,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "clearAllBudgets",
+      "filename": "apps/web/src/app/dashboard/budget/actions.ts"
+    }
+  },
+  "edge": {}
+}

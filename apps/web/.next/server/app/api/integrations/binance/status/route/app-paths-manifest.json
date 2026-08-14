@@ -1,0 +1,3 @@
+{
+  "/api/integrations/binance/status/route": "app/api/integrations/binance/status/route.js"
+}

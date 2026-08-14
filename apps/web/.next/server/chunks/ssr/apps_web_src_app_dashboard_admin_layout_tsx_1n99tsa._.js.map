@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "debugId": "5edff83a-f679-66b2-1a74-524cacce83d7",
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/dashboard/admin/layout.tsx"],"sourcesContent":["import React from \"react\";\n\nexport const metadata = {\n  title: \"Super Admin Command Console | FinanceOS\",\n  description: \"Standalone Super Admin Control Studio for System Health, AI Tax Laws, and Security Audit\",\n};\n\nexport default function AdminConsoleLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <div className=\"min-h-screen bg-[#07090e] text-white selection:bg-amber-500/30 selection:text-amber-200\">\n      {children}\n    </div>\n  );\n}\n"],"names":["metadata","title","description","AdminConsoleLayout","children","className"],"mappings":"wEAOe,SAASG,AAAmB,CAAEC,UAAQ,CAAiC,EACpF,MACE,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAIC,UAAU,mGACZD,GAGP,eAXwB,CACtBH,MAAO,0CACPC,YAAa,0FACf"}}]
+}

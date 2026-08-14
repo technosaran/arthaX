@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "debugId": "2afc8536-001d-24b9-01c6-80ffe28d64d8",
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/dashboard/settings/layout.tsx"],"sourcesContent":["import type { Metadata } from \"next\";\r\n\r\nexport const metadata: Metadata = {\r\n  title: \"Settings\",\r\n  description: \"Manage your account preferences, profile identity, and application settings.\",\r\n};\r\n\r\nexport default function SettingsLayout({\r\n  children,\r\n}: {\r\n  children: React.ReactNode;\r\n}) {\r\n  return <>{children}</>;\r\n}\r\n"],"names":["metadata","title","description","SettingsLayout","children"],"mappings":"wEAOe,SAASG,AAAe,CACrCC,UAAQ,CAGT,EACC,MAAO,CAAA,EAAA,EAAA,GAAA,EAAA,EAAA,QAAA,CAAA,UAAGA,GACZ,eAXkC,CAChCH,MAAO,WACPC,YAAa,8EACf"}}]
+}

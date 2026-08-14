@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "debugId": "f165fea6-4a4e-647f-dcdf-906431c13915",
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/dashboard/settings/data%3Afcb565%20%3Ctext/javascript%3E"],"sourcesContent":["/* __next_internal_action_entry_do_not_use__ [{\"00f8e054cb62e3046c670f587519fe506bae9faa25\":{\"name\":\"checkApiHealth\"}},\"apps/web/src/app/dashboard/settings/actions.ts\",\"\"] */\"use turbopack no side effects\";import{createServerReference,callServer,findSourceMapURL}from\"private-next-rsc-action-client-wrapper\";const $$RSC_SERVER_ACTION_3=/*#__PURE__*/createServerReference(\"00f8e054cb62e3046c670f587519fe506bae9faa25\",callServer,void 0,findSourceMapURL,\"checkApiHealth\");export{$$RSC_SERVER_ACTION_3 as checkApiHealth};"],"names":[],"mappings":"gEAA8M,IAAA,EAAA,EAAA,CAAA,CAAA,MAAsG,IAAM,EAAmC,CAAA,EAAA,EAAA,iBAAb,IAAa,AAAqB,EAAC,KAAxB,wCAAqE,EAAA,UAAU,CAAC,KAAK,EAAE,EAAA,gBAAgB,CAAC"}}]
+}

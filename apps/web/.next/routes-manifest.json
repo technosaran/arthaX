@@ -1,0 +1,520 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-DNS-Prefetch-Control",
+          "value": "on"
+        }
+      ],
+      "regex": "^(?:/(.*))(?:/)?$"
+    },
+    {
+      "source": "/icon-:path.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/icon-([^/]+?)\\.png(?:/)?$"
+    },
+    {
+      "source": "/favicon.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/favicon\\.png(?:/)?$"
+    },
+    {
+      "source": "/noise.svg",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/noise\\.svg(?:/)?$"
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ],
+      "regex": "^/manifest\\.webmanifest(?:/)?$"
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ],
+      "regex": "^/sw\\.js(?:/)?$"
+    },
+    {
+      "source": "/workbox-:path.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ],
+      "regex": "^/workbox-([^/]+?)\\.js(?:/)?$"
+    }
+  ],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/ai/assistant",
+      "regex": "^/api/ai/assistant(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai/assistant(?:/)?$"
+    },
+    {
+      "page": "/api/auth/google",
+      "regex": "^/api/auth/google(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/google(?:/)?$"
+    },
+    {
+      "page": "/api/auth/google/callback",
+      "regex": "^/api/auth/google/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/google/callback(?:/)?$"
+    },
+    {
+      "page": "/api/bank-parser",
+      "regex": "^/api/bank\\-parser(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bank\\-parser(?:/)?$"
+    },
+    {
+      "page": "/api/bots/telegram",
+      "regex": "^/api/bots/telegram(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/bots/telegram(?:/)?$"
+    },
+    {
+      "page": "/api/cas-parser",
+      "regex": "^/api/cas\\-parser(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cas\\-parser(?:/)?$"
+    },
+    {
+      "page": "/api/cron/dividend-detector",
+      "regex": "^/api/cron/dividend\\-detector(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/dividend\\-detector(?:/)?$"
+    },
+    {
+      "page": "/api/cron/market-sync",
+      "regex": "^/api/cron/market\\-sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/market\\-sync(?:/)?$"
+    },
+    {
+      "page": "/api/cron/recurring-transactions",
+      "regex": "^/api/cron/recurring\\-transactions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/recurring\\-transactions(?:/)?$"
+    },
+    {
+      "page": "/api/cron/sync-prices",
+      "regex": "^/api/cron/sync\\-prices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/sync\\-prices(?:/)?$"
+    },
+    {
+      "page": "/api/cron/tax-harvesting-digest",
+      "regex": "^/api/cron/tax\\-harvesting\\-digest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/tax\\-harvesting\\-digest(?:/)?$"
+    },
+    {
+      "page": "/api/cron/telegram-alerts",
+      "regex": "^/api/cron/telegram\\-alerts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/telegram\\-alerts(?:/)?$"
+    },
+    {
+      "page": "/api/cron/weekly-digest",
+      "regex": "^/api/cron/weekly\\-digest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/weekly\\-digest(?:/)?$"
+    },
+    {
+      "page": "/api/form16-parser",
+      "regex": "^/api/form16\\-parser(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/form16\\-parser(?:/)?$"
+    },
+    {
+      "page": "/api/health",
+      "regex": "^/api/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/health(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/binance/settings",
+      "regex": "^/api/integrations/binance/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/binance/settings(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/binance/status",
+      "regex": "^/api/integrations/binance/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/binance/status(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/binance/sync",
+      "regex": "^/api/integrations/binance/sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/binance/sync(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/zerodha/callback",
+      "regex": "^/api/integrations/zerodha/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/zerodha/callback(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/zerodha/login",
+      "regex": "^/api/integrations/zerodha/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/zerodha/login(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/zerodha/settings",
+      "regex": "^/api/integrations/zerodha/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/zerodha/settings(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/zerodha/status",
+      "regex": "^/api/integrations/zerodha/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/zerodha/status(?:/)?$"
+    },
+    {
+      "page": "/api/logo",
+      "regex": "^/api/logo(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/logo(?:/)?$"
+    },
+    {
+      "page": "/api/logo/refresh",
+      "regex": "^/api/logo/refresh(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/logo/refresh(?:/)?$"
+    },
+    {
+      "page": "/api/mcp",
+      "regex": "^/api/mcp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mcp(?:/)?$"
+    },
+    {
+      "page": "/api/reports/download",
+      "regex": "^/api/reports/download(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/reports/download(?:/)?$"
+    },
+    {
+      "page": "/api/run-migration",
+      "regex": "^/api/run\\-migration(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/run\\-migration(?:/)?$"
+    },
+    {
+      "page": "/api/seed",
+      "regex": "^/api/seed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/seed(?:/)?$"
+    },
+    {
+      "page": "/api/sync",
+      "regex": "^/api/sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/sync(?:/)?$"
+    },
+    {
+      "page": "/api/tax/auto-sync",
+      "regex": "^/api/tax/auto\\-sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/tax/auto\\-sync(?:/)?$"
+    },
+    {
+      "page": "/api/transactions/gmail-sync",
+      "regex": "^/api/transactions/gmail\\-sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/transactions/gmail\\-sync(?:/)?$"
+    },
+    {
+      "page": "/api/transactions/sms-sync",
+      "regex": "^/api/transactions/sms\\-sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/transactions/sms\\-sync(?:/)?$"
+    },
+    {
+      "page": "/api/transactions/telegram-sync",
+      "regex": "^/api/transactions/telegram\\-sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/transactions/telegram\\-sync(?:/)?$"
+    },
+    {
+      "page": "/auth/callback",
+      "regex": "^/auth/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/callback(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/dashboard/accounts",
+      "regex": "^/dashboard/accounts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/accounts(?:/)?$"
+    },
+    {
+      "page": "/dashboard/admin",
+      "regex": "^/dashboard/admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/admin(?:/)?$"
+    },
+    {
+      "page": "/dashboard/alternative-assets",
+      "regex": "^/dashboard/alternative\\-assets(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/alternative\\-assets(?:/)?$"
+    },
+    {
+      "page": "/dashboard/bonds",
+      "regex": "^/dashboard/bonds(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/bonds(?:/)?$"
+    },
+    {
+      "page": "/dashboard/budget",
+      "regex": "^/dashboard/budget(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/budget(?:/)?$"
+    },
+    {
+      "page": "/dashboard/expenses",
+      "regex": "^/dashboard/expenses(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/expenses(?:/)?$"
+    },
+    {
+      "page": "/dashboard/family",
+      "regex": "^/dashboard/family(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/family(?:/)?$"
+    },
+    {
+      "page": "/dashboard/fno",
+      "regex": "^/dashboard/fno(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/fno(?:/)?$"
+    },
+    {
+      "page": "/dashboard/forex",
+      "regex": "^/dashboard/forex(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/forex(?:/)?$"
+    },
+    {
+      "page": "/dashboard/goals",
+      "regex": "^/dashboard/goals(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/goals(?:/)?$"
+    },
+    {
+      "page": "/dashboard/income",
+      "regex": "^/dashboard/income(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/income(?:/)?$"
+    },
+    {
+      "page": "/dashboard/investments",
+      "regex": "^/dashboard/investments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/investments(?:/)?$"
+    },
+    {
+      "page": "/dashboard/ledger",
+      "regex": "^/dashboard/ledger(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/ledger(?:/)?$"
+    },
+    {
+      "page": "/dashboard/liabilities",
+      "regex": "^/dashboard/liabilities(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/liabilities(?:/)?$"
+    },
+    {
+      "page": "/dashboard/mutual-funds",
+      "regex": "^/dashboard/mutual\\-funds(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/mutual\\-funds(?:/)?$"
+    },
+    {
+      "page": "/dashboard/settings",
+      "regex": "^/dashboard/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/settings(?:/)?$"
+    },
+    {
+      "page": "/dashboard/stocks",
+      "regex": "^/dashboard/stocks(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/stocks(?:/)?$"
+    },
+    {
+      "page": "/dashboard/tax-reports",
+      "regex": "^/dashboard/tax\\-reports(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/tax\\-reports(?:/)?$"
+    },
+    {
+      "page": "/dashboard/transactions",
+      "regex": "^/dashboard/transactions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/transactions(?:/)?$"
+    },
+    {
+      "page": "/icon.png",
+      "regex": "^/icon\\.png(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/icon\\.png(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/manifest.webmanifest",
+      "regex": "^/manifest\\.webmanifest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/manifest\\.webmanifest(?:/)?$"
+    },
+    {
+      "page": "/privacy",
+      "regex": "^/privacy(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/privacy(?:/)?$"
+    },
+    {
+      "page": "/reset-password",
+      "regex": "^/reset\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reset\\-password(?:/)?$"
+    },
+    {
+      "page": "/reset-password/update",
+      "regex": "^/reset\\-password/update(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reset\\-password/update(?:/)?$"
+    },
+    {
+      "page": "/robots.txt",
+      "regex": "^/robots\\.txt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/robots\\.txt(?:/)?$"
+    },
+    {
+      "page": "/sitemap.xml",
+      "regex": "^/sitemap\\.xml(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sitemap\\.xml(?:/)?$"
+    },
+    {
+      "page": "/terms",
+      "regex": "^/terms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/terms(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

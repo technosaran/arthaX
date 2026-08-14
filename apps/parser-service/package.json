@@ -7,9 +7,9 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "@finance-os/db": "file:../../packages/db",
-    "@finance-os/logger": "file:../../packages/logger",
-    "@finance-os/shared-types": "file:../../packages/shared-types",
+    "@finance-os/db": "*",
+    "@finance-os/logger": "*",
+    "@finance-os/shared-types": "*",
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

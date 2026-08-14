@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="e3eaacb4-f6ff-8890-c9d5-336d398cdd0f")}catch(e){}}();
+module.exports=[35956,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"flex flex-col gap-[var(--section-gap)]",children:[(0,b.jsxs)("div",{className:"space-y-2",children:[(0,b.jsx)("div",{className:"h-10 w-48 bg-white/5 rounded-2xl"}),(0,b.jsx)("div",{className:"h-4 w-64 bg-white/5 rounded-xl"})]}),(0,b.jsx)("div",{className:"grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6",children:[1,2,3,4].map(a=>(0,b.jsx)("div",{className:"h-32 bg-white/5 rounded-[var(--radius-xl)] border border-white/5"},a))}),(0,b.jsx)("div",{className:"h-96 bg-white/5 rounded-[var(--radius-xl)] border border-white/5"})]})}])},20324,function(a){a.n(a.i(35956))}];
+
+//# debugId=e3eaacb4-f6ff-8890-c9d5-336d398cdd0f
+//# sourceMappingURL=apps_web_src_app_dashboard_liabilities_loading_tsx_01-errr._.js.map

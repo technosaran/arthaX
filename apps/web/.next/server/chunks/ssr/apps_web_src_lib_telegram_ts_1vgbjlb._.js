@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="00a014b2-14b8-2c5d-a6d0-7d93028fd332")}catch(e){}}();
+module.exports=[80911,a=>{"use strict";async function b(a,b,c,d){let e=process.env.TELEGRAM_BOT_TOKEN;if(e)try{let f=new FormData;f.append("chat_id",a);let g=new Blob([c],{type:"application/json"});f.append("document",g,b),d&&(f.append("caption",d),f.append("parse_mode","Markdown")),await fetch(`https://api.telegram.org/bot${e}/sendDocument`,{method:"POST",body:f})}catch(a){console.error("Failed to send Telegram document:",a)}}a.s(["sendTelegramDocument",0,b])}];
+
+//# debugId=00a014b2-14b8-2c5d-a6d0-7d93028fd332
+//# sourceMappingURL=apps_web_src_lib_telegram_ts_1vgbjlb._.js.map

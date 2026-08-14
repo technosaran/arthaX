@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "debugId": "18ef6125-eeb5-dc1d-a904-7b55e295c983",
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["../../../../../../apps/web/src/app/login/layout.tsx"],"sourcesContent":["import type { Metadata } from \"next\";\r\n\r\nexport const metadata: Metadata = {\r\n  title: \"Login\",\r\n  description: \"Sign in to arthaX — your personal wealth management terminal. Track stocks, mutual funds, expenses, income and automate bank transaction alerts.\",\r\n  alternates: {\r\n    canonical: \"/login\",\r\n  },\r\n  openGraph: {\r\n    title: \"Login\",\r\n    description: \"Sign in to arthaX — your personal wealth management terminal.\",\r\n    url: \"https://technosaranfin.vercel.app/login\",\r\n  },\r\n};\r\n\r\nexport default function LoginLayout({\r\n  children,\r\n}: {\r\n  children: React.ReactNode;\r\n}) {\r\n  return <>{children}</>;\r\n}\r\n"],"names":["metadata","title","description","alternates","canonical","openGraph","url","LoginLayout","children"],"mappings":"wEAee,SAASO,AAAY,UAClCC,CAAQ,CAGT,EACC,MAAO,CAAA,EAAA,EAAA,GAAA,EAAA,EAAA,QAAA,CAAA,UAAGA,GACZ,eAnBkC,CAChCP,MAAO,QACPC,YAAa,mJACbC,WAAY,CACVC,UAAW,QACb,EACAC,UAAW,CACTJ,MAAO,QACPC,YAAa,gEACbI,IAAK,yCACP,CACF"}}]
+}

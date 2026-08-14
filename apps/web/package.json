@@ -1,0 +1,44 @@
+{
+  "name": "@finance-os/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
+    "@sentry/nextjs": "^10.63.0",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.112.2",
+    "@tanstack/react-table": "^8.21.3",
+    "@vercel/analytics": "^2.0.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.39.0",
+    "lucide-react": "^1.29.0",
+    "next": "^16.2.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-hot-toast": "^2.6.0",
+    "react-qr-code": "^2.2.0",
+    "recharts": "^3.8.1",
+    "swr": "^2.4.1",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
+    "zxcvbn": "^4.4.2",
+    "@finance-os/db": "*",
+    "@finance-os/shared-types": "*"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/zxcvbn": "^4.4.5",
+    "eslint": "^9",
+    "eslint-config-next": "^16.2.3",
+    "tailwindcss": "^4"
+  }
+}

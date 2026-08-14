@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="2ca759df-9e4d-8861-dd28-45e46920332e")}catch(e){}}();
+module.exports=[57371,a=>{"use strict";a.s(["default",()=>b]);let b=(0,a.i(11857).registerClientReference)(function(){throw Error("Attempted to call the default export of [project]/apps/web/src/app/template.tsx from the server, but it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.")},"[project]/apps/web/src/app/template.tsx","default")},38290,a=>{"use strict";var b=a.i(57371);a.n(b)},68259,function(a){a.n(a.i(38290))}];
+
+//# debugId=2ca759df-9e4d-8861-dd28-45e46920332e
+//# sourceMappingURL=apps_web_src_app_template_tsx_1jzf0wx._.js.map

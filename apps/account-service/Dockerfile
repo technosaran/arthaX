@@ -1,7 +1,8 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json ./
+COPY packages ./packages
+COPY apps/account-service ./apps/account-service
+WORKDIR /app/apps/account-service
 RUN npm install
-COPY . .
 EXPOSE 4001
 CMD ["npm", "start"]

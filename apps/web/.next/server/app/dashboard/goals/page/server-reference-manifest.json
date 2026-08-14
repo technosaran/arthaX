@@ -1,0 +1,49 @@
+{
+  "node": {
+    "40c8e4dbecce25e1aa50d87a0233536b15a4d31d1e": {
+      "workers": {
+        "app/dashboard/goals/page": {
+          "moduleId": 67975,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "createGoal",
+      "filename": "apps/web/src/app/dashboard/goals/actions.ts"
+    },
+    "70636f46b0bf37833f80237e9455e193cc91cd01e9": {
+      "workers": {
+        "app/dashboard/goals/page": {
+          "moduleId": 67975,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "updateGoalAmount",
+      "filename": "apps/web/src/app/dashboard/goals/actions.ts"
+    },
+    "401a48c66d900b96353e2119c3b5bc13139080fca4": {
+      "workers": {
+        "app/dashboard/goals/page": {
+          "moduleId": 67975,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "deleteGoal",
+      "filename": "apps/web/src/app/dashboard/goals/actions.ts"
+    },
+    "60e5e61b0d8e7b7e036c175aa0cf917a1c17009c0e": {
+      "workers": {
+        "app/dashboard/goals/page": {
+          "moduleId": 67975,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "updateGoal",
+      "filename": "apps/web/src/app/dashboard/goals/actions.ts"
+    }
+  },
+  "edge": {}
+}

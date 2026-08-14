@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="28258956-f2f8-f82d-4aef-c88e13deb87d")}catch(e){}}();
+module.exports=[8158,a=>a.a(async(b,c)=>{try{var d=a.i(51081),e=b([d]);[d]=e.then?(await e)():e,a.s([]),c()}catch(a){c(a)}},!1),38441,a=>a.a(async(b,c)=>{try{var d=a.i(8158),e=a.i(51081),f=b([d,e]);[d,e]=f.then?(await f)():f,a.s(["00a931384d0fa679e7f208173a9d64db8106ac9080",()=>e.triggerAllMarketSync]),c()}catch(a){c(a)}},!1),12269,a=>{a.v(b=>Promise.all(["server/chunks/ssr/[root-of-the-server]__018lkn0._.js"].map(b=>a.l(b))).then(()=>b(23952)))},45398,a=>{a.v(b=>Promise.all(["server/chunks/ssr/[root-of-the-server]__0muf-xb._.js"].map(b=>a.l(b))).then(()=>b(63342)))},6219,a=>{a.v(b=>Promise.all(["server/chunks/ssr/apps_web_src_lib_telegram_ts_1vgbjlb._.js"].map(b=>a.l(b))).then(()=>b(80911)))}];
+
+//# debugId=28258956-f2f8-f82d-4aef-c88e13deb87d
+//# sourceMappingURL=apps_web_0iycxzg._.js.map

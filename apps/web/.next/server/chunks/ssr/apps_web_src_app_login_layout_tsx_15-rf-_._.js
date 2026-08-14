@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="18ef6125-eeb5-dc1d-a904-7b55e295c983")}catch(e){}}();
+module.exports=[25607,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function({children:a}){return(0,b.jsx)(b.Fragment,{children:a})},"metadata",0,{title:"Login",description:"Sign in to arthaX — your personal wealth management terminal. Track stocks, mutual funds, expenses, income and automate bank transaction alerts.",alternates:{canonical:"/login"},openGraph:{title:"Login",description:"Sign in to arthaX — your personal wealth management terminal.",url:"https://technosaranfin.vercel.app/login"}}])},99114,function(a){a.n(a.i(25607))}];
+
+//# debugId=18ef6125-eeb5-dc1d-a904-7b55e295c983
+//# sourceMappingURL=apps_web_src_app_login_layout_tsx_15-rf-_._.js.map

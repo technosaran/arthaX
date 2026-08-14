@@ -1,0 +1,5 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="28e0cedb-7103-eb28-e2cd-3cb89998e071")}catch(e){}}();
+module.exports=[31645,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"flex flex-col gap-[var(--section-gap)]",children:[(0,b.jsxs)("div",{className:"space-y-2",children:[(0,b.jsx)("div",{className:"h-10 w-48 bg-white/5 rounded-2xl"}),(0,b.jsx)("div",{className:"h-4 w-64 bg-white/5 rounded-xl"})]}),(0,b.jsx)("div",{className:"grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6",children:[1,2,3,4].map(a=>(0,b.jsx)("div",{className:"h-32 bg-white/5 rounded-[var(--radius-xl)] border border-white/5"},a))}),(0,b.jsx)("div",{className:"h-96 bg-white/5 rounded-[var(--radius-xl)] border border-white/5"})]})}])},60041,function(a){a.n(a.i(31645))}];
+
+//# debugId=28e0cedb-7103-eb28-e2cd-3cb89998e071
+//# sourceMappingURL=apps_web_src_app_dashboard_budget_loading_tsx_0x34_64._.js.map

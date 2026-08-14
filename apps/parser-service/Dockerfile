@@ -1,7 +1,8 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json ./
+COPY packages ./packages
+COPY apps/parser-service ./apps/parser-service
+WORKDIR /app/apps/parser-service
 RUN npm install
-COPY . .
 EXPOSE 4004
 CMD ["npm", "start"]

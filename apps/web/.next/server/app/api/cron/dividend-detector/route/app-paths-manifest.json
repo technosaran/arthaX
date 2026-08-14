@@ -1,0 +1,3 @@
+{
+  "/api/cron/dividend-detector/route": "app/api/cron/dividend-detector/route.js"
+}
