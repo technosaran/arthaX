@@ -329,14 +329,22 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
           return;
         }
 
+        const isBuy = formData.trade_type === "buy";
+        if (!isBuy && !editingId) {
+          const existing = activeStocks.find(s => s.symbol === finalSymbol);
+          if (!existing || Number(existing.quantity) < qty) {
+            toast.error(`You can only sell up to ${existing?.quantity || 0} shares of ${finalSymbol}`);
+            return;
+          }
+        }
+
         const price = parseFloat(formData.buy_price);
         if (!price || price <= 0 || !Number.isFinite(price)) {
-          toast.error("Please enter a valid buy price");
+          toast.error("Please enter a valid price");
           return;
         }
 
         const currentPrice = parseFloat(formData.current_price) > 0 ? parseFloat(formData.current_price) : price;
-        const isBuy = formData.trade_type === "buy";
         const turnover = qty * price;
         const autoCharges = calculateEquityDeliveryCharges(turnover, isBuy).totalCharges;
         const effectiveCharges = isCustomCharges ? (parseFloat(charges) || 0) : autoCharges;
@@ -723,11 +731,43 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
             </div>
 
             <div className="p-5 space-y-5 bg-[var(--bg-card)]">
+              {/* Order Type Toggle: Buy vs Sell */}
+              {!editingId && (
+                <div className="flex gap-2">
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({ ...formData, trade_type: "buy" })}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded border transition-colors ${
+                      formData.trade_type === "buy" 
+                        ? "border-[#4185f4] bg-[#4185f4]/10 text-[#4185f4]" 
+                        : "border-white/10 text-gray-400 hover:bg-white/5"
+                    }`}
+                  >
+                    Buy
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({ ...formData, trade_type: "sell" })}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded border transition-colors ${
+                      formData.trade_type === "sell" 
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]" 
+                        : "border-white/10 text-gray-400 hover:bg-white/5"
+                    }`}
+                  >
+                    Sell
+                  </button>
+                </div>
+              )}
+
               {/* Product selector: CNC vs MIS */}
               <div className="flex gap-2">
                 <button 
                   type="button" 
-                  className="flex-1 py-1.5 text-xs font-bold rounded border border-[#4185f4]/30 text-[#4185f4] bg-[#4185f4]/5 hover:bg-[#4185f4]/10 transition-colors"
+                  className={`flex-1 py-1.5 text-xs font-bold rounded border transition-colors ${
+                    formData.trade_type === "buy"
+                      ? "border-[#4185f4]/30 text-[#4185f4] bg-[#4185f4]/5 hover:bg-[#4185f4]/10"
+                      : "border-[var(--accent-primary)]/30 text-[var(--accent-primary)] bg-[var(--accent-primary)]/5 hover:bg-[var(--accent-primary)]/10"
+                  }`}
                 >
                   CNC (Longterm)
                 </button>

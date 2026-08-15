@@ -27,7 +27,10 @@ type TrendEntry = {
 
 export default function DashboardClient() {
   const { user_id } = useUser();
-  const { data: financeData, isLoading } = useFinanceData();
+  const { data: financeData, isLoading, isValidating } = useFinanceData();
+  
+  // Use a more robust loading state to prevent "Add account" flashing on slow connections
+  const isActuallyLoading = isLoading || (isValidating && (!financeData || !financeData.accounts || financeData.accounts.length === 0));
   
   const { 
     profile,
@@ -63,7 +66,7 @@ export default function DashboardClient() {
     } catch (e) {
       console.warn("localStorage access denied", e);
     }
-  }, [accounts.length, incomes.length, expenses.length, isLoading, user_id]);
+  }, [accounts.length, incomes.length, expenses.length, isActuallyLoading, user_id]);
 
   const handleOnboardingComplete = () => {
     if (user_id) {
@@ -392,14 +395,14 @@ export default function DashboardClient() {
 
   if (!isMounted) return null; // Prevent hydration mismatch
 
-  if (isLoading) {
+  if (isActuallyLoading) {
     return <LoadingSkeleton />;
   }
 
   return (
     <>
       {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
-      <DashboardDesktop stats={stats} recentLogs={recentLogs} goals={goals} accounts={accounts} isLoading={isLoading} />
+      <DashboardDesktop stats={stats} recentLogs={recentLogs} goals={goals} accounts={accounts} isLoading={isActuallyLoading} />
     </>
   );
 }

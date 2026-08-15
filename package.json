@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@supabase/supabase-js": "^2.112.3",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^6.0.0",
     "pg": "^8.22.0",

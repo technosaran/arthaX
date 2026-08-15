@@ -165,6 +165,18 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
         const totalInvested = purchasePrice * quantity;
         const currentValue = parseFloat(formData.current_value) || (currentPrice * quantity);
 
+        if (formData.bond_type === "Corporate" || formData.bond_type === "Sovereign") {
+          if (faceValue % 1000 !== 0) {
+            toast.error(`${formData.bond_type} bond face value must be a multiple of 1,000 or 10,000.`);
+            return;
+          }
+        } else if (formData.bond_type === "SGB") {
+          if (!Number.isInteger(parseFloat(formData.quantity))) {
+            toast.error("SGB must be bought in whole units (grams).");
+            return;
+          }
+        }
+
         if (editingId) {
           const res = await updateBond(editingId, {
             bond_name: formData.bond_name,
@@ -562,7 +574,15 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                       <div className="bg-[#0A0F1D] border border-[#00D09C]/40 p-3.5 rounded-xl space-y-4 mb-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs border-b border-[#1F293D] pb-2">
-                            <span className="text-[#848E9C] font-semibold">Total Capital Investment</span>
+                            <span className="text-[#848E9C] font-semibold">Clean Principal</span>
+                            <span className="font-extrabold text-white">₹{((Number(formData.quantity) * Number(formData.purchase_price)) - (Number(formData.accrued_interest) || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs border-b border-[#1F293D] pb-2">
+                            <span className="text-[#848E9C] font-semibold">Accrued Interest Paid</span>
+                            <span className="font-extrabold text-[#00D09C]">₹{(Number(formData.accrued_interest) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs border-b border-[#1F293D] pb-2">
+                            <span className="text-[#848E9C] font-semibold">Total Capital Investment (Dirty)</span>
                             <span className="font-extrabold text-white">₹{(Number(formData.quantity) * Number(formData.purchase_price)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
@@ -646,7 +666,7 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-4 gap-3">
                           <div className="space-y-1">
                             <label className="text-[0.6875rem] font-bold text-[#848E9C] uppercase">Coupon (%)</label>
                             <input required type="number" step="any" className="w-full bg-[#111827] border border-[#1F293D] rounded px-2.5 py-1 text-xs text-white outline-none focus:border-[#00D09C]" value={formData.coupon_rate} onChange={e => setFormData({...formData, coupon_rate: e.target.value})} />
@@ -656,7 +676,11 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
                             <input type="number" step="any" className="w-full bg-[#111827] border border-[#1F293D] rounded px-2.5 py-1 text-xs text-white outline-none focus:border-[#00D09C]" placeholder="Optional" value={formData.ytm} onChange={e => setFormData({...formData, ytm: e.target.value})} />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[0.6875rem] font-bold text-[#848E9C] uppercase">Payout Frequency</label>
+                            <label className="text-[0.6875rem] font-bold text-[#848E9C] uppercase">Accrued Interest</label>
+                            <input type="number" step="any" className="w-full bg-[#111827] border border-[#1F293D] rounded px-2.5 py-1 text-xs text-white outline-none focus:border-[#00D09C]" placeholder="₹0" value={formData.accrued_interest} onChange={e => setFormData({...formData, accrued_interest: e.target.value})} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[0.6875rem] font-bold text-[#848E9C] uppercase">Payout</label>
                             <select className="w-full bg-[#111827] border border-[#1F293D] rounded px-2.5 py-1 text-xs text-white outline-none focus:border-[#00D09C]" value={formData.interest_frequency} onChange={e => setFormData({...formData, interest_frequency: e.target.value})}>
                               <option value="Monthly">Monthly Payout</option>
                               <option value="Quarterly">Quarterly Payout</option>

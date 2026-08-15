@@ -56,6 +56,7 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   const [searchResults, setSearchResults] = useState<{ schemeCode: string, schemeName: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isNavFetching, setIsNavFetching] = useState(false);
 
   const searchDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -589,20 +590,25 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                             const derivedAmc = res.schemeName.trim().split(" ")[0];
                             setFormData({
                               ...formData, 
-                              fund_name: res.schemeName, 
+                          fund_name: res.schemeName, 
                               scheme_code: res.schemeCode,
                               amc_name: derivedAmc
                             });
                             setSearchQuery("");
                             setShowSearchDropdown(false);
                             if (res.schemeCode) {
-                              const liveData = await fetchLiveMFNAV(res.schemeCode);
-                              if (liveData) {
-                                setFormData(prev => ({
-                                  ...prev, 
-                                  current_nav: liveData.nav.toString(),
-                                  nav: prev.nav ? prev.nav : liveData.nav.toString()
-                                }));
+                              setIsNavFetching(true);
+                              try {
+                                const liveData = await fetchLiveMFNAV(res.schemeCode.toString());
+                                if (liveData) {
+                                  setFormData(prev => ({
+                                    ...prev, 
+                                    current_nav: liveData.nav.toString(),
+                                    nav: prev.nav ? prev.nav : liveData.nav.toString()
+                                  }));
+                                }
+                              } finally {
+                                setIsNavFetching(false);
                               }
                             }
                           }}
@@ -854,14 +860,11 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
                   Cancel
                 </button>
                 <button 
+                  disabled={submitting || isNavFetching}
                   type="submit" 
-                  disabled={submitting} 
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-white shadow-lg cursor-pointer ${
-                    editingId ? "bg-indigo-600 hover:bg-indigo-700" :
-                    formData.trade_type === 'sell' ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-500 hover:bg-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-                  }`}
+                  className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-xs rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? "Processing..." : (editingId ? "Modify Investment" : formData.trade_type === 'buy' ? "Invest Now" : "Redeem Now")}
+                  {submitting || isNavFetching ? "Processing..." : (editingId ? "Modify Investment" : formData.trade_type === 'buy' ? "Invest Now" : "Redeem Now")}
                 </button>
               </div>
             </form>

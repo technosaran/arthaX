@@ -63,6 +63,10 @@ export const transactions = pgTable("transactions", {
   source_type: text("source_type"),
   source_id: uuid("source_id"),
   ledger_log_id: uuid("ledger_log_id"),
+  gross_amount: numeric("gross_amount").default("0"),
+  fees: numeric("fees").default("0"),
+  taxes: numeric("taxes").default("0"),
+  net_amount: numeric("net_amount"),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow(),
 }, (t) => ({
@@ -105,6 +109,10 @@ export const ledgerLogs = pgTable("ledger_logs", {
   source_type: text("source_type"),
   source_id: uuid("source_id"),
   metadata: jsonb("metadata"),
+  gross_amount: numeric("gross_amount").default("0"),
+  fees: numeric("fees").default("0"),
+  taxes: numeric("taxes").default("0"),
+  net_amount: numeric("net_amount"),
   created_at: timestamp("created_at").defaultNow(),
 }, (t) => ({
   userIdIdx: index("ledger_logs_user_id_idx").on(t.user_id),
@@ -356,6 +364,7 @@ export const bondTransactions = pgTable("bond_transactions", {
   user_id: uuid("user_id").notNull(),
   bond_id: uuid("bond_id"),
   account_id: uuid("account_id"),
+  ledger_log_id: uuid("ledger_log_id"),
   transaction_type: text("transaction_type").notNull(),
   amount: numeric("amount").notNull(),
   quantity: numeric("quantity"),
@@ -369,8 +378,6 @@ export const bondTransactions = pgTable("bond_transactions", {
 }, (t) => ({
   userIdIdx: index("bond_transactions_user_id_idx").on(t.user_id),
   accountIdIdx: index("bond_transactions_account_id_idx").on(t.account_id)
-}));
-
 // ---------------------------------------------------------------------------
 // alternative_assets
 // ---------------------------------------------------------------------------

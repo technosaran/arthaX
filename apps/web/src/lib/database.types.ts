@@ -184,6 +184,7 @@ export type Database = {
           interest_amount: number | null
           interest_period_end: string | null
           interest_period_start: string | null
+          ledger_log_id: string | null
           notes: string | null
           price_per_bond: number | null
           quantity: number | null
@@ -200,6 +201,7 @@ export type Database = {
           interest_amount?: number | null
           interest_period_end?: string | null
           interest_period_start?: string | null
+          ledger_log_id?: string | null
           notes?: string | null
           price_per_bond?: number | null
           quantity?: number | null
@@ -216,6 +218,7 @@ export type Database = {
           interest_amount?: number | null
           interest_period_end?: string | null
           interest_period_start?: string | null
+          ledger_log_id?: string | null
           notes?: string | null
           price_per_bond?: number | null
           quantity?: number | null
@@ -552,10 +555,14 @@ export type Database = {
           amount: number | null
           created_at: string | null
           details: string | null
+          fees: number | null
+          gross_amount: number | null
           id: string
           metadata: Json | null
+          net_amount: number | null
           new_balance: number | null
           previous_balance: number | null
+          taxes: number | null
           source_id: string | null
           source_type: string | null
           user_id: string
@@ -567,10 +574,14 @@ export type Database = {
           amount?: number | null
           created_at?: string | null
           details?: string | null
+          fees?: number | null
+          gross_amount?: number | null
           id?: string
           metadata?: Json | null
+          net_amount?: number | null
           new_balance?: number | null
           previous_balance?: number | null
+          taxes?: number | null
           source_id?: string | null
           source_type?: string | null
           user_id: string
@@ -582,10 +593,14 @@ export type Database = {
           amount?: number | null
           created_at?: string | null
           details?: string | null
+          fees?: number | null
+          gross_amount?: number | null
           id?: string
           metadata?: Json | null
+          net_amount?: number | null
           new_balance?: number | null
           previous_balance?: number | null
+          taxes?: number | null
           source_id?: string | null
           source_type?: string | null
           user_id?: string
@@ -1015,10 +1030,14 @@ export type Database = {
           created_at: string
           date: string
           description: string
+          fees: number | null
+          gross_amount: number | null
           id: string
           ledger_log_id: string | null
+          net_amount: number | null
           source_id: string | null
           source_type: string | null
+          taxes: number | null
           type: string
           user_id: string
         }
@@ -1029,10 +1048,14 @@ export type Database = {
           created_at?: string
           date?: string
           description: string
+          fees?: number | null
+          gross_amount?: number | null
           id?: string
           ledger_log_id?: string | null
+          net_amount?: number | null
           source_id?: string | null
           source_type?: string | null
+          taxes?: number | null
           type: string
           user_id: string
         }
@@ -1043,10 +1066,14 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
+          fees?: number | null
+          gross_amount?: number | null
           id?: string
           ledger_log_id?: string | null
+          net_amount?: number | null
           source_id?: string | null
           source_type?: string | null
+          taxes?: number | null
           type?: string
           user_id?: string
         }

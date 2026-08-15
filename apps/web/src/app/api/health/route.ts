@@ -1,27 +1,13 @@
 import { NextResponse } from "next/server";
-import { isRedisHealthy, isRedisConfigured } from "@/lib/redis";
-import { createClient } from "@/lib/supabase-server";
+import { DiagnosticsService } from "@/services/diagnostics-service";
 
 export async function GET() {
   const startTime = Date.now();
-  let dbStatus = "unknown";
-  let dbLatencyMs = 0;
-
-  try {
-    const supabase = await createClient();
-    const dbStart = Date.now();
-    const { error } = await supabase.from("profiles").select("id").limit(1);
-    dbLatencyMs = Date.now() - dbStart;
-    dbStatus = error ? "degraded" : "healthy";
-  } catch {
-    dbStatus = "unhealthy";
-  }
-
-  const redisConfigured = isRedisConfigured();
-  const redisHealthy = isRedisHealthy();
+  const dbCheck = await DiagnosticsService.checkDatabase();
+  const redisCheck = await DiagnosticsService.checkRedis();
 
   const totalDurationMs = Date.now() - startTime;
-  const isHealthy = dbStatus === "healthy";
+  const isHealthy = dbCheck.status === "Healthy";
 
   return NextResponse.json(
     {
@@ -31,12 +17,12 @@ export async function GET() {
       latencyMs: totalDurationMs,
       services: {
         database: {
-          status: dbStatus,
-          latencyMs: dbLatencyMs,
+          status: dbCheck.status.toLowerCase(),
+          latencyMs: parseInt(dbCheck.latency.replace("ms", "")) || 0,
         },
         redis: {
-          configured: redisConfigured,
-          status: redisHealthy ? "healthy" : (redisConfigured ? "degraded" : "bypassed_in_memory"),
+          configured: redisCheck.status !== "Offline",
+          status: redisCheck.status === "Healthy" ? "healthy" : (redisCheck.status === "Offline" ? "bypassed_in_memory" : "degraded"),
         },
       },
     },

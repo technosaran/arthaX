@@ -55,7 +55,34 @@ export default function SettingsPage() {
   const { user, username, setUsername, loading, isSyncing } = useUser();
   const { data, mutate } = useFinanceData();
   const router = useRouter();
-  const { profile, accounts = [] } = data || {};
+  const { 
+    profile, 
+    accounts = [],
+    incomes = [],
+    expenses = [],
+    ledgerLogs = [],
+    investments = [],
+    mutualFunds = [],
+    stockTrades = [],
+    mutualFundTrades = [],
+    bonds = [],
+    liabilities = [],
+    alternativeAssets = [],
+    forexAccounts = [],
+  } = data || {};
+
+  const totalExportCount = incomes.length + 
+    expenses.length + 
+    accounts.length + 
+    ledgerLogs.length + 
+    investments.length + 
+    mutualFunds.length + 
+    stockTrades.length + 
+    mutualFundTrades.length + 
+    bonds.length + 
+    liabilities.length + 
+    alternativeAssets.length + 
+    forexAccounts.length;
 
   const [input, setInput] = useState(username);
   const [prevUsername, setPrevUsername] = useState(username);
@@ -338,7 +365,7 @@ export default function SettingsPage() {
         category: "Data & Storage",
         items: [
           { key: "imports", label: "Data Imports", icon: <Download className="w-4 h-4" />, badge: "2 Parsers", description: "Bank statement PDF & CAS parser" },
-          { key: "exports", label: "Data Exports", icon: <Upload className="w-4 h-4" />, badge: "10 Formats", description: "CSV exports & custom reports" },
+          { key: "exports", label: "Data Exports", icon: <Upload className="w-4 h-4" />, badge: `${totalExportCount} Records`, description: "CSV exports & custom reports" },
         ],
       },
       {

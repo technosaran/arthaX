@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 import { getFriendlyErrorMessage } from "@/lib/action-utils";
 import { revalidatePath } from "next/cache";
 import { Client } from "pg";
-import { EXTERNAL_APIS, probeExternalApi } from "@/lib/external-apis";
+
 
 export async function resetUserData() {
   try {
@@ -244,23 +244,8 @@ export async function checkApiHealth() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const results = await Promise.all(
-    Object.values(EXTERNAL_APIS).map((api) => probeExternalApi(api))
-  );
-
-  // Also include Supabase connection check
-  try {
-    const start = Date.now();
-    const { error } = await supabase.from("accounts").select("id").limit(1);
-    const latency = Date.now() - start;
-    if (error) {
-      results.push({ name: "Supabase DB Connection", status: "Degraded", latency: `${latency}ms`, code: 500, error: error.message });
-    } else {
-      results.push({ name: "Supabase DB Connection", status: "Healthy", latency: `${latency}ms`, code: 200 });
-    }
-  } catch (err) {
-    results.push({ name: "Supabase DB Connection", status: "Offline", latency: "—", code: 500, error: err instanceof Error ? err.message : "Unknown" });
-  }
+  const { DiagnosticsService } = await import("@/services/diagnostics-service");
+  const results = await DiagnosticsService.runAllDiagnostics();
 
   return { success: true, results };
 }

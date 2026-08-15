@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
@@ -53,6 +53,8 @@ export default function CryptoClient() {
   const { data: { investments, accounts }, mutate } = useFinanceData();
   const [submitting, withLock] = useSubmitLock();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const action = searchParams?.get("action");
   const { isSyncing: isSyncingBinance, syncHoldings: syncBinanceHoldings, status: binanceStatus } = useBinanceSettings();
 
   const [mounted, setMounted] = useState(false);
@@ -62,7 +64,7 @@ export default function CryptoClient() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<"dashboard" | "holdings" | "transactions">("dashboard");
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(action === "new");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 

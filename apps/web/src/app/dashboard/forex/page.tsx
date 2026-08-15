@@ -1,11 +1,29 @@
+import { Suspense } from "react";
+import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import ForexClient from "./ForexClient";
 
-type PageProps = {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+export const metadata: Metadata = {
+  title: "Forex Trading",
+  description: "Manage your forex accounts, trades, and PnL.",
 };
 
-export default async function ForexPage({ searchParams }: PageProps) {
-  const resolvedParams = await searchParams;
-  const queryString = new URLSearchParams(resolvedParams as any).toString();
-  redirect(`/dashboard/investments?tab=forex${queryString ? `&${queryString}` : ""}`);
+export const dynamic = "force-dynamic";
+
+export default async function ForexPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <ForexClient />
+    </Suspense>
+  );
 }

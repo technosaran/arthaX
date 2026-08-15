@@ -126,11 +126,22 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
         }
       }
 
-      const date = new Date(log.created_at);
+      const dateStr = log.created_at.endsWith("Z") || log.created_at.includes("+") ? log.created_at : log.created_at + "Z";
+      const date = new Date(dateStr);
 
       if (startDate || endDate) {
-        const start = startDate ? startOfDay(new Date(startDate)) : new Date(0);
-        const end = endDate ? endOfDay(new Date(endDate)) : new Date();
+        let start = new Date(0);
+        if (startDate) {
+          const [y, m, d] = startDate.split("-").map(Number);
+          start = startOfDay(new Date(y, m - 1, d));
+        }
+        
+        let end = new Date();
+        if (endDate) {
+          const [y, m, d] = endDate.split("-").map(Number);
+          end = endOfDay(new Date(y, m - 1, d));
+        }
+        
         return isWithinInterval(date, { start, end });
       }
       return true;

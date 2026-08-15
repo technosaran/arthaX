@@ -23,6 +23,21 @@ const nextConfig: NextConfig = {
     },
   },
 
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/tax',
+        destination: '/dashboard/tax-reports',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/tax-center',
+        destination: '/dashboard/tax-reports',
+        permanent: true,
+      },
+    ];
+  },
+
   // Security headers — consolidated here. All non-cache headers live in
   // the middleware (src/proxy.ts) for dynamic routes. Only cache-control
   // and X-DNS-Prefetch-Control are kept here for static assets.

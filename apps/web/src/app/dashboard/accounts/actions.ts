@@ -158,16 +158,19 @@ export async function deleteAccount(id: string) {
       return { error: "Built-in accounts (Cash Reserve, Zerodha Funds) are permanent and cannot be deleted." };
     }
 
-    // Unlink any transactions that reference this account to prevent foreign key constraint violations
-    const unlinkResults = await Promise.all([
-      supabase.from("forex_transactions").update({ bank_account_id: null }).eq("bank_account_id", id),
-      supabase.from("bond_transactions").update({ account_id: null }).eq("account_id", id),
-      supabase.from("mutual_fund_trades").update({ account_id: null }).eq("account_id", id),
-    ]);
-    const unlinkError = unlinkResults.find(r => r.error);
-    if (unlinkError?.error) {
-      console.error("Failed to unlink references:", unlinkError.error);
-      return { error: `Failed to unlink references: ${unlinkError.error.message}` };
+    // Check if the account has any transactions linked
+    const { count: txnCount, error: countError } = await supabase
+      .from("transactions")
+      .select("*", { count: "exact", head: true })
+      .eq("account_id", id);
+
+    if (countError) {
+      console.error("Failed to check for transactions:", countError);
+      return { error: `Failed to check for active transactions: ${countError.message}` };
+    }
+
+    if (txnCount && txnCount > 0) {
+      return { error: "Cannot delete this account because it has active transactions. Please empty and archive it instead." };
     }
 
     const { data: rpcData, error } = await supabase.rpc("delete_account_atomic_v2", {
