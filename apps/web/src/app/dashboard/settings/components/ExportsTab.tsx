@@ -311,7 +311,7 @@ export default function ExportsTab() {
       {/* Grid of One-Click Module Exporters */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+          <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">
             Module Quick CSV Exporters
           </h3>
           

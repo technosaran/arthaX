@@ -9,6 +9,7 @@ import { useFinanceData } from "@/hooks/use-finance-data";
 import { useUser } from "@/context/user-context";
 import { getCanonicalEnabledModules } from "@/lib/modules";
 import type { ModuleKey } from "@/lib/modules";
+import { TrendingDown, TrendingUp, RefreshCcw, LineChart, Bitcoin, BarChart2, Landmark, ShieldCheck, Banknote, FileText, Building2, Users } from "lucide-react";
 
 const nav = [
   {
@@ -158,18 +159,18 @@ function NavItem({ label, href, icon, pathname, isCollapsed }: (typeof nav)[0] &
 }
 
 const quickActions = [
-  { label: "Expense", href: "/dashboard/expenses?action=new", icon: "🔴", color: "var(--danger)" },
-  { label: "Income", href: "/dashboard/income?action=new", icon: "🟢", color: "var(--success)" },
-  { label: "Transfer", href: "/dashboard/accounts?action=transfer", icon: "🔄", color: "var(--accent-primary-light)" },
-  { label: "Trade", href: "/dashboard/stocks?action=new", icon: "📈", color: "#3b82f6" },
-  { label: "Crypto", href: "/dashboard/crypto?action=new", icon: "🪙", color: "#f59e0b" },
-  { label: "FnO", href: "/dashboard/fno?action=new", icon: "📊", color: "#10b981" },
-  { label: "Funds", href: "/dashboard/mutual-funds?action=new", icon: "🏦", color: "#a855f7" },
-  { label: "Bonds", href: "/dashboard/bonds?action=new", icon: "🔏", color: "#eab308" },
-  { label: "Forex", href: "/dashboard/forex?action=new", icon: "💱", color: "#fbbf24" },
-  { label: "Liability", href: "/dashboard/liabilities?action=new", icon: "💸", color: "#ec4899" },
-  { label: "Alt Asset", href: "/dashboard/alternative-assets?action=new", icon: "🏢", color: "#14b8a6" },
-  { label: "Family Send", href: "/dashboard/family?action=send", icon: "👨‍👩‍👧‍👦", color: "#8b5cf6" },
+  { label: "Expense", href: "/dashboard/expenses?action=new", icon: TrendingDown, color: "var(--danger)" },
+  { label: "Income", href: "/dashboard/income?action=new", icon: TrendingUp, color: "var(--success)" },
+  { label: "Transfer", href: "/dashboard/accounts?action=transfer", icon: RefreshCcw, color: "var(--accent-primary-light)" },
+  { label: "Trade", href: "/dashboard/stocks?action=new", icon: LineChart, color: "#3b82f6" },
+  { label: "Crypto", href: "/dashboard/crypto?action=new", icon: Bitcoin, color: "#f59e0b" },
+  { label: "FnO", href: "/dashboard/fno?action=new", icon: BarChart2, color: "#10b981" },
+  { label: "Funds", href: "/dashboard/mutual-funds?action=new", icon: Landmark, color: "#a855f7" },
+  { label: "Bonds", href: "/dashboard/bonds?action=new", icon: ShieldCheck, color: "#eab308" },
+  { label: "Forex", href: "/dashboard/forex?action=new", icon: Banknote, color: "#fbbf24" },
+  { label: "Liability", href: "/dashboard/liabilities?action=new", icon: FileText, color: "#ec4899" },
+  { label: "Alt Asset", href: "/dashboard/alternative-assets?action=new", icon: Building2, color: "#14b8a6" },
+  { label: "Family Send", href: "/dashboard/family?action=send", icon: Users, color: "#8b5cf6" },
 ];
 
 const actionModuleMap: Record<string, string> = {
@@ -326,7 +327,9 @@ export default function Sidebar() {
         <div id="quick-actions-dialog" role="dialog" aria-modal="true" aria-label="Quick actions" ref={quickActionDialogRef} className={`absolute bottom-[calc(var(--mobile-bottom-nav-height)+0.5rem)] left-4 right-4 max-h-[75vh] overflow-y-auto no-scrollbar grid grid-cols-2 gap-2.5 sm:gap-3 transition-all duration-500 ${isQuickActionOpen ? "translate-y-0 scale-100" : "translate-y-16 scale-90"}`} onClick={e => e.stopPropagation()}>
           {filteredQuickActions.map((action) => (
             <Link key={action.label} href={action.href} prefetch={true} onClick={() => setIsQuickActionOpen(false)} aria-label={`Add new ${action.label}`} className="glass-card-static p-4 flex flex-col items-center justify-center gap-2.5 no-underline transition-all active:scale-95 shadow-lg bg-[--bg-surface] animate-fade-in" style={{ border: `1px solid ${action.color}30` }}>
-              <div className="text-2xl filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.1)]" aria-hidden="true">{action.icon}</div>
+              <div className="text-2xl filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.1)] flex items-center justify-center text-[--text-secondary]" aria-hidden="true">
+                <action.icon className="w-6 h-6" />
+              </div>
               <span className="text-[0.5625rem] font-black uppercase tracking-[0.2em]" style={{ color: action.color }}>{action.label}</span>
             </Link>
           ))}

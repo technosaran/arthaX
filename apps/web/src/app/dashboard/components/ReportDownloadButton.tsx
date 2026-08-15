@@ -13,7 +13,7 @@ const AVAILABLE_MODULES = [
   { id: "bonds", label: "Bonds & Fixed Income", desc: "Fixed rate bonds, T-bills, and coupon yields" },
   { id: "alternative_assets", label: "Alternative Assets", desc: "Real estate, gold, and startup equity" },
   { id: "liabilities", label: "Loans & Outstanding Liabilities", desc: "Home loans, car loans, and EMI status" },
-  { id: "usd_portfolio", label: "USD Portfolio & Crypto Assets", desc: "US stocks, crypto tokens, and USD cash" },
+  { id: "usd_portfolio", label: "USD Portfolio & Crypto Assets", desc: "Crypto tokens and USD cash" },
   { id: "fy_tax_summary", label: "FY Tax Summary (India)", desc: "FY taxable income, tax payable vs paid, and regime overview" },
   { id: "capital_gains_statement", label: "Capital Gains Statement", desc: "STCG/LTCG by asset class with source traceability" },
   { id: "deduction_statement", label: "Deduction Statement", desc: "80C/80D/80CCD utilization and limits" },

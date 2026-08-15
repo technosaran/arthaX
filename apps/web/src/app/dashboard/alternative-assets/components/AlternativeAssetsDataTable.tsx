@@ -12,7 +12,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Building, Trophy, Package, Palette, Handshake, Lock, Target } from "lucide-react";
 import type { Tables } from "@/lib/database.types";
 import PnLValue from "@/components/pnl-value";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
@@ -27,13 +27,13 @@ interface AlternativeAssetsDataTableProps {
 }
 
 const CATEGORIES = [
-  { label: "Real Estate", icon: "🏙️" },
-  { label: "Gold / Precious Metals", icon: "🏆" },
-  { label: "Physical Assets", icon: "📦" },
-  { label: "Collectibles", icon: "🎨" },
-  { label: "Private Equity", icon: "🤝" },
-  { label: "Crypto (Cold Storage)", icon: "🔐" },
-  { label: "Others", icon: "🎯" },
+  { label: "Real Estate", icon: Building },
+  { label: "Gold / Precious Metals", icon: Trophy },
+  { label: "Physical Assets", icon: Package },
+  { label: "Collectibles", icon: Palette },
+  { label: "Private Equity", icon: Handshake },
+  { label: "Crypto (Cold Storage)", icon: Lock },
+  { label: "Others", icon: Target },
 ];
 
 const columnHelper = createColumnHelper<AltAsset>();
@@ -49,8 +49,8 @@ export default function AlternativeAssetsDataTable({ assets, onEdit, onDelete, o
           const category = CATEGORIES.find(c => c.label === info.row.original.category) || CATEGORIES[6];
           return (
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-sm shadow-sm">
-                {category.icon}
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[--accent-primary] shadow-sm">
+                <category.icon className="w-4 h-4" />
               </div>
               <div className="flex flex-col max-w-[200px]">
                 <p className="text-sm font-bold text-white truncate" title={info.getValue()}>{info.getValue()}</p>
@@ -151,7 +151,7 @@ export default function AlternativeAssetsDataTable({ assets, onEdit, onDelete, o
   if (assets.length === 0) {
     return (
       <EmptyState 
-        icon="💎"
+        icon={<Trophy className="w-12 h-12 text-[--accent-primary]" />}
         title="Register Your First Asset"
         description="Track real estate, gold, collectibles, and other tangible holdings. Build a complete picture of your alternative wealth portfolio."
         action={
@@ -206,7 +206,9 @@ export default function AlternativeAssetsDataTable({ assets, onEdit, onDelete, o
             <div key={asset.id} className="p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-lg shrink-0">{category.icon}</div>
+                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[--accent-primary] shrink-0">
+                    <category.icon className="w-5 h-5" />
+                  </div>
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-bold text-white truncate">{asset.name}</span>
                     <span className="text-xs text-[--text-muted]">{asset.category}</span>

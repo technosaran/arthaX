@@ -10,7 +10,7 @@ import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { format } from "date-fns";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
-import { Trash2 } from "lucide-react";
+import { Trash2, Building, Trophy, Package, Palette, Handshake, Lock, Target } from "lucide-react";
 import PnLValue from "@/components/pnl-value";
 
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
@@ -19,13 +19,13 @@ import AlternativeAssetsDataTable from "./components/AlternativeAssetsDataTable"
 import { getChartColour } from "@/lib/chart-colours";
 
 const CATEGORIES = [
-  { label: "Real Estate", icon: "🏙️" },
-  { label: "Gold / Precious Metals", icon: "🏆" },
-  { label: "Physical Assets", icon: "📦" },
-  { label: "Collectibles", icon: "🎨" },
-  { label: "Private Equity", icon: "🤝" },
-  { label: "Crypto (Cold Storage)", icon: "🔐" },
-  { label: "Others", icon: "🎯" },
+  { label: "Real Estate", icon: Building },
+  { label: "Gold / Precious Metals", icon: Trophy },
+  { label: "Physical Assets", icon: Package },
+  { label: "Collectibles", icon: Palette },
+  { label: "Private Equity", icon: Handshake },
+  { label: "Crypto (Cold Storage)", icon: Lock },
+  { label: "Others", icon: Target },
 ];
 
 export default function AlternativeAssetsClient({ initialData, isSubComponent = false }: { initialData?: FinanceData; isSubComponent?: boolean }) {
@@ -55,8 +55,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
   const searchResults = useMemo(() => {
     if (searchQuery.length < 1) return CATEGORIES;
     return CATEGORIES.filter(c => 
-      c.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      c.icon.includes(searchQuery)
+      c.label.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
 
@@ -185,8 +184,8 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
           <div className="absolute -top-24 -left-24 w-96 h-96 bg-[--accent-primary]/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="relative mb-6 p-6 rounded-3xl bg-white/[0.02] border border-white/5 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[--accent-primary]/15 to-emerald-500/15 border border-[--accent-primary]/25 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(14,165,233,0.3)] animate-pulse">
-              <span className="text-3xl">💎</span>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[--accent-primary]/15 to-emerald-500/15 border border-[--accent-primary]/25 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(14,165,233,0.3)] animate-pulse text-[--accent-primary]">
+              <Trophy className="w-8 h-8" />
             </div>
           </div>
           <h3 className="text-2xl md:text-3xl font-black text-[--text-primary] tracking-tight">Register Your First Asset</h3>
@@ -206,29 +205,29 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
         {!isSubComponent && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="glass-card-static p-6 border-white/5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Asset Valuation</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Asset Valuation</p>
               <p className="text-2xl md:text-3xl font-black text-white">₹{stats.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
               <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Market Value</p>
             </div>
             <div className="glass-card-static p-6 border-white/5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Acquisition Cost</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Acquisition Cost</p>
               <p className="text-2xl md:text-3xl font-black text-[--text-secondary]">₹{stats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
               <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Invested</p>
             </div>
             <div className="glass-card-static p-6 border-white/5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Portfolio Growth</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Portfolio Growth</p>
               <PnLValue amount={stats.netGrowth} size="lg" showIcon currency="INR" />
               <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Absolute Return</p>
             </div>
             <div className="glass-card-static p-6 border-white/5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Yield (ROI)</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Yield (ROI)</p>
               <p className={`text-2xl md:text-3xl font-black ${stats.netGrowth >= 0 ? "text-success" : "text-danger"}`}>
                 {stats.netGrowth >= 0 ? "+" : ""}{stats.growthPercent.toFixed(2)}%
               </p>
               <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Relative Return</p>
             </div>
             <div className="glass-card-static p-6 border-white/5 bg-gradient-to-br from-[--accent-primary]/10 to-transparent">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Asset Count</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Asset Count</p>
               <p className="text-xl md:text-2xl font-black text-white">{alternativeAssets.length}</p>
               <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Active Holdings</p>
             </div>
@@ -340,7 +339,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                     </ResponsiveContainer>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
-                       <span className="text-3xl mb-2">📊</span>
+                       <Target className="w-10 h-10 mb-2 opacity-20" />
                        <span className="text-xs uppercase tracking-widest font-black">No Data</span>
                     </div>
                   )}
@@ -436,13 +435,13 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
           title={editingId ? "Update Asset" : "Establish Asset"}
         >
           <div className="w-full">
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               
               {/* Search Section & Quick Category Chips - Only for new assets */}
               {!editingId && !formData.category && (
                 <div className="space-y-4">
                   <div className="relative z-50">
-                    <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] block mb-2">Search Asset Category</label>
+                    <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] block mb-2">Search Asset Category</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -462,7 +461,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                             className="px-6 py-4 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors flex justify-between items-center"
                           >
                             <div className="flex items-center gap-4">
-                              <span className="text-2xl">{cat.icon}</span>
+                              <cat.icon className="w-6 h-6 text-white" />
                               <div className="font-black text-white">{cat.label}</div>
                             </div>
                           </div>
@@ -482,7 +481,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                           onClick={() => handleCategorySelect(cat)}
                           className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/5 text-left transition-all cursor-pointer"
                         >
-                          <span className="text-xl">{cat.icon}</span>
+                          <cat.icon className="w-5 h-5 text-white shrink-0" />
                           <span className="text-xs font-bold text-white truncate">{cat.label}</span>
                         </button>
                       ))}
@@ -496,7 +495,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Asset Name *</label>
+                      <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Asset Name *</label>
                       <input 
                         required 
                         autoFocus
@@ -509,7 +508,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Classification</label>
+                        <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Classification</label>
                         {!editingId && (
                           <button
                             type="button"
@@ -521,7 +520,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                         )}
                       </div>
                       <div className="input-premium flex items-center gap-3 bg-white/5 pointer-events-none">
-                        <span>{selectedCategory?.icon || "💎"}</span>
+                        {selectedCategory ? <selectedCategory.icon className="w-5 h-5 text-[--accent-primary]" /> : <Trophy className="w-5 h-5 text-[--accent-primary]" />}
                         <span className="text-white font-bold">{formData.category}</span>
                       </div>
                     </div>
@@ -529,7 +528,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Acquisition Cost (₹) *</label>
+                      <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Acquisition Cost (₹) *</label>
                       <input 
                         required 
                         type="number" 
@@ -542,7 +541,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Current Valuation (₹) *</label>
+                      <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Current Valuation (₹) *</label>
                       <input 
                         required 
                         type="number" 
@@ -557,14 +556,14 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                   </div>
 
                   <details className="group glass-card-static border border-white/5 rounded-xl overflow-hidden mt-4">
-                    <summary className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] p-3.5 cursor-pointer outline-none hover:text-white transition-colors bg-white/[0.01] flex items-center justify-between">
+                    <summary className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] p-3.5 cursor-pointer outline-none hover:text-white transition-colors bg-white/[0.01] flex items-center justify-between">
                       <span>Additional Details (Date, Account, Notes)</span>
                       <span className="text-xs text-white/40 group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <div className="p-4 pt-2 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Acquisition Date</label>
+                          <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Acquisition Date</label>
                           <input 
                             type="date" 
                             className="input-premium" 
@@ -573,7 +572,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Source Account (Optional)</label>
+                          <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Source Account (Optional)</label>
                           <select 
                             aria-label="Select account" 
                             className="input-premium" 
@@ -597,7 +596,7 @@ export default function AlternativeAssetsClient({ initialData, isSubComponent = 
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Notes / Location</label>
+                        <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Notes / Location</label>
                         <input 
                           type="text" 
                           className="input-premium" 

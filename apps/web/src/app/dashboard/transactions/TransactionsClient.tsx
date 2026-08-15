@@ -7,31 +7,31 @@ import { format, parseISO } from "date-fns";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
-import { Plus } from "lucide-react";
+import { Plus, Building2, Laptop, Rocket, Gift, Sparkles, Undo2, Package, Home, Utensils, Plane, TrendingUp, Bus, Zap, Film, ShoppingBag, CreditCard, Tag } from "lucide-react";
 import { addIncome, deleteIncome } from "@/app/dashboard/income/actions";
 import { addExpense, deleteExpense } from "@/app/dashboard/expenses/actions";
 
 const INCOME_CATEGORIES = [
-  { label: "Salary", icon: "🏢" },
-  { label: "Work", icon: "💻" },
-  { label: "Freelance", icon: "🚀" },
-  { label: "Gift", icon: "💝" },
-  { label: "Bonus", icon: "✨" },
-  { label: "Refund", icon: "↩️" },
-  { label: "Others", icon: "📦" },
+  { label: "Salary", icon: Building2 },
+  { label: "Work", icon: Laptop },
+  { label: "Freelance", icon: Rocket },
+  { label: "Gift", icon: Gift },
+  { label: "Bonus", icon: Sparkles },
+  { label: "Refund", icon: Undo2 },
+  { label: "Others", icon: Package },
 ];
 
 const EXPENSE_CATEGORIES = [
-  { label: "Rent", icon: "🏠" },
-  { label: "Food", icon: "🍔" },
-  { label: "Travel", icon: "✈️" },
-  { label: "Investment", icon: "📈" },
-  { label: "Transport", icon: "🚌" },
-  { label: "Utilities", icon: "⚡" },
-  { label: "Entertainment", icon: "🎬" },
-  { label: "Shopping", icon: "🛍️" },
-  { label: "Subscription", icon: "💳" },
-  { label: "Others", icon: "📦" },
+  { label: "Rent", icon: Home },
+  { label: "Food", icon: Utensils },
+  { label: "Travel", icon: Plane },
+  { label: "Investment", icon: TrendingUp },
+  { label: "Transport", icon: Bus },
+  { label: "Utilities", icon: Zap },
+  { label: "Entertainment", icon: Film },
+  { label: "Shopping", icon: ShoppingBag },
+  { label: "Subscription", icon: CreditCard },
+  { label: "Others", icon: Package },
 ];
 
 export default function TransactionsClient() {
@@ -155,9 +155,9 @@ export default function TransactionsClient() {
     return acc ? acc.currency : "INR";
   };
 
-  const getCategoryIcon = (category: string, type: string) => {
+  const getCategoryConfig = (category: string, type: string) => {
     const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-    return categories.find(c => c.label === category)?.icon || "📦";
+    return categories.find(c => c.label === category);
   };
 
   // Filter transactions by selected month, year, type tab, global filter, and category
@@ -409,24 +409,24 @@ export default function TransactionsClient() {
       {/* Top Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-card-static p-6 border-white/5">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Inflow</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Inflow</p>
           <p className="text-2xl md:text-3xl font-black text-emerald-400">₹{stats.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Income</p>
         </div>
         <div className="glass-card-static p-6 border-white/5">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Outflow</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Outflow</p>
           <p className="text-2xl md:text-3xl font-black text-rose-500">₹{stats.totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Expenses</p>
         </div>
         <div className="glass-card-static p-6 border-white/5">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Net Cashflow</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Net Cashflow</p>
           <p className={`text-2xl md:text-3xl font-black ${stats.netFlow >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
             ₹{stats.netFlow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Margin</p>
         </div>
         <div className="glass-card-static p-6 border-white/5">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Savings Rate</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Savings Rate</p>
           <p className={`text-2xl md:text-3xl font-black ${stats.savingsRate >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
             {stats.savingsRate.toFixed(1)}%
           </p>
@@ -496,12 +496,12 @@ export default function TransactionsClient() {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-black/40 border-b border-white/5">
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Date</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Description</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Category</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Channel</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Value</th>
-                <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Amount</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Date</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Description</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Category</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Channel</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] text-right">Value</th>
+                <th className="px-5 py-3 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -514,7 +514,7 @@ export default function TransactionsClient() {
               ) : (
                 paginatedTransactions.map((t) => {
                   const isIncome = t.type === "income";
-                  const icon = getCategoryIcon(t.category || "Others", t.type);
+                  const iconConfig = getCategoryConfig(t.category || "Others", t.type);
                   const account = accounts.find(a => a.id === t.account_id);
                   const currency = getAccountCurrency(t.account_id);
 
@@ -531,7 +531,10 @@ export default function TransactionsClient() {
                       <td className="px-5 py-3.5 align-middle">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-lg flex-shrink-0">
-                            {icon}
+                            {(() => {
+                              const Ico = iconConfig?.icon || Tag;
+                              return <Ico className="w-4 h-4" />;
+                            })()}
                           </div>
                           <p className="text-sm font-medium text-white truncate max-w-[200px]">
                             {t.description}
@@ -659,7 +662,7 @@ export default function TransactionsClient() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-description">
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-description">
                   {modalType === "expense" ? "Merchant / Purpose" : "Source / Payor"}
                 </label>
                 <input 
@@ -677,7 +680,7 @@ export default function TransactionsClient() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-amount">
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-amount">
                     Amount (₹)
                   </label>
                   <input 
@@ -695,7 +698,7 @@ export default function TransactionsClient() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-date">
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-date">
                     Date
                   </label>
                   <input 
@@ -713,7 +716,7 @@ export default function TransactionsClient() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-category">
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-category">
                     Category
                   </label>
                   <select 
@@ -732,7 +735,7 @@ export default function TransactionsClient() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-account">
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-account">
                     Account
                   </label>
                   <select 
@@ -774,7 +777,7 @@ export default function TransactionsClient() {
               {(modalType === "expense" || modalType === "income") && (
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="tx-recurring">
+                    <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="tx-recurring">
                       Recurring {modalType === "expense" ? "Expense" : "Income"}
                     </label>
                     <input

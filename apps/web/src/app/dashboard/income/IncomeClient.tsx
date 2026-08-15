@@ -26,6 +26,7 @@ function getColorByLabel(label: string | null | undefined) {
 }
 
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "@/components/ui/recharts";
+import { Building2, Diamond, Laptop, Rocket, Gift, Sparkles, Undo2, Package } from "lucide-react";
 
 
 function getBrandMonogram(name: string): string {
@@ -178,14 +179,14 @@ const AccountBankLogo = memo(({ bankName, accountName, className = "w-10 h-10" }
 AccountBankLogo.displayName = "AccountBankLogo";
 
 const INCOME_CATEGORIES = [
-  { label: "Salary", icon: "🏢", color: CHART_COLOURS[0] },
-  { label: "Dividend", icon: "💎", color: "#10b981" },
-  { label: "Work", icon: "💻", color: CHART_COLOURS[1] },
-  { label: "Freelance", icon: "🚀", color: CHART_COLOURS[2] },
-  { label: "Gift", icon: "💝", color: CHART_COLOURS[3] },
-  { label: "Bonus", icon: "✨", color: CHART_COLOURS[4] },
-  { label: "Refund", icon: "↩️", color: CHART_COLOURS[5] },
-  { label: "Others", icon: "📦", color: CHART_COLOURS[6] },
+  { label: "Salary", icon: Building2, color: CHART_COLOURS[0] },
+  { label: "Dividend", icon: Diamond, color: "#10b981" },
+  { label: "Work", icon: Laptop, color: CHART_COLOURS[1] },
+  { label: "Freelance", icon: Rocket, color: CHART_COLOURS[2] },
+  { label: "Gift", icon: Gift, color: CHART_COLOURS[3] },
+  { label: "Bonus", icon: Sparkles, color: CHART_COLOURS[4] },
+  { label: "Refund", icon: Undo2, color: CHART_COLOURS[5] },
+  { label: "Others", icon: Package, color: CHART_COLOURS[6] },
 ];
 
 export default function IncomeClient({ initialData }: { initialData?: FinanceData }) {
@@ -680,12 +681,12 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className="sticky top-0 z-10 bg-[#12151c] shadow-sm">
                 <tr className="border-b border-white/5">
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Date</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Source</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Segment</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] hidden sm:table-cell">Destination</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Credit</th>
-                  <th className="px-4 md:px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] text-right">Actions</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Date</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Source</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Segment</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] hidden sm:table-cell">Destination</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] text-right">Credit</th>
+                  <th className="px-4 md:px-6 py-4 text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -934,7 +935,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
               >
                 {INCOME_CATEGORIES.map((c) => (
                   <option key={c.label} value={c.label} className="bg-[#151922] text-white py-1">
-                    {c.icon} {c.label}
+                    {c.label}
                   </option>
                 ))}
               </select>
@@ -942,12 +943,12 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Date</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Date</label>
                 <input type="date" required className="input-premium py-2 text-xs" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} autoComplete="new-password" id="income-date" name="date" />
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Account</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Account</label>
                 <select className="input-premium py-2 text-xs" value={formData.account_id} onChange={e => setFormData({...formData, account_id: e.target.value})} aria-label="Select deposit account" id="income-account" name="account_id">
                   <option value="" disabled className="bg-[--bg-surface]">Select Deposit Account</option>
                   {accounts.map(acc => {
@@ -979,7 +980,7 @@ export default function IncomeClient({ initialData }: { initialData?: FinanceDat
 
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]" htmlFor="inc-recurring">
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]" htmlFor="inc-recurring">
                   Recurring Income
                 </label>
                 <input

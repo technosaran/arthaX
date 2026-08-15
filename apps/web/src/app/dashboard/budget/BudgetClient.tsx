@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { upsertBudget, deleteBudget, copyPreviousMonthBudgets, clearAllBudgets } from "./actions";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
@@ -22,20 +22,20 @@ import {
 } from "@/components/ui/recharts";
 
 import { Drawer } from "@/components/ui/drawer";
-import { Copy, Trash2, Edit2, Plus, Check } from "lucide-react";
+import { Copy, Trash2, Edit2, Plus, Check, Target, BarChart2, Lightbulb, Home, Utensils, Plane, TrendingUp, Bus, Zap, Film, ShoppingBag, CreditCard, Package } from "lucide-react";
 import BudgetOverviewWidget from "@/components/dashboard/budget-overview-widget";
 
 const BUDGET_CATEGORIES = [
-  { label: "Rent", icon: "🏠" },
-  { label: "Food", icon: "🍔" },
-  { label: "Travel", icon: "✈️" },
-  { label: "Investment", icon: "📈" },
-  { label: "Transport", icon: "🚌" },
-  { label: "Utilities", icon: "⚡" },
-  { label: "Entertainment", icon: "🎬" },
-  { label: "Shopping", icon: "🛍️" },
-  { label: "Subscription", icon: "💳" },
-  { label: "Others", icon: "📦" }
+  { label: "Rent", icon: Home },
+  { label: "Food", icon: Utensils },
+  { label: "Travel", icon: Plane },
+  { label: "Investment", icon: TrendingUp },
+  { label: "Transport", icon: Bus },
+  { label: "Utilities", icon: Zap },
+  { label: "Entertainment", icon: Film },
+  { label: "Shopping", icon: ShoppingBag },
+  { label: "Subscription", icon: CreditCard },
+  { label: "Others", icon: Package }
 ];
 
 export default function BudgetClient({ initialData }: { initialData?: FinanceData }) {
@@ -46,7 +46,7 @@ export default function BudgetClient({ initialData }: { initialData?: FinanceDat
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerCategory, setDrawerCategory] = useState<string>("");
-  const [drawerIcon, setDrawerIcon] = useState<string>("📦");
+  const [drawerIcon, setDrawerIcon] = useState<React.ElementType>(Package);
   const [drawerAmount, setDrawerAmount] = useState<string>("");
   const [drawerSpent, setDrawerSpent] = useState<number>(0);
 
@@ -165,25 +165,25 @@ function normalizeCategory(cat: string): string {
   }, [totalSpent, daysPassed, totalBudgeted, daysInMonth, selectedMonth, selectedYear]);
 
   const dynamicCategories = useMemo(() => {
-    const catsMap = new Map<string, string>();
+    const catsMap = new Map<string, React.ElementType>();
     BUDGET_CATEGORIES.forEach(c => catsMap.set(c.label, c.icon));
     
     Object.keys(actualSpending).forEach(c => {
       const norm = normalizeCategory(c);
-      if (!catsMap.has(norm)) catsMap.set(norm, "📦");
+      if (!catsMap.has(norm)) catsMap.set(norm, Package);
     });
     currentBudgets.forEach(b => {
       const norm = normalizeCategory(b.category);
-      if (!catsMap.has(norm)) catsMap.set(norm, "📦");
+      if (!catsMap.has(norm)) catsMap.set(norm, Package);
     });
     
     return Array.from(catsMap.entries()).map(([label, icon]) => {
       let finalIcon = icon;
       const lower = label.toLowerCase();
-      if (lower === "food & dining" || lower === "food") finalIcon = "🍔";
-      else if (lower === "housing" || lower === "rent") finalIcon = "🏠";
-      else if (lower === "bills & utilities" || lower === "utilities") finalIcon = "⚡";
-      else if (lower === "transportation" || lower === "transport") finalIcon = "🚌";
+      if (lower === "food & dining" || lower === "food") finalIcon = Utensils;
+      else if (lower === "housing" || lower === "rent") finalIcon = Home;
+      else if (lower === "bills & utilities" || lower === "utilities") finalIcon = Zap;
+      else if (lower === "transportation" || lower === "transport") finalIcon = Bus;
       
       return { label, icon: finalIcon };
     }).sort((a, b) => {
@@ -477,31 +477,31 @@ function normalizeCategory(cat: string): string {
       {/* Top Key Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="glass-card-static p-5 border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-transparent to-transparent shadow-lg">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400/80 mb-2">Planned spend</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-cyan-400/80 mb-2">Planned spend</p>
           <p className="text-2xl font-black text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">₹{totalBudgeted.toLocaleString()}</p>
           <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Total monthly limit</p>
         </div>
         <div className="glass-card-static p-5 border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent shadow-lg">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-400/80 mb-2">Actual spend</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-amber-400/80 mb-2">Actual spend</p>
           <p className={`text-2xl font-black ${totalSpent > totalBudgeted && totalBudgeted > 0 ? "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]" : "text-white drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]"}`}>₹{totalSpent.toLocaleString()}</p>
           <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Real-time outflow</p>
         </div>
         <div className="glass-card-static p-5 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent shadow-lg">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400/80 mb-2">Margin</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-emerald-400/80 mb-2">Margin</p>
           <p className={`text-2xl font-black ${totalBudgeted - totalSpent >= 0 ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.4)]"}`}>
             ₹{(totalBudgeted - totalSpent).toLocaleString()}
           </p>
           <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Remaining balance</p>
         </div>
         <div className="glass-card-static p-5 border-sky-500/20 bg-gradient-to-br from-sky-500/10 via-transparent to-transparent shadow-lg">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-400/80 mb-2">Daily allowance</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-sky-400/80 mb-2">Daily allowance</p>
           <p className={`text-2xl font-black ${(daysInMonth - daysPassed) > 0 && (totalBudgeted - totalSpent) > 0 ? "text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]" : "text-slate-500"}`}>
             ₹{((daysInMonth - daysPassed) > 0 && (totalBudgeted - totalSpent) > 0 ? (totalBudgeted - totalSpent) / (daysInMonth - daysPassed) : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
           <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Safe spend / day</p>
         </div>
         <div className="glass-card-static p-5 border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent col-span-2 md:col-span-1 shadow-lg">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-400/80 mb-2">Monthly income</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-wider text-purple-400/80 mb-2">Monthly income</p>
           <p className="text-2xl font-black text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.3)]">₹{totalIncome.toLocaleString()}</p>
           <p className="text-[0.5625rem] text-[--text-muted] mt-1 opacity-80">Total revenue stream</p>
         </div>
@@ -511,7 +511,7 @@ function normalizeCategory(cat: string): string {
       {velocityForecast.some((v) => v.willExceed) && (
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-center gap-3">
-            <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm shrink-0">⚡</span>
+            <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0"><Zap className="w-4 h-4" /></span>
             <div>
               <p className="font-black text-amber-400 uppercase tracking-wider text-[11px]">Predictive Velocity Alert</p>
               <p className="text-gray-300 font-medium">
@@ -537,7 +537,7 @@ function normalizeCategory(cat: string): string {
               : "text-[--text-muted] hover:text-white hover:bg-white/5"
           }`}
         >
-          <span>🎯 Category Allocations</span>
+          <Target className="w-4 h-4" /><span>Category Allocations</span>
         </button>
 
         <button
@@ -549,7 +549,7 @@ function normalizeCategory(cat: string): string {
               : "text-[--text-muted] hover:text-white hover:bg-white/5"
           }`}
         >
-          <span>📊 Analytics & Pacing</span>
+          <BarChart2 className="w-4 h-4" /><span>Analytics & Pacing</span>
           {overBudgetCategories.length > 0 && (
             <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[0.625rem] font-bold">
               {overBudgetCategories.length} Over
@@ -566,7 +566,7 @@ function normalizeCategory(cat: string): string {
               : "text-[--text-muted] hover:text-white hover:bg-white/5"
           }`}
         >
-          <span>💡 Insights & Comparison</span>
+          <Lightbulb className="w-4 h-4" /><span>Insights & Comparison</span>
         </button>
       </div>
 
@@ -609,7 +609,7 @@ function normalizeCategory(cat: string): string {
           {/* Over Budget Alerts Banner */}
           {overBudgetCategories.length > 0 && (
             <div className="glass-card-static p-4.5 border-rose-500/20 bg-gradient-to-br from-rose-500/5 to-transparent">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-rose-400 mb-3.5 flex items-center gap-2">
+              <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-rose-400 mb-3.5 flex items-center gap-2">
                 <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 Over Budget Warnings
               </h3>
@@ -622,7 +622,7 @@ function normalizeCategory(cat: string): string {
                   return (
                     <div key={cat.label} className="flex justify-between items-center bg-rose-500/5 p-2.5 rounded-xl border border-rose-500/10 text-xs">
                       <div className="flex items-center gap-2">
-                        <span>{cat.icon}</span>
+                        {(() => { const Icon = cat.icon; return <Icon className="w-4 h-4 text-rose-300" />; })()}
                         <span className="font-bold text-white">{cat.label}</span>
                       </div>
                       <span className="font-black text-rose-400">₹{overage.toLocaleString()} over</span>
@@ -667,10 +667,10 @@ function normalizeCategory(cat: string): string {
                                   strokeDashoffset={113 * (1 - Math.min(percent, 100) / 100)}
                                 />
                               </svg>
-                              <span className="text-lg z-10">{cat.icon}</span>
+                              <span className="z-10">{(() => { const Icon = cat.icon; return <Icon className="w-5 h-5 text-white" />; })()}</span>
                             </>
                           ) : (
-                            <span className="text-lg p-2 bg-white/[0.04] rounded-2xl border border-white/10 shadow-inner">{cat.icon}</span>
+                            <span className="p-2.5 bg-white/[0.04] rounded-2xl border border-white/10 shadow-inner">{(() => { const Icon = cat.icon; return <Icon className="w-5 h-5 text-gray-400" />; })()}</span>
                           )}
                         </div>
                         <div>
@@ -761,7 +761,7 @@ function normalizeCategory(cat: string): string {
               <div className="glass-card-static p-5 min-h-[340px] flex flex-col border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
+                    <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">6-Month Budget vs Spend Trajectory</h3>
                     <p className="text-xs text-[--text-secondary] mt-0.5">Visual representation of total spending velocity compared to planning targets.</p>
                   </div>
                 </div>
@@ -799,7 +799,7 @@ function normalizeCategory(cat: string): string {
               <div className="glass-card-static p-5 flex flex-col justify-between min-h-[340px] border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent relative">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+                    <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">
                       {currentBudgets.length > 0 ? "Target Budget Allocation" : "Actual Spending Split"}
                     </h3>
                     <p className="text-xs text-[--text-secondary] mt-0.5">
@@ -827,7 +827,7 @@ function normalizeCategory(cat: string): string {
                     </ResponsiveContainer>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[--text-muted]">
-                       <span className="text-xl mb-1">📊</span>
+                       <span className="mb-2"><BarChart2 className="w-6 h-6 opacity-30" /></span>
                        <span className="text-[0.5625rem] uppercase tracking-widest font-black">No Budget or Expense Data</span>
                     </div>
                   )}
@@ -851,7 +851,7 @@ function normalizeCategory(cat: string): string {
             <div className="space-y-6">
               {/* Status Color Legend Card */}
               <div className="glass-card-static p-5 border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Status Legend</h3>
+                <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Status Legend</h3>
                 <div className="space-y-2.5 text-xs text-[--text-secondary]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -880,7 +880,7 @@ function normalizeCategory(cat: string): string {
               {/* Pacing & Trajectory Card */}
               <div className="glass-card-static p-5 relative overflow-hidden border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent">
                 <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-[70px] pointer-events-none ${isBurningFast && totalBudgeted > 0 ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-5">Pacing & Velocity</h3>
+                <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-5">Pacing & Velocity</h3>
                 <div className="grid grid-cols-2 gap-4 mb-5">
                   <div>
                     <p className="text-3xl font-black text-white">{daysInMonth - daysPassed}</p>
@@ -986,7 +986,7 @@ function normalizeCategory(cat: string): string {
                       <tr key={cat.label} className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <span className="text-xl p-1.5 bg-white/5 rounded-xl border border-white/10">{cat.icon}</span>
+                            <span className="p-2 bg-white/5 rounded-xl border border-white/10">{(() => { const Icon = cat.icon; return <Icon className="w-4 h-4 text-gray-300" />; })()}</span>
                             <span className="text-sm font-bold text-white">{cat.label}</span>
                           </div>
                         </td>
@@ -1061,8 +1061,8 @@ function normalizeCategory(cat: string): string {
           <div className="space-y-6">
             {/* Category Banner */}
             <div className="flex items-center gap-4 bg-white/[0.03] p-4 sm:p-5 rounded-2xl border border-white/10 shadow-inner">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/10 shrink-0">
-                {drawerIcon}
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-lg shadow-indigo-500/10 shrink-0">
+                {drawerIcon ? (() => { const Icon = drawerIcon; return <Icon className="w-7 h-7 text-indigo-400" />; })() : <Package className="w-7 h-7 text-indigo-400" />}
               </div>
               <div className="flex flex-col min-w-0">
                 <h4 className="text-lg font-black text-white tracking-tight">{drawerCategory}</h4>

@@ -9,7 +9,7 @@ import { addLiability, updateLiability, deleteLiability } from "./actions";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
-import { Trash2 } from "lucide-react";
+import { Trash2, User, Home, CreditCard, Calendar, Car, Building2, FileText } from "lucide-react";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from "@/components/ui/recharts";
@@ -17,13 +17,13 @@ import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieCha
 import LiabilitiesDataTable from "./components/LiabilitiesDataTable";
 
 const CATEGORIES = [
-  { label: "Personal Loan", icon: "👤" },
-  { label: "Home Loan", icon: "🏠" },
-  { label: "Credit Card", icon: "💳" },
-  { label: "EMI", icon: "📅" },
-  { label: "Vehicle Loan", icon: "🚗" },
-  { label: "Business Loan", icon: "🏢" },
-  { label: "Others", icon: "📄" },
+  { label: "Personal Loan", icon: User },
+  { label: "Home Loan", icon: Home },
+  { label: "Credit Card", icon: CreditCard },
+  { label: "EMI", icon: Calendar },
+  { label: "Vehicle Loan", icon: Car },
+  { label: "Business Loan", icon: Building2 },
+  { label: "Others", icon: FileText },
 ];
 
 export default function LiabilitiesClient({ initialData }: { initialData?: FinanceData }) {
@@ -285,27 +285,27 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
         {/* Top Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="glass-card-static p-6 border-white/5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Exposure</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Exposure</p>
             <p className="text-2xl md:text-3xl font-black text-rose-500">₹{stats.totalDebt.toLocaleString()}</p>
             <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Outstanding Principal</p>
           </div>
           <div className="glass-card-static p-6 border-white/5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Monthly Commitment</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Monthly Commitment</p>
             <p className="text-2xl md:text-3xl font-black text-orange-400">₹{stats.monthlyEMI.toLocaleString()}</p>
             <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Combined EMIs</p>
           </div>
           <div className="glass-card-static p-6 border-white/5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Weighted Interest</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Weighted Interest</p>
             <p className="text-2xl md:text-3xl font-black text-white">{stats.weightedInterest.toFixed(2)}%</p>
             <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Avg APR across debts (Max: {stats.highestInterest.toFixed(1)}%)</p>
           </div>
           <div className="glass-card-static p-6 border-white/5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Paid</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Paid</p>
             <p className="text-2xl md:text-3xl font-black text-white">₹{stats.totalPaid.toLocaleString()}</p>
             <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Cumulative Repayments</p>
           </div>
           <div className="glass-card-static p-6 border-white/5 bg-gradient-to-br from-rose-500/10 to-transparent">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Payoff Progress</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Payoff Progress</p>
             <p className={`text-2xl md:text-3xl font-black text-white`}>
               {stats.payoffPct.toFixed(1)}%
             </p>
@@ -551,47 +551,47 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Liability Name</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Liability Name</label>
                 <input required className="input-premium !h-10 text-xs" placeholder="e.g. HDFC Home Loan" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} autoComplete="new-password" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Category</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Category</label>
                 <select aria-label="Select liability category" id="liability-category" name="category" className="input-premium !h-10 text-xs text-white" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                  {CATEGORIES.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+                  {CATEGORIES.map(c => <option key={c.label} value={c.label} className="bg-[#181A20] text-white font-medium">{c.label}</option>)}
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Total Principal (₹)</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Total Principal (₹)</label>
                 <input required type="number" className="input-premium !h-10 text-xs tabular-nums" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: e.target.value})} autoComplete="new-password" inputMode="decimal" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Remaining Balance (₹)</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Remaining Balance (₹)</label>
                 <input required type="number" className="input-premium !h-10 text-xs tabular-nums" value={formData.remaining_amount} onChange={e => setFormData({...formData, remaining_amount: e.target.value})} autoComplete="new-password" inputMode="decimal" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Interest Rate (%)</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Interest Rate (%)</label>
                 <input type="number" step="0.01" className="input-premium !h-10 text-xs tabular-nums" value={formData.interest_rate} onChange={e => setFormData({...formData, interest_rate: e.target.value})} autoComplete="new-password" inputMode="decimal" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Monthly EMI (₹)</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Monthly EMI (₹)</label>
                 <input type="number" className="input-premium !h-10 text-xs tabular-nums" value={formData.monthly_payment} onChange={e => setFormData({...formData, monthly_payment: e.target.value})} autoComplete="new-password" inputMode="decimal" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Next Due Date</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Next Due Date</label>
                 <input type="date" className="input-premium !h-10 text-xs" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} autoComplete="new-password" />
               </div>
               {!editingId ? (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Destination Account (Optional)</label>
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Destination Account (Optional)</label>
                   <select aria-label="Select account" id="liability-account" name="account_id" className="input-premium !h-10 text-xs text-white" value={formData.account_id} onChange={e => setFormData({...formData, account_id: e.target.value})}>
                     <option value="">No Transaction</option>
                     {accounts.map(acc => {
@@ -609,7 +609,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
                 </div>
               ) : (
                 <div className="space-y-1.5 opacity-60">
-                  <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Destination Account</label>
+                  <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Destination Account</label>
                   <input className="input-premium !h-10 text-xs bg-white/5 cursor-not-allowed text-[--text-muted]" value="N/A" disabled />
                 </div>
               )}
@@ -617,7 +617,7 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
 
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Notes / Account Number</label>
+                <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Notes / Account Number</label>
                 <input type="text" className="input-premium !h-10 text-xs" placeholder="Optional notes..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} autoComplete="new-password" />
               </div>
             </div>

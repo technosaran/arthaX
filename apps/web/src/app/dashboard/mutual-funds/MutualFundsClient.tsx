@@ -311,8 +311,8 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
   return (
     <div className="flex flex-col animate-in fade-in duration-700 w-full relative font-sans space-y-4">
       {/* Sub-Header Actions Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-1">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4 py-1">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
           <div className="flex gap-1.5 rounded-xl bg-white/[0.03] border border-white/10 p-1 shadow-inner">
             <button 
               onClick={() => setActiveTab("dashboard")} 
@@ -345,7 +345,6 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
               SIP &amp; Orders
             </button>
           </div>
-          <span className="text-[0.625rem] bg-[#FF5722]/20 text-[#FF5722] border border-[#FF5722]/30 px-2 py-0.5 rounded font-black tracking-widest uppercase hidden sm:inline-block">DIRECT MF</span>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">

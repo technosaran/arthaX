@@ -887,7 +887,7 @@ export default function AccountsClient({ initialData }: { initialData?: FinanceD
               <div className="glass-card rich-border p-6 rounded-2xl border border-white/10 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">Ledger Activity Trend</h3>
+                    <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-indigo-400">Ledger Activity Trend</h3>
                     <p className="text-xl font-black text-white mt-1">Inflow vs Outflow History Curve</p>
                   </div>
                   <div className="flex items-center gap-4 text-xs font-bold">

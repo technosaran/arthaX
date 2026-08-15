@@ -148,7 +148,7 @@ export function TaxLossHarvestingCalculator({ input }: Props) {
             <Sparkles className="w-4 h-4 text-emerald-400" />
             {formatINR(simulation.netTaxSavings)}
           </p>
-          <p className="text-[10px] text-emerald-400 font-bold">Direct tax savings in ₹</p>
+          <p className="text-[10px] text-emerald-400 font-bold">Direct tax savings</p>
         </div>
 
         {/* Card 4: Unused ₹1.25L Exemption */}

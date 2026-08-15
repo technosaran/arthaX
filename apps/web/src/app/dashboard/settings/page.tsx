@@ -70,8 +70,6 @@ export default function SettingsPage() {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const prevIsSyncingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [prevSearchQuery, setPrevSearchQuery] = useState("");
 
   const handleTabChange = (key: TabKey) => {
     setActiveTab(key);
@@ -377,45 +375,17 @@ export default function SettingsPage() {
     return base;
   }, [activeModulesCount, profile?.telegram_chat_id, isSuperAdmin]);
 
-  const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return NAV_CATEGORIES;
-    const q = searchQuery.toLowerCase().trim();
-    return NAV_CATEGORIES.map((cat) => ({
-      ...cat,
-      items: cat.items.filter(
-        (item) =>
-          item.label.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q) ||
-          item.key.toLowerCase().includes(q)
-      ),
-    })).filter((cat) => cat.items.length > 0);
-  }, [searchQuery, NAV_CATEGORIES]);
-
-  const totalMatchingItems = useMemo(() => {
-    return filteredCategories.reduce((acc, cat) => acc + cat.items.length, 0);
-  }, [filteredCategories]);
-
   const mobileNavItems = useMemo(() => {
-    return filteredCategories.flatMap((c) => c.items);
-  }, [filteredCategories]);
+    return NAV_CATEGORIES.flatMap((c) => c.items);
+  }, []);
 
   const activeTabMeta = useMemo(() => {
     return NAV_CATEGORIES.flatMap((category) => category.items).find((item) => item.key === activeTab);
-  }, [NAV_CATEGORIES, activeTab]);
-
-  if (searchQuery !== prevSearchQuery) {
-    setPrevSearchQuery(searchQuery);
-    if (searchQuery.trim() && mobileNavItems.length > 0) {
-      const hasActiveTab = mobileNavItems.some((item) => item.key === activeTab);
-      if (!hasActiveTab) {
-        setActiveTab(mobileNavItems[0].key);
-      }
-    }
-  }
+  }, [activeTab]);
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in pb-12">
-      {/* Top Banner Header with Quick Search Bar */}
+      {/* Top Banner Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-card p-5 md:p-6 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-950/90 border border-white/10 shadow-xl">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
@@ -425,58 +395,15 @@ export default function SettingsPage() {
             Manage account identity, module layout, default payment nodes, imports/exports, and connected AI services.
           </p>
         </div>
-
-        {/* Real-time Settings Search Filter */}
-        <div className="w-full md:w-72 relative shrink-0">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search settings..."
-            autoComplete="off"
-            name="settings-filter-search"
-            aria-label="Search settings"
-            className="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition-all font-medium shadow-inner"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute inset-y-0 right-3 flex items-center text-xs text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Search Result Bar */}
-      {searchQuery && (
-        <div className="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
-          <span>
-            Found <strong>{totalMatchingItems}</strong> setting section{totalMatchingItems !== 1 ? "s" : ""} matching &quot;{searchQuery}&quot;
-          </span>
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="text-xs font-bold text-indigo-400 hover:underline"
-          >
-            Clear Search
-          </button>
-        </div>
-      )}
 
       {/* Main Dual Pane Layout Architecture */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Sidebar Navigation (Desktop md:grid-cols-4) with Independent Overflow Scroll */}
         <div className="hidden md:block md:col-span-4 lg:col-span-3 sticky top-6 max-h-[calc(100vh-5rem)] overflow-y-auto no-scrollbar pr-1">
           <div className="glass-card p-3 rounded-2xl bg-slate-900/60 border border-white/10 shadow-xl space-y-3">
-            {filteredCategories.map((cat) => (
+            {NAV_CATEGORIES.map((cat) => (
               <div key={cat.category} className="space-y-1">
                 <p className="px-3 text-[0.625rem] font-bold uppercase tracking-wider text-indigo-400/80">
                   {cat.category}
@@ -520,11 +447,7 @@ export default function SettingsPage() {
               </div>
             ))}
 
-            {filteredCategories.length === 0 && (
-              <div className="p-4 text-center text-xs text-gray-400">
-                No settings matching &quot;{searchQuery}&quot; found.
-              </div>
-            )}
+
           </div>
         </div>
 
@@ -571,20 +494,6 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {mobileNavItems.length === 0 ? (
-              <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-black/20 px-6 py-10 text-center">
-                <p className="text-sm font-bold text-white">No settings match your search.</p>
-                <p className="mt-1 text-xs text-[--text-muted]">Try a different keyword or clear the search filter.</p>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="mt-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 transition-all hover:bg-indigo-500/20"
-                >
-                  Clear Search
-                </button>
-              </div>
-            ) : (
-              <>
                 {activeTab === "profile" && (
             <ProfileTab
               input={input}
@@ -703,8 +612,7 @@ export default function SettingsPage() {
               canExecuteReset={canExecuteReset}
             />
                 )}
-              </>
-            )}
+
           </div>
         </div>
       </div>

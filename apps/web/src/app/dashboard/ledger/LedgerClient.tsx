@@ -5,6 +5,7 @@ import { endOfDay, format, isWithinInterval, startOfDay } from "date-fns";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import LedgerDataTable from "./components/LedgerDataTable";
 import MiniCalendar from "./components/MiniCalendar";
+import { Sparkles, Trash2, Edit2, ArrowDownToLine, ArrowUpFromLine, TrendingUp, TrendingDown, Users, Receipt, Wallet, Settings } from "lucide-react";
 
 type LedgerLog = {
   id: string;
@@ -23,17 +24,17 @@ type LedgerLog = {
 const DEBIT_ACTIONS = new Set(["ADJUST_DOWN", "TRANSFER_OUT", "DELETE", "SEND_MONEY", "EXPENSE", "WITHDRAWAL"]);
 const CREDIT_ACTIONS = new Set(["ADJUST_UP", "TRANSFER_IN", "CREATE", "INCOME", "DEPOSIT"]);
 
-const ACTION_CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; ring: string }> = {
-  CREATE: { label: "Created", icon: "✨", bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
-  DELETE: { label: "Deleted", icon: "🗑️", bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
-  UPDATE: { label: "Updated", icon: "✏️", bg: "rgba(99, 102, 241, 0.1)", text: "#818cf8", ring: "rgba(99, 102, 241, 0.2)" },
-  TRANSFER_IN: { label: "Inflow", icon: "📥", bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
-  TRANSFER_OUT: { label: "Outflow", icon: "📤", bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
-  ADJUST_UP: { label: "Adjust Up", icon: "📈", bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
-  ADJUST_DOWN: { label: "Adjust Down", icon: "📉", bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
-  SEND_MONEY: { label: "Family Send", icon: "👨‍👩‍👧‍👦", bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
-  EXPENSE: { label: "Expense", icon: "💸", bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
-  INCOME: { label: "Income", icon: "💰", bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
+const ACTION_CONFIG: Record<string, { label: string; icon: any; bg: string; text: string; ring: string }> = {
+  CREATE: { label: "Created", icon: Sparkles, bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
+  DELETE: { label: "Deleted", icon: Trash2, bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
+  UPDATE: { label: "Updated", icon: Edit2, bg: "rgba(99, 102, 241, 0.1)", text: "#818cf8", ring: "rgba(99, 102, 241, 0.2)" },
+  TRANSFER_IN: { label: "Inflow", icon: ArrowDownToLine, bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
+  TRANSFER_OUT: { label: "Outflow", icon: ArrowUpFromLine, bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
+  ADJUST_UP: { label: "Adjust Up", icon: TrendingUp, bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
+  ADJUST_DOWN: { label: "Adjust Down", icon: TrendingDown, bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
+  SEND_MONEY: { label: "Family Send", icon: Users, bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
+  EXPENSE: { label: "Expense", icon: Receipt, bg: "rgba(244, 63, 94, 0.1)", text: "#f43f5e", ring: "rgba(244, 63, 94, 0.2)" },
+  INCOME: { label: "Income", icon: Wallet, bg: "rgba(16, 185, 129, 0.1)", text: "#10b981", ring: "rgba(16, 185, 129, 0.2)" },
 };
 
 const formatMoney = (value: number | null | undefined, currency = "INR") => {
@@ -171,7 +172,7 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
   const getActionConfig = (type: string) => {
     return ACTION_CONFIG[type] || {
       label: type,
-      icon: "⚙️",
+      icon: Settings,
       bg: "rgba(255, 255, 255, 0.05)",
       text: "#8b8d98",
       ring: "rgba(255, 255, 255, 0.1)",
@@ -189,7 +190,9 @@ export default function LedgerClient({ initialData }: { initialData?: FinanceDat
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[0.5625rem] font-mono font-black uppercase tracking-wider border whitespace-nowrap"
         style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.ring }}
       >
-        <span className="text-xs shrink-0" aria-hidden="true">{cfg.icon}</span>
+        <span className="text-[--text-secondary] shrink-0" aria-hidden="true">
+          {typeof cfg.icon === 'function' || typeof cfg.icon === 'object' ? <cfg.icon className="w-3 h-3" /> : cfg.icon}
+        </span>
         {cfg.label}
       </span>
     );

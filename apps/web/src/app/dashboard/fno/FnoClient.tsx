@@ -315,25 +315,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
               </svg>
             </div>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-base font-extrabold text-white tracking-wider uppercase">F&amp;O Derivatives</h1>
-                <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">DERIVATIVES PRO</span>
-                <span 
-                  className="text-[0.625rem] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border tracking-wider"
-                  style={{ 
-                    backgroundColor: `${marketStatus.badgeColor}15`, 
-                    color: marketStatus.badgeColor,
-                    borderColor: `${marketStatus.badgeColor}40`
-                  }}
-                  title={marketStatus.nextSessionText}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: marketStatus.badgeColor }} />
-                  {marketStatus.statusText} • {marketStatus.formattedTimeIST}
-                </span>
-              </div>
-              <p className="text-[0.6875rem] text-[#848E9C] font-semibold flex items-center gap-1.5 mt-0.5">
-                NIFTY / BANKNIFTY Derivatives Watch • {marketStatus.nextSessionText}
-              </p>
+              <h1 className="text-base font-extrabold text-white tracking-wider uppercase">F&amp;O Derivatives</h1>
             </div>
           </div>
 
@@ -515,7 +497,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
           title="New F&O Position Ticket"
         >
           <div className="p-4 max-w-2xl mx-auto w-full">
-            <form onSubmit={handleLogSubmit} className="space-y-5">
+            <form onSubmit={handleLogSubmit} className="space-y-4">
               
               {/* Zerodha Kite Search & Presets Bar */}
               <div className="relative z-[120] space-y-2">
@@ -781,7 +763,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3">
-                          <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Trade Date</label>
+                          <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Trade Date</label>
                           <input 
                             required 
                             type="date" 
@@ -791,7 +773,7 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
                           />
                         </div>
                         <div className="space-y-3">
-                          <label className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Notes</label>
+                          <label className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Notes</label>
                           <input 
                             className="input-premium" 
                             placeholder="Optional strategy notes..." 

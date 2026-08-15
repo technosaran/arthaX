@@ -41,7 +41,7 @@ interface ExpenseDataTableProps {
   onDelete: (id: string) => void;
   onEdit?: (expense: Expense) => void;
   onAdd: () => void;
-  categories: { label: string; icon: string; color: string }[];
+  categories: { label: string; icon: any; color: string }[];
 }
 const columnHelper = createColumnHelper<Expense>();
 

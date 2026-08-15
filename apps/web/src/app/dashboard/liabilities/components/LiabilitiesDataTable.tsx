@@ -12,7 +12,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
-import { ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2 } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, TrendingDown } from "lucide-react";
 import type { Tables } from "@/lib/database.types";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
 
@@ -193,7 +193,7 @@ export default function LiabilitiesDataTable({ liabilities, onEdit, onDelete, on
   if (liabilities.length === 0) {
     return (
       <EmptyState 
-        icon="📉"
+        icon={<TrendingDown className="w-12 h-12 text-[--accent-primary]" />}
         title="No Liabilities Found"
         description="You haven't recorded any loans or debts."
         action={

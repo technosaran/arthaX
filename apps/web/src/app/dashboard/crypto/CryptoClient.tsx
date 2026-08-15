@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 import { useFinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
@@ -51,7 +52,8 @@ const POPULAR_COINS = [
 export default function CryptoClient() {
   const { data: { investments, accounts }, mutate } = useFinanceData();
   const [submitting, withLock] = useSubmitLock();
-  const { isSyncing: isSyncingBinance, syncHoldings: syncBinanceHoldings } = useBinanceSettings();
+  const router = useRouter();
+  const { isSyncing: isSyncingBinance, syncHoldings: syncBinanceHoldings, status: binanceStatus } = useBinanceSettings();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -366,12 +368,7 @@ export default function CryptoClient() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Binance Spot Portfolio</h1>
-                <span className="text-[0.5625rem] bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">PRO</span>
               </div>
-              <p className="text-[0.6875rem] text-[#848E9C] font-semibold flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-[#0ECB81] animate-pulse" />
-                Binance Live Data Feed • USDT Base Pair
-              </p>
             </div>
           </div>
 
@@ -412,6 +409,10 @@ export default function CryptoClient() {
             <div className="flex items-center gap-2">
               <button
                 onClick={async () => {
+                  if (!binanceStatus?.configured) {
+                    router.push('/dashboard/settings?tab=integrations');
+                    return;
+                  }
                   const res = await syncBinanceHoldings();
                   if (res.success) mutate();
                 }}

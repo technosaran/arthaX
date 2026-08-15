@@ -16,7 +16,7 @@ interface ExpenseFormProps {
   onSubmit: (data: any) => Promise<void>;
   submitting: boolean;
   accounts: Account[];
-  categories: { label: string; icon?: string }[];
+  categories: { label: string; icon?: any }[];
   defaultDate: string;
   defaultAccountId?: string;
   editingExpense?: {
@@ -197,7 +197,7 @@ export default function ExpenseForm({
         >
           {categories.map((c) => (
             <option key={c.label} value={c.label} className="bg-[#151922] text-white py-1">
-              {c.icon} {c.label}
+              {c.label}
             </option>
           ))}
         </select>

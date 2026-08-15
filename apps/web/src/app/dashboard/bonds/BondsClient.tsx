@@ -460,7 +460,7 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
             title={editingId ? "Modify Bond Investment" : "Wint Wealth - Record Bond"}
           >
             <div className="p-1 max-w-2xl mx-auto w-full text-white">
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 
                 {/* Wint Wealth Search & Quick Suggestions */}
                 {!formData.bond_name ? (

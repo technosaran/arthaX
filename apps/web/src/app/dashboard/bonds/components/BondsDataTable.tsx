@@ -199,8 +199,6 @@ export default function BondsDataTable({ bonds, onEdit, onAdd }: BondsDataTableP
           />
         </div>
       </div>
-      
-      {/* Detailed Statement Table View */}
       <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>

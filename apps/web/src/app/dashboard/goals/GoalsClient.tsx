@@ -13,6 +13,7 @@ import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from "@/components/ui/recharts";
+import { Home, Plane, ShieldAlert, Laptop, Car, TrendingUp, GraduationCap, Target } from "lucide-react";
 
 import { Drawer } from "@/components/ui/drawer";
 import GoalsDataTable from "./components/GoalsDataTable";
@@ -20,14 +21,14 @@ import GoalsDataTable from "./components/GoalsDataTable";
 type Goal = Tables<"goals">;
 
 const GOAL_CATEGORIES = [
-  { label: "Home", icon: "🏠" },
-  { label: "Travel", icon: "✈️" },
-  { label: "Emergency", icon: "🛡️" },
-  { label: "Tech", icon: "💻" },
-  { label: "Vehicle", icon: "🚗" },
-  { label: "Investment", icon: "📈" },
-  { label: "Education", icon: "🎓" },
-  { label: "Others", icon: "🎯" },
+  { label: "Home", icon: Home },
+  { label: "Travel", icon: Plane },
+  { label: "Emergency", icon: ShieldAlert },
+  { label: "Tech", icon: Laptop },
+  { label: "Vehicle", icon: Car },
+  { label: "Investment", icon: TrendingUp },
+  { label: "Education", icon: GraduationCap },
+  { label: "Others", icon: Target },
 ];
 
 export default function GoalsClient({ initialData }: { initialData?: FinanceData }) {
@@ -487,7 +488,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
           setFormData({ name: "", target_amount: "", current_amount: "0", deadline: "", category: "Others", account_id: "" });
         }} title={editingGoalId ? "Edit Goal" : "Create New Goal"} variant="center" width="max-w-md md:max-w-lg">
         <div className="p-2 w-full">
-          <form onSubmit={handleAddGoal} className="space-y-5">
+          <form onSubmit={handleAddGoal} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-[--text-muted] uppercase tracking-widest mb-2">Goal Name</label>
               <input
@@ -551,7 +552,7 @@ export default function GoalsClient({ initialData }: { initialData?: FinanceData
                 className="input-premium w-full font-bold"
               >
                 {GOAL_CATEGORIES.map(c => (
-                  <option key={c.label} value={c.label} className="bg-[#181A20] text-white font-medium">{c.icon} {c.label}</option>
+                  <option key={c.label} value={c.label} className="bg-[#181A20] text-white font-medium">{c.label}</option>
                 ))}
               </select>
             </div>

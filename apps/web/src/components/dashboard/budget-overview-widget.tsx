@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 
+import { Package, BarChart2 } from "lucide-react";
+
 type CategoryItem = {
   name: string;
   spent: number;
   limit: number;
-  icon?: string;
+  icon?: React.ElementType;
 };
 
 type BudgetOverviewWidgetProps = {
@@ -28,7 +30,7 @@ export default function BudgetOverviewWidget({ items = [], showUSD = false }: Bu
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-lg shadow-inner">📊</div>
+          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shadow-inner"><BarChart2 className="w-5 h-5 text-purple-400" /></div>
           <div>
             <h3 className="text-base font-bold text-white tracking-tight">Budget Overview</h3>
             <p className="text-xs text-[--text-muted]">Monthly spending vs category caps</p>
@@ -55,7 +57,7 @@ export default function BudgetOverviewWidget({ items = [], showUSD = false }: Bu
               <div key={cat.name} className="flex flex-col gap-1.5 p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-white flex items-center gap-2">
-                    <span>{cat.icon || "📦"}</span>
+                    {cat.icon ? (() => { const Icon = cat.icon; return <Icon className="w-4 h-4 text-gray-400" />; })() : <Package className="w-4 h-4 text-gray-400" />}
                     {cat.name}
                     {isExceeded ? (
                       <span className="text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded font-black tracking-wider">

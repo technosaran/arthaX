@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { format, differenceInDays, parseISO, isValid } from "date-fns";
+import { format, differenceInDays, differenceInMonths, parseISO, isValid } from "date-fns";
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,7 +12,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
-import { ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, PlusCircle, Grid, List } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, PlusCircle, Grid, List, Home, Plane, ShieldAlert, Laptop, Car, TrendingUp, GraduationCap, Target } from "lucide-react";
 import type { Tables } from "@/lib/database.types";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
 
@@ -28,14 +28,14 @@ interface GoalsDataTableProps {
 }
 
 const GOAL_CATEGORIES = [
-  { label: "Home", icon: "🏠" },
-  { label: "Travel", icon: "✈️" },
-  { label: "Emergency", icon: "🛡️" },
-  { label: "Tech", icon: "💻" },
-  { label: "Vehicle", icon: "🚗" },
-  { label: "Investment", icon: "📈" },
-  { label: "Education", icon: "🎓" },
-  { label: "Others", icon: "🎯" },
+  { label: "Home", icon: Home },
+  { label: "Travel", icon: Plane },
+  { label: "Emergency", icon: ShieldAlert },
+  { label: "Tech", icon: Laptop },
+  { label: "Vehicle", icon: Car },
+  { label: "Investment", icon: TrendingUp },
+  { label: "Education", icon: GraduationCap },
+  { label: "Others", icon: Target },
 ];
 
 const columnHelper = createColumnHelper<Goal>();
@@ -55,8 +55,11 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
         header: "Goal Name",
         cell: (info) => (
           <div className="flex items-center gap-3 font-semibold whitespace-nowrap">
-            <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs flex-shrink-0">
-              {GOAL_CATEGORIES.find(c => c.label === info.row.original.category)?.icon || "🎯"}
+            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[--accent-primary] flex-shrink-0">
+              {(() => {
+                const Icon = GOAL_CATEGORIES.find(c => c.label === info.row.original.category)?.icon || Target;
+                return <Icon className="w-5 h-5" />;
+              })()}
             </div>
             <p className="text-sm font-bold text-white group-hover:text-[--accent-primary] transition-colors truncate">
               {info.getValue()}
@@ -92,6 +95,68 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
                 />
               </div>
             </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "status",
+        header: "Status",
+        cell: (info) => {
+          const current = Number(info.row.original.current_amount);
+          const target = Number(info.row.original.target_amount);
+          const deadline = info.row.original.deadline;
+          
+          let isOverdue = false;
+          if (deadline) {
+            const parsed = parseISO(deadline);
+            if (isValid(parsed)) {
+               isOverdue = differenceInDays(parsed, new Date()) < 0;
+            }
+          }
+          const isCompleted = current >= target;
+          
+          const statusText = isCompleted ? "Achieved" : isOverdue ? "Overdue" : "On Track";
+          const statusColors = isCompleted 
+            ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" 
+            : isOverdue 
+              ? "text-rose-400 bg-rose-400/10 border-rose-400/20" 
+              : "text-sky-400 bg-sky-400/10 border-sky-400/20";
+
+          return (
+            <span className={`px-2 py-0.5 rounded-full text-[0.5625rem] font-black uppercase tracking-wider border whitespace-nowrap ${statusColors}`}>
+              {statusText}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "monthly_target",
+        header: "Monthly Target",
+        cell: (info) => {
+          const current = Number(info.row.original.current_amount);
+          const target = Number(info.row.original.target_amount);
+          const remaining = Math.max(0, target - current);
+          const deadline = info.row.original.deadline;
+          
+          if (remaining === 0) {
+             return <span className="text-xs font-bold text-emerald-400">Goal met</span>;
+          }
+          
+          let months = 1;
+          if (deadline) {
+            const parsed = parseISO(deadline);
+            if (isValid(parsed)) {
+               months = Math.max(1, differenceInMonths(parsed, new Date()));
+            }
+          }
+          
+          const monthly = remaining / months;
+          
+          return (
+             <div className="whitespace-nowrap">
+                <p className="text-xs font-bold text-white">₹{Math.ceil(monthly).toLocaleString()}</p>
+                <p className="text-[0.5625rem] font-bold text-[--text-muted]">per month</p>
+             </div>
           );
         },
       }),
@@ -190,7 +255,7 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
   if (goals.length === 0) {
     return (
       <EmptyState 
-        icon="🎯"
+        icon={<Target className="w-12 h-12 text-[--accent-primary]" />}
         title="No Goals Found"
         description="You haven't set any financial milestones yet."
         action={
@@ -216,7 +281,6 @@ export default function GoalsDataTable({ goals, initialFilter = "all", onEdit, o
           />
         </div>
       </div>
-        /* Detailed Statement Table View */
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>

@@ -14,18 +14,19 @@ import { getCategoryColour } from "@/lib/chart-colours";
 import ExpenseDataTable from "./components/ExpenseDataTable";
 import ExpenseForm from "./components/ExpenseForm";
 import { CustomChartTooltip } from "@/components/ui/chart-tooltip";
+import { Home, Utensils, Plane, TrendingUp, Bus, Zap, Film, ShoppingBag, CreditCard, Package } from "lucide-react";
 
 const CATEGORIES = [
-  { label: "Rent", icon: "🏠", color: getCategoryColour("Rent") },
-  { label: "Food", icon: "🍔", color: getCategoryColour("Food & Dining") },
-  { label: "Travel", icon: "✈️", color: getCategoryColour("Travel") },
-  { label: "Investment", icon: "📈", color: getCategoryColour("Investment") },
-  { label: "Transport", icon: "🚌", color: getCategoryColour("Transportation") },
-  { label: "Utilities", icon: "⚡", color: getCategoryColour("Utilities") },
-  { label: "Entertainment", icon: "🎬", color: getCategoryColour("Entertainment") },
-  { label: "Shopping", icon: "🛍️", color: getCategoryColour("Shopping") },
-  { label: "Subscription", icon: "💳", color: getCategoryColour("Subscription") },
-  { label: "Others", icon: "📦", color: getCategoryColour("Others") },
+  { label: "Rent", icon: Home, color: getCategoryColour("Rent") },
+  { label: "Food", icon: Utensils, color: getCategoryColour("Food & Dining") },
+  { label: "Travel", icon: Plane, color: getCategoryColour("Travel") },
+  { label: "Investment", icon: TrendingUp, color: getCategoryColour("Investment") },
+  { label: "Transport", icon: Bus, color: getCategoryColour("Transportation") },
+  { label: "Utilities", icon: Zap, color: getCategoryColour("Utilities") },
+  { label: "Entertainment", icon: Film, color: getCategoryColour("Entertainment") },
+  { label: "Shopping", icon: ShoppingBag, color: getCategoryColour("Shopping") },
+  { label: "Subscription", icon: CreditCard, color: getCategoryColour("Subscription") },
+  { label: "Others", icon: Package, color: getCategoryColour("Others") },
 ];
 
 export default function ExpensesClient({ initialData }: { initialData?: FinanceData }) {

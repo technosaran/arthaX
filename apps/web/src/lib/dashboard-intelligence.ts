@@ -1,6 +1,8 @@
+import { TrendingUp, TrendingDown, ShoppingBag, Zap, ShieldCheck } from "lucide-react";
+
 export type AIInsightBullet = {
   id: string;
-  icon: string;
+  icon: any;
   type: "positive" | "warning" | "neutral" | "info";
   text: string;
   subtext?: string;
@@ -94,7 +96,7 @@ export function generateDashboardInsights(params: {
   const insightsBullets: AIInsightBullet[] = [
     {
       id: "networth-bullet",
-      icon: isRicher ? "📈" : "📉",
+      icon: isRicher ? TrendingUp : TrendingDown,
       type: isRicher ? "positive" : "warning",
       text: isRicher
         ? `Net worth increased by ${Math.abs(netWorthGrowthPct).toFixed(1)}% this month.`
@@ -103,21 +105,21 @@ export function generateDashboardInsights(params: {
     },
     {
       id: "spending-bullet",
-      icon: "🛍️",
+      icon: ShoppingBag,
       type: "info",
       text: `Highest spend: ₹${topExpenseCategoryAmount.toLocaleString()} on ${topExpenseCategory}.`,
       subtext: "Track micro-transactions to optimize savings",
     },
     {
       id: "bill-bullet",
-      icon: "⚡",
+      icon: Zap,
       type: "warning",
       text: `${nextBillName} (₹${nextBillAmount.toLocaleString()}) ${nextBillDueDate}.`,
       subtext: "Auto-pay enabled via linked account",
     },
     {
       id: "risk-bullet",
-      icon: "🛡️",
+      icon: ShieldCheck,
       type: "positive",
       text: "Portfolio risk level: Balanced / Medium.",
       subtext: "Good equity vs debt balance",

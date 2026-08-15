@@ -287,53 +287,33 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
               <div 
                 className="flex flex-col gap-6"
               >
-                {/* INR Net Worth */}
+                {/* Net Worth (Flippable) */}
                 <div className="flex flex-col">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <span className="text-xs font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md">
-                      <span>INR Net Worth</span>
-                      <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
-                        INR ₹
+                    <button 
+                      type="button"
+                      onClick={() => setShowUSD(!showUSD)}
+                      className="text-xs font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md cursor-pointer hover:bg-slate-700/60 hover:scale-105 transition-all active:scale-95"
+                    >
+                      <span>{showUSD ? 'USD' : 'INR'} Net Worth</span>
+                      <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                        {showUSD ? 'USD $' : 'INR ₹'}
+                        <svg className="w-3 h-3 text-amber-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                       </span>
-                    </span>
+                    </button>
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-tight border ${
-                      stats.totalDayPnLINR >= 0 
+                      (showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR) >= 0 
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
                         : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                     }`}>
-                      <span>Today: {stats.totalDayPnLINR >= 0 ? "+" : "-"}</span>
+                      <span>Today: {(showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR) >= 0 ? "+" : "-"}</span>
                       <span className="font-mono tabular-nums">
-                        ₹{Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        {showUSD ? "$" : "₹"}{Math.abs(showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </span>
                     </span>
                   </div>
                   <h2 className="text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden">
-                    ₹{stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </h2>
-                </div>
-                
-                {/* USD Net Worth */}
-                <div className="flex flex-col mt-4">
-                  <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <span className="text-xs font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 backdrop-blur-md">
-                      <span>USD Net Worth</span>
-                      <span className="text-[10px] font-mono font-semibold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
-                        USD $
-                      </span>
-                    </span>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-tight border ${
-                      stats.totalDayPnLUSD >= 0 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                    }`}>
-                      <span>Today: {stats.totalDayPnLUSD >= 0 ? "+" : "-"}</span>
-                      <span className="font-mono tabular-nums">
-                        ${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </span>
-                    </span>
-                  </div>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden">
-                    ${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {showUSD ? "$" : "₹"}{(showUSD ? stats.netWorthUSD : stats.netWorthINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </h2>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface DangerZoneTabProps {
   handleResetClick: () => void;
@@ -25,6 +26,12 @@ export default function DangerZoneTab({
   handleResetConfirm,
   canExecuteReset,
 }: DangerZoneTabProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="max-w-2xl animate-fade-in-up">
       <div className="glass-card-static p-6 md:p-10 border-rose-500/20 bg-rose-500/[0.02] relative overflow-hidden">
@@ -39,7 +46,7 @@ export default function DangerZoneTab({
           </div>
           <div>
             <h2 className="text-base font-bold text-rose-500">Danger Zone</h2>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-500/60 mt-0.5">Destructive Actions</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-rose-500/60 mt-0.5">Destructive Actions</p>
           </div>
         </div>
 
@@ -59,7 +66,7 @@ export default function DangerZoneTab({
       </div>
 
       {/* Reset Confirmation Modal */}
-      {showResetModal && (
+      {showResetModal && mounted && createPortal(
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={() => setShowResetModal(false)}
@@ -123,7 +130,8 @@ export default function DangerZoneTab({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -17,8 +17,6 @@ import FnoClient from "@/app/dashboard/fno/FnoClient";
 import ForexClient from "@/app/dashboard/forex/ForexClient";
 import AlternativeAssetsClient from "@/app/dashboard/alternative-assets/AlternativeAssetsClient";
 import CryptoClient from "@/app/dashboard/crypto/CryptoClient";
-import { ZerodhaConnectCard } from "@/components/integrations/zerodha/ZerodhaConnectCard";
-import { BinanceConnectCard } from "@/components/integrations/binance/BinanceConnectCard";
 
 export default function InvestmentsClient() {
   const searchParams = useSearchParams();
@@ -42,8 +40,7 @@ export default function InvestmentsClient() {
   const availableTabs = useMemo(() => {
     const list = [{ key: "overview", label: "Overview" }];
     if (currencyMode === "USD") {
-      // USD mode: Overview + US Equities + Forex + Crypto
-      if (hasStocks) list.push({ key: "stocks-usd", label: "US Equities" });
+      // USD mode: Overview + Forex + Crypto
       if (hasForex) list.push({ key: "forex", label: "Forex" });
       list.push({ key: "crypto", label: "Crypto ($ USDT)" });
     } else {
@@ -90,11 +87,6 @@ export default function InvestmentsClient() {
     const stocksCurrent = activeStocks.reduce((sum, i) => sum + (Number(i.quantity) * Number(i.current_price)), 0);
     const stocksRealized = investments.filter(i => i.type === "stock" && i.currency !== "USD").reduce((sum, i) => sum + Number(i.realized_pnl || 0), 0);
 
-    // 2. USD Equities / Stocks (Separate USD)
-    const activeUsdStocks = investments.filter(i => i.type === "stock" && Number(i.quantity) > 0 && i.currency === "USD");
-    const usdStocksInvested = activeUsdStocks.reduce((sum, i) => sum + (Number(i.quantity) * Number(i.buy_price)), 0);
-    const usdStocksCurrent = activeUsdStocks.reduce((sum, i) => sum + (Number(i.quantity) * Number(i.current_price)), 0);
-    const usdStocksRealized = investments.filter(i => i.type === "stock" && i.currency === "USD").reduce((sum, i) => sum + Number(i.realized_pnl || 0), 0);
 
     // 3. Mutual Funds (INR)
     const activeMF = mutualFunds.filter(m => Number(m.units) > 0);
@@ -133,10 +125,10 @@ export default function InvestmentsClient() {
     const cryptoInvestedUSD = activeCrypto.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.buy_price)), 0);
     const cryptoCurrentUSD = activeCrypto.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.current_price)), 0);
 
-    const totalInvestedUSDCombined = forexInvestedUSD + usdStocksInvested + cryptoInvestedUSD;
-    const totalCurrentUSDCombined = forexCurrentUSD + usdStocksCurrent + cryptoCurrentUSD;
+    const totalInvestedUSDCombined = forexInvestedUSD + cryptoInvestedUSD;
+    const totalCurrentUSDCombined = forexCurrentUSD + cryptoCurrentUSD;
     const unrealizedPnLUSD = totalCurrentUSDCombined - totalInvestedUSDCombined;
-    const totalRealizedUSDCombined = forexRealizedUSD + usdStocksRealized;
+    const totalRealizedUSDCombined = forexRealizedUSD;
     const totalPnLUSDCombined = unrealizedPnLUSD + totalRealizedUSDCombined;
     const openHoldingROIUSD = totalInvestedUSDCombined > 0 ? (unrealizedPnLUSD / totalInvestedUSDCombined) * 100 : 0;
     const totalPnLPercentUSDCombined = Number.isFinite(openHoldingROIUSD) ? openHoldingROIUSD : 0;
@@ -157,7 +149,6 @@ export default function InvestmentsClient() {
       },
       usd: {
         forexValue: forexCurrentUSD,
-        usdStocksValue: usdStocksCurrent,
         cryptoValue: cryptoCurrentUSD,
         totalInvested: totalInvestedUSDCombined,
         totalCurrent: totalCurrentUSDCombined,
@@ -193,9 +184,6 @@ export default function InvestmentsClient() {
     const data = [];
     if (portfolioStats.usd.forexValue > 0) {
       data.push({ name: "Forex Trading", value: portfolioStats.usd.forexValue, fill: "#06B6D4" });
-    }
-    if (portfolioStats.usd.usdStocksValue > 0) {
-      data.push({ name: "US Equities", value: portfolioStats.usd.usdStocksValue, fill: "#38BDF8" });
     }
     if (portfolioStats.usd.cryptoValue > 0) {
       data.push({ name: "Crypto (USDT)", value: portfolioStats.usd.cryptoValue, fill: "#8B5CF6" });
@@ -253,11 +241,6 @@ export default function InvestmentsClient() {
         </div>
       </div>
 
-      {/* Integration Cards (Guarded by Feature Flags) */}
-      <div className="flex flex-col gap-3">
-        <ZerodhaConnectCard />
-        <BinanceConnectCard />
-      </div>
 
       {/* Segmented Navigation Bar */}
       <div className="flex flex-wrap gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1 max-w-fit">
@@ -286,27 +269,27 @@ export default function InvestmentsClient() {
           {currencyMode === "INR" ? (
             /* INR Portfolio Summary stats */
             <div>
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">INR Portfolio (Stocks, Mutual Funds, Bonds, Alt Assets)</h2>
+              <h2 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">INR Portfolio (Stocks, Mutual Funds, Bonds, Alt Assets)</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Invested</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalInvested)}</p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">INR Principal</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Value</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Current Value</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatINR(portfolioStats.inr.totalCurrent)}</p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Portfolio P&amp;L</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Portfolio P&amp;L</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{formatINR(portfolioStats.inr.totalPnL)}
                   </p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Total Return</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Percentage ROI</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Percentage ROI</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.inr.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.inr.totalPnL >= 0 ? "+" : ""}{portfolioStats.inr.totalPnLPercent.toFixed(2)}%
                   </p>
@@ -317,27 +300,27 @@ export default function InvestmentsClient() {
           ) : (
             /* USD Portfolio Summary stats */
             <div>
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">USD Dollars Portfolio (Forex Trading, US Equities, Crypto USDT)</h2>
+              <h2 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">USD Dollars Portfolio (Forex Trading, US Equities, Crypto USDT)</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Total Invested</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Total Invested</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.usd.totalInvested)}</p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">USD Principal ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Current Equity</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Current Equity</p>
                   <p className="text-2xl md:text-3xl font-black text-white">{formatUSD(portfolioStats.usd.totalCurrent)}</p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Market Value ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">USD P&amp;L</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">USD P&amp;L</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.usd.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.usd.totalPnL >= 0 ? "+" : ""}{formatUSD(portfolioStats.usd.totalPnL)}
                   </p>
                   <p className="text-[0.5625rem] font-bold text-[--text-muted] mt-2 uppercase tracking-widest opacity-60">Net Gain/Loss ($)</p>
                 </div>
                 <div className="glass-card-static p-6 border-white/5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted] mb-3">Percentage ROI</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted] mb-3">Percentage ROI</p>
                   <p className={`text-2xl md:text-3xl font-black ${portfolioStats.usd.totalPnL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
                     {portfolioStats.usd.totalPnL >= 0 ? "+" : ""}{portfolioStats.usd.totalPnLPercent.toFixed(2)}%
                   </p>
@@ -445,20 +428,6 @@ export default function InvestmentsClient() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-white">US Equities / Stocks</span>
-                        <span className="text-[--text-secondary]">{formatUSD(portfolioStats.usd.usdStocksValue)}</span>
-                      </div>
-                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-sky-400 rounded-full" 
-                          style={{ 
-                            width: `${portfolioStats.usd.totalCurrent > 0 ? (portfolioStats.usd.usdStocksValue / portfolioStats.usd.totalCurrent) * 100 : 0}%` 
-                          }} 
-                        />
-                      </div>
-                    </div>
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold">
@@ -545,8 +514,7 @@ export default function InvestmentsClient() {
       {currencyMode === "INR" && activeTab === "alt-assets" && hasAltAssets && <AlternativeAssetsClient isSubComponent />}
       {activeTab === "crypto" && <CryptoClient />}
 
-      {/* USD sub-clients: US Equities + Forex + Crypto */}
-      {currencyMode === "USD" && activeTab === "stocks-usd" && hasStocks && <StocksClient showUSD={true} />}
+      {/* USD sub-clients: Forex + Crypto */}
       {currencyMode === "USD" && activeTab === "forex" && hasForex && <ForexClient />}
     </div>
   );

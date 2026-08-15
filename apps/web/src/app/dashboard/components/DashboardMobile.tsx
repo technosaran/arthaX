@@ -6,7 +6,7 @@ import { memo, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { getCanonicalEnabledModules } from "@/lib/modules";
-
+import { TrendingUp, Landmark, LineChart, ShieldCheck, Banknote, FileText, Building2, Users, Sparkles, TrendingDown } from "lucide-react";
 
 
 import { type DashboardStats } from "./DashboardDesktop";
@@ -20,18 +20,19 @@ type Props = {
 };
 
 const secondaryQuickActions = [
-  { label: "Stock Trade", href: "/dashboard/stocks?action=new", icon: "📈", color: "#3b82f6", desc: "Equities market", module: "Stocks" },
-  { label: "Mutual Fund", href: "/dashboard/mutual-funds?action=new", icon: "🏦", color: "#a855f7", desc: "SIP & Lumpsum", module: "Mutual Funds" },
-  { label: "FnO Trade", href: "/dashboard/fno?action=new", icon: "📊", color: "#10b981", desc: "Derivatives", module: "FnO" },
-  { label: "Bonds", href: "/dashboard/bonds?action=new", icon: "🔏", color: "#eab308", desc: "Fixed income", module: "Bonds" },
-  { label: "Forex", href: "/dashboard/forex?action=new", icon: "💱", color: "#fbbf24", desc: "Currencies", module: "Forex" },
-  { label: "Liability", href: "/dashboard/liabilities?action=new", icon: "💸", color: "#ec4899", desc: "Loans & EMIs", module: "Liabilities" },
-  { label: "Alt Asset", href: "/dashboard/alternative-assets?action=new", icon: "🏢", color: "#14b8a6", desc: "Gold & Property", module: "Alt Assets" },
-  { label: "Family Send", href: "/dashboard/family?action=send", icon: "👨‍👩‍👧‍👦", color: "#8b5cf6", desc: "Send to members", module: "Family Management" },
+  { label: "Stock Trade", href: "/dashboard/stocks?action=new", icon: TrendingUp, color: "#3b82f6", desc: "Equities market", module: "Stocks" },
+  { label: "Mutual Fund", href: "/dashboard/mutual-funds?action=new", icon: Landmark, color: "#a855f7", desc: "SIP & Lumpsum", module: "Mutual Funds" },
+  { label: "FnO Trade", href: "/dashboard/fno?action=new", icon: LineChart, color: "#10b981", desc: "Derivatives", module: "FnO" },
+  { label: "Bonds", href: "/dashboard/bonds?action=new", icon: ShieldCheck, color: "#eab308", desc: "Fixed income", module: "Bonds" },
+  { label: "Forex", href: "/dashboard/forex?action=new", icon: Banknote, color: "#fbbf24", desc: "Currencies", module: "Forex" },
+  { label: "Liability", href: "/dashboard/liabilities?action=new", icon: FileText, color: "#ec4899", desc: "Loans & EMIs", module: "Liabilities" },
+  { label: "Alt Asset", href: "/dashboard/alternative-assets?action=new", icon: Building2, color: "#14b8a6", desc: "Gold & Property", module: "Alt Assets" },
+  { label: "Family Send", href: "/dashboard/family?action=send", icon: Users, color: "#8b5cf6", desc: "Send to members", module: "Family Management" },
 ];
 
 const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accounts, isValidating }: Props) {
   const { data: { profile } = {} } = useFinanceData();
+  const [showUSD, setShowUSD] = useState(false);
   
   const enabledModules = useMemo(() => {
     return getCanonicalEnabledModules(profile?.enabled_modules);
@@ -69,13 +70,20 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
         <div className="absolute -left-16 -bottom-16 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full" />
         
         <div className="flex flex-col gap-4">
-          {/* INR Net Worth */}
+          {/* Net Worth (Flippable) */}
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
-                <span>INR Net Worth</span>
-                <span className="text-[0.625rem] font-bold text-sky-400">(INR ₹)</span>
-              </span>
+              <button 
+                type="button"
+                onClick={() => setShowUSD(!showUSD)}
+                className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 active:scale-95 transition-all"
+              >
+                <span>{showUSD ? 'USD' : 'INR'} Net Worth</span>
+                <span className="text-[0.625rem] font-bold text-sky-400 flex items-center gap-1">
+                  ({showUSD ? 'USD $' : 'INR ₹'})
+                  <svg className="w-2.5 h-2.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                </span>
+              </button>
               <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 <span>Live</span>
@@ -85,70 +93,29 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
             <div className="flex flex-col">
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-                  stats.totalDayPnLINR >= 0 
+                  (showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR) >= 0 
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
                     : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
                 }`}>
-                  <span>Today: {stats.totalDayPnLINR >= 0 ? "+" : "-"}</span>
+                  <span>Today: {(showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR) >= 0 ? "+" : "-"}</span>
                   <span>
-                    ₹{Math.abs(stats.totalDayPnLINR).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {showUSD ? "$" : "₹"}{Math.abs(showUSD ? stats.totalDayPnLUSD : stats.totalDayPnLINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </span>
                 </span>
                 
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-                  (stats.totalGrowthINR || 0) >= 0 
+                  (showUSD ? (stats.totalGrowthUSD || 0) : (stats.totalGrowthINR || 0)) >= 0 
                     ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
                     : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
                 }`}>
-                  <span>Growth: {(stats.totalGrowthINR || 0) >= 0 ? "+" : "-"}</span>
+                  <span>Growth: {(showUSD ? (stats.totalGrowthUSD || 0) : (stats.totalGrowthINR || 0)) >= 0 ? "+" : "-"}</span>
                   <span>
-                    ₹{Math.abs(stats.totalGrowthINR || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {showUSD ? "$" : "₹"}{Math.abs(showUSD ? (stats.totalGrowthUSD || 0) : (stats.totalGrowthINR || 0)).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </span>
                 </span>
               </div>
               <h1 className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap">
-                ₹{stats.netWorthINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </h1>
-            </div>
-          </div>
-
-          <div className="w-full h-[1px] bg-white/5 my-2" />
-
-          {/* USD Net Worth */}
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[--text-muted] flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10">
-                <span>USD Net Worth</span>
-                <span className="text-[0.625rem] font-bold text-sky-400">(USD $)</span>
-              </span>
-            </div>
-            
-            <div className="flex flex-col">
-              <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-                  stats.totalDayPnLUSD >= 0 
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.15)]' 
-                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
-                }`}>
-                  <span>Today: {stats.totalDayPnLUSD >= 0 ? "+" : "-"}</span>
-                  <span>
-                    ${Math.abs(stats.totalDayPnLUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
-                </span>
-                
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.625rem] font-extrabold tracking-tight border backdrop-blur-md transition-all ${
-                  (stats.totalGrowthUSD || 0) >= 0 
-                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.15)]' 
-                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]'
-                }`}>
-                  <span>Growth: {(stats.totalGrowthUSD || 0) >= 0 ? "+" : "-"}</span>
-                  <span>
-                    ${Math.abs(stats.totalGrowthUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
-                </span>
-              </div>
-              <h1 className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap">
-                ${stats.netWorthUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {showUSD ? "$" : "₹"}{(showUSD ? stats.netWorthUSD : stats.netWorthINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </h1>
             </div>
           </div>
@@ -174,7 +141,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
       {/* Primary Fast Record actions */}
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Fast Logs</h3>
+          <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Fast Logs</h3>
           <span className="text-[0.5625rem] text-[--text-muted] font-bold">Frequent entries</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -212,7 +179,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
       {/* Assets & Trades registration */}
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Assets & Markets</h3>
+          <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Assets & Markets</h3>
           <span className="text-[0.5625rem] text-[--text-muted] font-bold">Investments</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -223,8 +190,8 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
               className="glass-card-static p-3 flex items-center gap-3 no-underline transition-all active:scale-[0.97] bg-white/[0.01] border border-white/5 shadow-sm rounded-2xl animate-fade-in"
               style={{ borderLeft: `3px solid ${action.color}40` }}
             >
-              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg shrink-0">
-                {action.icon}
+              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[--text-secondary] shrink-0">
+                <action.icon className="w-4 h-4" />
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-white tracking-tight leading-snug">{action.label}</span>
@@ -239,7 +206,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
       {enabledModules.includes("Ledger") && (
         <div className="flex flex-col gap-2.5 px-0.5">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Financial Pulse</h3>
+            <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Financial Pulse</h3>
             <Link href="/dashboard/ledger" className="text-[0.5625rem] font-black uppercase tracking-wider text-[--accent-primary] no-underline">Statement</Link>
           </div>
           <div className="space-y-2">
@@ -250,7 +217,7 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                  <div key={log.id} className="glass-card-static flex items-center justify-between gap-3 p-3 bg-white/[0.01] border border-white/5 rounded-2xl">
                    <div className="flex min-w-0 items-center gap-3">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0 ${isOut ? "bg-rose-500/5 text-rose-400 border border-rose-500/10" : "bg-emerald-500/5 text-emerald-400 border border-emerald-500/10"}`}>
-                        {log.action_type === "CREATE" ? "✨" : isOut ? "📉" : "📈"}
+                        {log.action_type === "CREATE" ? <Sparkles className="w-3.5 h-3.5" /> : isOut ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
                       </div>
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-xs font-bold text-white leading-tight">{log.details}</span>

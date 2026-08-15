@@ -99,14 +99,12 @@ export function Drawer({
           aria-modal="true"
           aria-label={title}
         >
-          {/* Top Accent Gradient */}
-          <div className="h-[3px] w-full bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 shrink-0" />
-          
+          {/* Removed top accent gradient per 'No Colored Border Accents' rule */}
           {/* Header */}
           <div className="px-4 sm:px-5 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
             <div>
               <h2 className="text-base font-black text-white tracking-tight">{title}</h2>
-              <p className="text-[0.5625rem] font-bold uppercase tracking-[0.15em] text-[--text-muted]">
+              <p className="text-[0.5625rem] font-bold uppercase tracking-wider text-[--text-muted]">
                 Enter Details & Sync Wealth Ledger
               </p>
             </div>

@@ -1,9 +1,11 @@
+import { Wallet, LineChart, Landmark, Bitcoin, Landmark as GovBuilding, Building2, Globe } from "lucide-react";
+
 export type AssetClassItem = {
   key: string;
   name: string;
   value: number;
   percentage: number;
-  icon: string;
+  icon: any;
   color: string;
 };
 
@@ -99,13 +101,13 @@ export function calculatePortfolioAnalytics(params: {
   const denominator = Math.max(1, totalAssets);
 
   const rawClasses = [
-    { key: "cash", name: "Cash & Savings", value: cashBalance, icon: "💵", color: "#10b981" },
-    { key: "stocks", name: "Indian Stocks", value: stockBalance, icon: "📊", color: "#3b82f6" },
-    { key: "mf", name: "Mutual Funds", value: mfBalance, icon: "📈", color: "#8b5cf6" },
-    { key: "crypto", name: "Crypto Assets", value: cryptoBalance, icon: "⚡", color: "#f97316" },
-    { key: "bonds", name: "Bonds & Debentures", value: bondBalance, icon: "🏛️", color: "#06b6d4" },
-    { key: "alt", name: "Alternative Assets", value: altBalance, icon: "🏠", color: "#ec4899" },
-    { key: "forex", name: "Forex & International", value: forexBalance, icon: "🌍", color: "#14b8a6" },
+    { key: "cash", name: "Cash & Savings", value: cashBalance, icon: Wallet, color: "#10b981" },
+    { key: "stocks", name: "Indian Stocks", value: stockBalance, icon: LineChart, color: "#3b82f6" },
+    { key: "mf", name: "Mutual Funds", value: mfBalance, icon: Landmark, color: "#8b5cf6" },
+    { key: "crypto", name: "Crypto Assets", value: cryptoBalance, icon: Bitcoin, color: "#f97316" },
+    { key: "bonds", name: "Bonds & Debentures", value: bondBalance, icon: GovBuilding, color: "#06b6d4" },
+    { key: "alt", name: "Alternative Assets", value: altBalance, icon: Building2, color: "#ec4899" },
+    { key: "forex", name: "Forex & International", value: forexBalance, icon: Globe, color: "#14b8a6" },
   ];
 
   const assetClasses: AssetClassItem[] = rawClasses.map((item) => ({

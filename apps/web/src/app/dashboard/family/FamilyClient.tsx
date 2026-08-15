@@ -509,7 +509,7 @@ export default function FamilyClient() {
           },
         ].map((s, i) => (
           <div key={i} className="glass-card-static p-6 border-white/5 flex flex-col justify-between min-h-[120px]">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">{s.label}</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">{s.label}</p>
             <p className={`text-2xl font-black tracking-tight truncate ${s.color} mt-2`} title={s.value}>
               {s.value}
             </p>
@@ -528,7 +528,7 @@ export default function FamilyClient() {
             <div>
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-pink-400" />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">6-Month Support Flow</h3>
+                <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">6-Month Support Flow</h3>
               </div>
               <p className="text-xl font-black text-white mt-1">Monthly Family Cashflow Trend</p>
             </div>
@@ -563,7 +563,7 @@ export default function FamilyClient() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-rose-400" />
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">Allocation Split</h3>
+              <h3 className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">Allocation Split</h3>
             </div>
           </div>
           <p className="text-xl font-black text-white">Support by Member</p>
@@ -923,33 +923,8 @@ export default function FamilyClient() {
 
             {/* Profile Photo Settings */}
             <div>
-              <label style={labelStyle}>Profile Photo / Avatar Settings</label>
+              <label style={labelStyle}>Profile Photo (Optional)</label>
               <div className="space-y-2">
-                {/* Preset Avatars */}
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {[
-                    { label: "👨 Father", url: "/avatar_father.png" },
-                    { label: "👩 Mother", url: "/avatar_mother.png" },
-                    { label: "👦 Son", url: "https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?w=150&auto=format&fit=crop&q=80" },
-                    { label: "👧 Daughter", url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80" },
-                    { label: "👴 Grandpa", url: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80" },
-                    { label: "👵 Grandma", url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setMemberForm(prev => ({ ...prev, avatar_url: preset.url }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                        memberForm.avatar_url === preset.url
-                          ? "bg-pink-500 text-white border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.4)]"
-                          : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-
                 {/* Custom Photo URL Input & File Upload */}
                 <div className="flex items-center gap-2">
                   <input

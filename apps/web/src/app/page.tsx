@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import { TrendingUp, Landmark, Wallet, Bot, PieChart, ShieldCheck } from "lucide-react";
 
 export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -120,32 +121,32 @@ export default function HomePage() {
         >
           {[
             {
-              icon: "📈",
+              icon: TrendingUp,
               title: "Stock Portfolio Tracking",
               desc: "Monitor your equity holdings, track real-time prices, and analyze portfolio performance with live market data.",
             },
             {
-              icon: "🏦",
+              icon: Landmark,
               title: "Mutual Fund Analytics",
               desc: "Track mutual fund NAVs, XIRR returns, scheme-wise holdings, and AMC-branded fund visualization.",
             },
             {
-              icon: "💰",
+              icon: Wallet,
               title: "Expense & Income Tracking",
               desc: "Categorize and analyze spending patterns, income sources, and monthly cash flow with detailed breakdowns.",
             },
             {
-              icon: "🤖",
+              icon: Bot,
               title: "Automated Transaction Sync",
               desc: "Auto-detect bank debit and credit alerts from Gmail and SMS to eliminate manual data entry.",
             },
             {
-              icon: "📊",
+              icon: PieChart,
               title: "Budget & Goals Management",
               desc: "Set monthly budgets, financial goals, and track progress with visual indicators and alerts.",
             },
             {
-              icon: "🛡️",
+              icon: ShieldCheck,
               title: "Enterprise-Grade Security",
               desc: "Row-Level Security (RLS) isolation, AES-256 encryption at rest, TLS 1.3 in transit, and Google OAuth 2.0.",
             },
@@ -154,7 +155,9 @@ export default function HomePage() {
               key={i}
               className="bg-[#06090e]/80 border border-white/[0.06] rounded-2xl p-6 hover:border-cyan-500/20 transition-all hover:bg-[#080c14] group"
             >
-              <span className="text-2xl mb-3 block">{feature.icon}</span>
+              <span className="mb-3 block text-cyan-400">
+                <feature.icon className="w-8 h-8" />
+              </span>
               <h3 className="text-base font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">
                 {feature.title}
               </h3>

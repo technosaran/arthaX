@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
 import type { Tables } from "@/lib/database.types";
@@ -18,11 +18,14 @@ import StocksHistoryTable from "./components/StocksHistoryTable";
 import { calculateEquityDeliveryCharges } from "@/lib/zerodha-charges";
 import { getIndianMarketStatus, type MarketStatusInfo } from "@/lib/market-hours";
 import { triggerMarketAndDividendSync } from "@/app/dashboard/investments/sync-actions";
+import { useZerodhaSettings } from "@/hooks/use-zerodha-settings";
 
 type Stock = Tables<"investments"> & { day_change?: number; day_change_percent?: number };
 
 export default function StocksClient({ initialData, showUSD = false }: { initialData?: FinanceData; showUSD?: boolean }) {
   const { data: { investments, accounts, profile, stockTrades, incomes }, mutate } = useFinanceData(initialData);
+  const router = useRouter();
+  const { status: zerodhaStatus } = useZerodhaSettings();
 
   const dividendSummary = useMemo(() => {
     if (!incomes) return { total: 0, count: 0 };
@@ -418,7 +421,6 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-base font-extrabold text-white tracking-wider uppercase">Equity Portfolio</h1>
-                <span className="text-[0.5625rem] bg-[#387ED1]/20 text-[#387ED1] border border-[#387ED1]/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">EQUITY PRO</span>
               </div>
             </div>
           </div>
@@ -469,6 +471,20 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                   <svg className="w-3.5 h-3.5 text-[#387ED1]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 )}
                 Refresh LTP
+              </button>
+              <button
+                onClick={() => {
+                  if (!zerodhaStatus?.configured) {
+                    router.push('/dashboard/settings?tab=integrations');
+                    return;
+                  }
+                  window.location.href = "/api/integrations/zerodha/login";
+                }}
+                className="bg-[#FF5722]/10 hover:bg-[#FF5722]/20 border border-[#FF5722]/30 text-[#FF5722] px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                title="Sync holdings directly from Zerodha Kite"
+              >
+                <span className="font-black">K</span>
+                Sync Zerodha
               </button>
               <button 
                 onClick={() => { 

@@ -12,7 +12,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { EmptyState } from "@/components/empty-state";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Shield } from "lucide-react";
 import { getTableHeaderClass, getTableCellClass } from "@/lib/utils";
 
 type LedgerLog = {
@@ -111,9 +111,24 @@ export default function LedgerDataTable({
         ),
         cell: (info) => {
           const val = info.getValue();
-          return <span className="text-xs text-white font-medium whitespace-nowrap">{val ? format(new Date(val), "dd-MM-yyyy") : "—"}</span>;
+          if (!val) return <span className="text-xs text-white font-medium whitespace-nowrap">—</span>;
+          const date = new Date(val);
+          return (
+            <div className="whitespace-nowrap flex flex-col gap-0.5">
+               <span className="text-xs font-bold text-white">{format(date, "dd MMM yyyy")}</span>
+               <span className="text-[0.5625rem] font-bold text-[--text-muted]">{format(date, "hh:mm a")}</span>
+            </div>
+          );
         },
         sortingFn: "datetime",
+      }),
+      columnHelper.accessor("id", {
+        header: "Ref No.",
+        cell: (info) => (
+          <span className="text-[0.5625rem] font-mono text-[--text-muted] uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5 whitespace-nowrap">
+            {info.getValue().substring(0, 8)}
+          </span>
+        )
       }),
       columnHelper.accessor("account_name", {
         header: "Account",
@@ -137,9 +152,11 @@ export default function LedgerDataTable({
         header: "Particulars",
         cell: (info) => {
           const details = info.getValue() || "No details provided";
+          const type = info.row.original.action_type || "LOG";
           return (
-            <div className="text-xs text-gray-300 leading-relaxed max-w-[240px] break-words">
-              {details}
+            <div className="flex flex-col gap-1 max-w-[240px] break-words">
+              <span className="text-[0.5625rem] font-black uppercase tracking-wider text-rose-300">{type.replace(/_/g, " ")}</span>
+              <span className="text-xs text-gray-300 leading-relaxed">{details}</span>
             </div>
           );
         }
@@ -245,7 +262,7 @@ export default function LedgerDataTable({
         <EmptyState
           title="No Ledger Entries Located"
           description="No transaction matches the current date filters."
-          icon="🛡️"
+          icon={<Shield className="w-12 h-12 text-[--accent-primary]" />}
           glowColor="indigo"
           action={
             <button
@@ -355,7 +372,7 @@ export default function LedgerDataTable({
           >
             Previous
           </button>
-          <span className="text-xs font-black uppercase tracking-[0.2em] text-[--text-muted]">
+          <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[--text-muted]">
             Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
           </span>
           <button
