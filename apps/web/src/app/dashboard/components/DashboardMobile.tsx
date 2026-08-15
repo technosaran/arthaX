@@ -114,7 +114,10 @@ const DashboardMobile = memo(function DashboardMobile({ stats, recentLogs, accou
                   </span>
                 </span>
               </div>
-              <h1 className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap">
+              <h1 
+                className="text-3xl font-[950] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-slate-200 whitespace-nowrap cursor-pointer"
+                onClick={() => setShowUSD(!showUSD)}
+              >
                 {showUSD ? "$" : "₹"}{(showUSD ? stats.netWorthUSD : stats.netWorthINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </h1>
             </div>

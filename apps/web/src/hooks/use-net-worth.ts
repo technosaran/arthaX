@@ -172,9 +172,9 @@ export function useNetWorth() {
 
       if (isCryptoAsset(inv)) {
         totalInvestedUSD += cost;
-        totalInvestedINR += cost * 85.0;
+        totalInvestedINR += 0;
         totalGrowthUSD += gain;
-        totalGrowthINR += gain * 85.0;
+        totalGrowthINR += 0;
       } else {
         const { inr: costINR, usd: costUSD } = getInvestmentValues(cost, inv.currency);
         const { inr: gainINR, usd: gainUSD } = getInvestmentValues(gain, inv.currency);

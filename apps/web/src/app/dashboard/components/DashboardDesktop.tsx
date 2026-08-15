@@ -312,7 +312,10 @@ const DashboardDesktop = memo(function DashboardDesktop({ stats, recentLogs, goa
                       </span>
                     </span>
                   </div>
-                  <h2 className="text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden">
+                  <h2 
+                    className="text-4xl sm:text-5xl md:text-6xl font-sans font-bold tracking-tight text-white tabular-nums whitespace-nowrap overflow-hidden cursor-pointer"
+                    onClick={() => setShowUSD(!showUSD)}
+                  >
                     {showUSD ? "$" : "₹"}{(showUSD ? stats.netWorthUSD : stats.netWorthINR).toLocaleString(showUSD ? 'en-US' : 'en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </h2>
                 </div>

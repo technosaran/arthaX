@@ -227,8 +227,11 @@ export default function DashboardClient() {
         : (prevClose > 0 ? currentPrice - prevClose : currentPrice - Number(inv.buy_price || 0));
       const rawPnL = dayChangePerUnit * quantity;
       const isUSD = isCryptoAsset(inv) || inv.currency === "USD";
-      totalDayPnLINR += isUSD ? rawPnL * 85.0 : rawPnL;
-      totalDayPnLUSD += isUSD ? rawPnL : rawPnL / 85.0;
+      if (isUSD) {
+        totalDayPnLUSD += rawPnL;
+      } else {
+        totalDayPnLINR += rawPnL;
+      }
     });
 
     mutualFunds.forEach((mf) => {
@@ -240,8 +243,11 @@ export default function DashboardClient() {
         : (prevNav > 0 ? currentNav - prevNav : currentNav - Number(mf.avg_nav || 0));
       const rawPnL = dayChangePerUnit * units;
       const isUSD = (mf as any).currency === "USD";
-      totalDayPnLINR += isUSD ? rawPnL * 85.0 : rawPnL;
-      totalDayPnLUSD += isUSD ? rawPnL : rawPnL / 85.0;
+      if (isUSD) {
+        totalDayPnLUSD += rawPnL;
+      } else {
+        totalDayPnLINR += rawPnL;
+      }
     });
 
     const isBaseUSD = profile?.base_currency === "USD";
@@ -252,21 +258,27 @@ export default function DashboardClient() {
     // Calculate All-Time Total Investment Growth & ROI across all assets
     let totalInvestedINR = 0;
     let totalGrowthINR = 0;
+    let totalInvestedUSD = 0;
+    let totalGrowthUSD = 0;
 
     investments.forEach((inv) => {
       const quantity = Number(inv.quantity || 0);
       const buyPrice = Number(inv.buy_price || 0);
       const currentPrice = Number(inv.current_price || buyPrice);
       const isUSD = isCryptoAsset(inv) || inv.currency === "USD";
-      const fx = isUSD ? 85.0 : 1.0;
 
-      const invested = quantity * buyPrice * fx;
-      const current = quantity * currentPrice * fx;
+      const invested = quantity * buyPrice;
+      const current = quantity * currentPrice;
       const unrealizedPnL = current - invested;
-      const realizedPnL = Number((inv as any).realized_pnl || 0) * fx;
+      const realizedPnL = Number((inv as any).realized_pnl || 0);
 
-      totalInvestedINR += invested;
-      totalGrowthINR += (unrealizedPnL + realizedPnL);
+      if (isUSD) {
+        totalInvestedUSD += invested;
+        totalGrowthUSD += (unrealizedPnL + realizedPnL);
+      } else {
+        totalInvestedINR += invested;
+        totalGrowthINR += (unrealizedPnL + realizedPnL);
+      }
     });
 
     mutualFunds.forEach((mf) => {
@@ -274,22 +286,32 @@ export default function DashboardClient() {
       const avgNav = Number(mf.avg_nav || 0);
       const currentNav = Number(mf.current_nav || avgNav);
       const isUSD = (mf as any).currency === "USD";
-      const fx = isUSD ? 85.0 : 1.0;
 
-      const invested = units * avgNav * fx;
-      const current = units * currentNav * fx;
+      const invested = units * avgNav;
+      const current = units * currentNav;
       const unrealizedPnL = current - invested;
-      const realizedPnL = Number(mf.realized_pnl || 0) * fx;
+      const realizedPnL = Number(mf.realized_pnl || 0);
 
-      totalInvestedINR += invested;
-      totalGrowthINR += (unrealizedPnL + realizedPnL);
+      if (isUSD) {
+        totalInvestedUSD += invested;
+        totalGrowthUSD += (unrealizedPnL + realizedPnL);
+      } else {
+        totalInvestedINR += invested;
+        totalGrowthINR += (unrealizedPnL + realizedPnL);
+      }
     });
 
     (alternativeAssets || []).forEach((alt: any) => {
       const purchase = Number(alt.purchase_price || 0);
       const current = Number(alt.current_value || purchase);
-      totalInvestedINR += purchase;
-      totalGrowthINR += (current - purchase);
+      const isUSD = alt.currency === "USD";
+      if (isUSD) {
+        totalInvestedUSD += purchase;
+        totalGrowthUSD += (current - purchase);
+      } else {
+        totalInvestedINR += purchase;
+        totalGrowthINR += (current - purchase);
+      }
     });
 
     (bonds || []).forEach((b: any) => {
@@ -297,12 +319,19 @@ export default function DashboardClient() {
       const qty = Number(b.quantity || 1);
       const current = Number(b.current_price || purchase) * qty;
       const invested = purchase * qty;
-      totalInvestedINR += invested;
-      totalGrowthINR += (current - invested);
+      const isUSD = b.currency === "USD";
+      if (isUSD) {
+        totalInvestedUSD += invested;
+        totalGrowthUSD += (current - invested);
+      } else {
+        totalInvestedINR += invested;
+        totalGrowthINR += (current - invested);
+      }
     });
 
-    const totalGrowthUSD = totalGrowthINR / 85.0;
-    const totalGrowthPercent = totalInvestedINR > 0 ? (totalGrowthINR / totalInvestedINR) * 100 : 0;
+    const totalInvested = isBaseUSD ? totalInvestedUSD : totalInvestedINR;
+    const totalGrowth = isBaseUSD ? totalGrowthUSD : totalGrowthINR;
+    const totalGrowthPercent = totalInvested > 0 ? (totalGrowth / totalInvested) * 100 : 0;
 
 
     return { 

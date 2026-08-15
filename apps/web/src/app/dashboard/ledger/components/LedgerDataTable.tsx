@@ -122,14 +122,6 @@ export default function LedgerDataTable({
         },
         sortingFn: "datetime",
       }),
-      columnHelper.accessor("id", {
-        header: "Ref No.",
-        cell: (info) => (
-          <span className="text-[0.5625rem] font-mono text-[--text-muted] uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5 whitespace-nowrap">
-            {info.getValue().substring(0, 8)}
-          </span>
-        )
-      }),
       columnHelper.accessor("account_name", {
         header: "Account",
         cell: (info) => <span className="text-xs font-semibold text-[--text-secondary] whitespace-nowrap">{info.getValue() || "—"}</span>

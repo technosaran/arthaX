@@ -243,6 +243,19 @@ export const BrandLogo = memo(({ name, symbol, className = "", style }: { name?:
 
     if (!domain) return [];
 
+    // Custom overrides for specific domains if we want updated/full logos dynamically
+    const CUSTOM_LOGO_OVERRIDES: Record<string, string> = {
+      "amazon.com": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
+      // add more domain overrides here if needed
+    };
+
+    if (domain && CUSTOM_LOGO_OVERRIDES[domain]) {
+      return [
+        CUSTOM_LOGO_OVERRIDES[domain],
+        `https://img.logo.dev/${domain}?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256`
+      ];
+    }
+
     // logo.dev — single source with built-in monogram fallback (always returns 200 OK)
     return [
       `https://img.logo.dev/${domain}?token=pk_eUkLSBOcQ7-s3ZgpjJOLvQ&format=png&size=256`,
