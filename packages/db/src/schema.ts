@@ -378,6 +378,8 @@ export const bondTransactions = pgTable("bond_transactions", {
 }, (t) => ({
   userIdIdx: index("bond_transactions_user_id_idx").on(t.user_id),
   accountIdIdx: index("bond_transactions_account_id_idx").on(t.account_id)
+}));
+
 // ---------------------------------------------------------------------------
 // alternative_assets
 // ---------------------------------------------------------------------------

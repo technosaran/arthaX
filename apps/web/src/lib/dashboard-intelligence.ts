@@ -34,6 +34,7 @@ export function generateDashboardInsights(params: {
   liabilities: any[];
   goals: any[];
   pieData: Array<{ name: string; value: number }>;
+  previousNetWorth?: number;
 }): DecisionAnswers {
   const {
     monthlyIncome = 0,
@@ -42,13 +43,21 @@ export function generateDashboardInsights(params: {
     liabilities = [],
     goals = [],
     pieData = [],
+    previousNetWorth,
   } = params;
 
-  const netWorthDeltaAmount = Math.round(monthlyIncome - monthlySpend);
-  const netWorthGrowthPct = netWorth > 0 ? (netWorthDeltaAmount / netWorth) * 100 : 0;
+  const previousNetWorthNum = previousNetWorth !== undefined ? previousNetWorth : (netWorth - (monthlyIncome - monthlySpend));
+  const netWorthDeltaAmount = netWorth - previousNetWorthNum;
+  const netWorthGrowthPct = previousNetWorthNum > 0 ? (netWorthDeltaAmount / previousNetWorthNum) * 100 : 0;
   const isRicher = netWorthDeltaAmount >= 0;
 
-  const estimatedBudget = Math.max(monthlyIncome * 0.7, 50000);
+  let totalDebtObligations = 0;
+  liabilities.forEach((l: any) => {
+    totalDebtObligations += Number(l.minimum_payment || l.emi_amount || 0);
+  });
+  
+  const targetSavings = monthlyIncome * 0.20; // 20% savings rule of thumb
+  const estimatedBudget = Math.max(0, monthlyIncome - totalDebtObligations - targetSavings);
   const budgetRemainingAmount = Math.max(0, estimatedBudget - monthlySpend);
   const daysInMonth = 30;
   const currentDay = new Date().getDate();

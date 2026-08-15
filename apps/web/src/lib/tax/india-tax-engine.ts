@@ -337,13 +337,31 @@ export function computeIndiaTaxReport(input: TaxEngineInput) {
 
   const grossIncome = salaryIncome + (housePropertyIncome - housePropertyExpense) + otherSourcesIncome + uncategorizedIncome + stcg + ltcg;
 
-  const taxableOld = Math.max(0, grossIncome - rule.standardDeductionOld - totalDeductions);
-  const taxableNew = Math.max(0, grossIncome - rule.standardDeductionNew);
+  // 1. Separate Special Rate Income
+  const LTCG_EXEMPTION = 125000;
+  const taxableLtcg = Math.max(0, ltcg - LTCG_EXEMPTION);
+  const taxableStcg = Math.max(0, stcg);
+  
+  // 2. Compute Normal Income
+  const normalIncomeOld = Math.max(0, (grossIncome - stcg - ltcg) - rule.standardDeductionOld - totalDeductions);
+  const normalIncomeNew = Math.max(0, (grossIncome - stcg - ltcg) - rule.standardDeductionNew);
+  
+  // 3. Compute Base Tax
+  const oldNormalTax = calcSlabTax(normalIncomeOld, rule.oldRegimeSlabs);
+  const newNormalTax = calcSlabTax(normalIncomeNew, rule.newRegimeSlabs);
+  
+  const ltcgTaxRate = fyStartYear >= 2024 ? 0.125 : 0.10;
+  const stcgTaxRate = fyStartYear >= 2024 ? 0.20 : 0.15;
+  
+  const specialTax = (taxableLtcg * ltcgTaxRate) + (taxableStcg * stcgTaxRate);
+  
+  const oldTaxBeforeRebate = oldNormalTax + specialTax;
+  const newTaxBeforeRebate = newNormalTax + specialTax;
 
-  const oldTaxBeforeRebate = calcSlabTax(taxableOld, rule.oldRegimeSlabs);
-  const newTaxBeforeRebate = calcSlabTax(taxableNew, rule.newRegimeSlabs);
+  const totalTaxableOld = normalIncomeOld + taxableLtcg + taxableStcg;
+  const totalTaxableNew = normalIncomeNew + taxableLtcg + taxableStcg;
 
-  // Section 87A Tax Rebate with Marginal Relief
+  // 4. Section 87A Tax Rebate with Marginal Relief
   const compute87ARebateWithMarginalRelief = (
     taxableIncome: number,
     taxBeforeRebate: number,
@@ -368,12 +386,40 @@ export function computeIndiaTaxReport(input: TaxEngineInput) {
   const sec87aThresholdOld = rule.sec87aThresholdOld ?? 500000;
   const sec87aMaxRebateOld = rule.sec87aMaxRebateOld ?? 12500;
 
-  const oldRebate = compute87ARebateWithMarginalRelief(taxableOld, oldTaxBeforeRebate, sec87aThresholdOld, sec87aMaxRebateOld);
-  const newRebate = compute87ARebateWithMarginalRelief(taxableNew, newTaxBeforeRebate, sec87aThresholdNew, sec87aMaxRebateNew);
+  const oldRebate = compute87ARebateWithMarginalRelief(totalTaxableOld, oldTaxBeforeRebate, sec87aThresholdOld, sec87aMaxRebateOld);
+  const newRebate = compute87ARebateWithMarginalRelief(totalTaxableNew, newTaxBeforeRebate, sec87aThresholdNew, sec87aMaxRebateNew);
 
-  const oldTax = Math.max(0, oldTaxBeforeRebate - oldRebate);
-  const newTax = Math.max(0, newTaxBeforeRebate - newRebate);
+  let oldTax = Math.max(0, oldTaxBeforeRebate - oldRebate);
+  let newTax = Math.max(0, newTaxBeforeRebate - newRebate);
 
+  // 5. Surcharge and Surcharge Marginal Relief
+  const applySurcharge = (baseTax: number, totalIncome: number, isNewRegime: boolean) => {
+    if (totalIncome <= 5000000) return baseTax;
+    
+    let surchargeRate = 0;
+    if (totalIncome > 5000000 && totalIncome <= 10000000) surchargeRate = 0.10;
+    else if (totalIncome > 10000000 && totalIncome <= 20000000) surchargeRate = 0.15;
+    else if (totalIncome > 20000000) surchargeRate = isNewRegime ? 0.25 : 0.25;
+
+    const taxWithSurcharge = baseTax * (1 + surchargeRate);
+    
+    let threshold = 5000000;
+    let prevSurchargeRate = 0;
+    if (totalIncome > 20000000) { threshold = 20000000; prevSurchargeRate = 0.15; }
+    else if (totalIncome > 10000000) { threshold = 10000000; prevSurchargeRate = 0.10; }
+    
+    const excessIncome = totalIncome - threshold;
+    const assumedTaxAtThreshold = baseTax * (threshold / totalIncome); 
+    const taxAtThresholdWithPrevSurcharge = assumedTaxAtThreshold * (1 + prevSurchargeRate);
+    const maxAllowedTax = taxAtThresholdWithPrevSurcharge + excessIncome;
+
+    return Math.min(taxWithSurcharge, maxAllowedTax);
+  };
+
+  oldTax = applySurcharge(oldTax, totalTaxableOld, false);
+  newTax = applySurcharge(newTax, totalTaxableNew, true);
+
+  // 6. Cess
   const oldTaxWithCess = oldTax * (1 + rule.cessRate);
   const newTaxWithCess = newTax * (1 + rule.cessRate);
   const selectedTaxBeforePaid = regime === "old" ? oldTaxWithCess : newTaxWithCess;

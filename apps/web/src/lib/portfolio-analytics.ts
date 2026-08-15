@@ -72,9 +72,9 @@ export function calculatePortfolioAnalytics(params: {
   const todayPnLPct = totalInvValue > 0 ? (todayPnL / totalInvValue) * 100 : 0;
 
   const costBasis = realCostBasis > 0 ? realCostBasis : totalInvValue;
-  const totalGain = Math.max(0, totalInvValue - costBasis);
+  const totalGain = totalInvValue - costBasis;
   const totalGainPct = costBasis > 0 ? (totalGain / costBasis) * 100 : 0;
-  const xirrPct = totalGainPct > 0 ? Number(totalGainPct.toFixed(2)) : 0;
+  const xirrPct = Number(totalGainPct.toFixed(2));
 
   let bestPerformerName = "—";
   let bestPerformerGainPct = 0;
