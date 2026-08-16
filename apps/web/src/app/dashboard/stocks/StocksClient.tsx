@@ -16,6 +16,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } 
 import StocksDataTable from "./components/StocksDataTable";
 import StocksHistoryTable from "./components/StocksHistoryTable";
 import { calculateEquityDeliveryCharges } from "@/lib/zerodha-charges";
+import { getZerodhaRules } from "@/lib/broker-rules/zerodha";
 import { getIndianMarketStatus, type MarketStatusInfo } from "@/lib/market-hours";
 import { triggerMarketAndDividendSync } from "@/app/dashboard/investments/sync-actions";
 import { useZerodhaSettings } from "@/hooks/use-zerodha-settings";
@@ -952,6 +953,7 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                       const isBuy = formData.trade_type === "buy";
                       const calc = calculateEquityDeliveryCharges(turnover, isBuy);
                       const currentCharges = parseFloat(charges) || 0;
+                      const currentRule = getZerodhaRules(new Date()).equityDelivery;
 
                       return (
                         <>
@@ -967,26 +969,26 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
                               <span className="font-bold text-[#41B883]">₹0.00 (Free)</span>
                             </div>
                             <div className="flex justify-between text-[#848E9C]">
-                              <span>STT (0.1%):</span>
+                              <span>STT ({(currentRule.sttPct * 100).toFixed(3)}%):</span>
                               <span className="font-mono text-white">₹{calc.stt.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-[#848E9C]">
-                              <span>NSE Txn Fee (0.00297%):</span>
+                              <span>NSE Txn Fee ({(currentRule.nseTxnFeePct * 100).toFixed(5)}%):</span>
                               <span className="font-mono text-white">₹{calc.transactionFee.toFixed(2)}</span>
                             </div>
                             {isBuy ? (
                               <div className="flex justify-between text-[#848E9C]">
-                                <span>Stamp Duty (0.015%):</span>
+                                <span>Stamp Duty ({(currentRule.stampDutyBuyPct * 100).toFixed(3)}%):</span>
                                 <span className="font-mono text-white">₹{calc.stampDuty.toFixed(2)}</span>
                               </div>
                             ) : (
                               <div className="flex justify-between text-[#848E9C]">
                                 <span>DP Charges:</span>
-                                <span className="font-mono text-white">₹15.93</span>
+                                <span className="font-mono text-white">₹{currentRule.dpChargeMalePerScripDay}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-[#848E9C]">
-                              <span>GST (18%):</span>
+                              <span>GST ({(currentRule.gstPct * 100).toFixed(0)}%):</span>
                               <span className="font-mono text-white">₹{calc.gst.toFixed(2)}</span>
                             </div>
                           </div>

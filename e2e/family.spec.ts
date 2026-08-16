@@ -10,7 +10,7 @@ test.describe('Family Management E2E', () => {
     await page.goto('/login');
     const emailInput = page.getByPlaceholder("you@example.com");
     const passwordInput = page.getByPlaceholder("••••••••");
-    const submitButton = page.getByRole('button', { name: /sign in/i });
+    const submitButton = page.getByRole('button', { name: /access terminal/i });
 
     await expect(emailInput).toBeVisible();
     await expect(passwordInput).toBeVisible();

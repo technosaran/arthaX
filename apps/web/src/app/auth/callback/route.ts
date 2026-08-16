@@ -55,14 +55,6 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const AUTHORIZED_EMAIL = "iamsaran.ai@gmail.com";
-      const ACCESS_RESTRICTED_MSG = "Access Restricted. arthaX is operating in private single-user mode for authorized accounts only.";
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && user.email?.trim().toLowerCase() !== AUTHORIZED_EMAIL) {
-        await supabase.auth.signOut();
-        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(ACCESS_RESTRICTED_MSG)}`);
-      }
       return response;
     } else {
       console.error("OAuth callback exchangeCodeForSession error:", error);

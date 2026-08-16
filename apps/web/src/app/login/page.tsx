@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { login } from "./actions";
 import { createClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import "./login.css";
-
-const MAX_ATTEMPTS = 3;
-const LOCKOUT_DURATION_MS = 15000;
 
 const containerVariants: any = {
   hidden: { opacity: 0 },
@@ -63,56 +60,6 @@ export default function LoginPage() {
   const [emailInput, setEmailInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
-  const [lockoutSeconds, setLockoutSeconds] = useState(0);
-  const failCountRef = useRef(0);
-  const lockoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startLockout = useCallback((durationMs: number, customUntil?: number) => {
-    const until = customUntil || (Date.now() + durationMs);
-    setLockoutUntil(until);
-    setLockoutSeconds(Math.ceil((until - Date.now()) / 1000));
-
-    if (!customUntil) {
-      localStorage.setItem("lockoutUntil", until.toString());
-    }
-
-    if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current);
-    lockoutTimerRef.current = setInterval(() => {
-      const remaining = Math.ceil((until - Date.now()) / 1000);
-      if (remaining <= 0) {
-        setLockoutUntil(null);
-        setLockoutSeconds(0);
-        localStorage.removeItem("lockoutUntil");
-        if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current);
-      } else {
-        setLockoutSeconds(remaining);
-      }
-    }, 1000);
-  }, []);
-
-  useEffect(() => {
-    const savedUntil = localStorage.getItem("lockoutUntil");
-    const savedFails = localStorage.getItem("failCount");
-    
-    if (savedFails) {
-      failCountRef.current = parseInt(savedFails, 10);
-    }
-    
-    if (savedUntil) {
-      const until = parseInt(savedUntil, 10);
-      if (until > Date.now()) {
-        setTimeout(() => {
-          startLockout(until - Date.now(), until);
-        }, 0);
-      } else {
-        localStorage.removeItem("lockoutUntil");
-        localStorage.removeItem("failCount");
-        failCountRef.current = 0;
-      }
-    }
-  }, [startLockout]);
-
   useEffect(() => {
     const urlError = searchParams.get("error");
     if (urlError) {
@@ -151,8 +98,6 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (lockoutUntil && Date.now() < lockoutUntil) return;
-
     setError("");
     setLoading(true);
     
@@ -161,20 +106,9 @@ export default function LoginPage() {
       const result = await login(formData);
         
       if (result?.error) {
-        failCountRef.current += 1;
-        localStorage.setItem("failCount", failCountRef.current.toString());
         setError(result.error);
         setLoading(false);
-
-        if (failCountRef.current >= MAX_ATTEMPTS) {
-          const multiplier = Math.pow(2, failCountRef.current - MAX_ATTEMPTS);
-          startLockout(LOCKOUT_DURATION_MS * multiplier);
-        }
       } else {
-        failCountRef.current = 0;
-        localStorage.removeItem("failCount");
-        localStorage.removeItem("lockoutUntil");
-        
         router.push("/dashboard");
       }
     } catch {
@@ -182,8 +116,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
-  const isLockedOut = lockoutSeconds > 0;
 
   return (
     <div className="login-wrapper relative min-h-screen w-full flex flex-col lg:flex-row bg-[#030712] font-sans selection:bg-sky-500/30 overflow-x-hidden">
@@ -313,7 +245,6 @@ export default function LoginPage() {
                   type="email"
                   required
                   autoComplete="email"
-                  disabled={isLockedOut}
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   className="peer w-full bg-white/[0.03] border border-white/10 text-white text-sm rounded-xl pl-12 pr-4 pt-5 pb-2 outline-none focus:border-sky-500/50 focus:bg-white/[0.05] focus:shadow-[0_0_20px_rgba(14,165,233,0.15)] transition-all placeholder-transparent"
@@ -340,7 +271,6 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
-                  disabled={isLockedOut}
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   className="peer w-full bg-white/[0.03] border border-white/10 text-white text-sm rounded-xl pl-12 pr-12 pt-5 pb-2 outline-none focus:border-sky-500/50 focus:bg-white/[0.05] focus:shadow-[0_0_20px_rgba(14,165,233,0.15)] transition-all placeholder-transparent"
@@ -393,26 +323,13 @@ export default function LoginPage() {
               ) : null}
             </AnimatePresence>
 
-            {isLockedOut && (
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="flex items-center gap-2.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs font-medium"
-              >
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
-                </svg>
-                Too many attempts. Locked out for {lockoutSeconds}s
-              </motion.div>
-            )}
-
             {/* Primary Action Button */}
             <motion.button
               variants={itemVariants}
               layout
               type="submit"
-              disabled={loading || isLockedOut}
-              whileTap={{ scale: (loading || isLockedOut) ? 1 : 0.98 }}
+              disabled={loading}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
               className="relative w-full h-12 mt-2 rounded-xl text-white text-sm font-bold tracking-wide overflow-hidden transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed group"
             >
               <div className="absolute inset-0 transition-colors duration-300 bg-sky-500 hover:bg-sky-400 shadow-[0_0_25px_rgba(14,165,233,0.3)]" />
@@ -451,7 +368,7 @@ export default function LoginPage() {
             variants={itemVariants}
             type="button"
             onClick={handleGoogleLogin}
-            disabled={loading || isLockedOut}
+            disabled={loading}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 rounded-xl text-white text-xs font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group shadow-sm"
           >
             <svg className="w-4 h-4 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">

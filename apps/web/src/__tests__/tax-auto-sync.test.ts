@@ -18,6 +18,8 @@ describe("Dynamic AI Tax Rule Manager & Auto-Sync Engine", () => {
       oldRegimeSlabs: [{ upto: 300000, rate: 0 }],
       newRegimeSlabs: [{ upto: 500000, rate: 0 }],
       deductionLimits: { "80C": 200000 },
+      stcgTaxRate: 0.20,
+      ltcgTaxRate: 0.125,
     });
 
     const registered = getTaxRuleForYear(2027);

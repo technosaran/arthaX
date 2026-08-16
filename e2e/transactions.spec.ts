@@ -8,7 +8,7 @@ test.describe('Transactions Management E2E', () => {
 
   test('search input exists on login page redirect', async ({ page }) => {
     await page.goto('/login');
-    const submitButton = page.getByRole('button', { name: /sign in/i });
+    const submitButton = page.getByRole('button', { name: /access terminal/i });
     await expect(submitButton).toBeVisible();
   });
 });

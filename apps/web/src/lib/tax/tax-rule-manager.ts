@@ -63,6 +63,8 @@ export async function autoSyncTaxRulesFromAnnouncement(
     oldRegimeSlabs: result.oldRegimeSlabs,
     newRegimeSlabs: result.newRegimeSlabs,
     deductionLimits: result.deductionLimits,
+    stcgTaxRate: 0.20,
+    ltcgTaxRate: 0.125,
   };
 
   registerTaxRule(newRule);

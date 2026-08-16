@@ -10,6 +10,8 @@ export const MODULE_KEYS = [
   "Alt Assets",
   "Liabilities",
   "Goals",
+  "Insurance",
+  "Retirement",
   "Family Management",
   "Ledger",
 ] as const;
@@ -25,6 +27,8 @@ export const MODULE_DISPLAY_LABELS: Record<ModuleKey, string> = {
   "Alt Assets": "Assets",
   "Liabilities": "Loans",
   "Goals": "Goals",
+  "Insurance": "Insurance",
+  "Retirement": "Retirement Planner",
   "Family Management": "Family Management",
   "Ledger": "Ledger",
 };
@@ -44,6 +48,8 @@ export function getCanonicalEnabledModules(rawEnabledModules?: string[] | null):
       "Tax",
       "Assets",
       "Loans",
+      "Insurance",
+      "Retirement",
       "Family",
     ];
   }
@@ -78,6 +84,12 @@ export function getCanonicalEnabledModules(rawEnabledModules?: string[] | null):
     if (m === "Liabilities" || m === "Loans") {
       result.add("Liabilities");
       result.add("Loans");
+    }
+    if (m === "Insurance") {
+      result.add("Insurance");
+    }
+    if (m === "Retirement" || m === "FIRE") {
+      result.add("Retirement");
     }
     if (m === "Family Management" || m === "Family") {
       result.add("Family Management");

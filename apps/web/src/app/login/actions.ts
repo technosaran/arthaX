@@ -33,9 +33,6 @@ async function clearFailedAttempts(email: string) {
 
 
 
-const AUTHORIZED_EMAIL = "iamsaran.ai@gmail.com";
-const ACCESS_RESTRICTED_MSG = "Access Restricted. arthaX is operating in private single-user mode for authorized accounts only.";
-
 export type AuthResult = {
   success?: boolean;
   error?: string;
@@ -56,11 +53,6 @@ export async function login(formData: FormData): Promise<AuthResult> {
   }
 
   const emailStr = email.trim();
-
-  if (emailStr.toLowerCase() !== AUTHORIZED_EMAIL) {
-    logger.warn("Unauthorized login attempt blocked", { email: emailStr });
-    return { error: ACCESS_RESTRICTED_MSG };
-  }
 
   try {
     const bruteCheck = await checkBruteForce(emailStr);
@@ -97,8 +89,29 @@ export async function login(formData: FormData): Promise<AuthResult> {
   return { success: true };
 }
 
-export async function signup(_formData: FormData): Promise<AuthResult> {
-  return {
-    error: "Registration is disabled. arthaX is operating in private single-user mode for authorized accounts only."
-  };
+export async function signup(formData: FormData): Promise<AuthResult> {
+  const email = formData.get("email");
+  const password = formData.get("password");
+
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return { error: "Email is required." };
+  }
+
+  if (!password || typeof password !== "string" || !password.trim()) {
+    return { error: "Password is required." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) {
+    logger.error("Signup error", { err: error instanceof Error ? error : new Error(String(error)) });
+    return { error: error.message || "Failed to sign up." };
+  }
+
+  return { success: true };
 }

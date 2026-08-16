@@ -1,4 +1,4 @@
-export type BrokerRuleVersion = "FY2025-26" | "FY2026-27";
+export type BrokerRuleVersion = string;
 
 export interface BrokerCharges {
   version: BrokerRuleVersion;
@@ -45,7 +45,7 @@ export interface BrokerCharges {
   };
 }
 
-export const ZERODHA_RULES: Record<BrokerRuleVersion, BrokerCharges> = {
+export const ZERODHA_RULES: Record<string, BrokerCharges> = {
   "FY2025-26": {
     version: "FY2025-26",
     equityDelivery: {
@@ -137,14 +137,22 @@ export const ZERODHA_RULES: Record<BrokerRuleVersion, BrokerCharges> = {
 };
 
 export function getZerodhaRules(dateOrVersion: string | Date = new Date()): BrokerCharges {
-  if (typeof dateOrVersion === "string" && ["FY2025-26", "FY2026-27"].includes(dateOrVersion)) {
-    return ZERODHA_RULES[dateOrVersion as BrokerRuleVersion];
+  if (typeof dateOrVersion === "string" && ZERODHA_RULES[dateOrVersion]) {
+    return ZERODHA_RULES[dateOrVersion];
   }
   
-  const d = new Date(dateOrVersion);
-  // Simple FY resolution: FY2026-27 starts April 1, 2026
-  if (d >= new Date("2026-04-01")) {
-    return ZERODHA_RULES["FY2026-27"];
+  const d = typeof dateOrVersion === "string" ? new Date() : dateOrVersion;
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const fyStartYear = month >= 3 ? year : year - 1;
+  const versionStr = `FY${fyStartYear}-${(fyStartYear + 1).toString().slice(2)}`;
+  
+  if (ZERODHA_RULES[versionStr]) {
+    return ZERODHA_RULES[versionStr];
   }
-  return ZERODHA_RULES["FY2025-26"];
+  
+  const ruleKeys = Object.keys(ZERODHA_RULES).sort();
+  if (ruleKeys.length === 0) throw new Error("No broker rules defined");
+  
+  return ZERODHA_RULES[ruleKeys[ruleKeys.length - 1]];
 }

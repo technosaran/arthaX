@@ -551,3 +551,23 @@ export const recipients = pgTable("recipients", {
 }, (t) => ({
   userIdIdx: index("recipients_user_id_idx").on(t.user_id)
 }));
+// ---------------------------------------------------------------------------
+// insurance_policies
+// ---------------------------------------------------------------------------
+export const insurancePolicies = pgTable("insurance_policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").notNull(),
+  provider: text("provider").notNull(),
+  policy_name: text("policy_name").notNull(),
+  policy_number: text("policy_number"),
+  type: text("type").notNull(),
+  coverage_amount: numeric("coverage_amount").default("0").notNull(),
+  premium_amount: numeric("premium_amount").default("0").notNull(),
+  premium_frequency: text("premium_frequency").default("annual").notNull(),
+  next_due_date: date("next_due_date"),
+  documents_url: text("documents_url"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  userIdIdx: index("insurance_policies_user_id_idx").on(t.user_id)
+}));

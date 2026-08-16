@@ -19,6 +19,8 @@ export type TaxRuleVersion = {
   standardDeductionOld: number;
   standardDeductionNew: number;
   cessRate: number;
+  stcgTaxRate: number;
+  ltcgTaxRate: number;
   sec87aThresholdNew?: number;
   sec87aMaxRebateNew?: number;
   sec87aThresholdOld?: number;
@@ -35,6 +37,8 @@ export const INDIA_TAX_RULES: TaxRuleVersion[] = [
     standardDeductionOld: 50000,
     standardDeductionNew: 75000,
     cessRate: 0.04,
+    stcgTaxRate: 0.20,
+    ltcgTaxRate: 0.125,
     sec87aThresholdNew: 700000,
     sec87aMaxRebateNew: 25000,
     sec87aThresholdOld: 500000,
@@ -65,6 +69,8 @@ export const INDIA_TAX_RULES: TaxRuleVersion[] = [
     standardDeductionOld: 50000,
     standardDeductionNew: 75000,
     cessRate: 0.04,
+    stcgTaxRate: 0.20,
+    ltcgTaxRate: 0.125,
     sec87aThresholdNew: 1200000,
     sec87aMaxRebateNew: 60000,
     sec87aThresholdOld: 500000,
@@ -350,8 +356,8 @@ export function computeIndiaTaxReport(input: TaxEngineInput) {
   const oldNormalTax = calcSlabTax(normalIncomeOld, rule.oldRegimeSlabs);
   const newNormalTax = calcSlabTax(normalIncomeNew, rule.newRegimeSlabs);
   
-  const ltcgTaxRate = fyStartYear >= 2024 ? 0.125 : 0.10;
-  const stcgTaxRate = fyStartYear >= 2024 ? 0.20 : 0.15;
+  const ltcgTaxRate = rule.ltcgTaxRate;
+  const stcgTaxRate = rule.stcgTaxRate;
   
   const specialTax = (taxableLtcg * ltcgTaxRate) + (taxableStcg * stcgTaxRate);
   
@@ -381,8 +387,8 @@ export function computeIndiaTaxReport(input: TaxEngineInput) {
     return 0;
   };
 
-  const sec87aThresholdNew = rule.sec87aThresholdNew ?? (fyStartYear >= 2025 ? 1200000 : 700000);
-  const sec87aMaxRebateNew = rule.sec87aMaxRebateNew ?? (fyStartYear >= 2025 ? 60000 : 25000);
+  const sec87aThresholdNew = rule.sec87aThresholdNew ?? 700000;
+  const sec87aMaxRebateNew = rule.sec87aMaxRebateNew ?? 25000;
   const sec87aThresholdOld = rule.sec87aThresholdOld ?? 500000;
   const sec87aMaxRebateOld = rule.sec87aMaxRebateOld ?? 12500;
 
@@ -580,8 +586,9 @@ export function computeTaxLossHarvesting(input: TaxEngineInput): TaxHarvestingRe
 
   // Indian Tax Act 2025: STCG @ 20%, LTCG @ 12.5% above 1.25L exemption
   const LTCG_EXEMPTION = 125000;
-  const STCG_RATE = 0.20;
-  const LTCG_RATE = 0.125;
+  const rule = pickRule(input.fyStartYear);
+  const STCG_RATE = rule.stcgTaxRate;
+  const LTCG_RATE = rule.ltcgTaxRate;
 
   const initialStcgTax = Math.max(0, stcgRealized) * STCG_RATE;
   const initialLtcgTax = Math.max(0, ltcgRealized - LTCG_EXEMPTION) * LTCG_RATE;

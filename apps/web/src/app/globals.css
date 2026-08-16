@@ -90,7 +90,7 @@
   --page-padding-y: 2rem;
   --page-max-width: 1600px;
   /* Sidebar - Professional Navigation */
-  --sidebar-bg: #0b0d12;
+  --sidebar-bg: #10131c;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-active: rgba(212, 175, 55, 0.15);
   --sidebar-hover: rgba(255, 255, 255, 0.05);
@@ -803,6 +803,12 @@ body {
   html {
     @apply font-sans;
     scroll-behavior: smooth;
+  }
+  tbody tr {
+    transition: background-color 0.15s ease-in-out;
+  }
+  tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.025);
   }
   button:not([disabled]) {
     transition: background-color 0.3s, color 0.3s, opacity 0.3s, border-color 0.3s;

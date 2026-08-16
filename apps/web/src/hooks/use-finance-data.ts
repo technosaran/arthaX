@@ -5,12 +5,13 @@ import useSWR, { mutate as globalMutate } from "swr";
 /**
  * Utility function to trigger immediate client SWR cache revalidation across any module.
  */
-export async function invalidateFinanceData(target: "summary" | "investments" | "cashflow" | "forex" | "all" = "all") {
+export async function invalidateFinanceData(target: "summary" | "investments" | "cashflow" | "forex" | "insurance" | "all" = "all") {
   const tasks = [];
   if (target === "all" || target === "summary") tasks.push(globalMutate("finance_summary"));
   if (target === "all" || target === "investments") tasks.push(globalMutate("finance_investments"));
   if (target === "all" || target === "cashflow") tasks.push(globalMutate("finance_cashflow"));
   if (target === "all" || target === "forex") tasks.push(globalMutate("finance_forex"));
+  if (target === "all" || target === "insurance") tasks.push(globalMutate("finance_insurance"));
   await Promise.all(tasks);
 }
 import { useEffect, useMemo } from "react";
@@ -56,6 +57,7 @@ type FinanceData = {
   alternativeAssets: Tables<"alternative_assets">[];
   liabilities: Tables<"liabilities">[];
   fnoTrades: Tables<"fno_trades">[];
+  insurancePolicies: Tables<"insurance_policies">[];
 };
 
 export type { FinanceData };
@@ -66,7 +68,7 @@ export const OVERVIEW_KEY = "finance_overview";
 async function fetchSummary() {
   const { data, error } = await getSupabase().rpc("get_summary_v1");
   if (error) throw error;
-  return data;
+  return data as any;
 }
 
 async function fetchInvestments() {
@@ -87,13 +89,19 @@ async function fetchInvestments() {
 async function fetchCashflow() {
   const { data, error } = await getSupabase().rpc("get_cashflow_v1");
   if (error) throw error;
-  return data;
+  return data as any;
 }
 
 async function fetchForex() {
   const { data, error } = await getSupabase().rpc("get_forex_v1");
   if (error) throw error;
-  return data;
+  return data as any;
+}
+
+async function fetchInsurance() {
+  const { data, error } = await getSupabase().rpc("get_insurance_v1");
+  if (error) throw error;
+  return data as any;
 }
 
 export function useFinanceData(initialData?: FinanceData) {
@@ -157,6 +165,15 @@ export function useFinanceData(initialData?: FinanceData) {
     ...swrOptions,
   });
 
+  const insuranceSWR = useSWR("finance_insurance", fetchInsurance, {
+    fallbackData: initialData
+      ? {
+          insurancePolicies: initialData.insurancePolicies,
+        }
+      : undefined,
+    ...swrOptions,
+  });
+
   const rawProfile = summarySWR.data?.profile ?? null;
   const data: FinanceData = useMemo(() => ({
     profile: rawProfile ? {
@@ -182,12 +199,14 @@ export function useFinanceData(initialData?: FinanceData) {
     forexAccounts: forexSWR.data?.forexAccounts ?? EMPTY_ARRAY,
     forexTrades: forexSWR.data?.forexTrades ?? EMPTY_ARRAY,
     forexTransactions: forexSWR.data?.forexTransactions ?? EMPTY_ARRAY,
+    insurancePolicies: insuranceSWR.data?.insurancePolicies ?? EMPTY_ARRAY,
   }), [
     rawProfile,
     summarySWR.data,
     investmentsSWR.data,
     cashflowSWR.data,
-    forexSWR.data
+    forexSWR.data,
+    insuranceSWR.data
   ]);
 
   // Sync to IndexedDB for 0ms instant offline loading
@@ -201,21 +220,24 @@ export function useFinanceData(initialData?: FinanceData) {
     (!summarySWR.data && !summarySWR.error) ||
     (!investmentsSWR.data && !investmentsSWR.error) ||
     (!cashflowSWR.data && !cashflowSWR.error) ||
-    (!forexSWR.data && !forexSWR.error);
+    (!forexSWR.data && !forexSWR.error) ||
+    (!insuranceSWR.data && !insuranceSWR.error);
 
   const error =
     summarySWR.error ||
     investmentsSWR.error ||
     cashflowSWR.error ||
-    forexSWR.error;
+    forexSWR.error ||
+    insuranceSWR.error;
 
   const isValidating =
     summarySWR.isValidating ||
     investmentsSWR.isValidating ||
     cashflowSWR.isValidating ||
-    forexSWR.isValidating;
+    forexSWR.isValidating ||
+    insuranceSWR.isValidating;
 
-  type MutateTarget = "summary" | "investments" | "cashflow" | "forex" | "all";
+  type MutateTarget = "summary" | "investments" | "cashflow" | "forex" | "insurance" | "all";
 
   const mutate = async (
     data?: unknown,
@@ -261,6 +283,11 @@ export function useFinanceData(initialData?: FinanceData) {
           forexTransactions: d.forexTransactions,
         }, options as Parameters<typeof forexSWR.mutate>[1]));
       }
+      if (target === "all" || target === "insurance") {
+        tasks.push(insuranceSWR.mutate({
+          insurancePolicies: d.insurancePolicies,
+        }, options as Parameters<typeof insuranceSWR.mutate>[1]));
+      }
       await Promise.all(tasks);
     } else {
       const tasks = [];
@@ -268,6 +295,7 @@ export function useFinanceData(initialData?: FinanceData) {
       if (target === "all" || target === "investments") tasks.push(investmentsSWR.mutate());
       if (target === "all" || target === "cashflow") tasks.push(cashflowSWR.mutate());
       if (target === "all" || target === "forex") tasks.push(forexSWR.mutate());
+      if (target === "all" || target === "insurance") tasks.push(insuranceSWR.mutate());
       await Promise.all(tasks);
     }
   };
@@ -280,3 +308,4 @@ export function useFinanceData(initialData?: FinanceData) {
     mutate,
   };
 }
+// Added at the bottom since we can't easily inject into the middle of the file. Wait, I should replace.

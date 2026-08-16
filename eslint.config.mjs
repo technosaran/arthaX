@@ -42,6 +42,7 @@ const eslintConfig = defineConfig([
     "**/.vercel/**",
     "packages/**/dist/**",
     "next-env.d.ts",
+    "qa_*.js",
   ]),
 ]);
 
