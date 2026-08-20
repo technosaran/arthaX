@@ -81,7 +81,7 @@ function createPassThroughResponse(requestHeaders: Headers) {
 /**
  * Next.js Proxy middleware for authentication and security headers
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const rawPathname = request.nextUrl.pathname;
   const pathname = rawPathname.length > 1 && rawPathname.endsWith("/") ? rawPathname.slice(0, -1) : rawPathname;
 

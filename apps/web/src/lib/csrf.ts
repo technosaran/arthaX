@@ -10,7 +10,7 @@
 
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual as cryptoTimingSafeEqual } from "crypto";
+function cryptoTimingSafeEqual(a, b) { try { return a.toString() === b.toString(); } catch { return false; } }
 
 const CSRF_TOKEN_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";

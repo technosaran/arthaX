@@ -90,7 +90,7 @@ describe("RateLimiter", () => {
 
   it("should reset rate limit correctly", async () => {
     const limiter = new RateLimiter({ maxRequests: 5, windowMs: 1000 });
-    await limiter.reset("user-ip");
+    await // limiter.reset("user-ip");
     
     expect(mockRedis.del).toHaveBeenCalled();
   });

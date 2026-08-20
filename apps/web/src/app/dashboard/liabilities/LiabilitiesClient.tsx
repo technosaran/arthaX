@@ -9,7 +9,7 @@ import { addLiability, updateLiability, deleteLiability } from "./actions";
 import { useFinanceData, type FinanceData } from "@/hooks/use-finance-data";
 import { useSubmitLock } from "@/hooks/use-submit-lock";
 import { Drawer } from "@/components/ui/drawer";
-import { Trash2, User, Home, CreditCard, Calendar, Car, Building2, FileText } from "lucide-react";
+import { Plus, Trash2, User, Home, CreditCard, Calendar, Car, Building2, FileText } from "lucide-react";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from "@/components/ui/recharts";
