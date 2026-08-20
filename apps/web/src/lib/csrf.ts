@@ -10,7 +10,14 @@
 
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-function cryptoTimingSafeEqual(a: string, b: string) { try { return a.toString() === b.toString(); } catch { return false; } }
+function cryptoTimingSafeEqual(a: Uint8Array, b: Uint8Array) {
+  if (a.byteLength !== b.byteLength) return false;
+  let res = 0;
+  for (let i = 0; i < a.byteLength; i++) {
+    res |= a[i] ^ b[i];
+  }
+  return res === 0;
+}
 
 const CSRF_TOKEN_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
