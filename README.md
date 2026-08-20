@@ -11,7 +11,7 @@ A premium, institutional-grade personal finance dashboard built with Next.js 16,
 - **Forms**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
 - **Tables**: [TanStack Table](https://tanstack.com/table/latest)
-- **Testing**: [Vitest](https://vitest.dev/) + React Testing Library
+- **Testing**: [Jest](https://jestjs.io/) + React Testing Library
 - **Language**: TypeScript (strict mode)
 
 ## Modules

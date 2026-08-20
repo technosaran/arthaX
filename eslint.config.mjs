@@ -10,7 +10,7 @@ const eslintConfig = defineConfig([
       "complexity": "off",
       "no-console": ["warn", { "allow": ["warn", "error"] }],
       "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
       "prefer-const": "error",
       "no-var": "error",
       "eqeqeq": ["error", "always"],
@@ -42,7 +42,8 @@ const eslintConfig = defineConfig([
     "**/.vercel/**",
     "packages/**/dist/**",
     "next-env.d.ts",
-    "qa_*.js",
+    "**/database.types.ts",
+
   ]),
 ]);
 

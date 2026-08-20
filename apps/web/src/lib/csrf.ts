@@ -85,21 +85,15 @@ export async function csrfMiddleware(request: NextRequest): Promise<NextResponse
     return null;
   }
 
-  // Skip CSRF check for authenticated API routes that use session, token auth, or file uploads
+  // Skip CSRF check only for true webhook/cron endpoints that use alternate authentication
+  // (e.g., Bearer tokens, secret headers, or external service callbacks)
   const pathname = request.nextUrl.pathname;
   if (
-    pathname.startsWith("/api/sync") ||
-    pathname.startsWith("/api/accounts/") ||
-    pathname.startsWith("/api/bots/") ||
     pathname.startsWith("/api/cron/") ||
-    pathname.startsWith("/api/transactions/") ||
-    pathname.startsWith("/api/ai/") ||
-    pathname.startsWith("/api/mcp") ||
-    pathname.startsWith("/api/bank-parser") ||
-    pathname.startsWith("/api/cas-parser") ||
-    pathname.startsWith("/api/integrations/")
+    pathname.startsWith("/api/bots/telegram") ||
+    pathname.startsWith("/api/sync")
   ) {
-    // Sync, accounts, bots, cron, transactions, AI, MCP, and statement parser endpoints use session/auth tokens or standalone webhooks
+    // Cron jobs use CRON_SECRET header, Telegram uses webhook secret, sync uses service tokens
     return null;
   }
 

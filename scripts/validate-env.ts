@@ -11,6 +11,7 @@ import * as path from "path";
 const REQUIRED_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "DATABASE_URL",
 ];
 
 const OPTIONAL_VARS = [
@@ -20,6 +21,8 @@ const OPTIONAL_VARS = [
   { name: "TELEGRAM_BOT_TOKEN", description: "Telegram Bot Token for webhook notifications" },
   // Note: TELEGRAM_WEBHOOK_SECRET must also be registered with Telegram via setWebhook secret_token parameter
   { name: "TELEGRAM_WEBHOOK_SECRET", description: "Secret token validated via X-Telegram-Bot-Api-Secret-Token header on webhook requests" },
+  { name: "SUPABASE_SERVICE_ROLE_KEY", description: "Supabase service role key for admin operations" },
+  { name: "GEMINI_API_KEY", description: "Google Gemini API key for AI features" },
 ];
 
 function loadEnvFiles() {

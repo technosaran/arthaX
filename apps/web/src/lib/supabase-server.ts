@@ -36,7 +36,13 @@ export const createClient = cache(async () => {
                 path: options?.path ?? "/",
               });
             });
-          } catch {}
+          } catch (err: unknown) {
+            // Cookie setting can fail in Server Components (read-only context) — this is expected
+            // Log unexpected errors for observability
+            if (err instanceof Error && !err.message.includes('cookies')) {
+              console.error('[supabase-server] Unexpected error setting cookies:', err.message);
+            }
+          }
         },
       },
     }

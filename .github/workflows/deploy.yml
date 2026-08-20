@@ -1,11 +1,14 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+    branches: [main]
 
 jobs:
   verify_and_deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Production Deploy
     runs-on: ubuntu-latest
     steps:

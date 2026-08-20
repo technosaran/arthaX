@@ -15,7 +15,11 @@ const config = {
     '^@finance-os/db$': '<rootDir>/packages/db/src/index.ts',
     '^@finance-os/logger$': '<rootDir>/packages/logger/src/index.ts',
   },
-  testMatch: ['<rootDir>/apps/web/src/__tests__/**/*.{test,spec}.{ts,tsx}'],
+  testMatch: [
+    '<rootDir>/apps/web/src/__tests__/**/*.{test,spec}.{ts,tsx}',
+    '<rootDir>/apps/*/src/**/*.{test,spec}.{ts,tsx}',
+    '<rootDir>/packages/*/src/**/*.{test,spec}.{ts,tsx}',
+  ],
 };
 
 module.exports = createJestConfig(config);
