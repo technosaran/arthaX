@@ -1,9 +1,7 @@
 /**
- * Redis-backed Sliding Window Rate Limiter.
- * Implements requirement 1.1: Rate limiting middleware with Redis.
+ * Edge-compatible Rate Limiter for Middleware.
+ * Uses an in-memory map which works loosely across edge invocations.
  */
-
-import { getRedisClient, isRedisHealthy } from "./redis";
 
 export interface RateLimitConfig {
   maxRequests: number;
@@ -18,28 +16,7 @@ export interface RateLimitResult {
   limit: number;
 }
 
-// In-memory fallback store for when Redis is unavailable
 const memoryStore = new Map<string, number[]>();
-const MAX_MEMORY_KEYS = 5000;
-
-// Periodically clean up memoryStore to prevent memory leaks
-const gcInterval = setInterval(() => {
-  const now = Date.now();
-  // Assume a safe max window of 1 hour (3600000 ms) for cleanup
-  for (const [key, timestamps] of memoryStore.entries()) {
-    if (timestamps.length === 0 || now - timestamps[timestamps.length - 1] > 3600000) {
-      memoryStore.delete(key);
-    }
-  }
-  // Enforce absolute capacity limit if keys exceed cap
-  if (memoryStore.size > MAX_MEMORY_KEYS) {
-    const keysToDelete = Array.from(memoryStore.keys()).slice(0, memoryStore.size - MAX_MEMORY_KEYS);
-    for (const key of keysToDelete) {
-      memoryStore.delete(key);
-    }
-  }
-}, 60000);
-if (gcInterval.unref) gcInterval.unref();
 
 export class RateLimiter {
   private maxRequests: number;
@@ -52,54 +29,14 @@ export class RateLimiter {
     this.keyPrefix = config.keyPrefix || "rl";
   }
 
-  /**
-   * Checks if the key is within rate limits.
-   */
   public async check(key: string): Promise<RateLimitResult> {
-    const fullKey = `${this.keyPrefix}:${key}`;
+    const fullKey = this.keyPrefix + ":" + key;
     const now = Date.now();
     const windowStart = now - this.windowMs;
     const resetAt = new Date(now + this.windowMs);
 
-    const redis = getRedisClient();
-    if (redis && isRedisHealthy()) {
-      try {
-        const uuid = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" 
-          ? crypto.randomUUID() 
-          : Math.random().toString(36).substring(2);
-        const member = `${now}:${uuid}`;
-        
-        // Pipeline/multi for atomic operations
-        const pipeline = redis.multi();
-        pipeline.zremrangebyscore(fullKey, 0, windowStart);
-        pipeline.zadd(fullKey, now, member);
-        pipeline.zcard(fullKey);
-        pipeline.expire(fullKey, Math.ceil(this.windowMs / 1000));
-        
-        const results = await pipeline.exec();
-        if (results && results[2]) {
-          const count = results[2][1] as number;
-          const allowed = count <= this.maxRequests;
-          const remaining = Math.max(0, this.maxRequests - count);
-
-          return {
-            allowed,
-            remaining,
-            resetAt,
-            limit: this.maxRequests,
-          };
-        }
-      } catch (err) {
-        console.error("[RateLimiter] Redis error, falling back to memory:", err);
-      }
-    }
-
-    // In-memory fallback sliding window counter
     let timestamps = memoryStore.get(fullKey) || [];
-    // Clean old timestamps
     timestamps = timestamps.filter((t) => t > windowStart);
-    
-    // Add current timestamp
     timestamps.push(now);
     memoryStore.set(fullKey, timestamps);
 
@@ -107,58 +44,13 @@ export class RateLimiter {
     const allowed = count <= this.maxRequests;
     const remaining = Math.max(0, this.maxRequests - count);
 
-    return {
-      allowed,
-      remaining,
-      resetAt,
-      limit: this.maxRequests,
-    };
-  }
-
-  /**
-   * Resets rate limit counter for a key.
-   */
-  public async reset(key: string): Promise<void> {
-    const fullKey = `${this.keyPrefix}:${key}`;
-    const redis = getRedisClient();
-    if (redis && isRedisHealthy()) {
-      try {
-        await redis.del(fullKey);
-      } catch (err) {
-        console.error("[RateLimiter] Redis reset error:", err);
-      }
-    }
-    memoryStore.delete(fullKey);
+    return { allowed, remaining, resetAt, limit: this.maxRequests };
   }
 }
 
-/**
- * Factory to create rate limiter instances
- */
-export function createRateLimiter(config: RateLimitConfig): RateLimiter {
-  return new RateLimiter(config);
-}
-
-// Preset configurations
 export const RATE_LIMIT_PRESETS = {
-  sync: {
-    maxRequests: 10,
-    windowMs: 60 * 1000, // 10 req/min
-    keyPrefix: "rl:sync",
-  },
-  reports: {
-    maxRequests: 30,
-    windowMs: 60 * 1000, // 30 req/min
-    keyPrefix: "rl:reports",
-  },
-  general: {
-    maxRequests: 100,
-    windowMs: 60 * 1000, // 100 req/min
-    keyPrefix: "rl:general",
-  },
-  auth: {
-    maxRequests: 5,
-    windowMs: 60 * 1000, // 5 req/min
-    keyPrefix: "rl:auth",
-  },
+  sync: { maxRequests: 10, windowMs: 60 * 1000, keyPrefix: "rl:sync" },
+  reports: { maxRequests: 30, windowMs: 60 * 1000, keyPrefix: "rl:reports" },
+  general: { maxRequests: 100, windowMs: 60 * 1000, keyPrefix: "rl:general" },
+  auth: { maxRequests: 5, windowMs: 60 * 1000, keyPrefix: "rl:auth" },
 };
