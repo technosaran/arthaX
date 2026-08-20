@@ -12,6 +12,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 
 import MutualFundsDataTable, { AMCAvatar } from "./components/MutualFundsDataTable";
 import MFHistoryTable from "./components/MFHistoryTable";
@@ -483,13 +485,29 @@ export default function MutualFundsClient({ initialData }: { initialData?: Finan
 
         {activeTab === "holdings" && (
           <div className="animate-in fade-in mt-4">
-            <MutualFundsDataTable 
-              funds={mutualFunds} 
-              onEdit={startEdit} 
-              onBuy={startBuy}
-              onSell={startSell}
-              onAdd={() => setShowAddModal(true)} 
-            />
+            {mutualFunds.length > 0 ? (
+              <MutualFundsDataTable 
+                funds={mutualFunds} 
+                onEdit={startEdit} 
+                onBuy={startBuy}
+                onSell={startSell}
+                onAdd={() => setShowAddModal(true)} 
+              />
+            ) : (
+              <EmptyState
+                title="No Mutual Fund Holdings"
+                description="You don't have any mutual funds in your portfolio yet."
+                icon={<TrendingUp size={32} />}
+                action={
+                  <button 
+                    onClick={() => setShowAddModal(true)} 
+                    className="bg-[#FF5722] hover:bg-[#e04a1b] text-white font-black px-4 py-1.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(255,87,34,0.3)] cursor-pointer"
+                  >
+                    + Start SIP / Invest
+                  </button>
+                }
+              />
+            )}
           </div>
         )}
 

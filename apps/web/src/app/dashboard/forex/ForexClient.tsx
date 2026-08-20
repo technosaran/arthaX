@@ -24,6 +24,8 @@ import PnLValue from "@/components/pnl-value";
 import type { Tables } from "@/lib/database.types";
 
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 
 import ForexDataTable from "./components/ForexDataTable";
 
@@ -316,20 +318,19 @@ export default function ForexClient({ initialData }: { initialData?: FinanceData
       </div>
 
       {filteredForexTrades.length === 0 && filteredForexTransactions.length === 0 && filteredForexAccounts.length === 0 ? (
-        <div className="glass-card-static relative overflow-hidden p-8 md:p-16 text-center flex flex-col items-center justify-center min-h-[450px]">
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-[--accent-primary]/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="relative mb-6 p-6 rounded-3xl bg-white/[0.02] border border-white/5 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[--accent-primary]/15 to-emerald-500/15 border border-[--accent-primary]/25 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(14,165,233,0.3)] animate-pulse">
-              <span className="text-3xl">💱</span>
-            </div>
-          </div>
-          <h3 className="text-2xl md:text-3xl font-black text-[--text-primary] tracking-tight">Forex Terminal</h3>
-          <p className="text-sm text-[--text-muted] mt-3 max-w-lg mx-auto font-medium leading-relaxed">Track currency trading performance, manage deposits/withdrawals, and monitor net returns across forex brokers.</p>
-          <div className="mt-8 flex justify-center">
-             <button onClick={() => setShowAccountModal(true)} className="btn-primary">Add Broker Account</button>
-          </div>
-        </div>
+        <EmptyState
+          title="Forex Terminal"
+          description="No daily P&L entries logged. Connect a broker account to start tracking your daily forex performance."
+          icon={<TrendingUp size={32} />}
+          action={
+            <button 
+              onClick={() => setShowAccountModal(true)} 
+              className="btn-secondary !h-11"
+            >
+              Add Broker Account
+            </button>
+          }
+        />
       ) : (
       <>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">

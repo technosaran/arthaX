@@ -12,6 +12,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 
 import StocksDataTable from "./components/StocksDataTable";
 import StocksHistoryTable from "./components/StocksHistoryTable";
@@ -676,13 +678,29 @@ export default function StocksClient({ initialData, showUSD = false }: { initial
 
           {activeTab === "holdings" && (
             <div className="animate-in fade-in">
-              <StocksDataTable 
-                stocks={activeStocks} 
-                onEdit={startEdit} 
-                onBuy={startBuy}
-                onSell={startSell} 
-                onAdd={() => setShowAddModal(true)} 
-              />
+              {activeStocks.length > 0 ? (
+                <StocksDataTable 
+                  stocks={activeStocks} 
+                  onEdit={startEdit} 
+                  onBuy={startBuy}
+                  onSell={startSell} 
+                  onAdd={() => setShowAddModal(true)} 
+                />
+              ) : (
+                <EmptyState
+                  title="No Stock Holdings"
+                  description="You don't have any stocks in your portfolio yet."
+                  icon={<TrendingUp size={32} />}
+                  action={
+                    <button 
+                      onClick={() => setShowAddModal(true)} 
+                      className="bg-[#41B883] hover:bg-[#38a373] text-black font-extrabold px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(65,184,131,0.3)] cursor-pointer"
+                    >
+                      + New Order
+                    </button>
+                  }
+                />
+              )}
             </div>
           )}
 

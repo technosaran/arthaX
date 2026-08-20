@@ -13,6 +13,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { Trash2 } from "lucide-react";
 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "@/components/ui/recharts";
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 
 import FNODataTable from "./components/FNODataTable";
 import { calculateFnoFuturesCharges, calculateFnoOptionsCharges } from "@/lib/zerodha-charges";
@@ -400,18 +402,34 @@ export default function FnoClient({ initialData }: { initialData?: FinanceData }
 
           {activeTab === "positions" && (
             <div className="animate-in fade-in">
-              <FNODataTable 
-                trades={activePositions}
-                onCloseTrade={(trade) => {
-                  setSelectedTrade(trade);
-                  setCloseFormData(prev => ({ ...prev, close_date: new Date().toISOString().split("T")[0], exit_price: "" }));
-                  setShowCloseForm(true);
-                }}
-                onDeleteTrade={handleDeleteTrade}
-                onAdd={() => setShowLogForm(true)}
-                showActions={true}
-                livePrices={{}}
-              />
+              {activePositions.length > 0 ? (
+                <FNODataTable 
+                  trades={activePositions}
+                  onCloseTrade={(trade) => {
+                    setSelectedTrade(trade);
+                    setCloseFormData(prev => ({ ...prev, close_date: new Date().toISOString().split("T")[0], exit_price: "" }));
+                    setShowCloseForm(true);
+                  }}
+                  onDeleteTrade={handleDeleteTrade}
+                  onAdd={() => setShowLogForm(true)}
+                  showActions={true}
+                  livePrices={{}}
+                />
+              ) : (
+                <EmptyState
+                  title="No Active Positions"
+                  description="You don't have any open F&O positions."
+                  icon={<TrendingUp size={32} />}
+                  action={
+                    <button 
+                      onClick={() => setShowLogForm(true)}
+                      className="bg-[#387ED1] hover:bg-[#306eb8] text-white font-extrabold px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(56,126,209,0.3)] cursor-pointer"
+                    >
+                      + New F&O Position
+                    </button>
+                  }
+                />
+              )}
               
               {activePositions.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6 bg-[#151515] p-5 border border-white/5 rounded">

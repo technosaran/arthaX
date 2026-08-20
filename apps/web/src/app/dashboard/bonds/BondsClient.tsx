@@ -12,6 +12,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { getColorByLabel } from "@/lib/chart-colours";
 import { calculateAccruedInterest, generateRepaymentSchedule, type InterestFrequency } from "@/lib/bond-math";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "@/components/ui/recharts";
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 import BondsDataTable from "./components/BondsDataTable";
 
 import type { Tables } from "@/lib/database.types";
@@ -290,20 +292,17 @@ export default function BondsClient({ initialData }: { initialData?: FinanceData
           </button>
         </div>
 
-        {bonds.length === 0 ? (
-          <div className="bg-[#111827] border border-[#1F293D] rounded-3xl p-8 md:p-16 text-center flex flex-col items-center justify-center min-h-[450px] shadow-2xl relative overflow-hidden">
-            <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#00D09C]/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="relative mb-6 p-6 rounded-3xl bg-[#0A0F1D] border border-[#1F293D] shadow-2xl">
-              <div className="w-16 h-16 rounded-2xl bg-[#00D09C]/15 border border-[#00D09C]/30 flex items-center justify-center shadow-[0_0_30px_rgba(0,208,156,0.2)] animate-pulse">
-                <span className="text-3xl">🏛️</span>
-              </div>
-            </div>
-            <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">No Active Bond Holdings</h3>
-            <p className="text-sm text-[#848E9C] mt-3 max-w-lg mx-auto font-medium leading-relaxed">Lock in predictable fixed interest returns up to 11.5% p.a. with senior-secured corporate bonds and sovereign gold bonds.</p>
-            <div className="mt-8 flex justify-center">
-               <button onClick={() => setShowAddModal(true)} className="bg-[#00D09C] text-black font-extrabold px-6 py-3 rounded-xl text-xs uppercase tracking-wider hover:bg-[#00b386] transition-all shadow-[0_0_20px_rgba(0,208,156,0.3)] cursor-pointer">+ Add Bond Investment</button>
-            </div>
-          </div>
+        {bonds.length === 0 && historyBonds.length === 0 ? (
+          <EmptyState
+            title="No Active Bond Holdings"
+            description="Lock in predictable fixed interest returns up to 11.5% p.a. with senior-secured corporate bonds and sovereign gold bonds."
+            icon={<TrendingUp size={32} />}
+            action={
+              <button onClick={() => setShowAddModal(true)} className="bg-[#00D09C] text-black font-extrabold px-6 py-3 rounded-xl text-xs uppercase tracking-wider hover:bg-[#00b386] transition-all shadow-[0_0_20px_rgba(0,208,156,0.3)] cursor-pointer">
+                + Add Bond Investment
+              </button>
+            }
+          />
         ) : (
         <>
           {/* Top Wint Stats Summary Cards */}

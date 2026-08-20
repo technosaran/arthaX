@@ -13,7 +13,8 @@ import { Trash2, User, Home, CreditCard, Calendar, Car, Building2, FileText } fr
 import { getColorByLabel } from "@/lib/chart-colours";
 
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from "@/components/ui/recharts";
-
+import { EmptyState } from "@/components/empty-state";
+import { TrendingUp } from "lucide-react";
 import LiabilitiesDataTable from "./components/LiabilitiesDataTable";
 
 const CATEGORIES = [
@@ -266,20 +267,19 @@ export default function LiabilitiesClient({ initialData }: { initialData?: Finan
       </div>
 
       {liabilities.length === 0 && loanHistoryLogs.length === 0 ? (
-        <div className="glass-card-static relative overflow-hidden p-8 md:p-16 text-center flex flex-col items-center justify-center min-h-[450px]">
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-rose-500/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="relative mb-6 p-6 rounded-3xl bg-white/[0.02] border border-white/5 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500/15 to-orange-500/15 border border-rose-500/25 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(244,63,94,0.3)] animate-pulse">
-              <span className="text-3xl">📉</span>
-            </div>
-          </div>
-          <h3 className="text-2xl md:text-3xl font-black text-[--text-primary] tracking-tight">No Active Liabilities</h3>
-          <p className="text-sm text-[--text-muted] mt-3 max-w-lg mx-auto font-medium leading-relaxed">Track loans, EMIs, credit cards, and other debt obligations. Monitor repayment progress and stay on top of your financial commitments.</p>
-          <div className="mt-8 flex justify-center">
-             <button onClick={() => setShowAddModal(true)} className="btn-primary !bg-rose-500 hover:!bg-rose-600">Record First Liability</button>
-          </div>
-        </div>
+        <EmptyState
+          title="No Active Liabilities"
+          description="You have no active loans or credit card debt. Good job staying debt-free!"
+          icon={<TrendingUp size={32} />}
+          action={
+            <button 
+              onClick={() => setShowAddModal(true)} 
+              className="btn-primary !h-11 px-6 !bg-rose-500 hover:!bg-rose-600 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+            >
+              <Plus size={16} /> Record First Liability
+            </button>
+          }
+        />
       ) : (
       <>
         {/* Top Stats Cards */}
