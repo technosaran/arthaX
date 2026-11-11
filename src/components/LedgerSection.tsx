@@ -21,7 +21,7 @@ import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import BankLogo from "@/components/BankLogo";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
-import { fetchFromCache, saveToCache, invalidateCacheKeys } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -84,22 +84,31 @@ export default function LedgerSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
 
+  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
+  const redisIncomeKey = getUserCacheKey(user?.id, CACHE_KEYS.INCOME);
+  const redisExpensesKey = getUserCacheKey(user?.id, CACHE_KEYS.EXPENSES);
+  const redisAccountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
+
+  // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
+  const initialCache = useMemo(() => {
+    return getFromLocalCache<{
+      incomes: RawIncomeItem[];
+      expenses: RawExpenseItem[];
+      accounts: AccountItem[];
+    }>(redisLedgerKey);
+  }, [redisLedgerKey]);
+
   // Raw Data State
-  const [incomes, setIncomes] = useState<RawIncomeItem[]>([]);
-  const [expenses, setExpenses] = useState<RawExpenseItem[]>([]);
-  const [accounts, setAccounts] = useState<AccountItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [incomes, setIncomes] = useState<RawIncomeItem[]>(initialCache?.incomes || []);
+  const [expenses, setExpenses] = useState<RawExpenseItem[]>(initialCache?.expenses || []);
+  const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Active month in YYYY-MM format with strict boundary constraints
   const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
-
-  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
-  const redisIncomeKey = getUserCacheKey(user?.id, CACHE_KEYS.INCOME);
-  const redisExpensesKey = getUserCacheKey(user?.id, CACHE_KEYS.EXPENSES);
-  const redisAccountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
 
   // Compute earliest month that actually has ledger records
   const earliestMonthYear = useMemo(() => {
@@ -203,9 +212,9 @@ export default function LedgerSection() {
     if (!user) return;
     setErrorMsg(null);
 
-    // Try Redis cache first (if not bypassing)
+    // Instant local cache check
     if (!skipCache) {
-      const cached = await fetchFromCache<{
+      const cached = getFromLocalCache<{
         incomes: RawIncomeItem[];
         expenses: RawExpenseItem[];
         accounts: AccountItem[];

@@ -23,11 +23,15 @@ export const getUserCacheKey = (userId: string | undefined | null, resource: str
 };
 
 /**
- * Get cached item from Upstash Redis with optional fallback
+ * Get cached item from Upstash Redis with timeout fallback (max 1000ms)
  */
 export async function getCachedData<T>(key: string): Promise<T | null> {
   try {
-    const data = await redis.get<T>(key);
+    const fetchPromise = redis.get<T>(key);
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 1000)
+    );
+    const data = await Promise.race([fetchPromise, timeoutPromise]);
     return data;
   } catch (err) {
     console.warn(`[Redis Cache] Failed to get ${key}:`, err);

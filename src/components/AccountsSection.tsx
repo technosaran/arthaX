@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import BankLogo from "@/components/BankLogo";
 import AppleWalletCard from "@/components/AppleWalletCard";
-import { fetchFromCache, saveToCache, invalidateCacheKeys } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 
 const DEFAULT_CASH_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -24,8 +24,17 @@ interface Account {
 export default function AccountsSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const redisKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
+  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
+
+  // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
+  const initialAccounts = React.useMemo(() => {
+    return getFromLocalCache<Account[]>(redisKey) || [];
+  }, [redisKey]);
+
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+  const [loading, setLoading] = useState<boolean>(initialAccounts.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,16 +66,13 @@ export default function AccountsSection() {
     );
   };
 
-  const redisKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
-  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
-
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
     if (!user) return;
     setErrorMsg(null);
 
-    // 1. Check Redis Cache for Instant Load (if not bypassing)
+    // 1. Instant Synchronous Check from Tier 1 & 2 Local Cache
     if (!skipCache) {
-      const cached = await fetchFromCache<Account[]>(redisKey);
+      const cached = getFromLocalCache<Account[]>(redisKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setAccounts(cached);
         setLoading(false);
@@ -130,7 +136,7 @@ export default function AccountsSection() {
 
         setAccounts(mapped);
 
-        // Update Upstash Redis Cache in background
+        // Update Multi-Tier Cache (Local 0ms + Redis background)
         saveToCache(redisKey, mapped, 3600);
       }
     } catch {

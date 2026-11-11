@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { ShieldCheck, PieChart as PieChartIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getFromLocalCache, saveToCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -23,15 +25,37 @@ export default function DashboardSection() {
   const { user, profile } = useAuth();
   const [greeting, setGreeting] = useState("");
   const [emoji, setEmoji] = useState("");
-  const [name, setName] = useState("");
-  const [netWorth, setNetWorth] = useState<number>(0);
-  const [accounts, setAccounts] = useState<AccountItem[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const redisPortfolioKey = getUserCacheKey(user?.id, CACHE_KEYS.PORTFOLIO);
 
   // Active month in YYYY-MM format with strict boundary constraints
-  const currentMonthYear = React.useMemo(() => getCurrentMonthYear(), []);
+  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
-  const [earliestMonthYear, setEarliestMonthYear] = useState<string>(() => getCurrentMonthYear());
+
+  // Instant Tier 1 & 2 Local Cache load (0ms latency)
+  const initialCache = useMemo(() => {
+    return getFromLocalCache<{
+      name: string;
+      netWorth: number;
+      accounts: AccountItem[];
+      earliestMonthYear: string;
+    }>(redisPortfolioKey);
+  }, [redisPortfolioKey]);
+
+  const [name, setName] = useState<string>(initialCache?.name || profile?.name || "");
+  const [netWorth, setNetWorth] = useState<number>(initialCache?.netWorth || 0);
+  const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
+  const [earliestMonthYear, setEarliestMonthYear] = useState<string>(
+    initialCache?.earliestMonthYear || currentMonthYear
+  );
+  const [loading, setLoading] = useState<boolean>(!initialCache);
+
+  // Synchronize greeting name if profile arrives
+  useEffect(() => {
+    if (profile?.name && !name) {
+      setName(profile.name);
+    }
+  }, [profile?.name, name]);
 
   // Clamp selectedMonthYear so it cannot be in the future or before earliest data
   useEffect(() => {
@@ -79,61 +103,84 @@ export default function DashboardSection() {
     try {
       const supabase = createClient();
 
-      // 1. Fetch greeting name
-      const { data: userData } = await supabase
-        .from("user_settings")
-        .select("name")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Parallel concurrent burst: all 5 telemetry queries run simultaneously
+      const [
+        userDataRes,
+        accountsRes,
+        accEarliestRes,
+        incEarliestRes,
+        expEarliestRes,
+      ] = await Promise.all([
+        supabase.from("user_settings").select("name").eq("id", user.id).maybeSingle(),
+        supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
+        supabase
+          .from("accounts")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("income")
+          .select("received_date")
+          .eq("user_id", user.id)
+          .order("received_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("expenses")
+          .select("expense_date")
+          .eq("user_id", user.id)
+          .order("expense_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      if (userData?.name) {
-        setName(userData.name);
-      } else if (profile?.name) {
-        setName(profile.name);
-      } else {
-        setName(user.user_metadata?.full_name || user.email?.split("@")[0] || "User");
-      }
+      // 1. Resolve user display name
+      const resolvedName =
+        userDataRes.data?.name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "User";
+      setName(resolvedName);
 
-      // 2. Fetch all accounts with type and balance
-      const { data: accountsData } = await supabase
-        .from("accounts")
-        .select("id, name, type, balance")
-        .eq("user_id", user.id);
-
-      if (accountsData && accountsData.length > 0) {
-        const mapped: AccountItem[] = accountsData.map((item) => ({
+      // 2. Resolve accounts and net worth
+      let mapped: AccountItem[] = [];
+      let total = 0;
+      if (accountsRes.data && accountsRes.data.length > 0) {
+        mapped = accountsRes.data.map((item) => ({
           id: item.id,
           name: item.name,
           type: item.type,
           balance: Number(item.balance) || 0,
         }));
-        setAccounts(mapped);
-        const total = mapped.reduce((acc, curr) => acc + curr.balance, 0);
-        setNetWorth(total);
-      } else {
-        setAccounts([]);
-        setNetWorth(0);
+        total = mapped.reduce((acc, curr) => acc + curr.balance, 0);
       }
+      setAccounts(mapped);
+      setNetWorth(total);
 
-      // 3. Discover earliest activity month across accounts, income, and expenses
-      const [accEarliest, incEarliest, expEarliest] = await Promise.all([
-        supabase.from("accounts").select("created_at").eq("user_id", user.id).order("created_at", { ascending: true }).limit(1).maybeSingle(),
-        supabase.from("income").select("received_date").eq("user_id", user.id).order("received_date", { ascending: true }).limit(1).maybeSingle(),
-        supabase.from("expenses").select("expense_date").eq("user_id", user.id).order("expense_date", { ascending: true }).limit(1).maybeSingle(),
-      ]);
-
+      // 3. Resolve earliest month
       const candidateMonths = [
-        accEarliest.data?.created_at,
-        incEarliest.data?.received_date,
-        expEarliest.data?.expense_date,
+        accEarliestRes.data?.created_at,
+        incEarliestRes.data?.received_date,
+        expEarliestRes.data?.expense_date,
       ];
-      setEarliestMonthYear(getEarliestDataMonth(candidateMonths, currentMonthYear));
+      const earliestMonth = getEarliestDataMonth(candidateMonths, currentMonthYear);
+      setEarliestMonthYear(earliestMonth);
+
+      // 4. Update multi-tier cache
+      saveToCache(redisPortfolioKey, {
+        name: resolvedName,
+        netWorth: total,
+        accounts: mapped,
+        earliestMonthYear: earliestMonth,
+      });
     } catch (err) {
       console.warn("Error fetching dashboard telemetry:", err);
     } finally {
       setLoading(false);
     }
-  }, [user, profile, currentMonthYear]);
+  }, [user, currentMonthYear, redisPortfolioKey]);
 
   useEffect(() => {
     // Determine greeting & emoji

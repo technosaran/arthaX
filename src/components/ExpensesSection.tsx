@@ -24,7 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
-import { fetchFromCache, saveToCache, invalidateCacheKeys } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -144,9 +144,23 @@ const QUICK_PRESETS = [
 export default function ExpensesSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [accounts, setAccounts] = useState<AccountItem[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const redisExpensesKey = getUserCacheKey(user?.id, CACHE_KEYS.EXPENSES);
+  const redisAccountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
+  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
+
+  // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
+  const initialExpenses = useMemo(() => {
+    return getFromLocalCache<ExpenseItem[]>(redisExpensesKey) || [];
+  }, [redisExpensesKey]);
+
+  const initialAccounts = useMemo(() => {
+    return getFromLocalCache<AccountItem[]>(redisAccountsKey) || [];
+  }, [redisAccountsKey]);
+
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(initialExpenses);
+  const [accounts, setAccounts] = useState<AccountItem[]>(initialAccounts);
+  const [loading, setLoading] = useState<boolean>(initialExpenses.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -247,15 +261,11 @@ export default function ExpensesSection() {
     }
   };
 
-  const redisExpensesKey = getUserCacheKey(user?.id, CACHE_KEYS.EXPENSES);
-  const redisAccountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
-  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
-
   // 1. Fetch Accounts for linking
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
     if (!user) return;
     if (!skipCache) {
-      const cached = await fetchFromCache<any[]>(redisAccountsKey);
+      const cached = getFromLocalCache<any[]>(redisAccountsKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setAccounts(cached);
       }
@@ -270,15 +280,15 @@ export default function ExpensesSection() {
         .order("name", { ascending: true });
 
       if (data) {
-        setAccounts(
-          data.map((a) => ({
-            id: a.id,
-            name: a.name,
-            type: a.type,
-            balance: Number(a.balance) || 0,
-            last_four: a.last_four,
-          }))
-        );
+        const mapped = data.map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          balance: Number(a.balance) || 0,
+          last_four: a.last_four,
+        }));
+        setAccounts(mapped);
+        saveToCache(redisAccountsKey, mapped, 3600);
       }
     } catch {
       // Non-blocking
@@ -290,9 +300,9 @@ export default function ExpensesSection() {
     if (!user) return;
     setErrorMsg(null);
 
-    // Try Redis cache first (if not bypassing)
+    // Instant local cache check
     if (!skipCache) {
-      const cached = await fetchFromCache<ExpenseItem[]>(redisExpensesKey);
+      const cached = getFromLocalCache<ExpenseItem[]>(redisExpensesKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setExpenses(cached);
         setLoading(false);
@@ -323,7 +333,7 @@ export default function ExpensesSection() {
 
         setExpenses(mapped);
 
-        // Update Redis Cache
+        // Update Multi-Tier Cache
         saveToCache(redisExpensesKey, mapped, 3600);
       }
     } catch {

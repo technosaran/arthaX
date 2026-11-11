@@ -49,7 +49,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
-import { fetchFromCache, saveToCache, invalidateCacheKeys } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -196,13 +196,18 @@ export default function BudgetsSection() {
   const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
 
-  const [budgets, setBudgets] = useState<BudgetItem[]>([]);
+  const redisBudgetsKey = getUserCacheKey(user?.id, CACHE_KEYS.BUDGETS);
+
+  // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
+  const initialBudgets = useMemo(() => {
+    return getFromLocalCache<BudgetItem[]>(redisBudgetsKey) || [];
+  }, [redisBudgetsKey]);
+
+  const [budgets, setBudgets] = useState<BudgetItem[]>(initialBudgets);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(initialBudgets.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const redisBudgetsKey = getUserCacheKey(user?.id, CACHE_KEYS.BUDGETS);
 
   // Filters
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -279,7 +284,7 @@ export default function BudgetsSection() {
     setErrorMsg(null);
     try {
       if (!skipCache) {
-        const cached = await fetchFromCache<BudgetItem[]>(redisBudgetsKey);
+        const cached = getFromLocalCache<BudgetItem[]>(redisBudgetsKey);
         if (cached && Array.isArray(cached) && cached.length > 0) {
           setBudgets(cached);
           setLoading(false);
@@ -309,6 +314,7 @@ export default function BudgetsSection() {
         }));
         setBudgets(mapped);
 
+        // Update Multi-Tier Cache
         saveToCache(redisBudgetsKey, mapped, 3600);
       }
     } catch {

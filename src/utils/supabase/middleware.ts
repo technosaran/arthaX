@@ -2,6 +2,19 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 export const updateSession = async (request: NextRequest) => {
+  const url = request.nextUrl.clone();
+  const pathname = url.pathname;
+
+  // Fast bypass for API routes, auth callbacks, and static files
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/_next") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -38,13 +51,10 @@ export const updateSession = async (request: NextRequest) => {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const url = request.nextUrl.clone();
-  const pathname = url.pathname;
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
-  const isApiRoute = pathname.startsWith("/api");
 
   // If user is not authenticated and trying to access private application routes (e.g. /)
-  if (!user && !isAuthRoute && !isApiRoute) {
+  if (!user && !isAuthRoute) {
     url.pathname = "/login";
     const redirectResponse = NextResponse.redirect(url);
     // Forward any session cookies refreshed during getUser()

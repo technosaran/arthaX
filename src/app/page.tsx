@@ -20,6 +20,16 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
+  // Lazy-mount and keep visited tabs alive for 0ms instant switching without re-renders
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
+    dashboard: true,
+  });
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
@@ -51,27 +61,47 @@ export default function Home() {
       {/* Ultra Dark Modern Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
       />
 
-      {/* Main Section */}
-      {activeTab === "accounts" ? (
-        <AccountsSection />
-      ) : activeTab === "income" ? (
-        <IncomeSection />
-      ) : activeTab === "expenses" ? (
-        <ExpensesSection />
-      ) : activeTab === "budgets" ? (
-        <BudgetsSection />
-      ) : activeTab === "ledger" ? (
-        <LedgerSection />
-      ) : activeTab === "settings" ? (
-        <SettingsSection />
-      ) : (
-        <DashboardSection />
-      )}
+      {/* Main Viewport Container with 0ms Instant Tab Switching */}
+      <div className="flex-1 h-screen overflow-hidden relative">
+        <div className={`h-full w-full ${activeTab === "dashboard" ? "block" : "hidden"}`}>
+          <DashboardSection />
+        </div>
+        {visitedTabs.accounts && (
+          <div className={`h-full w-full ${activeTab === "accounts" ? "block" : "hidden"}`}>
+            <AccountsSection />
+          </div>
+        )}
+        {visitedTabs.income && (
+          <div className={`h-full w-full ${activeTab === "income" ? "block" : "hidden"}`}>
+            <IncomeSection />
+          </div>
+        )}
+        {visitedTabs.expenses && (
+          <div className={`h-full w-full ${activeTab === "expenses" ? "block" : "hidden"}`}>
+            <ExpensesSection />
+          </div>
+        )}
+        {visitedTabs.budgets && (
+          <div className={`h-full w-full ${activeTab === "budgets" ? "block" : "hidden"}`}>
+            <BudgetsSection />
+          </div>
+        )}
+        {visitedTabs.ledger && (
+          <div className={`h-full w-full ${activeTab === "ledger" ? "block" : "hidden"}`}>
+            <LedgerSection />
+          </div>
+        )}
+        {visitedTabs.settings && (
+          <div className={`h-full w-full ${activeTab === "settings" ? "block" : "hidden"}`}>
+            <SettingsSection />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

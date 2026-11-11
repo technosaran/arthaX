@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -28,11 +28,23 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = window.localStorage.getItem("arthax_cached_profile");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const inFlightFetchRef = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string, defaultName?: string) => {
+    if (inFlightFetchRef.current === userId) return;
+    inFlightFetchRef.current = userId;
+
     try {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -42,10 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (data) {
-        setProfile({
+        const newProf = {
           name: data.name || defaultName || "User",
           theme: data.theme || "ultra",
-        });
+        };
+        setProfile(newProf);
+        try {
+          window.localStorage.setItem("arthax_cached_profile", JSON.stringify(newProf));
+        } catch {}
       } else if (!error) {
         // Fallback upsert if profile record was not created
         const nameToSet = defaultName || "User";
@@ -54,10 +70,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: nameToSet,
           theme: "ultra",
         });
-        setProfile({ name: nameToSet, theme: "ultra" });
+        const newProf = { name: nameToSet, theme: "ultra" };
+        setProfile(newProf);
+        try {
+          window.localStorage.setItem("arthax_cached_profile", JSON.stringify(newProf));
+        } catch {}
       }
     } catch (err) {
       console.warn("Failed to fetch user profile:", err);
+    } finally {
+      inFlightFetchRef.current = null;
     }
   }, []);
 
@@ -95,10 +117,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchProfile(currentUser.id, fallbackName);
       } else {
         setProfile(null);
+        try {
+          window.localStorage.removeItem("arthax_cached_profile");
+        } catch {}
       }
 
       setLoading(false);
-      router.refresh();
+      if (event === "SIGNED_OUT") {
+        router.push("/login");
+      }
     });
 
     return () => {
@@ -122,10 +149,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         (payload: any) => {
           if (payload.new) {
-            setProfile((prev) => ({
-              name: payload.new.name || prev?.name || "User",
-              theme: payload.new.theme || prev?.theme || "ultra",
-            }));
+            setProfile((prev) => {
+              const updated = {
+                name: payload.new.name || prev?.name || "User",
+                theme: payload.new.theme || prev?.theme || "ultra",
+              };
+              try {
+                window.localStorage.setItem("arthax_cached_profile", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
           }
         }
       )
@@ -138,6 +171,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const supabase = createClient();
+    try {
+      window.localStorage.removeItem("arthax_cached_profile");
+    } catch {}
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);

@@ -23,6 +23,7 @@ create table if not exists public.accounts (
 );
 
 create index if not exists idx_accounts_user_id on public.accounts(user_id);
+create index if not exists idx_accounts_user_created on public.accounts(user_id, created_at desc);
 alter table public.accounts enable row level security;
 
 -- 3. Income Table
@@ -40,6 +41,7 @@ create table if not exists public.income (
 );
 
 create index if not exists idx_income_user_id on public.income(user_id);
+create index if not exists idx_income_user_received_date on public.income(user_id, received_date desc);
 alter table public.income enable row level security;
 
 -- 4. Expenses Table
@@ -56,6 +58,7 @@ create table if not exists public.expenses (
 );
 
 create index if not exists idx_expenses_user_id on public.expenses(user_id);
+create index if not exists idx_expenses_user_expense_date on public.expenses(user_id, expense_date desc);
 alter table public.expenses enable row level security;
 
 -- 5. Budgets Table
@@ -72,6 +75,7 @@ create table if not exists public.budgets (
 );
 
 create index if not exists idx_budgets_user_id on public.budgets(user_id);
+create index if not exists idx_budgets_user_created on public.budgets(user_id, created_at desc);
 alter table public.budgets enable row level security;
 
 -- 6. Row Level Security Policies (Strict User Isolation)

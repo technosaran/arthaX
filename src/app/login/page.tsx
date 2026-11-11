@@ -43,9 +43,9 @@ export default function LoginPage() {
   // Auto-redirect if user already has an active session
   useEffect(() => {
     if (!authLoading && user) {
-      window.location.href = "/";
+      router.replace("/");
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, router]);
 
   // Clean error translation for user-friendly UX
   const formatAuthError = (msg: string) => {
