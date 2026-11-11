@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ==========================================================================
+   arthaX Institutional FinTech Design System
+   Synthesized from market leaders: Groww, Zerodha Kite, Stripe & Linear
+   ========================================================================== */
+
+:root,
+[data-theme="ultra"] {
+  /* Institutional Obsidian Pro (CRED & Robinhood Pro inspired) */
+  --app-bg: #05070a;
+  --app-card: #0b0f17;
+  --app-card-hover: #131a26;
+  --app-fg: #ffffff;
+  --app-border: #1a2333;
+  --app-border-subtle: rgba(255, 255, 255, 0.08);
+  --app-muted: #8ba0b8;
+  --app-accent: #00e5a3;
+  --app-accent-hover: #00c78e;
+  --app-accent-subtle: rgba(0, 229, 163, 0.12);
+  --app-profit: #00e5a3;
+  --app-loss: #ff4d4f;
+  --app-ring: #00e5a3;
+  --app-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
+  --app-badge-bg: rgba(0, 229, 163, 0.12);
+  --app-badge-fg: #00e5a3;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="dark"] {
+  /* Midnight FinTech Terminal (Zerodha Kite Dark & Stripe Dark inspired) */
+  --app-bg: #0b0f19;
+  --app-card: #111827;
+  --app-card-hover: #172237;
+  --app-fg: #f8fafc;
+  --app-border: #1e293b;
+  --app-border-subtle: rgba(255, 255, 255, 0.07);
+  --app-muted: #94a3b8;
+  --app-accent: #00d09c;
+  --app-accent-hover: #00b386;
+  --app-accent-subtle: rgba(0, 208, 156, 0.12);
+  --app-profit: #00d09c;
+  --app-loss: #f87171;
+  --app-ring: #00d09c;
+  --app-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+  --app-badge-bg: rgba(0, 208, 156, 0.12);
+  --app-badge-fg: #00d09c;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+[data-theme="light"] {
+  /* Modern High-Trust Light FinTech (Groww & Zerodha Kite Light inspired) */
+  --app-bg: #f8fafc;
+  --app-card: #ffffff;
+  --app-card-hover: #f1f5f9;
+  --app-fg: #0f172a;
+  --app-border: #e2e8f0;
+  --app-border-subtle: #f1f5f9;
+  --app-muted: #64748b;
+  --app-accent: #00b386;
+  --app-accent-hover: #009973;
+  --app-accent-subtle: rgba(0, 179, 134, 0.1);
+  --app-profit: #00b386;
+  --app-loss: #ef4444;
+  --app-ring: #00b386;
+  --app-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --app-badge-bg: rgba(0, 179, 134, 0.1);
+  --app-badge-fg: #008764;
 }
+
+/* ==========================================================================
+   FinTech Typography Rules (Plus Jakarta Sans + Inter + JetBrains Mono)
+   ========================================================================== */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--font-plus-jakarta), var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
+  letter-spacing: -0.012em;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Headings with crisp fintech geometric tracking */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-plus-jakarta), var(--font-inter), sans-serif;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+/* Tabular Financial Numerics (Rigid column alignment for currencies & percentages) */
+.font-mono,
+.tabular-nums,
+[data-numeric="true"] {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: -0.02em;
+}
+
+/* Fintech Card & Container Transitions */
+.fintech-card {
+  background-color: var(--app-card);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fintech-card:hover {
+  background-color: var(--app-card-hover);
+  border-color: var(--app-border);
+}
+
+/* Custom Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--app-border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-muted);
+}
+
+/* Selection Color matching Brand */
+::selection {
+  background-color: var(--app-accent-subtle);
+  color: var(--app-fg);
 }

@@ -1,5 +1,5 @@
 {
-  "name": "finex",
+  "name": "arthax",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
+    "@upstash/redis": "^1.41.0",
+    "lucide-react": "^1.71.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
