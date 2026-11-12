@@ -15,6 +15,7 @@ import {
   TrendingDown,
   Target,
   BookOpen,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -32,6 +33,7 @@ const TAB_META: Record<string, { label: string; icon: React.ComponentType<{ size
   income: { label: "Income Streams", icon: TrendingUp },
   expenses: { label: "Expenses & Outflows", icon: TrendingDown },
   budgets: { label: "Category Budgets", icon: Target },
+  family: { label: "Family Space", icon: Users },
   ledger: { label: "Consolidated Ledger", icon: BookOpen },
   settings: { label: "Preferences & Vault", icon: Settings },
 };
