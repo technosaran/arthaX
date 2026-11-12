@@ -8,6 +8,7 @@ import {
   TrendingDown,
   Target,
   BookOpen,
+  Users,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { id: "income", label: "Income", icon: TrendingUp, activeColor: "text-emerald-400" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, activeColor: "text-rose-400" },
   { id: "budgets", label: "Budgets", icon: Target, activeColor: "text-amber-400" },
+  { id: "family", label: "Family", icon: Users, activeColor: "text-violet-400" },
   { id: "ledger", label: "Ledger", icon: BookOpen, activeColor: "text-sky-400" },
   { id: "settings", label: "Settings", icon: Settings },
 ];

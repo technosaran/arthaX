@@ -9,6 +9,7 @@ import AccountsSection from "@/components/AccountsSection";
 import IncomeSection from "@/components/IncomeSection";
 import ExpensesSection from "@/components/ExpensesSection";
 import BudgetsSection from "@/components/BudgetsSection";
+import FamilySection from "@/components/FamilySection";
 import LedgerSection from "@/components/LedgerSection";
 import SettingsSection from "@/components/SettingsSection";
 import { useAuth } from "@/context/AuthContext";
@@ -112,6 +113,11 @@ export default function HomeClient() {
           {visitedTabs.budgets && (
             <div className={`h-full w-full ${activeTab === "budgets" ? "block" : "hidden"}`}>
               <BudgetsSection />
+            </div>
+          )}
+          {visitedTabs.family && (
+            <div className={`h-full w-full ${activeTab === "family" ? "block" : "hidden"}`}>
+              <FamilySection />
             </div>
           )}
           {visitedTabs.ledger && (
