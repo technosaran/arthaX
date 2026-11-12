@@ -59,14 +59,14 @@ export default function Sidebar({
       >
         {collapsed ? (
           <div className="w-full flex items-center justify-center">
-            <Logo size={28} showText={false} />
+            <Logo size={32} showText={false} />
           </div>
         ) : (
           <div className="w-full flex items-center justify-between">
-            <Logo size={28} showText={true} />
+            <Logo size={32} showText={true} />
             <button
               onClick={() => setCollapsed(true)}
-              className="hidden md:flex items-center justify-center w-7 h-7 rounded-lg border transition-all cursor-pointer opacity-70 hover:opacity-100"
+              className="flex items-center justify-center w-7 h-7 rounded-lg border transition-all cursor-pointer opacity-70 hover:opacity-100"
               style={{
                 borderColor: "var(--app-border)",
                 backgroundColor: "var(--app-card)",

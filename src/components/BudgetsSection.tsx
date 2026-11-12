@@ -8,7 +8,6 @@ import {
   Loader2,
   X,
   Search,
-  Download,
   Pencil,
   LayoutGrid,
   List,
@@ -19,7 +18,6 @@ import {
   TrendingDown,
   ShieldCheck,
   Zap,
-  Copy,
   SlidersHorizontal,
   Home,
   Utensils,
@@ -86,8 +84,8 @@ export interface CategoryMeta {
 }
 
 export const BUDGET_CATEGORIES: CategoryMeta[] = [
-  { name: "Housing & Rent", color: "#F43F5E", icon: Home, defaultAmount: 20000 },
-  { name: "Groceries & Essentials", color: "#10B981", icon: ShoppingCart, defaultAmount: 10000 },
+  { name: "Housing & Rent", color: "#df514c", icon: Home, defaultAmount: 20000 },
+  { name: "Groceries & Essentials", color: "#4bb473", icon: ShoppingCart, defaultAmount: 10000 },
   { name: "Food & Dining", color: "#F59E0B", icon: Utensils, defaultAmount: 6000 },
   { name: "Utilities & Bills", color: "#3B82F6", icon: Zap, defaultAmount: 4500 },
   { name: "Transport & Fuel", color: "#8B5CF6", icon: Car, defaultAmount: 4500 },
@@ -95,7 +93,7 @@ export const BUDGET_CATEGORIES: CategoryMeta[] = [
   { name: "Shopping & Lifestyle", color: "#EC4899", icon: ShoppingBag, defaultAmount: 5000 },
   { name: "Electronics & Gadgets", color: "#38BDF8", icon: Laptop, defaultAmount: 5000 },
   { name: "Health & Medical", color: "#06B6D4", icon: HeartPulse, defaultAmount: 3500 },
-  { name: "Fitness & Sports", color: "#10B981", icon: Dumbbell, defaultAmount: 2500 },
+  { name: "Fitness & Sports", color: "#4bb473", icon: Dumbbell, defaultAmount: 2500 },
   { name: "Entertainment & OTT", color: "#A855F7", icon: Film, defaultAmount: 2000 },
   { name: "Travel & Vacations", color: "#6366F1", icon: Plane, defaultAmount: 8000 },
   { name: "Subscriptions & SaaS", color: "#14B8A6", icon: Layers, defaultAmount: 1500 },
@@ -111,11 +109,11 @@ export const BUDGET_CATEGORIES: CategoryMeta[] = [
   { name: "Home & Maintenance", color: "#78716C", icon: Wrench, defaultAmount: 3000 },
   { name: "Pet Care & Vet", color: "#E879F9", icon: Heart, defaultAmount: 2500 },
   { name: "Emergency Reserve", color: "#22C55E", icon: ShieldCheck, defaultAmount: 5000 },
-  { name: "Charity & Community", color: "#EF4444", icon: Heart, defaultAmount: 1500 },
+  { name: "Charity & Community", color: "#df514c", icon: Heart, defaultAmount: 1500 },
   { name: "Books & Courses", color: "#F59E0B", icon: BookOpen, defaultAmount: 1500 },
   { name: "Hobbies & Creative", color: "#8B5CF6", icon: Activity, defaultAmount: 2000 },
   { name: "Office & Coworking", color: "#64748B", icon: Laptop, defaultAmount: 3000 },
-  { name: "Alcohol & Nightlife", color: "#F43F5E", icon: Utensils, defaultAmount: 3500 },
+  { name: "Alcohol & Nightlife", color: "#df514c", icon: Utensils, defaultAmount: 3500 },
   { name: "Other & Contingency", color: "#71717A", icon: CircleDollarSign, defaultAmount: 2500 },
 ];
 
@@ -134,59 +132,6 @@ export const CATEGORY_COLORS: Record<string, string> = BUDGET_CATEGORIES.reduce(
   },
   {} as Record<string, string>
 );
-
-interface PresetPackage {
-  name: string;
-  description: string;
-  budgets: { category: string; amount: number }[];
-}
-
-const PRESET_PACKAGES: PresetPackage[] = [
-  {
-    name: "Essential Blueprint",
-    description: "Covers everyday essentials: groceries, rent, utilities, fuel, medical & savings",
-    budgets: [
-      { category: "Housing & Rent", amount: 20000 },
-      { category: "Groceries & Essentials", amount: 10000 },
-      { category: "Food & Dining", amount: 5000 },
-      { category: "Utilities & Bills", amount: 4500 },
-      { category: "Transport & Fuel", amount: 4500 },
-      { category: "Health & Medical", amount: 3000 },
-      { category: "Subscriptions & SaaS", amount: 1500 },
-      { category: "Investments & Wealth", amount: 15000 },
-    ],
-  },
-  {
-    name: "Urban Living & Leisure",
-    description: "Designed for modern lifestyle with dining, gadgets, travel & fitness",
-    budgets: [
-      { category: "Housing & Rent", amount: 28000 },
-      { category: "Groceries & Essentials", amount: 12000 },
-      { category: "Food & Dining", amount: 10000 },
-      { category: "Shopping & Lifestyle", amount: 8000 },
-      { category: "Electronics & Gadgets", amount: 6000 },
-      { category: "Fitness & Sports", amount: 3000 },
-      { category: "Entertainment & OTT", amount: 3000 },
-      { category: "Travel & Vacations", amount: 10000 },
-      { category: "Investments & Wealth", amount: 20000 },
-    ],
-  },
-  {
-    name: "Family & Home Builder",
-    description: "Comprehensive home package with child care, maintenance, vehicle, insurance & EMIs",
-    budgets: [
-      { category: "Housing & Rent", amount: 25000 },
-      { category: "Groceries & Essentials", amount: 14000 },
-      { category: "Utilities & Bills", amount: 6000 },
-      { category: "Debt & Loan EMI", amount: 18000 },
-      { category: "Insurance & Protection", amount: 4500 },
-      { category: "Family & Child Care", amount: 10000 },
-      { category: "Vehicle & Servicing", amount: 4000 },
-      { category: "Home & Maintenance", amount: 4000 },
-      { category: "Emergency Reserve", amount: 5000 },
-    ],
-  },
-];
 
 export default function BudgetsSection() {
   const { user } = useAuth();
@@ -219,7 +164,6 @@ export default function BudgetsSection() {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetItem | null>(null);
-  const [isPresetsOpen, setIsPresetsOpen] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
 
   // Form states
@@ -299,7 +243,7 @@ export default function BudgetsSection() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setErrorMsg("Unable to retrieve budget records from database.");
+        setErrorMsg("Unable to retrieve budget records.");
       } else if (data) {
         const mapped: BudgetItem[] = data.map((b) => ({
           id: b.id,
@@ -318,7 +262,7 @@ export default function BudgetsSection() {
         saveToCache(redisBudgetsKey, mapped, 3600);
       }
     } catch {
-      setErrorMsg("Failed to connect to database for budgets.");
+      setErrorMsg("Unable to load budgets. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -707,148 +651,9 @@ export default function BudgetsSection() {
     }
   };
 
-  // Apply Preset Package
-  const handleApplyPreset = async (preset: PresetPackage) => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      const supabase = createClient();
-
-      const inserts = preset.budgets.map((b) => ({
-        user_id: user.id,
-        category: b.category,
-        amount: b.amount,
-        period: "monthly",
-        month_year: selectedMonthYear,
-        alert_threshold: 80,
-        notes: `Blueprint: ${preset.name}`,
-      }));
-
-      await supabase
-        .from("budgets")
-        .delete()
-        .eq("month_year", selectedMonthYear)
-        .eq("user_id", user.id);
-
-      const { error } = await supabase.from("budgets").insert(inserts);
-      if (error) throw error;
-
-      showToast("Blueprint Applied", `Applied ${preset.name} (${preset.budgets.length} categories)`, "success");
-      setIsPresetsOpen(false);
-      await invalidateCacheKeys([redisBudgetsKey, "arthax:cache:budgets"]);
-      await fetchBudgets(true);
-    } catch {
-      showToast("Error", "Could not apply preset budget package.", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Clone from Previous Month
-  const handleCopyPreviousMonth = async () => {
-    if (!user) return;
-    const [yearStr, monthStr] = selectedMonthYear.split("-");
-    let year = parseInt(yearStr, 10);
-    let month = parseInt(monthStr, 10) - 1;
-    month -= 1;
-    if (month < 0) {
-      month = 11;
-      year -= 1;
-    }
-    const prevMonthYear = `${year}-${String(month + 1).padStart(2, "0")}`;
-
-    const prevBudgets = budgets.filter((b) => b.month_year === prevMonthYear);
-    if (prevBudgets.length === 0) {
-      showToast("No Records", `No budgets found in previous month (${prevMonthYear}) to copy.`, "info");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const supabase = createClient();
-      const inserts = prevBudgets.map((b) => ({
-        user_id: user.id,
-        category: b.category,
-        amount: b.amount,
-        period: b.period,
-        month_year: selectedMonthYear,
-        alert_threshold: b.alert_threshold,
-        notes: b.notes ? `Copied from ${prevMonthYear}` : null,
-      }));
-
-      await supabase
-        .from("budgets")
-        .delete()
-        .eq("month_year", selectedMonthYear)
-        .eq("user_id", user.id);
-
-      const { error } = await supabase.from("budgets").insert(inserts);
-      if (error) throw error;
-
-      showToast("Budgets Cloned", `Cloned ${prevBudgets.length} category budgets from ${prevMonthYear}`, "success");
-      await invalidateCacheKeys([redisBudgetsKey, "arthax:cache:budgets"]);
-      await fetchBudgets(true);
-    } catch {
-      showToast("Copy Failed", "Could not clone budgets from previous month.", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // CSV Export
-  const handleExportCSV = () => {
-    if (currentMonthBudgets.length === 0) {
-      showToast("No Data", "There are no budgets configured for this month to export.", "info");
-      return;
-    }
-
-    const headers = [
-      "Category",
-      "Month",
-      "Budget Limit (INR)",
-      "Actual Spent (INR)",
-      "Remaining (INR)",
-      "Utilization (%)",
-      "Status",
-      "Notes",
-    ];
-
-    const rows = allCategoryCards
-      .filter((c) => c.isBudgeted)
-      .map((item) => {
-        let status = "On Track";
-        if (item.isOverBudget) status = "Over Budget";
-        else if (item.isWarning) status = "Near Limit";
-
-        return [
-          `"${item.category}"`,
-          `"${selectedMonthYear}"`,
-          item.budgetAmount.toFixed(2),
-          item.spentAmount.toFixed(2),
-          item.remainingAmount.toFixed(2),
-          item.percentUsed.toFixed(1) + "%",
-          `"${status}"`,
-          `"${(item.budgetItem?.notes || "").replace(/"/g, '""')}"`,
-        ];
-      });
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `arthaX_budgets_${selectedMonthYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showToast("Export Ready", `Budget audit report for ${selectedMonthYear} exported.`, "success");
-  };
-
   return (
     <main
-      className="flex-1 h-screen overflow-y-auto px-4 sm:px-8 py-6 transition-colors select-none"
+      className="flex-1 h-full overflow-y-auto px-4 sm:px-8 py-6 transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* 1. TOP HEADER & MONTH CONTROLS */}
@@ -861,17 +666,6 @@ export default function BudgetsSection() {
               style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-card)" }}
             >
               {activeBudgetsCount} Active / {allCategoryCards.length} Categories
-            </span>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-400" />
-              Live Sync
             </span>
           </div>
           <p className="text-xs opacity-60 mt-1">
@@ -927,48 +721,6 @@ export default function BudgetsSection() {
             )}
           </div>
 
-          {/* Smart Presets */}
-          <button
-            onClick={() => setIsPresetsOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-all cursor-pointer opacity-80 hover:opacity-100"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-            title="Auto-generate budgets using tested blueprints"
-          >
-            <Sparkles size={13} className="text-amber-400" />
-            <span className="hidden sm:inline">Blueprints</span>
-          </button>
-
-          {/* Clone Past Month */}
-          <button
-            onClick={handleCopyPreviousMonth}
-            disabled={submitting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-all cursor-pointer opacity-80 hover:opacity-100 disabled:opacity-40"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-            title="Clone budgets from previous month"
-          >
-            <Copy size={13} />
-            <span className="hidden md:inline">Clone Past</span>
-          </button>
-
-          {/* Export CSV */}
-          <button
-            onClick={handleExportCSV}
-            className="p-2 text-xs rounded-xl border transition-all cursor-pointer opacity-80 hover:opacity-100"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-            title="Export CSV audit"
-          >
-            <Download size={13} />
-          </button>
-
           {/* Custom Budget Modal Button */}
           <button
             onClick={() => handleOpenAddModal()}
@@ -988,9 +740,9 @@ export default function BudgetsSection() {
         <div
           className="mb-6 p-3.5 rounded-xl text-xs border flex items-center justify-between"
           style={{
-            borderColor: "rgba(244, 63, 94, 0.4)",
+            borderColor: "rgba(223, 81, 76, 0.4)",
             backgroundColor: "var(--app-card)",
-            color: "#F43F5E",
+            color: "#df514c",
           }}
         >
           <div className="flex items-center gap-2">
@@ -1068,7 +820,7 @@ export default function BudgetsSection() {
           </div>
           <div
             className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight"
-            style={{ color: totalRemaining >= 0 ? "#10B981" : "#F43F5E" }}
+            style={{ color: totalRemaining >= 0 ? "#4bb473" : "#df514c" }}
           >
             {loading
               ? "..."
@@ -1123,17 +875,17 @@ export default function BudgetsSection() {
               style={{
                 borderColor: `${
                   overallPercentUsed > 100
-                    ? "#F43F5E"
+                    ? "#df514c"
                     : overallPercentUsed > 80
                     ? "#F59E0B"
-                    : "#10B981"
+                    : "#4bb473"
                 }40`,
                 color:
                   overallPercentUsed > 100
-                    ? "#F43F5E"
+                    ? "#df514c"
                     : overallPercentUsed > 80
                     ? "#F59E0B"
-                    : "#10B981",
+                    : "#4bb473",
               }}
             >
               {overallPercentUsed.toFixed(1)}% burned
@@ -1142,7 +894,7 @@ export default function BudgetsSection() {
 
           <div className="text-[11px] opacity-70">
             Projected Spend:{" "}
-            <strong className="font-bold font-mono text-white">
+            <strong className="font-bold font-mono" style={{ color: "var(--app-fg)" }}>
               {formatINR(paceMetrics.projectedSpend)}
             </strong>
             {totalBudgeted > 0 && (
@@ -1163,7 +915,7 @@ export default function BudgetsSection() {
 
         <div
           className="w-full h-2 rounded-full overflow-hidden"
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.08)" }}
+          style={{ backgroundColor: "var(--app-track-bg)" }}
         >
           <div
             className="h-full rounded-full transition-all duration-500"
@@ -1171,10 +923,10 @@ export default function BudgetsSection() {
               width: `${Math.min(100, overallPercentUsed)}%`,
               backgroundColor:
                 overallPercentUsed > 100
-                  ? "#F43F5E"
+                  ? "#df514c"
                   : overallPercentUsed > 80
                   ? "#F59E0B"
-                  : "#10B981",
+                  : "#4bb473",
             }}
           />
         </div>
@@ -1390,21 +1142,21 @@ export default function BudgetsSection() {
             const Icon = item.IconComponent;
             const progress = Math.min(100, item.percentUsed);
             const statusColor = item.isOverBudget
-              ? "#F43F5E"
+              ? "#df514c"
               : item.isWarning
               ? "#F59E0B"
-              : "#10B981";
+              : "#4bb473";
 
             // If budget is ALREADY ACTIVE
             if (item.isBudgeted) {
               return (
                 <div
                   key={item.category}
-                  className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-white/40 shadow-sm group relative"
+                  className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border)] hover:shadow-md shadow-sm group relative"
                   style={{
                     backgroundColor: "var(--app-card)",
                     borderColor: item.isOverBudget
-                      ? "rgba(244, 63, 94, 0.4)"
+                      ? "rgba(223, 81, 76, 0.4)"
                       : item.isWarning
                       ? "rgba(245, 158, 11, 0.3)"
                       : "var(--app-border-subtle)",
@@ -1448,7 +1200,7 @@ export default function BudgetsSection() {
                       <div className="flex items-baseline justify-between">
                         <span
                           className="text-lg font-extrabold tracking-tight"
-                          style={{ color: item.isOverBudget ? "#F43F5E" : "var(--app-fg)" }}
+                          style={{ color: item.isOverBudget ? "#df514c" : "var(--app-fg)" }}
                         >
                           {formatINR(item.spentAmount)}
                         </span>
@@ -1460,7 +1212,7 @@ export default function BudgetsSection() {
                       {/* Progress Track */}
                       <div
                         className="w-full h-1.5 rounded-full overflow-hidden mt-2"
-                        style={{ backgroundColor: "rgba(255, 255, 255, 0.08)" }}
+                        style={{ backgroundColor: "var(--app-track-bg)" }}
                       >
                         <div
                           className="h-full rounded-full transition-all duration-300"
@@ -1480,7 +1232,7 @@ export default function BudgetsSection() {
                   >
                     <span
                       className="font-medium truncate"
-                      style={{ color: item.isOverBudget ? "#F43F5E" : "#10B981" }}
+                      style={{ color: item.isOverBudget ? "#df514c" : "#4bb473" }}
                     >
                       {item.isOverBudget
                         ? `Exceeded +${formatINR(Math.abs(item.remainingAmount))}`
@@ -1513,7 +1265,7 @@ export default function BudgetsSection() {
               <div
                 key={item.category}
                 onClick={() => handleOpenAddModal(item.category, item.meta.defaultAmount)}
-                className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-white/40 shadow-sm group cursor-pointer"
+                className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border)] hover:shadow-md shadow-sm group cursor-pointer"
                 style={{
                   backgroundColor: "var(--app-card)",
                   borderColor: "var(--app-border-subtle)",
@@ -1621,10 +1373,10 @@ export default function BudgetsSection() {
                 {displayedCards.map((item) => {
                   const progress = Math.min(100, item.percentUsed);
                   const statusColor = item.isOverBudget
-                    ? "#F43F5E"
+                    ? "#df514c"
                     : item.isWarning
                     ? "#F59E0B"
-                    : "#10B981";
+                    : "#4bb473";
 
                   const Icon = item.IconComponent;
 
@@ -1655,13 +1407,13 @@ export default function BudgetsSection() {
                       </td>
                       <td
                         className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#F43F5E" : "var(--app-fg)" }}
+                        style={{ color: item.isOverBudget ? "#df514c" : "var(--app-fg)" }}
                       >
                         {formatINR(item.spentAmount)}
                       </td>
                       <td
                         className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#F43F5E" : "#10B981" }}
+                        style={{ color: item.isOverBudget ? "#df514c" : "#4bb473" }}
                       >
                         {item.isBudgeted ? (
                           item.isOverBudget
@@ -1676,7 +1428,7 @@ export default function BudgetsSection() {
                           <div className="flex items-center gap-2">
                             <div
                               className="flex-1 h-1.5 rounded-full overflow-hidden"
-                              style={{ backgroundColor: "rgba(255, 255, 255, 0.08)" }}
+                              style={{ backgroundColor: "var(--app-track-bg)" }}
                             >
                               <div
                                 className="h-full rounded-full"
@@ -1761,7 +1513,7 @@ export default function BudgetsSection() {
 
       {/* MODAL 1: ADD / EDIT BUDGET */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
             className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto"
             style={{
@@ -1961,94 +1713,9 @@ export default function BudgetsSection() {
         </div>
       )}
 
-      {/* MODAL 2: BLUEPRINTS / PRESETS */}
-      {isPresetsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-lg rounded-2xl border p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border-subtle)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div>
-                <h3 className="text-base font-bold tracking-tight">Smart Budget Blueprints</h3>
-                <p className="text-xs opacity-50 mt-0.5">
-                  One-click category presets for {monthDisplayTitle}.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsPresetsOpen(false)}
-                className="p-1 rounded-lg opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {PRESET_PACKAGES.map((pkg) => {
-                const pkgTotal = pkg.budgets.reduce((s, b) => s + b.amount, 0);
-
-                return (
-                  <div
-                    key={pkg.name}
-                    className="p-3.5 rounded-xl border transition-all"
-                    style={{
-                      borderColor: "var(--app-border-subtle)",
-                      backgroundColor: "var(--app-bg)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div>
-                        <div className="font-semibold text-xs">{pkg.name}</div>
-                        <div className="text-[11px] opacity-50">{pkg.description}</div>
-                      </div>
-                      <div className="text-right font-mono">
-                        <div className="text-xs font-bold text-emerald-400">
-                          {formatINR(pkgTotal)}
-                        </div>
-                        <div className="text-[10px] opacity-40">
-                          {pkg.budgets.length} categories
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 my-2.5">
-                      {pkg.budgets.map((b) => (
-                        <span
-                          key={b.category}
-                          className="text-[10px] font-mono px-2 py-0.5 rounded-md border opacity-60"
-                          style={{ borderColor: "var(--app-border-subtle)" }}
-                        >
-                          {b.category}: {formatINR(b.amount)}
-                        </span>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => handleApplyPreset(pkg)}
-                      disabled={submitting}
-                      className="w-full py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer hover:opacity-90 disabled:opacity-40"
-                      style={{
-                        backgroundColor: "var(--app-fg)",
-                        color: "var(--app-bg)",
-                      }}
-                    >
-                      {submitting ? "Applying..." : `Apply ${pkg.name}`}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: DELETE CONFIRMATION */}
+      {/* MODAL 2: DELETE CONFIRMATION */}
       {deleteConfirmationId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
             className="w-full max-w-sm rounded-2xl border p-5 space-y-3 shadow-2xl relative"
             style={{

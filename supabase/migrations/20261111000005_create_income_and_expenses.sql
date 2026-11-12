@@ -4,6 +4,7 @@
 -- 1. Create Income Table
 CREATE TABLE IF NOT EXISTS public.income (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
   title TEXT NOT NULL,
   amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
   category TEXT NOT NULL DEFAULT 'Salary',
@@ -37,6 +38,7 @@ CREATE POLICY "Allow public delete on income"
 -- 2. Create Expenses Table
 CREATE TABLE IF NOT EXISTS public.expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
   title TEXT NOT NULL,
   amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
   category TEXT NOT NULL DEFAULT 'Food & Dining',

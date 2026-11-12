@@ -7,13 +7,28 @@ const NO_CACHE_HEADERS = {
   Expires: "0",
 };
 
+// Safe cache key validator: must start with arthax:cache: and contain only safe chars
+function isValidKey(key: string): boolean {
+  if (!key || typeof key !== "string") return false;
+  if (key.length > 256) return false;
+  return /^arthax:cache:[a-zA-Z0-9_\-:]+$/.test(key);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const key = searchParams.get("key");
+  const rawKey = searchParams.get("key");
 
-  if (!key) {
+  if (!rawKey || !rawKey.trim()) {
     return NextResponse.json(
       { error: "Missing cache key" },
+      { status: 400, headers: NO_CACHE_HEADERS }
+    );
+  }
+
+  const key = rawKey.trim();
+  if (!isValidKey(key)) {
+    return NextResponse.json(
+      { error: "Invalid cache key format" },
       { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
@@ -27,18 +42,40 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { key, value, ttl = 3600 } = body;
-
-    if (!key) {
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
       return NextResponse.json(
-        { error: "Missing cache key" },
+        { error: "Invalid JSON body" },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
-    await setCachedData(key, value, ttl);
-    return NextResponse.json({ success: true, key }, { headers: NO_CACHE_HEADERS });
+    const { key, value, ttl = 3600 } = body;
+
+    if (!key || typeof key !== "string") {
+      return NextResponse.json(
+        { error: "Missing or invalid cache key" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
+
+    const trimmedKey = key.trim();
+    if (!isValidKey(trimmedKey)) {
+      return NextResponse.json(
+        { error: "Invalid cache key format" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
+
+    const numericTtl = typeof ttl === "number" && ttl > 0 && ttl <= 86400 * 7 ? ttl : 3600;
+    await setCachedData(trimmedKey, value, numericTtl);
+
+    return NextResponse.json(
+      { success: true, key: trimmedKey },
+      { headers: NO_CACHE_HEADERS }
+    );
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Cache set failed" },
@@ -73,16 +110,18 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    if (keysToDelete.length === 0) {
+    const validatedKeys = keysToDelete.filter(isValidKey);
+
+    if (validatedKeys.length === 0) {
       return NextResponse.json(
-        { error: "Missing cache key or keys" },
+        { error: "Missing or invalid cache keys" },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
-    await invalidateCachedData(keysToDelete);
+    await invalidateCachedData(validatedKeys);
     return NextResponse.json(
-      { success: true, invalidated: keysToDelete },
+      { success: true, invalidated: validatedKeys },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (err) {

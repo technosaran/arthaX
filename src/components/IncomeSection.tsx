@@ -24,6 +24,8 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
+import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
+import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
 import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
@@ -67,12 +69,12 @@ const INCOME_CATEGORIES = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Salary: "#10B981", // Emerald
+  Salary: "#4bb473", // Zerodha Kite Green
   Freelance: "#8B5CF6", // Violet
   Business: "#F59E0B", // Amber
   Dividends: "#06B6D4", // Cyan
   Interest: "#3B82F6", // Royal Blue
-  Rental: "#F43F5E", // Rose
+  Rental: "#df514c", // Zerodha Kite Red
   "Capital Gains": "#EC4899", // Pink
   Bonus: "#14B8A6", // Teal
   "Crypto & Web3": "#F97316", // Orange
@@ -527,38 +529,26 @@ export default function IncomeSection() {
   }, [categoryTotals]);
 
   // Donut/Pie Chart Segments
-  const radius = 45;
-  const circumference = 2 * Math.PI * radius;
-
-  const chartSegments = useMemo(() => {
-    if (totalRawIncome === 0) return [];
-    let offset = 0;
+  const donutSegments: DonutSegment[] = useMemo(() => {
     return Object.entries(categoryTotals)
       .sort((a, b) => b[1] - a[1])
-      .map(([cat, val]) => {
-        const percentage = (val / totalRawIncome) * 100;
-        const currentOffset = offset;
-        offset += (percentage / 100) * circumference;
-        return {
-          category: cat,
-          amount: val,
-          percentage,
-          color: CATEGORY_COLORS[cat] || "#10B981",
-          strokeDasharray: `${(percentage / 100) * circumference} ${circumference}`,
-          strokeDashoffset: -currentOffset,
-        };
-      });
-  }, [categoryTotals, totalRawIncome, circumference]);
+      .map(([cat, val]) => ({
+        label: cat,
+        value: val,
+        color: CATEGORY_COLORS[cat] || "#4bb473",
+      }));
+  }, [categoryTotals]);
 
   // Line Chart: 6-Month Inflow Timeline Trend
-  const monthlyTrend = useMemo(() => {
-    const months: { key: string; label: string; total: number }[] = [];
+  const lineChartData: LinePoint[] = useMemo(() => {
+    const months: { key: string; label: string; fullLabel: string; value: number }[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const label = d.toLocaleString("default", { month: "short" });
-      months.push({ key, label, total: 0 });
+      const fullLabel = d.toLocaleString("default", { month: "long", year: "numeric" });
+      months.push({ key, label, fullLabel, value: 0 });
     }
 
     incomes.forEach((item) => {
@@ -566,7 +556,7 @@ export default function IncomeSection() {
         const itemKey = item.received_date.substring(0, 7);
         const target = months.find((m) => m.key === itemKey);
         if (target) {
-          target.total += item.amount;
+          target.value += item.amount;
         }
       }
     });
@@ -574,54 +564,9 @@ export default function IncomeSection() {
     return months;
   }, [incomes]);
 
-  const maxTrendIncome = useMemo(() => {
-    return Math.max(...monthlyTrend.map((m) => m.total), 1) * 1.15;
-  }, [monthlyTrend]);
-
-  const linePoints = useMemo(() => {
-    const plotWidth = 430;
-    const plotHeight = 90;
-    const paddingLeft = 35;
-    const paddingTop = 20;
-    const count = monthlyTrend.length;
-
-    return monthlyTrend.map((m, idx) => {
-      const x = paddingLeft + (count > 1 ? (idx / (count - 1)) * plotWidth : plotWidth / 2);
-      const y = paddingTop + plotHeight - (m.total / maxTrendIncome) * plotHeight;
-      return { x, y, label: m.label, total: m.total };
-    });
-  }, [monthlyTrend, maxTrendIncome]);
-
-  const linePath = useMemo(() => {
-    if (linePoints.length === 0) return "";
-    if (linePoints.length === 1) return `M ${linePoints[0].x} ${linePoints[0].y}`;
-
-    let d = `M ${linePoints[0].x.toFixed(1)} ${linePoints[0].y.toFixed(1)}`;
-    for (let i = 0; i < linePoints.length - 1; i++) {
-      const p0 = linePoints[i === 0 ? i : i - 1];
-      const p1 = linePoints[i];
-      const p2 = linePoints[i + 1];
-      const p3 = linePoints[i + 2] || p2;
-
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-    }
-    return d;
-  }, [linePoints]);
-
-  const areaPath = useMemo(() => {
-    if (linePoints.length === 0) return "";
-    const baseline = 20 + 90; // 110
-    return `${linePath} L ${linePoints[linePoints.length - 1].x.toFixed(1)} ${baseline} L ${linePoints[0].x.toFixed(1)} ${baseline} Z`;
-  }, [linePath, linePoints]);
-
   return (
     <main
-      className="flex-1 h-screen p-6 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-6 sm:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Top Header */}
@@ -641,20 +586,9 @@ export default function IncomeSection() {
             >
               {displayedIncomes.length} Streams • {isAllTime ? "All Time" : monthDisplayTitle}
             </span>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-400" />
-              Live Sync
-            </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Cashflow channels, monthly recurring yields, salary pipelines, and capital dividends.
+            Track your salaries, investments, dividends, and recurring inflows.
           </p>
         </div>
 
@@ -828,98 +762,16 @@ export default function IncomeSection() {
             color: "var(--app-fg)",
           }}
         >
-          <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-            <div>
-              <h3 className="text-sm font-bold tracking-tight">Inflow Trajectory</h3>
-              <p className="text-[11px] opacity-60 font-mono mt-0.5">6-Month Monthly Inflow Trend</p>
-            </div>
-            <div
-              className="px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold text-emerald-400"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              Peak: {formatINR(Math.max(...monthlyTrend.map((m) => m.total)))}
-            </div>
-          </div>
-
-          {/* SVG Line Chart */}
-          <div className="w-full pt-4">
-            <svg viewBox="0 0 500 150" className="w-full h-44 overflow-visible">
-              <defs>
-                <linearGradient id="incomeTrendGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Subtle Horizontal Reference Guidelines */}
-              <line x1="35" y1="20" x2="465" y2="20" stroke="var(--app-border-subtle)" strokeDasharray="3 3" strokeWidth="0.75" />
-              <line x1="35" y1="65" x2="465" y2="65" stroke="var(--app-border-subtle)" strokeDasharray="3 3" strokeWidth="0.75" />
-              <line x1="35" y1="110" x2="465" y2="110" stroke="var(--app-border-subtle)" strokeWidth="1" />
-
-              {/* Area Under Curve */}
-              {areaPath && <path d={areaPath} fill="url(#incomeTrendGradient)" />}
-
-              {/* Smooth Trend Line */}
-              {linePath && (
-                <path
-                  d={linePath}
-                  fill="none"
-                  stroke="#10B981"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              )}
-
-              {/* Data Dots & Month Labels */}
-              {linePoints.map((pt, idx) => (
-                <g key={idx}>
-                  {/* Outer glow circle on active data */}
-                  {pt.total > 0 && (
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={7}
-                      fill="#10B981"
-                      opacity="0.2"
-                    />
-                  )}
-                  {/* Point circle */}
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={pt.total > 0 ? 4 : 2.5}
-                    fill="#10B981"
-                    stroke="var(--app-card)"
-                    strokeWidth="1.5"
-                  />
-                  {/* Month Label */}
-                  <text
-                    x={pt.x}
-                    y={130}
-                    textAnchor="middle"
-                    className="text-[10px] font-mono fill-current opacity-60"
-                  >
-                    {pt.label}
-                  </text>
-                  {/* Hover / Point Value */}
-                  {pt.total > 0 && (
-                    <text
-                      x={pt.x}
-                      y={pt.y - 10}
-                      textAnchor="middle"
-                      className="text-[9px] font-mono fill-current font-bold opacity-80"
-                    >
-                      {formatINR(pt.total).replace(".00", "")}
-                    </text>
-                  )}
-                </g>
-              ))}
-            </svg>
-          </div>
+          <InteractiveLineChart
+            title="Inflow Trajectory"
+            subtitle="6-Month Monthly Inflow Trend"
+            data={lineChartData}
+            color="#4bb473"
+            gradientId="incomeTrendGradient"
+            formatter={formatINR}
+            type="income"
+            emptyMessage="No income records found in the last 6 months."
+          />
         </div>
 
         {/* Right Card: Stream Allocation Donut / Pie Chart */}
@@ -933,86 +785,32 @@ export default function IncomeSection() {
         >
           <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
             <div className="flex items-center gap-1.5">
-              <PieChartIcon size={14} className="text-emerald-400" />
+              <PieChartIcon size={14} className="text-[#4bb473]" />
               <h3 className="text-sm font-bold tracking-tight">Inflow Allocation</h3>
             </div>
             <span className="text-[10px] font-mono opacity-50">
-              {chartSegments.length} Streams
+              {donutSegments.length} Streams
             </span>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center h-44 w-full">
-              <Loader2 size={24} className="animate-spin" />
-            </div>
-          ) : incomes.length === 0 || totalRawIncome === 0 ? (
-            <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs opacity-60 w-full">
-              <PieChartIcon size={28} className="opacity-40 mb-2 text-emerald-400" />
-              <p>No income data available.</p>
-              <p className="text-[11px] mt-1">Record your first income to view stream allocation.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row items-center gap-6 justify-center pt-4">
-              {/* SVG Donut / Pie Chart */}
-              <div className="flex justify-center items-center relative flex-shrink-0">
-                <svg width="150" height="150" viewBox="0 0 120 120" className="transform -rotate-90">
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    fill="none"
-                    stroke="var(--app-border-subtle)"
-                    strokeWidth="14"
-                  />
-                  {chartSegments.map((segment, idx) => (
-                    <circle
-                      key={idx}
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="none"
-                      stroke={segment.color}
-                      strokeWidth="14"
-                      strokeDasharray={segment.strokeDasharray}
-                      strokeDashoffset={segment.strokeDashoffset}
-                      className="transition-all duration-500 ease-out"
-                    />
-                  ))}
-                </svg>
-
-                {/* Donut Center Label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
-                  <span className="text-[8px] uppercase tracking-wider font-semibold opacity-60">
-                    Monthly Inflow
-                  </span>
-                  <span className="text-[11px] font-bold font-mono tracking-tight text-emerald-400">
-                    {formatINR(totalMonthlyIncome)}
-                  </span>
-                </div>
+          <div className="pt-4 flex items-center justify-center">
+            {loading ? (
+              <div className="flex items-center justify-center h-44 w-full">
+                <Loader2 size={24} className="animate-spin opacity-50" />
               </div>
-
-              {/* Legend with Color Dots, Categories, and Percentages */}
-              <div className="space-y-1.5 w-full max-h-40 overflow-y-auto pr-1">
-                {chartSegments.map((segment, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs py-0.5">
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: segment.color }}
-                      />
-                      <span className="truncate text-[11px] font-medium opacity-90">{segment.category}</span>
-                    </div>
-                    <div className="flex items-center gap-2 font-mono flex-shrink-0 text-right">
-                      <span className="text-[11px] font-semibold">{formatINR(segment.amount)}</span>
-                      <span className="text-[10px] opacity-50 w-8 text-right">
-                        {segment.percentage.toFixed(0)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            ) : (
+              <InteractiveDonutChart
+                totalLabel="Monthly Inflow"
+                totalValue={totalMonthlyIncome}
+                segments={donutSegments}
+                formatter={formatINR}
+                centerColor="#4bb473"
+                emptyMessage="No income data available."
+                emptySubMessage="Record your first income to view stream allocation."
+                icon={<PieChartIcon size={24} className="opacity-50 text-[#4bb473]" />}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -1027,7 +825,7 @@ export default function IncomeSection() {
             style={{
               borderColor: "var(--app-border-subtle)",
               backgroundColor: "var(--app-card)",
-              color: "#10B981",
+              color: "#4bb473",
             }}
           >
             {displayedIncomes.length}
@@ -1124,13 +922,13 @@ export default function IncomeSection() {
           {/* Transaction Rows */}
           <div className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
             {displayedIncomes.map((item) => {
-              const catColor = CATEGORY_COLORS[item.category] || "#10B981";
+              const catColor = CATEGORY_COLORS[item.category] || "#4bb473";
               const account = accounts.find((a) => a.id === item.account_id);
 
               return (
                 <div
                   key={item.id}
-                  className="transition-colors hover:bg-white/[0.02] group"
+                  className="transition-colors hover:bg-[var(--app-card-hover)] group"
                 >
                   {/* Desktop Grid Row (md and up) */}
                   <div className="hidden md:grid grid-cols-12 items-center gap-4 py-3.5 px-5">
@@ -1188,7 +986,7 @@ export default function IncomeSection() {
                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px]"
                             style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
                           >
-                            <BankLogo name={account.name} size={14} />
+                            <BankLogo name={account.name} size={18} />
                             <span className="truncate max-w-[130px]">{account.name}</span>
                           </span>
                         ) : (
@@ -1222,16 +1020,16 @@ export default function IncomeSection() {
                         <button
                           onClick={() => openEditModal(item)}
                           title="Edit Stream"
-                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-400 transition-all text-zinc-400 cursor-pointer"
-                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
+                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-400 transition-all opacity-70 hover:opacity-100 cursor-pointer"
+                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
                         >
                           <Pencil size={13} />
                         </button>
                         <button
                           onClick={() => handleDeleteIncome(item.id, item.title)}
                           title="Delete Record"
-                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400 transition-all text-zinc-400 cursor-pointer"
-                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
+                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400 transition-all opacity-70 hover:opacity-100 cursor-pointer"
+                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1309,7 +1107,7 @@ export default function IncomeSection() {
 
       {/* POPUP MODAL: Add / Edit Income */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
             className="w-full max-w-lg rounded-2xl border p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
             style={{

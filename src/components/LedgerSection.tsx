@@ -20,6 +20,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import BankLogo from "@/components/BankLogo";
+import EntityLogo from "@/components/EntityLogo";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
 import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
@@ -295,7 +296,7 @@ export default function LedgerSection() {
         );
       }
     } catch {
-      setErrorMsg("Failed to connect to database for ledger verification.");
+      setErrorMsg("Unable to load ledger entries. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -533,7 +534,7 @@ export default function LedgerSection() {
 
   return (
     <main
-      className="flex-1 h-screen p-6 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-6 sm:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* SECTION HEADER */}
@@ -556,20 +557,9 @@ export default function LedgerSection() {
             >
               {ledgerEntries.length} Entries • {isAllTime ? "All Time" : monthDisplayTitle}
             </span>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-400" />
-              Live Telemetry
-            </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Real-time double-entry journal, account passbooks, running balances, and cashflow audit trail.
+            Double-entry statements, account passbooks, and running balances.
           </p>
         </div>
 
@@ -810,7 +800,7 @@ export default function LedgerSection() {
           <div>
             <h3 className="text-base font-bold">No Ledger Entries Found</h3>
             <p className="text-xs opacity-60 mt-1 max-w-sm mx-auto">
-              Transactions logged under Income and Expenses will appear here automatically with real-time balance tracking.
+              Transactions logged under Income and Expenses will appear here automatically.
             </p>
           </div>
         </div>
@@ -854,7 +844,7 @@ export default function LedgerSection() {
                     <tr
                       key={entry.id}
                       onClick={() => setSelectedVoucher(entry)}
-                      className="group transition-colors cursor-pointer hover:bg-white/[0.03]"
+                      className="group transition-colors cursor-pointer hover:bg-[var(--app-card-hover)]"
                       style={{ borderColor: "var(--app-border-subtle)" }}
                     >
                       {/* Date */}
@@ -875,18 +865,31 @@ export default function LedgerSection() {
 
                       {/* Description & Details */}
                       <td className="py-3.5 px-4 max-w-xs">
-                        <div className="font-semibold truncate">{entry.title}</div>
-                        {entry.notes && (
-                          <div className="text-[11px] opacity-60 truncate mt-0.5">{entry.notes}</div>
-                        )}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <EntityLogo
+                            name={entry.title}
+                            category={entry.category}
+                            size={36}
+                          />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm tracking-tight truncate" title={entry.title}>
+                              {entry.title}
+                            </div>
+                            {entry.notes && (
+                              <div className="text-[11px] opacity-60 truncate mt-0.5" title={entry.notes}>
+                                {entry.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Account */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {entry.account ? (
-                          <div className="flex items-center gap-2">
-                            <BankLogo name={entry.account.name} size={18} />
-                            <span className="font-medium">{entry.account.name}</span>
+                          <div className="flex items-center gap-2.5">
+                            <BankLogo name={entry.account.name} size={24} />
+                            <span className="font-medium text-xs">{entry.account.name}</span>
                             {entry.account.last_four && (
                               <span className="text-[10px] opacity-60 font-mono">
                                 ••{entry.account.last_four.slice(-4)}
@@ -949,7 +952,7 @@ export default function LedgerSection() {
 
       {/* MODAL 1: TRANSACTION VOUCHER DETAIL MODAL */}
       {selectedVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div
             className="w-full max-w-lg rounded-2xl border p-6 space-y-5 shadow-2xl transition-all select-text"
             style={{
@@ -966,7 +969,7 @@ export default function LedgerSection() {
               </div>
               <button
                 onClick={() => setSelectedVoucher(null)}
-                className="p-1 rounded hover:bg-white/10 opacity-70 hover:opacity-100 cursor-pointer"
+                className="p-1 rounded hover:bg-[var(--app-card-hover)] opacity-70 hover:opacity-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -991,7 +994,10 @@ export default function LedgerSection() {
                 {selectedVoucher.type === "CREDIT" ? "+" : "-"}
                 {formatINR(selectedVoucher.amount)}
               </div>
-              <div className="text-xs opacity-70 font-semibold">{selectedVoucher.title}</div>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <EntityLogo name={selectedVoucher.title} category={selectedVoucher.category} size={24} />
+                <span className="text-xs opacity-80 font-semibold">{selectedVoucher.title}</span>
+              </div>
             </div>
 
             {/* Metadata Fields */}
@@ -1012,7 +1018,7 @@ export default function LedgerSection() {
                 <span className="opacity-60">Account Linked</span>
                 {selectedVoucher.account ? (
                   <div className="flex items-center gap-2 font-medium">
-                    <BankLogo name={selectedVoucher.account.name} size={18} />
+                    <BankLogo name={selectedVoucher.account.name} size={22} />
                     <span>{selectedVoucher.account.name}</span>
                     {selectedVoucher.account.last_four && (
                       <span className="font-mono opacity-60">•••{selectedVoucher.account.last_four}</span>
@@ -1087,7 +1093,7 @@ export default function LedgerSection() {
 
       {/* MODAL 2: DELETE & AUTOMATIC REVERSAL CONFIRMATION MODAL */}
       {isDeleteModalOpen && entryToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div
             className="w-full max-w-md rounded-2xl border p-6 space-y-4 shadow-2xl transition-all"
             style={{
@@ -1103,7 +1109,7 @@ export default function LedgerSection() {
 
             <p className="text-xs opacity-75">
               Are you sure you want to permanently delete{" "}
-              <span className="font-bold text-white">"{entryToDelete.title}"</span> (
+              <span className="font-bold" style={{ color: "var(--app-fg)" }}>"{entryToDelete.title}"</span> (
               {formatINR(entryToDelete.amount)}) from the ledger?
             </p>
 

@@ -197,7 +197,50 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 8. Enable Realtime Publications & Replica Identity Full
+-- 8. Atomic Balance Operations (RPC Functions)
+create or replace function public.decrement_account_balance(
+  p_account_id uuid,
+  p_user_id text,
+  p_amount numeric
+)
+returns numeric
+language plpgsql
+security definer
+as $$
+declare
+  v_new_balance numeric;
+begin
+  update public.accounts
+  set balance = round((balance - p_amount)::numeric, 2)
+  where id = p_account_id and user_id = p_user_id
+  returning balance into v_new_balance;
+
+  return coalesce(v_new_balance, 0);
+end;
+$$;
+
+create or replace function public.increment_account_balance(
+  p_account_id uuid,
+  p_user_id text,
+  p_amount numeric
+)
+returns numeric
+language plpgsql
+security definer
+as $$
+declare
+  v_new_balance numeric;
+begin
+  update public.accounts
+  set balance = round((balance + p_amount)::numeric, 2)
+  where id = p_account_id and user_id = p_user_id
+  returning balance into v_new_balance;
+
+  return coalesce(v_new_balance, 0);
+end;
+$$;
+
+-- 9. Enable Realtime Publications & Replica Identity Full
 alter table public.accounts replica identity full;
 alter table public.user_settings replica identity full;
 alter table public.income replica identity full;

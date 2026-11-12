@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import BankLogo from "@/components/BankLogo";
 import AppleWalletCard from "@/components/AppleWalletCard";
+import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 
 const DEFAULT_CASH_ID = "00000000-0000-0000-0000-000000000001";
@@ -296,35 +297,27 @@ export default function AccountsSection() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Vibrant high-contrast fintech color palette
+  // Vibrant high-contrast fintech color palette (Zerodha Kite Green & Red standard)
   const chartPalette = [
-    "#10B981", // Emerald Green (Cash / Savings)
+    "#4bb473", // Zerodha Kite Green (Cash / Savings)
     "#3B82F6", // Royal Blue (HDFC / Banking)
     "#8B5CF6", // Purple / Violet (Fixed Deposits)
     "#06B6D4", // Neon Cyan (Investments / Demat)
     "#F59E0B", // Bright Amber / Gold
     "#EC4899", // Vivid Pink
-    "#F43F5E", // Coral Rose
+    "#df514c", // Zerodha Kite Red
     "#14B8A6", // Teal
   ];
 
-  const chartSegments = Object.entries(typeMap).map(([catType, catBalance], index) => {
-    const percentage = totalBalance > 0 ? (catBalance / totalBalance) * 100 : 0;
-    return {
-      type: catType,
-      balance: catBalance,
-      percentage,
-      color: chartPalette[index % chartPalette.length],
-    };
-  });
-
-  const radius = 45;
-  const circumference = 2 * Math.PI * radius;
-  let cumulativeOffset = 0;
+  const donutSegments: DonutSegment[] = Object.entries(typeMap).map(([catType, catBalance], index) => ({
+    label: catType,
+    value: catBalance,
+    color: chartPalette[index % chartPalette.length],
+  }));
 
   return (
     <main
-      className="flex-1 h-screen p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-4 sm:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Header */}
@@ -335,20 +328,9 @@ export default function AccountsSection() {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-400" />
-              Live Sync
-            </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Connected debit cards, liquid cash vault, and asset allocation.
+            Connected accounts, liquid cash vault, and asset allocation.
           </p>
         </div>
 
@@ -425,91 +407,24 @@ export default function AccountsSection() {
 
           {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
           <div
-            className="lg:col-span-7 flex flex-col sm:flex-row items-center gap-8 justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
+            className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
             style={{ borderColor: "var(--app-border-subtle)" }}
           >
             {loading ? (
               <div className="flex items-center justify-center h-44 w-full">
-                <Loader2 size={24} className="animate-spin" />
-              </div>
-            ) : accounts.length === 0 || totalBalance === 0 ? (
-              <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs opacity-60 w-full">
-                <PieChartIcon size={28} className="opacity-40 mb-2" />
-                <p>No allocation data available.</p>
-                <p className="text-[11px] mt-1">Update Cash in Hand or link an account to view your breakdown.</p>
+                <Loader2 size={24} className="animate-spin opacity-50" />
               </div>
             ) : (
-              <>
-                {/* Colorful SVG Donut Chart */}
-                <div className="flex justify-center items-center relative flex-shrink-0">
-                  <svg width="170" height="170" viewBox="0 0 120 120" className="transform -rotate-90">
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="none"
-                      stroke="var(--app-border-subtle)"
-                      strokeWidth="14"
-                    />
-                    {chartSegments.map((segment, idx) => {
-                      const strokeDasharray = `${(segment.percentage / 100) * circumference} ${circumference}`;
-                      const offset = cumulativeOffset;
-                      cumulativeOffset += (segment.percentage / 100) * circumference;
-
-                      return (
-                        <circle
-                          key={idx}
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          fill="none"
-                          stroke={segment.color}
-                          strokeWidth="14"
-                          strokeDasharray={strokeDasharray}
-                          strokeDashoffset={-offset}
-                          className="transition-all duration-500 ease-out"
-                        />
-                      );
-                    })}
-                  </svg>
-
-                  {/* Donut Center Label */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
-                    <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60">
-                      Total Assets
-                    </span>
-                    <span className="text-[13px] font-bold font-mono tracking-tight">
-                      {formatINR(totalBalance)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Legend with Vibrant Color Dots, Types, and Percentages */}
-                <div className="space-y-2.5 w-full sm:max-w-xs">
-                  <div className="flex items-center gap-1.5 pb-1 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-                    <PieChartIcon size={13} className="opacity-70" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">
-                      Asset Allocation
-                    </span>
-                  </div>
-
-                  {chartSegments.map((segment, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                          style={{ backgroundColor: segment.color }}
-                        />
-                        <span className="truncate opacity-80 text-[11px] font-medium">{segment.type}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-mono flex-shrink-0 text-[11px]">
-                        <span className="font-bold">{segment.percentage.toFixed(1)}%</span>
-                        <span className="opacity-50 text-[10px]">({formatINR(segment.balance)})</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <InteractiveDonutChart
+                title="Asset Allocation"
+                totalLabel="Total Assets"
+                totalValue={totalBalance}
+                segments={donutSegments}
+                formatter={formatINR}
+                emptyMessage="No allocation data available."
+                emptySubMessage="Update Cash in Hand or link an account to view your breakdown."
+                icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
+              />
             )}
           </div>
         </div>
@@ -520,23 +435,12 @@ export default function AccountsSection() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider">
-              Holdings & Debit Cards ({accounts.length})
+              Holdings & Accounts ({accounts.length})
             </h2>
             <p className="text-xs opacity-60 mt-0.5">
-              Apple Wallet style cards with instant tap-to-pay styling and real-time ledger balance.
+              Your accounts and liquid assets with running balances.
             </p>
           </div>
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-400" />
-            Live Sync
-          </span>
         </div>
 
         {loading ? (
@@ -568,7 +472,7 @@ export default function AccountsSection() {
 
       {/* POPUP MODAL: Add New Account */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
             className="w-full max-w-lg rounded-2xl border p-6 sm:p-8 space-y-6 shadow-2xl relative"
             style={{
@@ -711,7 +615,7 @@ export default function AccountsSection() {
 
       {/* POPUP MODAL: Edit Cash in Hand Balance */}
       {isEditingCash && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
             className="w-full max-w-md rounded-2xl border p-6 sm:p-8 space-y-6 shadow-2xl relative"
             style={{

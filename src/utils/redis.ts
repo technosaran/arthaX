@@ -26,8 +26,11 @@ export const getUserCacheKey = (userId: string | undefined | null, resource: str
  * Get cached item from Upstash Redis with timeout fallback (max 1000ms)
  */
 export async function getCachedData<T>(key: string): Promise<T | null> {
+  if (!key) return null;
   try {
     const fetchPromise = redis.get<T>(key);
+    // Attach catch handler so background failure doesn't cause unhandled rejection
+    fetchPromise.catch(() => {});
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => resolve(null), 1000)
     );
@@ -40,28 +43,39 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Set cached item in Upstash Redis with TTL (default 1 hour = 3600s)
+ * Set cached item in Upstash Redis with TTL (default 1 hour = 3600s) with timeout safeguard
  */
 export async function setCachedData<T>(
   key: string,
   value: T,
   ttlSeconds: number = 3600
 ): Promise<void> {
+  if (!key || value === undefined) return;
   try {
-    await redis.set(key, value, { ex: ttlSeconds });
+    const setPromise = redis.set(key, value, { ex: ttlSeconds });
+    setPromise.catch(() => {});
+    const timeoutPromise = new Promise<void>((resolve) =>
+      setTimeout(() => resolve(), 1200)
+    );
+    await Promise.race([setPromise, timeoutPromise]);
   } catch (err) {
     console.warn(`[Redis Cache] Failed to set ${key}:`, err);
   }
 }
 
 /**
- * Invalidate one or multiple cached items in Upstash Redis
+ * Invalidate one or multiple cached items in Upstash Redis with timeout safeguard
  */
 export async function invalidateCachedData(keys: string | string[]): Promise<void> {
   const keyList = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
   if (keyList.length === 0) return;
   try {
-    await Promise.all(keyList.map((k) => redis.del(k)));
+    const delPromise = Promise.all(keyList.map((k) => redis.del(k)));
+    delPromise.catch(() => {});
+    const timeoutPromise = new Promise<void>((resolve) =>
+      setTimeout(() => resolve(), 1500)
+    );
+    await Promise.race([delPromise, timeoutPromise]);
   } catch (err) {
     console.warn(`[Redis Cache] Failed to invalidate keys:`, err);
   }

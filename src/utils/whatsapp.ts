@@ -21,10 +21,19 @@ export async function sendWhatsAppTextMessage({
     };
   }
 
+  const cleanTo = to.replace(/[^0-9]/g, "");
+  if (!cleanTo) {
+    return { success: false, error: "Invalid recipient phone number format" };
+  }
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     const url = `https://graph.facebook.com/v21.0/${pId}/messages`;
     const response = await fetch(url, {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -32,7 +41,7 @@ export async function sendWhatsAppTextMessage({
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to,
+        to: cleanTo,
         type: "text",
         text: {
           preview_url: false,
@@ -40,6 +49,7 @@ export async function sendWhatsAppTextMessage({
         },
       }),
     });
+    clearTimeout(timeoutId);
 
     const data = await response.json();
     if (!response.ok) {

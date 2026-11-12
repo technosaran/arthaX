@@ -1,18 +1,24 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { ShieldCheck, PieChart as PieChartIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  PieChart as PieChartIcon,
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Layers,
+  Sun,
+  SunMedium,
+  Moon,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getFromLocalCache, saveToCache } from "@/utils/cacheClient";
-import {
-  getCurrentMonthYear,
-  formatMonthDisplay,
-  getEarliestDataMonth,
-  computeNextMonth,
-  computePrevMonth,
-} from "@/utils/monthUtils";
+import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
+import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
 
 interface AccountItem {
   id: string;
@@ -21,16 +27,28 @@ interface AccountItem {
   balance: number;
 }
 
+interface MonthHistoryItem {
+  key: string;
+  label: string;
+  fullLabel: string;
+  income: number;
+  expenses: number;
+  net: number;
+}
+
+function getInitialTimeGreeting(): { text: string; period: "morning" | "afternoon" | "evening" } {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: "Good morning", period: "morning" };
+  if (hour < 17) return { text: "Good afternoon", period: "afternoon" };
+  return { text: "Good evening", period: "evening" };
+}
+
 export default function DashboardSection() {
   const { user, profile } = useAuth();
-  const [greeting, setGreeting] = useState("");
-  const [emoji, setEmoji] = useState("");
+  const [greeting, setGreeting] = useState(() => getInitialTimeGreeting().text);
+  const [timePeriod, setTimePeriod] = useState<"morning" | "afternoon" | "evening">(() => getInitialTimeGreeting().period);
 
   const redisPortfolioKey = getUserCacheKey(user?.id, CACHE_KEYS.PORTFOLIO);
-
-  // Active month in YYYY-MM format with strict boundary constraints
-  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
-  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
 
   // Instant Tier 1 & 2 Local Cache load (0ms latency)
   const initialCache = useMemo(() => {
@@ -38,55 +56,34 @@ export default function DashboardSection() {
       name: string;
       netWorth: number;
       accounts: AccountItem[];
-      earliestMonthYear: string;
     }>(redisPortfolioKey);
   }, [redisPortfolioKey]);
 
-  const [name, setName] = useState<string>(initialCache?.name || profile?.name || "");
+  const [name, setName] = useState<string>(profile?.name || initialCache?.name || "");
   const [netWorth, setNetWorth] = useState<number>(initialCache?.netWorth || 0);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
-  const [earliestMonthYear, setEarliestMonthYear] = useState<string>(
-    initialCache?.earliestMonthYear || currentMonthYear
-  );
+  const [monthlyHistory, setMonthlyHistory] = useState<MonthHistoryItem[]>([]);
+  const [trajectoryMode, setTrajectoryMode] = useState<"net" | "income" | "expenses">("net");
   const [loading, setLoading] = useState<boolean>(!initialCache);
 
-  // Synchronize greeting name if profile arrives
+  const displayName = profile?.name || name;
+
+  const initials = useMemo(() => {
+    const source = displayName || user?.user_metadata?.full_name || user?.email || "";
+    if (!source) return "U";
+    const parts = source.trim().split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return source.substring(0, 2).toUpperCase();
+  }, [displayName, user]);
+
+  // Synchronize greeting name whenever profile arrives or updates
   useEffect(() => {
-    if (profile?.name && !name) {
+    if (profile?.name) {
       setName(profile.name);
     }
-  }, [profile?.name, name]);
-
-  // Clamp selectedMonthYear so it cannot be in the future or before earliest data
-  useEffect(() => {
-    if (selectedMonthYear > currentMonthYear) {
-      setSelectedMonthYear(currentMonthYear);
-    } else if (earliestMonthYear && selectedMonthYear < earliestMonthYear) {
-      setSelectedMonthYear(earliestMonthYear);
-    }
-  }, [selectedMonthYear, currentMonthYear, earliestMonthYear]);
-
-  const canGoPrev = selectedMonthYear > earliestMonthYear;
-  const canGoNext = selectedMonthYear < currentMonthYear;
-  const isCurrentMonth = selectedMonthYear === currentMonthYear;
-
-  const monthDisplayTitle = React.useMemo(() => {
-    return formatMonthDisplay(selectedMonthYear);
-  }, [selectedMonthYear]);
-
-  const handlePrevMonth = () => {
-    if (!canGoPrev) return;
-    setSelectedMonthYear((prev) => computePrevMonth(prev, earliestMonthYear));
-  };
-
-  const handleNextMonth = () => {
-    if (!canGoNext) return;
-    setSelectedMonthYear((prev) => computeNextMonth(prev, currentMonthYear));
-  };
-
-  const handleResetToCurrentMonth = () => {
-    setSelectedMonthYear(currentMonthYear);
-  };
+  }, [profile?.name]);
 
   // Format currency into Indian Numbering System (e.g. ₹1,48,92,450.00)
   const formatINR = (val: number) => {
@@ -103,37 +100,12 @@ export default function DashboardSection() {
     try {
       const supabase = createClient();
 
-      // Parallel concurrent burst: all 5 telemetry queries run simultaneously
-      const [
-        userDataRes,
-        accountsRes,
-        accEarliestRes,
-        incEarliestRes,
-        expEarliestRes,
-      ] = await Promise.all([
+      // Parallel concurrent burst: telemetry queries run simultaneously
+      const [userDataRes, accountsRes, expensesRes, incomeRes] = await Promise.all([
         supabase.from("user_settings").select("name").eq("id", user.id).maybeSingle(),
         supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
-        supabase
-          .from("accounts")
-          .select("created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("income")
-          .select("received_date")
-          .eq("user_id", user.id)
-          .order("received_date", { ascending: true })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("expenses")
-          .select("expense_date")
-          .eq("user_id", user.id)
-          .order("expense_date", { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+        supabase.from("expenses").select("amount, expense_date").eq("user_id", user.id),
+        supabase.from("income").select("amount, received_date").eq("user_id", user.id),
       ]);
 
       // 1. Resolve user display name
@@ -159,45 +131,77 @@ export default function DashboardSection() {
       setAccounts(mapped);
       setNetWorth(total);
 
-      // 3. Resolve earliest month
-      const candidateMonths = [
-        accEarliestRes.data?.created_at,
-        incEarliestRes.data?.received_date,
-        expEarliestRes.data?.expense_date,
-      ];
-      const earliestMonth = getEarliestDataMonth(candidateMonths, currentMonthYear);
-      setEarliestMonthYear(earliestMonth);
+      // 3. Compute 6-Month Trajectory History
+      const months: MonthHistoryItem[] = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label = d.toLocaleString("default", { month: "short" });
+        const fullLabel = d.toLocaleString("default", { month: "long", year: "numeric" });
+        months.push({ key, label, fullLabel, income: 0, expenses: 0, net: 0 });
+      }
+
+      if (incomeRes.data) {
+        incomeRes.data.forEach((inc: any) => {
+          if (inc.received_date) {
+            const incKey = inc.received_date.substring(0, 7);
+            const target = months.find((m) => m.key === incKey);
+            if (target) {
+              target.income += Number(inc.amount) || 0;
+            }
+          }
+        });
+      }
+
+      if (expensesRes.data) {
+        expensesRes.data.forEach((exp: any) => {
+          if (exp.expense_date) {
+            const expKey = exp.expense_date.substring(0, 7);
+            const target = months.find((m) => m.key === expKey);
+            if (target) {
+              target.expenses += Number(exp.amount) || 0;
+            }
+          }
+        });
+      }
+
+      // Compute Net Cash Flow per month
+      months.forEach((m) => {
+        m.net = Math.max(0, m.income - m.expenses);
+      });
+
+      setMonthlyHistory(months);
 
       // 4. Update multi-tier cache
       saveToCache(redisPortfolioKey, {
         name: resolvedName,
         netWorth: total,
         accounts: mapped,
-        earliestMonthYear: earliestMonth,
       });
     } catch (err) {
       console.warn("Error fetching dashboard telemetry:", err);
     } finally {
       setLoading(false);
     }
-  }, [user, currentMonthYear, redisPortfolioKey]);
+  }, [user, redisPortfolioKey]);
 
   useEffect(() => {
-    // Determine greeting & emoji
+    // Determine greeting & time period symbol
     const currentHour = new Date().getHours();
     let timeGreeting = "Good morning";
-    let timeEmoji = "☀️";
+    let period: "morning" | "afternoon" | "evening" = "morning";
 
     if (currentHour >= 12 && currentHour < 17) {
       timeGreeting = "Good afternoon";
-      timeEmoji = "🌤️";
+      period = "afternoon";
     } else if (currentHour >= 17) {
       timeGreeting = "Good evening";
-      timeEmoji = "🌙";
+      period = "evening";
     }
 
     setGreeting(timeGreeting);
-    setEmoji(timeEmoji);
+    setTimePeriod(period);
 
     if (!user) return;
 
@@ -210,6 +214,16 @@ export default function DashboardSection() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "accounts", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "income", filter: `user_id=eq.${user.id}` },
         () => fetchDashboardData()
       )
       .on(
@@ -233,15 +247,15 @@ export default function DashboardSection() {
     };
   }, [user, fetchDashboardData]);
 
-  // Vibrant high-contrast fintech color palette
+  // Vibrant high-contrast fintech color palette (Zerodha Kite Green & Red standard)
   const chartPalette = [
-    "#10B981", // Emerald Green (Cash / Savings)
+    "#4bb473", // Zerodha Kite Green (Cash / Savings)
     "#3B82F6", // Royal Blue (HDFC / Banking)
     "#8B5CF6", // Purple / Violet (Fixed Deposits)
     "#06B6D4", // Neon Cyan (Investments / Demat)
     "#F59E0B", // Bright Amber / Gold
     "#EC4899", // Vivid Pink
-    "#F43F5E", // Coral Rose
+    "#df514c", // Zerodha Kite Red
     "#14B8A6", // Teal
   ];
 
@@ -252,24 +266,36 @@ export default function DashboardSection() {
     return acc;
   }, {} as Record<string, number>);
 
-  const chartSegments = Object.entries(typeMap)
+  const donutSegments: DonutSegment[] = Object.entries(typeMap)
     .filter(([_, bal]) => bal > 0)
-    .map(([catType, catBalance], index) => {
-      const percentage = netWorth > 0 ? (catBalance / netWorth) * 100 : 0;
-      return {
-        type: catType,
-        balance: catBalance,
-        percentage,
-        color: chartPalette[index % chartPalette.length],
-      };
-    });
+    .map(([catType, catBalance], index) => ({
+      label: catType,
+      value: catBalance,
+      color: chartPalette[index % chartPalette.length],
+    }));
 
-  const radius = 45;
-  const circumference = 2 * Math.PI * radius;
+  // Line chart data points based on selected trajectory mode
+  const linePoints: LinePoint[] = useMemo(() => {
+    return monthlyHistory.map((m) => ({
+      key: m.key,
+      label: m.label,
+      fullLabel: m.fullLabel,
+      value:
+        trajectoryMode === "net"
+          ? m.net
+          : trajectoryMode === "income"
+          ? m.income
+          : m.expenses,
+    }));
+  }, [monthlyHistory, trajectoryMode]);
+
+  const total6MonthInflow = monthlyHistory.reduce((acc, curr) => acc + curr.income, 0);
+  const total6MonthOutflow = monthlyHistory.reduce((acc, curr) => acc + curr.expenses, 0);
+  const total6MonthSavings = Math.max(0, total6MonthInflow - total6MonthOutflow);
 
   return (
     <main
-      className="flex-1 h-screen p-6 md:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-4 sm:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Header */}
@@ -277,258 +303,246 @@ export default function DashboardSection() {
         className="pb-6 mb-8 border-b"
         style={{ borderColor: "var(--app-border)" }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
-              <span>{greeting}{name ? `, ${name}` : ""}</span>
-              <span className="text-2xl select-none">{emoji}</span>
-            </h1>
-            <p className="text-xs opacity-70 mt-1.5 font-medium">
-              Real-time portfolio telemetry, liquid liquidity & capital analytics.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Month Stepper */}
-            <div
-              className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              <button
-                onClick={handlePrevMonth}
-                disabled={!canGoPrev}
-                title={!canGoPrev ? "No earlier portfolio records" : "Previous Month"}
-                className={`p-1.5 rounded-lg transition-all ${
-                  !canGoPrev
-                    ? "opacity-25 cursor-not-allowed"
-                    : "opacity-70 hover:opacity-100 cursor-pointer"
-                }`}
+            <h1 className="text-3xl sm:text-4xl md:text-[2.5rem] font-extrabold tracking-tight flex items-center gap-3">
+              <span>{greeting}{displayName ? `, ${displayName}` : ""}</span>
+              <span
+                className="inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl border select-none flex-shrink-0 shadow-sm"
+                style={{
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-card)",
+                }}
+                title={timePeriod === "morning" ? "Morning" : timePeriod === "afternoon" ? "Afternoon" : "Evening"}
               >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="px-3 font-semibold min-w-[110px] text-center">
-                {monthDisplayTitle}
+                {timePeriod === "morning" && <Sun size={22} className="text-amber-400" />}
+                {timePeriod === "afternoon" && <SunMedium size={22} className="text-amber-400" />}
+                {timePeriod === "evening" && <Moon size={22} className="text-indigo-400" />}
               </span>
-              <button
-                onClick={handleNextMonth}
-                disabled={!canGoNext}
-                title={!canGoNext ? "Future months are not yet available" : "Next Month"}
-                className={`p-1.5 rounded-lg transition-all ${
-                  !canGoNext
-                    ? "opacity-25 cursor-not-allowed"
-                    : "opacity-70 hover:opacity-100 cursor-pointer"
-                }`}
-              >
-                <ChevronRight size={14} />
-              </button>
-              {!isCurrentMonth && (
-                <button
-                  onClick={handleResetToCurrentMonth}
-                  className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
-                  style={{ borderColor: "var(--app-border-subtle)" }}
-                >
-                  Today
-                </button>
-              )}
-            </div>
-
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <span className="w-2 h-2 rounded-full animate-pulse bg-emerald-400" />
-              Live Telemetry
-            </span>
+            </h1>
+            <p className="text-xs sm:text-sm opacity-70 mt-2 font-medium">
+              Overview of your accounts, income, and spending.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Big Total Net Worth Card with Pie Chart on Right */}
-      <div
-        className="rounded-2xl p-6 sm:p-8 border max-w-7xl transition-colors shadow-sm"
-        style={{
-          backgroundColor: "var(--app-card)",
-          borderColor: "var(--app-border)",
-          color: "var(--app-fg)",
-        }}
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          {/* Left Column: Total Net Worth Summary */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
-                Total Net Worth
-              </span>
-              <span
-                className="px-2 py-0.5 text-[10px] font-bold rounded border font-mono"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                  color: "var(--app-fg)",
-                }}
-              >
-                INR (₹)
-              </span>
-            </div>
-
-            <div>
-              <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight">
-                {loading ? "..." : formatINR(netWorth)}
-              </div>
-              <p className="text-xs opacity-60 mt-1.5">
-                Live portfolio valuation across connected accounts and liquid assets.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border text-[11px] font-mono opacity-80"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                <ShieldCheck size={13} className="text-emerald-400" />
-                {accounts.length} {accounts.length === 1 ? "Connected Account" : "Connected Accounts"}
-              </span>
-              {chartSegments.length > 0 && (
+      <div className="max-w-7xl space-y-6">
+        {/* CARD 1: Big Total Net Worth Card with Interactive Pie Chart on Right */}
+        <div
+          className="rounded-2xl p-6 sm:p-8 border transition-colors shadow-sm"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+            color: "var(--app-fg)",
+          }}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left Column: Total Net Worth Summary */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
+                  Total Net Worth
+                </span>
                 <span
-                  className="px-3 py-1 rounded-md border text-[11px] font-mono opacity-80"
+                  className="px-2 py-0.5 text-[10px] font-bold rounded border font-mono"
+                  style={{
+                    borderColor: "var(--app-border-subtle)",
+                    backgroundColor: "var(--app-bg)",
+                    color: "var(--app-fg)",
+                  }}
+                >
+                  INR (₹)
+                </span>
+              </div>
+
+              <div>
+                <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight">
+                  {loading ? "..." : formatINR(netWorth)}
+                </div>
+                <p className="text-xs opacity-60 mt-1.5">
+                  Total balance across all your connected accounts and cash.
+                </p>
+              </div>
+
+              {/* Holdings Count Pill */}
+              <div className="flex items-center gap-2 pt-2">
+                <div
+                  className="px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1.5"
                   style={{
                     borderColor: "var(--app-border-subtle)",
                     backgroundColor: "var(--app-bg)",
                   }}
                 >
-                  {chartSegments.length} {chartSegments.length === 1 ? "Asset Class" : "Asset Classes"}
-                </span>
+                  <Layers size={13} className="text-[#4bb473]" />
+                  <span className="font-bold">{accounts.length}</span>
+                  <span className="opacity-60">{accounts.length === 1 ? "Account" : "Accounts"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Asset Allocation Donut Chart & Interactive Legend */}
+            <div
+              className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
+              style={{ borderColor: "var(--app-border-subtle)" }}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center h-44 w-full">
+                  <Loader2 size={24} className="animate-spin opacity-50" />
+                </div>
+              ) : (
+                <InteractiveDonutChart
+                  title="Asset Allocation"
+                  totalLabel="Total Assets"
+                  totalValue={netWorth}
+                  segments={donutSegments}
+                  formatter={formatINR}
+                  emptyMessage="No allocation data available."
+                  emptySubMessage="Add accounts or cash in hand to see your portfolio breakdown."
+                  icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
+                />
               )}
             </div>
           </div>
+        </div>
 
-          {/* Right Column: Asset Allocation Donut Chart & Legend */}
-          <div
-            className="lg:col-span-7 flex flex-col sm:flex-row items-center gap-8 justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
-            style={{ borderColor: "var(--app-border-subtle)" }}
-          >
-            {loading ? (
-              <div className="flex items-center justify-center h-44 w-full">
-                <Loader2 size={24} className="animate-spin opacity-50" />
-              </div>
-            ) : accounts.length === 0 || netWorth <= 0 || chartSegments.length === 0 ? (
-              <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs opacity-60 w-full">
-                <PieChartIcon size={28} className="opacity-40 mb-2" />
-                <p>No allocation data available.</p>
-                <p className="text-[11px] mt-1">
-                  Add accounts or cash in hand to see your portfolio breakdown.
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Colorful SVG Donut Chart */}
-                <div className="flex justify-center items-center relative flex-shrink-0">
-                  <svg
-                    width="160"
-                    height="160"
-                    viewBox="0 0 120 120"
-                    className="transform -rotate-90"
-                  >
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="none"
-                      stroke="var(--app-border-subtle)"
-                      strokeWidth="14"
-                    />
-                    {(() => {
-                      let cumulativeOffset = 0;
-                      return chartSegments.map((segment, idx) => {
-                        const strokeDasharray = `${(segment.percentage / 100) * circumference} ${circumference}`;
-                        const offset = cumulativeOffset;
-                        cumulativeOffset += (segment.percentage / 100) * circumference;
+        {/* CARD 2: Interactive 6-Month Cash Flow & Capital Trajectory Line Chart */}
+        <div
+          className="rounded-2xl p-6 sm:p-8 border transition-colors shadow-sm"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+            color: "var(--app-fg)",
+          }}
+        >
+          {/* Top Bar with Trajectory Mode Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+            <div>
+              <h3 className="text-base font-bold tracking-tight">6-Month Capital Trajectory</h3>
+              <p className="text-xs opacity-60 font-mono mt-0.5">
+                Monthly Inflow, Outflow & Savings Trend
+              </p>
+            </div>
 
-                        return (
-                          <circle
-                            key={idx}
-                            cx="60"
-                            cy="60"
-                            r={radius}
-                            fill="none"
-                            stroke={segment.color}
-                            strokeWidth="14"
-                            strokeDasharray={strokeDasharray}
-                            strokeDashoffset={-offset}
-                            className="transition-all duration-500 ease-out"
-                          />
-                        );
-                      });
-                    })()}
-                  </svg>
-
-                  {/* Donut Center Label */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
-                    <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60">
-                      Total Assets
-                    </span>
-                    <span className="text-[12px] font-bold font-mono tracking-tight">
-                      {formatINR(netWorth)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Legend */}
-                <div className="space-y-2.5 w-full sm:max-w-xs">
-                  <div
-                    className="flex items-center justify-between pb-1.5 border-b"
-                    style={{ borderColor: "var(--app-border-subtle)" }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <PieChartIcon size={13} className="opacity-70" />
-                      <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">
-                        Asset Allocation
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono opacity-50">
-                      {chartSegments.length} {chartSegments.length === 1 ? "Class" : "Classes"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                    {chartSegments.map((segment, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                            style={{ backgroundColor: segment.color }}
-                          />
-                          <span className="truncate opacity-80 text-[11px] font-medium">
-                            {segment.type}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-mono flex-shrink-0 text-[11px]">
-                          <span className="font-bold">
-                            {segment.percentage.toFixed(1)}%
-                          </span>
-                          <span className="opacity-50 text-[10px]">
-                            ({formatINR(segment.balance)})
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Mode Switcher Segmented Control */}
+            <div
+              className="flex items-center p-1 rounded-xl border self-start sm:self-auto"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <button
+                onClick={() => setTrajectoryMode("net")}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  trajectoryMode === "net"
+                    ? "shadow-sm"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+                style={{
+                  backgroundColor: trajectoryMode === "net" ? "var(--app-card)" : "transparent",
+                  color: trajectoryMode === "net" ? "#4bb473" : "inherit",
+                }}
+              >
+                Net Savings
+              </button>
+              <button
+                onClick={() => setTrajectoryMode("income")}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  trajectoryMode === "income"
+                    ? "shadow-sm"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+                style={{
+                  backgroundColor: trajectoryMode === "income" ? "var(--app-card)" : "transparent",
+                  color: trajectoryMode === "income" ? "#4bb473" : "inherit",
+                }}
+              >
+                Inflow
+              </button>
+              <button
+                onClick={() => setTrajectoryMode("expenses")}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  trajectoryMode === "expenses"
+                    ? "shadow-sm"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+                style={{
+                  backgroundColor: trajectoryMode === "expenses" ? "var(--app-card)" : "transparent",
+                  color: trajectoryMode === "expenses" ? "#df514c" : "inherit",
+                }}
+              >
+                Outflow
+              </button>
+            </div>
           </div>
+
+          {/* Quick 6-Month Summary Statistics Pills */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div
+              className="p-3.5 rounded-xl border flex items-center justify-between"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Inflow</span>
+                <div className="text-base font-extrabold font-mono text-[#4bb473] mt-0.5">
+                  {formatINR(total6MonthInflow)}
+                </div>
+              </div>
+              <ArrowUpRight size={18} className="text-[#4bb473] opacity-80" />
+            </div>
+
+            <div
+              className="p-3.5 rounded-xl border flex items-center justify-between"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Outflow</span>
+                <div className="text-base font-extrabold font-mono text-[#df514c] mt-0.5">
+                  {formatINR(total6MonthOutflow)}
+                </div>
+              </div>
+              <ArrowDownRight size={18} className="text-[#df514c] opacity-80" />
+            </div>
+
+            <div
+              className="p-3.5 rounded-xl border flex items-center justify-between"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Net Retained</span>
+                <div className="text-base font-extrabold font-mono text-[#4bb473] mt-0.5">
+                  {formatINR(total6MonthSavings)}
+                </div>
+              </div>
+              <TrendingUp size={18} className="text-[#4bb473] opacity-80" />
+            </div>
+          </div>
+
+          {/* Interactive Line Chart Component */}
+          {loading ? (
+            <div className="flex items-center justify-center h-48 w-full">
+              <Loader2 size={24} className="animate-spin opacity-50" />
+            </div>
+          ) : (
+            <InteractiveLineChart
+              data={linePoints}
+              color={trajectoryMode === "expenses" ? "#df514c" : "#4bb473"}
+              gradientId="dashboardTrajectoryGradient"
+              formatter={formatINR}
+              type={trajectoryMode === "expenses" ? "expense" : "income"}
+              emptyMessage="No financial transaction records recorded in the past 6 months."
+            />
+          )}
         </div>
       </div>
     </main>

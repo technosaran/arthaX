@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { parseExpenseMessage, matchAccount } from "@/utils/expenseParser";
+import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expenseParser";
 import { sendWhatsAppTextMessage } from "@/utils/whatsapp";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getLocalDateString } from "@/utils/monthUtils";
 
 /**
  * Webhook Verification Handler (GET)
@@ -14,7 +15,8 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || "arthax_secure_token";
+  const verifyToken =
+    process.env.WHATSAPP_VERIFY_TOKEN || "arthax_secure_whatsapp_token_2026";
 
   if (mode === "subscribe" && token === verifyToken) {
     console.log("[WhatsApp Webhook] Handshake verified successfully.");
@@ -31,18 +33,26 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
 
-    // 1. Support direct testing (e.g. from Postman, curl, or ArthaX test panel)
+    // 1. Support direct testing or official Meta Cloud API payload
     let messageText = "";
     let senderPhone = "";
     let phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
     let explicitUserId = "";
+    let messageId: string | null = null;
 
     if (body.text) {
+      // Direct testing from test suite, curl, or shortcut
       messageText = body.text;
       senderPhone = body.phone || "test_user";
       explicitUserId = body.user_id || "";
+      messageId = body.message_id || `direct_${Date.now()}`;
     } else if (body.entry && body.entry[0]?.changes && body.entry[0].changes[0]?.value) {
       // Official Meta WhatsApp Cloud API Payload
       const value = body.entry[0].changes[0].value;
@@ -50,20 +60,28 @@ export async function POST(req: NextRequest) {
 
       const messageObj = value.messages?.[0];
       if (!messageObj) {
-        // Status updates (delivered, read, etc.)
+        // Acknowledge status updates (sent, delivered, read) without processing
         return NextResponse.json({ status: "acknowledged_status_update" });
       }
 
       senderPhone = messageObj.from || "";
+      messageId = messageObj.id || null;
+
       if (messageObj.type === "text" && messageObj.text?.body) {
         messageText = messageObj.text.body;
       } else {
-        // Non-text message (voice note, image, sticker)
+        // Non-text message (voice note, image, sticker, location)
         if (senderPhone) {
           await sendWhatsAppTextMessage({
             phoneNumberId,
             to: senderPhone,
-            message: "⚠️ Please send text messages to log expenses (e.g. *Dinner 500 HDFC* or *Petrol 1200 Cash*).",
+            message:
+              "Please send text messages or copy-paste transaction SMS to log expenses.\n\n" +
+              "*Examples:*\n" +
+              "• *Dinner 500 HDFC*\n" +
+              "• *Petrol 1200 Cash*\n" +
+              "• *Groceries 450 SBI*\n" +
+              "• *Uber 320*",
           });
         }
         return NextResponse.json({ status: "ignored_non_text_message" });
@@ -74,31 +92,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty or unrecognized message" }, { status: 400 });
     }
 
-    // 2. Resolve User ID
-    // Check if an authorized user ID is configured, or lookup the user
-    let userId = explicitUserId || process.env.WHATSAPP_AUTHORIZED_USER_ID;
+    // -------------------------------------------------------------
+    // 2. Resolve User ID (Guaranteed Multi-Tenant Safety)
+    // -------------------------------------------------------------
+    let userId = explicitUserId || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
 
     if (!userId) {
-      // Find the first registered user in user_settings or accounts as default
-      const { data: fallbackUser } = await supabaseAdmin
+      // Fallback for single-user self-hosted instance
+      const { data: defaultUser } = await supabaseAdmin
         .from("user_settings")
         .select("id")
         .limit(1)
         .maybeSingle();
 
-      if (fallbackUser?.id) {
-        userId = fallbackUser.id;
-      } else {
-        const { data: accUser } = await supabaseAdmin
-          .from("accounts")
-          .select("user_id")
-          .limit(1)
-          .maybeSingle();
-        userId = accUser?.user_id || "default_user";
+      userId = defaultUser?.id || null;
+    }
+
+    if (!userId) {
+      console.warn("[WhatsApp Webhook] No registered user found to assign expense.");
+      if (senderPhone && senderPhone !== "test_user") {
+        await sendWhatsAppTextMessage({
+          phoneNumberId,
+          to: senderPhone,
+          message:
+            "Your WhatsApp number is not linked to an active ArthaX account. Please sign in to ArthaX and configure your user settings.",
+        });
+      }
+      return NextResponse.json({ error: "User resolution failed" }, { status: 400 });
+    }
+
+    // -------------------------------------------------------------
+    // 3. Idempotency Check: Prevent duplicate logging on webhook retries
+    // -------------------------------------------------------------
+    if (messageId) {
+      const { data: existingExpense } = await supabaseAdmin
+        .from("expenses")
+        .select("id, title, amount")
+        .ilike("notes", `%${messageId}%`)
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingExpense) {
+        console.log(`[WhatsApp Webhook] Duplicate message ${messageId} already recorded. Skipping.`);
+        return NextResponse.json({
+          status: "already_processed",
+          duplicate: true,
+          expense_id: existingExpense.id,
+        });
       }
     }
 
-    // 3. Fetch Accounts for this User
+    // -------------------------------------------------------------
+    // 4. Fetch Accounts for this User
+    // -------------------------------------------------------------
     const { data: accounts, error: accErr } = await supabaseAdmin
       .from("accounts")
       .select("id, name, type, balance, last_four")
@@ -108,15 +155,23 @@ export async function POST(req: NextRequest) {
       console.error("[WhatsApp Webhook] Error fetching accounts:", accErr);
     }
 
-    const userAccounts = accounts || [];
+    const userAccounts: AccountSummary[] = (accounts || []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      balance: Number(a.balance) || 0,
+      last_four: a.last_four,
+    }));
 
-    // 4. Parse the Message (Amount, Category, Title, Account)
+    // -------------------------------------------------------------
+    // 5. Parse Message (Amount, Category, Title, Account)
+    // -------------------------------------------------------------
     const parsed = parseExpenseMessage(messageText, userAccounts);
 
     if (!parsed.amount || parsed.amount <= 0) {
       const helpMsg =
-        `⚠️ Could not find a valid amount in:\n"${messageText}"\n\n` +
-        `💡 *Try formats like:*\n` +
+        `Could not find a valid amount in:\n"${messageText}"\n\n` +
+        `*Try formats like:*\n` +
         `• *Dinner 500 HDFC*\n` +
         `• *Petrol 1200 Cash*\n` +
         `• *Groceries 450 SBI*\n` +
@@ -133,11 +188,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Match the Target Account
+    // -------------------------------------------------------------
+    // 6. Match Target Account
+    // -------------------------------------------------------------
     const targetAccount = matchAccount(parsed.accountQuery, userAccounts);
 
-    // 6. Insert Expense into Supabase
-    const expenseDate = new Date().toISOString().split("T")[0];
+    // -------------------------------------------------------------
+    // 7. Insert Expense into Supabase (Timezone Aware: Asia/Kolkata)
+    // -------------------------------------------------------------
+    const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
+    const notesContent = messageId
+      ? `Automated via WhatsApp [${messageId}] ("${messageText}")`
+      : `Automated via WhatsApp ("${messageText}")`;
+
     const { data: insertedExpense, error: expErr } = await supabaseAdmin
       .from("expenses")
       .insert([
@@ -148,7 +211,7 @@ export async function POST(req: NextRequest) {
           category: parsed.category,
           account_id: targetAccount?.id || null,
           expense_date: expenseDate,
-          notes: `Automated via WhatsApp ("${messageText}")`,
+          notes: notesContent,
         },
       ])
       .select()
@@ -159,10 +222,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to record expense", details: expErr.message }, { status: 500 });
     }
 
-    // 7. Deduct Balance from the Account
+    // -------------------------------------------------------------
+    // 8. Deduct Balance from Account (Preserves Overdraft & Decimal Precision)
+    // -------------------------------------------------------------
     let updatedBalance = 0;
     if (targetAccount) {
-      updatedBalance = Math.max(0, Number(targetAccount.balance) - parsed.amount);
+      updatedBalance = Number((Number(targetAccount.balance) - parsed.amount).toFixed(2));
       const { error: updErr } = await supabaseAdmin
         .from("accounts")
         .update({ balance: updatedBalance })
@@ -174,12 +239,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 8. Invalidate Redis Caches
+    // -------------------------------------------------------------
+    // 9. Invalidate Multi-Tier Redis Caches
+    // -------------------------------------------------------------
     try {
       await invalidateCachedData([
         getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
         getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+        getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
         "arthax:cache:expenses",
         "arthax:cache:accounts",
         "arthax:cache:ledger",
@@ -188,7 +257,9 @@ export async function POST(req: NextRequest) {
       console.warn("[WhatsApp Webhook] Redis cache invalidation warning:", cErr);
     }
 
-    // 9. Format Confirmation Message & Reply to WhatsApp
+    // -------------------------------------------------------------
+    // 10. Format Confirmation Message & Reply to WhatsApp
+    // -------------------------------------------------------------
     const currencyFormatter = new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
@@ -196,13 +267,13 @@ export async function POST(req: NextRequest) {
     });
 
     const replyMsg =
-      `✅ *Expense Logged!*\n\n` +
-      `💸 *Amount:* ${currencyFormatter.format(parsed.amount)}\n` +
-      `🏷️ *Category:* ${parsed.category}\n` +
-      `📝 *Note:* ${parsed.title}\n` +
-      `🏦 *Account:* ${targetAccount ? targetAccount.name : "None (Unassigned)"}\n` +
-      (targetAccount ? `💳 *New Balance:* ${currencyFormatter.format(updatedBalance)}\n\n` : "\n") +
-      `_Logged automatically in ArthaX_ ⚡`;
+      `*Expense Logged!*\n\n` +
+      `*Amount:* ${currencyFormatter.format(parsed.amount)}\n` +
+      `*Category:* ${parsed.category}\n` +
+      `*Note:* ${parsed.title}\n` +
+      `*Account:* ${targetAccount ? targetAccount.name : "None (Unassigned)"}\n` +
+      (targetAccount ? `*New Balance:* ${currencyFormatter.format(updatedBalance)}\n\n` : "\n") +
+      `_Logged automatically in ArthaX_`;
 
     if (senderPhone && senderPhone !== "test_user") {
       await sendWhatsAppTextMessage({

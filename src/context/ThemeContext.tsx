@@ -34,9 +34,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Apply theme to DOM
   const applyThemeToDOM = (t: ThemeMode) => {
     document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.style.colorScheme = t === "light" ? "light" : "dark";
     if (t === "light") {
       document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
     } else {
+      document.documentElement.classList.remove("light");
       document.documentElement.classList.add("dark");
     }
   };

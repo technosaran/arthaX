@@ -16,6 +16,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfileLocally: (updates: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
+  updateProfileLocally: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -186,6 +188,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfileLocally = useCallback((updates: Partial<UserProfile>) => {
+    setProfile((prev) => {
+      const merged = {
+        name: updates.name !== undefined ? updates.name : (prev?.name || "User"),
+        theme: updates.theme !== undefined ? updates.theme : (prev?.theme || "ultra"),
+      };
+      try {
+        window.localStorage.setItem("arthax_cached_profile", JSON.stringify(merged));
+      } catch {}
+      return merged;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -194,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signOut,
         refreshProfile,
+        updateProfileLocally,
       }}
     >
       {children}
