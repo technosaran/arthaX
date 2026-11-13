@@ -1,20 +1,45 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import DashboardSection from "@/components/DashboardSection";
-import AccountsSection from "@/components/AccountsSection";
-import IncomeSection from "@/components/IncomeSection";
-import ExpensesSection from "@/components/ExpensesSection";
-import BudgetsSection from "@/components/BudgetsSection";
-import FamilySection from "@/components/FamilySection";
-import LedgerSection from "@/components/LedgerSection";
-import SettingsSection from "@/components/SettingsSection";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
 import { Loader2 } from "lucide-react";
+
+const TabLoadingFallback = () => (
+  <div className="h-full w-full flex items-center justify-center p-8">
+    <div className="flex items-center gap-2.5 text-xs font-mono opacity-50">
+      <Loader2 size={16} className="animate-spin text-[#4bb473]" />
+      <span>Loading section...</span>
+    </div>
+  </div>
+);
+
+const AccountsSection = dynamic(() => import("@/components/AccountsSection"), {
+  loading: TabLoadingFallback,
+});
+const IncomeSection = dynamic(() => import("@/components/IncomeSection"), {
+  loading: TabLoadingFallback,
+});
+const ExpensesSection = dynamic(() => import("@/components/ExpensesSection"), {
+  loading: TabLoadingFallback,
+});
+const BudgetsSection = dynamic(() => import("@/components/BudgetsSection"), {
+  loading: TabLoadingFallback,
+});
+const FamilySection = dynamic(() => import("@/components/FamilySection"), {
+  loading: TabLoadingFallback,
+});
+const LedgerSection = dynamic(() => import("@/components/LedgerSection"), {
+  loading: TabLoadingFallback,
+});
+const SettingsSection = dynamic(() => import("@/components/SettingsSection"), {
+  loading: TabLoadingFallback,
+});
 
 export default function HomeClient() {
   const { user, loading } = useAuth();

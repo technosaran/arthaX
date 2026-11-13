@@ -50,6 +50,23 @@ export default function LoginClient() {
     }
   }, [user, authLoading, router]);
 
+  // Check URL query parameters for callback errors
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get("error");
+      if (err) {
+        if (err === "auth_callback_failed") {
+          setErrorMessage("Google authentication failed or was cancelled. Please try again.");
+        } else if (err === "missing_config") {
+          setErrorMessage("Authentication configuration error: Supabase URL or keys are missing.");
+        } else {
+          setErrorMessage(`Authentication error: ${err}`);
+        }
+      }
+    }
+  }, []);
+
   // Clean error translation for user-friendly UX
   const formatAuthError = (msg: string) => {
     const lower = msg.toLowerCase();

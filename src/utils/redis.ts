@@ -14,6 +14,10 @@ export const CACHE_KEYS = {
   PORTFOLIO: "portfolio",
   LEDGER: "ledger",
   BUDGETS: "budgets",
+  FAMILY_MEMBERS: "family_members",
+  FAMILY_GOALS: "family_goals",
+  FAMILY_RESPONSIBILITIES: "family_responsibilities",
+  FAMILY_VAULT: "family_vault",
 } as const;
 
 // Helper to scope cache keys per user for complete multi-tenant isolation

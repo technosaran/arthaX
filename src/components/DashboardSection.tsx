@@ -100,17 +100,31 @@ export default function DashboardSection() {
     try {
       const supabase = createClient();
 
-      // Parallel concurrent burst: telemetry queries run simultaneously
-      const [userDataRes, accountsRes, expensesRes, incomeRes] = await Promise.all([
-        supabase.from("user_settings").select("name").eq("id", user.id).maybeSingle(),
+      const now = new Date();
+      // Calculate earliest date for the 6-month trajectory window (1st of 5 months ago)
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+        .toISOString()
+        .split("T")[0];
+
+      // Parallel concurrent burst: accounts and filtered 6-month historical telemetry
+      const [accountsRes, expensesRes, incomeRes] = await Promise.all([
         supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
-        supabase.from("expenses").select("amount, expense_date").eq("user_id", user.id),
-        supabase.from("income").select("amount, received_date").eq("user_id", user.id),
+        supabase
+          .from("expenses")
+          .select("amount, expense_date")
+          .eq("user_id", user.id)
+          .gte("expense_date", sixMonthsAgo),
+        supabase
+          .from("income")
+          .select("amount, received_date")
+          .eq("user_id", user.id)
+          .gte("received_date", sixMonthsAgo),
       ]);
 
-      // 1. Resolve user display name
+      // 1. Resolve user display name from existing profile context
       const resolvedName =
-        userDataRes.data?.name ||
+        profile?.name ||
+        name ||
         user.user_metadata?.full_name ||
         user.email?.split("@")[0] ||
         "User";
@@ -133,7 +147,6 @@ export default function DashboardSection() {
 
       // 3. Compute 6-Month Trajectory History
       const months: MonthHistoryItem[] = [];
-      const now = new Date();
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

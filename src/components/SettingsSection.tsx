@@ -762,7 +762,7 @@ export default function SettingsSection() {
         showToast("No Data", "There are no transactions to export.", "info");
         return;
       }
-      exportLedgerPDF(income, expenses, accounts);
+      await exportLedgerPDF(income, expenses, accounts);
       showToast("PDF Generated", "Consolidated Ledger Statement downloaded.", "success");
     } catch (err) {
       console.error("Ledger PDF export failed:", err);
@@ -780,7 +780,7 @@ export default function SettingsSection() {
         showToast("No Data", "There are no expenses to export.", "info");
         return;
       }
-      exportExpensesPDF(expenses, accounts);
+      await exportExpensesPDF(expenses, accounts);
       showToast("PDF Generated", "Expenses Statement downloaded.", "success");
     } catch (err) {
       console.error("Expenses PDF export failed:", err);
@@ -798,7 +798,7 @@ export default function SettingsSection() {
         showToast("No Data", "There are no income records to export.", "info");
         return;
       }
-      exportIncomePDF(income, accounts);
+      await exportIncomePDF(income, accounts);
       showToast("PDF Generated", "Income Streams Statement downloaded.", "success");
     } catch (err) {
       console.error("Income PDF export failed:", err);
@@ -816,7 +816,7 @@ export default function SettingsSection() {
         showToast("No Data", "There are no budgets configured to export.", "info");
         return;
       }
-      exportBudgetsPDF(budgets, expenses);
+      await exportBudgetsPDF(budgets, expenses);
       showToast("PDF Generated", "Category Budgets Statement downloaded.", "success");
     } catch (err) {
       console.error("Budgets PDF export failed:", err);
@@ -834,7 +834,7 @@ export default function SettingsSection() {
         showToast("No Data", "There are no accounts to export.", "info");
         return;
       }
-      exportAccountsPDF(accounts);
+      await exportAccountsPDF(accounts);
       showToast("PDF Generated", "Bank & Liquid Accounts Statement downloaded.", "success");
     } catch (err) {
       console.error("Accounts PDF export failed:", err);
@@ -853,7 +853,7 @@ export default function SettingsSection() {
         showToast("No Data", "No records found in database to export.", "info");
         return;
       }
-      exportMasterPortfolioPDF(accounts, income, expenses, budgets);
+      await exportMasterPortfolioPDF(accounts, income, expenses, budgets);
       showToast("PDF Generated", "Comprehensive Portfolio Statement downloaded.", "success");
     } catch (err) {
       console.error("Master PDF export failed:", err);

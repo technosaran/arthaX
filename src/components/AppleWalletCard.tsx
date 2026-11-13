@@ -506,11 +506,11 @@ export default function AppleWalletCard({
       <div className="relative z-10 flex items-start justify-between">
         <div className="flex items-center gap-3">
           {isCash ? (
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 backdrop-blur-md flex items-center justify-center shadow-inner flex-shrink-0">
-              <Banknote size={21} className="text-emerald-400" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md ring-1 ring-emerald-500/30 flex-shrink-0 flex items-center justify-center bg-[#064E3B]">
+              <BankLogo name="cash" size={40} />
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-white shadow-md flex items-center justify-center flex-shrink-0 overflow-hidden ring-1 ring-white/20">
+            <div className="w-10 h-10 rounded-xl bg-white shadow-md flex items-center justify-center flex-shrink-0 overflow-hidden ring-1 ring-white/20 p-1">
               <BankLogo name={account.name} size={30} />
             </div>
           )}

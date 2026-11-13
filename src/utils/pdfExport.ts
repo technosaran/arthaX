@@ -1,5 +1,11 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+async function initPdf() {
+  const [{ jsPDF }, autoTableModule] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const autoTable = autoTableModule.default || autoTableModule;
+  return { jsPDF, autoTable };
+}
 
 function formatCurrency(val: number): string {
   return new Intl.NumberFormat("en-IN", {
@@ -23,7 +29,7 @@ function formatDateDisplay(dateString?: string): string {
   }
 }
 
-function addHeader(doc: jsPDF, title: string, subtitle: string, recordCount: number) {
+function addHeader(doc: any, title: string, subtitle: string, recordCount: number) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const dateStr = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -65,7 +71,7 @@ function addHeader(doc: jsPDF, title: string, subtitle: string, recordCount: num
   doc.text(`${subtitle} • Total Records: ${recordCount}`, 14, 39);
 }
 
-function addFooter(doc: jsPDF) {
+function addFooter(doc: any) {
   const pageCount = (doc as any).internal.getNumberOfPages();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -95,7 +101,8 @@ function addFooter(doc: jsPDF) {
 /* =========================================================================
    1. CONSOLIDATED LEDGER STATEMENT PDF
    ========================================================================= */
-export function exportLedgerPDF(income: any[], expenses: any[], accounts: any[]) {
+export async function exportLedgerPDF(income: any[], expenses: any[], accounts: any[]) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
@@ -252,7 +259,8 @@ export function exportLedgerPDF(income: any[], expenses: any[], accounts: any[])
 /* =========================================================================
    2. EXPENSES STATEMENT PDF
    ========================================================================= */
-export function exportExpensesPDF(expenses: any[], accounts: any[]) {
+export async function exportExpensesPDF(expenses: any[], accounts: any[]) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
@@ -347,7 +355,8 @@ export function exportExpensesPDF(expenses: any[], accounts: any[]) {
 /* =========================================================================
    3. INCOME STATEMENT PDF
    ========================================================================= */
-export function exportIncomePDF(income: any[], accounts: any[]) {
+export async function exportIncomePDF(income: any[], accounts: any[]) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
@@ -443,7 +452,8 @@ export function exportIncomePDF(income: any[], accounts: any[]) {
 /* =========================================================================
    4. CATEGORY BUDGETS STATEMENT PDF
    ========================================================================= */
-export function exportBudgetsPDF(budgets: any[], expenses: any[]) {
+export async function exportBudgetsPDF(budgets: any[], expenses: any[]) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
@@ -507,7 +517,8 @@ export function exportBudgetsPDF(budgets: any[], expenses: any[]) {
 /* =========================================================================
    5. BANK & LIQUID ACCOUNTS PDF
    ========================================================================= */
-export function exportAccountsPDF(accounts: any[]) {
+export async function exportAccountsPDF(accounts: any[]) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
@@ -566,12 +577,13 @@ export function exportAccountsPDF(accounts: any[]) {
 /* =========================================================================
    6. COMPREHENSIVE MASTER PORTFOLIO PDF
    ========================================================================= */
-export function exportMasterPortfolioPDF(
+export async function exportMasterPortfolioPDF(
   accounts: any[],
   income: any[],
   expenses: any[],
   budgets: any[]
 ) {
+  const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 

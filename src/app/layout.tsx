@@ -9,14 +9,12 @@ import { ToastProvider } from "@/context/ToastContext";
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -43,6 +41,15 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full" data-theme="ultra" suppressHydrationWarning>
       <head>
+        <link
+          rel="preconnect"
+          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ytqqzeemkzhifbtthanh.supabase.co"}
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="dns-prefetch"
+          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ytqqzeemkzhifbtthanh.supabase.co"}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
