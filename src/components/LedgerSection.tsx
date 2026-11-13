@@ -521,21 +521,10 @@ export default function LedgerSection() {
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <BookOpen size={24} className="text-amber-400 flex-shrink-0" />
-              <span>General Ledger</span>
-            </h1>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              {ledgerEntries.length} Entries • {isAllTime ? "All Time" : monthDisplayTitle}
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <BookOpen size={24} className="text-amber-400 flex-shrink-0" />
+            <span>General Ledger</span>
+          </h1>
           <p className="text-xs opacity-70 mt-1">
             Double-entry statements, account passbooks, and running balances.
           </p>
@@ -749,6 +738,22 @@ export default function LedgerSection() {
             Total Turnover: {formatINR(kpiMetrics.totalVolume)}
           </p>
         </div>
+      </div>
+
+      {/* TABLE HEADER / ENTRY COUNTER */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider opacity-60">
+          Journal Transactions
+        </h2>
+        <span
+          className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-medium"
+          style={{
+            borderColor: "var(--app-border-subtle)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          {ledgerEntries.length} Entries • {isAllTime ? "All Time" : monthDisplayTitle}
+        </span>
       </div>
 
       {/* LEDGER DATA VIEW: JOURNAL TABLE */}

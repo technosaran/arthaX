@@ -1,44 +1,93 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <defs>
-    <linearGradient id="favPlateGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#131922"/>
-      <stop offset="100%" stop-color="#080b0f"/>
+    <!-- Deep Space Obsidian Plate -->
+    <linearGradient id="axFavBg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F141D"/>
+      <stop offset="50%" stop-color="#080C12"/>
+      <stop offset="100%" stop-color="#020407"/>
     </linearGradient>
 
-    <linearGradient id="favGreenGrad" x1="20" y1="20" x2="90" y2="90" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#34D399"/>
-      <stop offset="50%" stop-color="#10B981"/>
-      <stop offset="100%" stop-color="#059669"/>
+    <!-- Radial Emerald-Cyan Ambient Glow -->
+    <radialGradient id="axFavAura" cx="50" cy="48" r="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F5A0" stop-opacity="0.35"/>
+      <stop offset="45%" stop-color="#00D26A" stop-opacity="0.14"/>
+      <stop offset="75%" stop-color="#0EA5E9" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Holographic Chamfered Rim Gradient -->
+    <linearGradient id="axFavRim" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.35)"/>
+      <stop offset="35%" stop-color="rgba(0,245,160,0.4)"/>
+      <stop offset="70%" stop-color="rgba(14,165,233,0.25)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.06)"/>
     </linearGradient>
 
-    <linearGradient id="favSilverGrad" x1="20" y1="80" x2="80" y2="20" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#F8FAFC"/>
-      <stop offset="60%" stop-color="#E2E8F0"/>
-      <stop offset="100%" stop-color="#94A3B8"/>
+    <!-- Sovereign Emerald Gradient (Left Ascent & Primary Apex) -->
+    <linearGradient id="axFavEmerald" x1="18" y1="18" x2="82" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F5A0"/>
+      <stop offset="30%" stop-color="#10B981"/>
+      <stop offset="70%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
     </linearGradient>
 
-    <linearGradient id="favCoreGlow" x1="50" y1="40" x2="50" y2="60" gradientUnits="userSpaceOnUse">
+    <!-- Electric Cyan-Azure Gradient (Back Crossing Ray) -->
+    <linearGradient id="axFavCyan" x1="18" y1="28" x2="82" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="40%" stop-color="#0EA5E9"/>
+      <stop offset="80%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+
+    <!-- Fore Multiplier Blade Gradient (Crossing Over with Platinum Sheen) -->
+    <linearGradient id="axFavFore" x1="82" y1="24" x2="22" y2="78" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#34D399"/>
+      <stop offset="25%" stop-color="#6EE7B7"/>
+      <stop offset="65%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#047857"/>
     </linearGradient>
+
+    <!-- Apex Summit Flare Gradient -->
+    <linearGradient id="axFavApex" x1="50" y1="12" x2="50" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#00F5A0"/>
+    </linearGradient>
+
+    <!-- Drop Shadow for Dimensional Layering -->
+    <filter id="axFavDrop" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+
+    <!-- Weave Shadow for Fore-Blade Overlap -->
+    <filter id="axFavWeave" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="-1" dy="4" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.8"/>
+    </filter>
   </defs>
 
-  <!-- Rounded Base Tile -->
-  <rect x="2" y="2" width="96" height="96" rx="22" fill="url(#favPlateGrad)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2"/>
+  <!-- Squircle Base Canvas with Luxury Chamfer -->
+  <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#axFavBg)" stroke="url(#axFavRim)" stroke-width="1.5"/>
+  <rect x="2" y="2" width="96" height="96" rx="24" fill="url(#axFavAura)"/>
 
-  <!-- Outer Geometric Precision Rhombus Accent -->
-  <path d="M50 14 L84 50 L50 86 L16 50 Z" stroke="url(#favGreenGrad)" stroke-width="2" stroke-opacity="0.45" fill="none"/>
+  <!-- Subtle Geometric Lattice Alignment Circle -->
+  <circle cx="50" cy="50" r="32" stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="3 3"/>
 
-  <!-- Left Apex Blade: 'A' Left Stroke (Silver/Platinum) -->
-  <path d="M50 20 L24 76 H38 L50 48 L62 76 H76 L50 20 Z" fill="url(#favSilverGrad)"/>
+  <!-- 1. BACK RAY OF THE 'X' (Upper-Left to Lower-Right) -->
+  <path d="M22 30 L78 74" stroke="url(#axFavCyan)" stroke-width="10" stroke-linecap="round"/>
 
-  <!-- Interlocking Dynamic 'X' Blade (Neon Emerald) -->
-  <path d="M78 26 L22 74 H36 L78 38 V26 Z" fill="url(#favGreenGrad)"/>
-  <path d="M74 74 L46 48 L56 38 L84 64 V74 H74 Z" fill="url(#favGreenGrad)"/>
+  <!-- 2. THE SOVEREIGN APEX CHEVRON ('A' ASCENT & SUMMIT) -->
+  <path d="M22 74 L47.5 18.5 C48.8 16 51.2 16 52.5 18.5 L78 74" stroke="url(#axFavEmerald)" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#axFavDrop)"/>
 
-  <!-- Precision Horizontal Crossbar & Core Prism -->
-  <path d="M36 58 H64 L59 50 H41 L36 58 Z" fill="url(#favCoreGlow)"/>
+  <!-- 3. FORE MULTIPLIER BLADE ('X' FOREGROUND WEAVE) -->
+  <path d="M78 30 L50 52 L22 74" stroke="url(#axFavFore)" stroke-width="10" stroke-linecap="round" filter="url(#axFavWeave)"/>
 
-  <!-- Apex Summit Light Point -->
-  <circle cx="50" cy="20" r="3" fill="#FFFFFF"/>
+  <!-- 4. HORIZONTAL TITANIUM CROSSBAR OF 'A' -->
+  <path d="M35 52 H65" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" opacity="0.95" filter="url(#axFavDrop)"/>
+
+  <!-- 5. CENTRAL RADIANT PRISM NEXUS -->
+  <circle cx="50" cy="52" r="3" fill="#00F5A0"/>
+  <circle cx="50" cy="52" r="1.5" fill="#FFFFFF"/>
+
+  <!-- 6. ZENITH APEX SUMMIT BEACON -->
+  <circle cx="50" cy="18" r="3.2" fill="url(#axFavApex)"/>
+  <circle cx="50" cy="18" r="1.5" fill="#FFFFFF"/>
 </svg>

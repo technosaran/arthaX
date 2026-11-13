@@ -82,15 +82,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const FREQUENCIES = ["Monthly", "One-time", "Weekly", "Yearly", "Quarterly"];
 
-const QUICK_PRESETS = [
-  { label: "Primary Salary", title: "Primary Tech Salary", amount: 120000, category: "Salary", frequency: "Monthly" },
-  { label: "Freelance Gig", title: "Web & UI Consulting Gig", amount: 45000, category: "Freelance", frequency: "One-time" },
-  { label: "Stock Dividends", title: "Quarterly Stock Dividend Yield", amount: 8500, category: "Dividends", frequency: "Quarterly" },
-  { label: "Bank Interest", title: "FD & Savings Accrued Interest", amount: 3200, category: "Interest", frequency: "Quarterly" },
-  { label: "House Rent", title: "Real Estate Rental Inflow", amount: 18000, category: "Rental", frequency: "Monthly" },
-  { label: "Annual Bonus", title: "Performance Bonus Inflow", amount: 50000, category: "Bonus", frequency: "One-time" },
-];
-
 export default function IncomeSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -359,13 +350,6 @@ export default function IncomeSection() {
     setCreditToAccount(false); // Default false on edit
     setNotes(item.notes || "");
     setIsModalOpen(true);
-  };
-
-  const applyPreset = (preset: (typeof QUICK_PRESETS)[0]) => {
-    setTitle(preset.title);
-    setAmount(preset.amount.toString());
-    setCategory(preset.category);
-    setFrequency(preset.frequency);
   };
 
   const handleSubmitIncome = async (e: React.FormEvent) => {
@@ -1077,9 +1061,9 @@ export default function IncomeSection() {
 
       {/* POPUP MODAL: Add / Edit Income */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md rounded-2xl border p-4 sm:p-5 shadow-2xl relative max-h-[95vh] overflow-y-auto"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",
@@ -1088,74 +1072,44 @@ export default function IncomeSection() {
           >
             {/* Modal Header */}
             <div
-              className="flex items-center justify-between pb-4 border-b"
+              className="flex items-center justify-between pb-3 mb-3 border-b"
               style={{ borderColor: "var(--app-border-subtle)" }}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className="w-9 h-9 rounded-lg border flex items-center justify-center"
+                  className="w-7 h-7 rounded-lg border flex items-center justify-center"
                   style={{
                     borderColor: "var(--app-border)",
                     backgroundColor: "var(--app-bg)",
                   }}
                 >
-                  <TrendingUp size={18} className="text-emerald-400" />
+                  <TrendingUp size={15} className="text-emerald-400" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight">
-                    {editingIncome ? "Edit Income Stream" : "Record Income Stream"}
-                  </h3>
-                  <p className="text-xs opacity-60">
-                    {editingIncome ? "Update existing earnings stream." : "Log a new earnings inflow channel."}
-                  </p>
-                </div>
+                <h3 className="text-base font-bold tracking-tight">
+                  {editingIncome ? "Edit Income" : "Add Income"}
+                </h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer"
+                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer opacity-70 hover:opacity-100"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Quick Presets (Only for New Income) */}
-            {!editingIncome && (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-wider opacity-60">
-                  <Sparkles size={11} className="text-emerald-400" />
-                  <span>Quick Presets</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => applyPreset(preset)}
-                      className="text-[11px] px-2.5 py-1 rounded-lg border transition-all hover:scale-105 cursor-pointer opacity-80 hover:opacity-100"
-                      style={{
-                        borderColor: "var(--app-border-subtle)",
-                        backgroundColor: "var(--app-bg)",
-                      }}
-                    >
-                      {preset.label} (₹{preset.amount.toLocaleString("en-IN")})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitIncome} className="space-y-4">
+            <form onSubmit={handleSubmitIncome} className="space-y-3">
+              {/* Row 1: Title */}
               <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
                   Income Source / Title
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Primary Tech Salary, Client Consulting, Dividend Yield"
+                  placeholder="e.g. Salary, Consulting, Bonus"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors"
+                  className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
                   style={{
                     backgroundColor: "var(--app-bg)",
                     borderColor: "var(--app-border)",
@@ -1164,15 +1118,60 @@ export default function IncomeSection() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Row 2: Amount & Date */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Amount (₹ INR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs sm:text-sm font-mono opacity-60">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      className="w-full rounded-lg pl-7 pr-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: "var(--app-bg)",
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-fg)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Received Date
+                  </label>
+                  <input
+                    type="date"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Category & Frequency */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
                     Category
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors cursor-pointer"
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
                     style={{
                       backgroundColor: "var(--app-bg)",
                       borderColor: "var(--app-border)",
@@ -1188,13 +1187,13 @@ export default function IncomeSection() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
                     Frequency
                   </label>
                   <select
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
-                    className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors cursor-pointer"
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
                     style={{
                       backgroundColor: "var(--app-bg)",
                       borderColor: "var(--app-border)",
@@ -1210,40 +1209,41 @@ export default function IncomeSection() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Row 4: Account & Notes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Amount (₹ INR)
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Account (Optional)
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-sm font-mono opacity-60">₹</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      required
-                      className="w-full rounded-lg pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
-                      style={{
-                        backgroundColor: "var(--app-bg)",
-                        borderColor: "var(--app-border)",
-                        color: "var(--app-fg)",
-                      }}
-                    />
-                  </div>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  >
+                    <option value="">None / Cash</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({formatINR(acc.balance)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Received Date
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Notes (Optional)
                   </label>
                   <input
-                    type="date"
-                    value={receivedDate}
-                    onChange={(e) => setReceivedDate(e.target.value)}
-                    className="w-full rounded-lg px-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
+                    type="text"
+                    placeholder="e.g. Payroll / NEFT"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
                     style={{
                       backgroundColor: "var(--app-bg)",
                       borderColor: "var(--app-border)",
@@ -1253,68 +1253,28 @@ export default function IncomeSection() {
                 </div>
               </div>
 
-              {/* Deposited Into Account */}
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Deposited Into Account (Optional)
+              {/* Checkbox: auto credit to account */}
+              {!editingIncome && accountId && (
+                <label className="flex items-center gap-2 pt-0.5 text-xs opacity-80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={creditToAccount}
+                    onChange={(e) => setCreditToAccount(e.target.checked)}
+                    className="rounded accent-emerald-500 cursor-pointer"
+                  />
+                  <span>Add to {accounts.find((a) => a.id === accountId)?.name} balance</span>
                 </label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors cursor-pointer"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                >
-                  <option value="">None / Unlinked (Direct Cash)</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} — {acc.type} ({formatINR(acc.balance)})
-                    </option>
-                  ))}
-                </select>
+              )}
 
-                {!editingIncome && accountId && (
-                  <label className="flex items-center gap-2 mt-2 text-xs opacity-80 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={creditToAccount}
-                      onChange={(e) => setCreditToAccount(e.target.checked)}
-                      className="rounded accent-emerald-500 cursor-pointer"
-                    />
-                    <span>Automatically add to {accounts.find((a) => a.id === accountId)?.name} balance</span>
-                  </label>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Notes or Memo (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Credited via NEFT / Payroll direct deposit"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                />
-              </div>
-
+              {/* Actions */}
               <div
-                className="flex items-center justify-end gap-3 pt-4 border-t"
+                className="flex items-center justify-end gap-2.5 pt-3 border-t"
                 style={{ borderColor: "var(--app-border-subtle)" }}
               >
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
                   style={{ borderColor: "var(--app-border)" }}
                 >
                   Cancel
@@ -1322,14 +1282,14 @@ export default function IncomeSection() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
                   style={{
                     backgroundColor: "var(--app-fg)",
                     color: "var(--app-bg)",
                   }}
                 >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  {editingIncome ? "Update Income" : "Save Income"}
+                  {submitting && <Loader2 size={12} className="animate-spin" />}
+                  {editingIncome ? "Update" : "Save Income"}
                 </button>
               </div>
             </form>

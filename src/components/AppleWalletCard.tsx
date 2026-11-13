@@ -398,6 +398,8 @@ export interface AppleWalletCardProps {
   stackIndex?: number;
   isActiveInStack?: boolean;
   onSelectInStack?: () => void;
+  isSelected?: boolean;
+  onSelect?: (acc: AccountData) => void;
 }
 
 export default function AppleWalletCard({
@@ -411,6 +413,8 @@ export default function AppleWalletCard({
   stackIndex = 0,
   isActiveInStack = false,
   onSelectInStack,
+  isSelected = false,
+  onSelect,
 }: AppleWalletCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const theme = getAppleWalletTheme(account.name, account.type);
@@ -436,13 +440,17 @@ export default function AppleWalletCard({
 
   return (
     <div
-      onClick={isStacked ? onSelectInStack : undefined}
+      onClick={isStacked ? onSelectInStack : onSelect ? () => onSelect(account) : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`group relative aspect-[1.586/1] w-full rounded-[22px] sm:rounded-[24px] p-5 sm:p-6 flex flex-col justify-between overflow-hidden transition-all duration-300 ease-out select-none ${
-        isStacked
+        isStacked || onSelect
           ? "cursor-pointer"
           : "hover:-translate-y-1.5 hover:shadow-2xl"
+      } ${
+        isSelected
+          ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-[#0b0f19] shadow-[0_0_30px_rgba(16,185,129,0.35)] -translate-y-1"
+          : ""
       } ${className}`}
       style={{
         background: theme.bgGradient,
@@ -533,6 +541,12 @@ export default function AppleWalletCard({
 
         {/* Top Right Controls: Contactless Wave + Frosted Actions */}
         <div className="flex items-center gap-2.5">
+          {isSelected && (
+            <span className="px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-mono font-bold tracking-wider bg-emerald-400 text-black shadow-md flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+              FILTERED
+            </span>
+          )}
           {!isCash && <ContactlessWave className="text-white/60 drop-shadow-sm" />}
 
           {isCash ? (

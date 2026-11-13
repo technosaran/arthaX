@@ -13,6 +13,8 @@ import {
   Mail,
   Send,
   RefreshCw,
+  RotateCcw,
+  FileText,
   Coins,
   Wallet,
   Calendar,
@@ -88,6 +90,48 @@ const RELATIONSHIPS = [
   "Relative",
   "Other Dependent",
 ];
+
+function getRelationshipBadge(rel: string) {
+  const r = (rel || "").toLowerCase();
+  if (r.includes("child") || r.includes("kid") || r.includes("son") || r.includes("daughter")) {
+    return {
+      label: rel,
+      bg: "rgba(16, 185, 129, 0.12)",
+      text: "#34d399",
+      border: "rgba(16, 185, 129, 0.3)",
+    };
+  }
+  if (r.includes("spouse") || r.includes("wife") || r.includes("husband") || r.includes("partner")) {
+    return {
+      label: rel,
+      bg: "rgba(244, 63, 94, 0.12)",
+      text: "#fb7185",
+      border: "rgba(244, 63, 94, 0.3)",
+    };
+  }
+  if (r.includes("parent") || r.includes("mother") || r.includes("father") || r.includes("dad") || r.includes("mom")) {
+    return {
+      label: rel,
+      bg: "rgba(245, 158, 11, 0.12)",
+      text: "#fbbf24",
+      border: "rgba(245, 158, 11, 0.3)",
+    };
+  }
+  if (r.includes("sibling") || r.includes("brother") || r.includes("sister")) {
+    return {
+      label: rel,
+      bg: "rgba(139, 92, 246, 0.12)",
+      text: "#a78bfa",
+      border: "rgba(139, 92, 246, 0.3)",
+    };
+  }
+  return {
+    label: rel || "Family",
+    bg: "rgba(56, 189, 248, 0.12)",
+    text: "#38bdf8",
+    border: "rgba(56, 189, 248, 0.3)",
+  };
+}
 
 const AVATAR_COLORS = [
   "#10B981", // Modern Vibrant Emerald
@@ -970,14 +1014,22 @@ export default function FamilySection() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {members.map((member) => {
-              const initials = member.name
-                .split(" ")
-                .map((p) => p[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
+              // Clean name of brackets or symbols for robust initials & title display
+              const cleanName = member.name.replace(/[\(\)\[\]\{\}\.,_-]/g, " ").trim();
+              const initials =
+                cleanName
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .map((p) => p[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase() || member.name.slice(0, 2).toUpperCase();
+
+              // Clean display name so "(Child)" is not repeated if badge already says Child
+              const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
+              const relBadge = getRelationshipBadge(member.relationship);
 
               const allowance = Number(member.monthly_allowance) || 0;
               const spending = getMemberSpendingForMonth(member);
@@ -987,114 +1039,149 @@ export default function FamilySection() {
               return (
                 <div
                   key={member.id}
-                  className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-[var(--app-accent)] shadow-sm"
+                  className="group relative rounded-2xl border p-5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
                   style={{
                     backgroundColor: "var(--app-card)",
                     borderColor: "var(--app-border)",
                   }}
                 >
-                  <div>
+                  {/* Ambient accent background glow on hover */}
+                  <div
+                    className="absolute -top-24 -right-24 w-48 h-48 rounded-full pointer-events-none opacity-10 blur-3xl transition-opacity group-hover:opacity-25"
+                    style={{ backgroundColor: member.avatar_color || "#10B981" }}
+                  />
+
+                  <div className="relative z-10">
                     {/* Member Header */}
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Premium Avatar with gradient and micro-ring */}
                         <div
-                          className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-sm flex-shrink-0"
-                          style={{ backgroundColor: member.avatar_color || "#10B981" }}
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md flex-shrink-0 ring-1 ring-white/20 transition-transform group-hover:scale-105"
+                          style={{
+                            background: `linear-gradient(135deg, ${member.avatar_color || "#10B981"}ee, ${member.avatar_color || "#10B981"}88)`,
+                            boxShadow: `0 4px 14px -2px ${(member.avatar_color || "#10B981")}40`,
+                          }}
                         >
                           {initials}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold tracking-tight">{member.name}</h3>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[11px] opacity-60 mt-0.5">
+                        <div className="min-w-0">
+                          <h3 className="text-base font-extrabold tracking-tight truncate capitalize" title={member.name}>
+                            {displayName}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-1">
                             <span
-                              className="px-2 py-0.2 rounded-full text-[10px] font-semibold border"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
                               style={{
-                                borderColor: "var(--app-border-subtle)",
-                                backgroundColor: "var(--app-bg)",
+                                backgroundColor: relBadge.bg,
+                                color: relBadge.text,
+                                borderColor: relBadge.border,
                               }}
                             >
-                              {member.relationship}
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
+                              {relBadge.label}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1">
+                      {/* Header Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={() => {
                             setEditingMember(member);
                             setMemberModalOpen(true);
                           }}
-                          className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-white/5 transition-all cursor-pointer"
                           style={{ borderColor: "var(--app-border-subtle)" }}
                           title="Edit Member"
                         >
-                          <Pencil size={12} />
+                          <Pencil size={13} />
                         </button>
                         <button
                           onClick={() => handleDeleteMember(member.id, member.name)}
-                          className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
+                          className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all cursor-pointer text-rose-400"
                           style={{ borderColor: "var(--app-border-subtle)" }}
                           title="Remove Member"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </div>
 
-                    {/* Money Tracking Box */}
+                    {/* Financial Support Health Box */}
                     <div
-                      className="mt-4 p-3.5 rounded-xl border space-y-2.5"
+                      className="mt-4 p-4 rounded-xl border space-y-3 shadow-xs"
                       style={{
                         backgroundColor: "var(--app-bg)",
                         borderColor: "var(--app-border-subtle)",
                       }}
                     >
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="opacity-70">Monthly Target Support</span>
-                        <span className="font-mono font-bold">{formatINR(allowance)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="opacity-70">
-                          {isAllTime ? "Money Sent (All Time)" : `Sent in ${monthDisplayTitle}`}
-                        </span>
-                        <span className="font-mono font-bold text-emerald-400">
-                          {formatINR(spending)}
-                        </span>
+                      {/* Metric Split */}
+                      <div className="flex items-end justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            {isAllTime ? "Total Sent" : `Sent in ${monthDisplayTitle}`}
+                          </span>
+                          <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400 mt-0.5">
+                            {formatINR(spending)}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 block">
+                            Target Support
+                          </span>
+                          <div className="text-sm sm:text-base font-extrabold font-mono tracking-tight opacity-90 mt-0.5">
+                            {allowance > 0 ? formatINR(allowance) : "None"}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Progress Bar */}
+                      {/* Progress Bar with Dynamic Multi-Stop Gradient Fill */}
                       <div
-                        className="w-full h-2 rounded-full overflow-hidden"
-                        style={{ backgroundColor: "var(--app-track-bg)" }}
+                        className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10"
                       >
                         <div
-                          className="h-full rounded-full transition-all duration-300"
+                          className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${Math.min(100, percentSpent)}%`,
-                            backgroundColor:
+                            background:
                               spending > allowance && allowance > 0
-                                ? "var(--app-loss)"
+                                ? "linear-gradient(90deg, #f43f5e, #e11d48)"
                                 : percentSpent >= 80
-                                ? "#10B981"
-                                : member.avatar_color || "var(--app-accent)",
+                                ? "linear-gradient(90deg, #10b981, #059669)"
+                                : `linear-gradient(90deg, ${member.avatar_color || "#3b82f6"}, #10b981)`,
                           }}
                         />
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] pt-0.5">
-                        <span className="opacity-60">{percentSpent}% of target</span>
+                      {/* Status Row */}
+                      <div className="flex items-center justify-between text-xs pt-0.5">
                         <span
-                          className="font-mono font-medium"
+                          className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
                           style={{
-                            color: remaining <= 0 && allowance > 0 ? "var(--app-accent)" : "#F59E0B",
+                            borderColor: "var(--app-border-subtle)",
+                            backgroundColor: "var(--app-card)",
+                            color: "var(--app-fg)",
+                          }}
+                        >
+                          {percentSpent}% fulfilled
+                        </span>
+                        <span
+                          className="font-mono text-[11px] font-bold"
+                          style={{
+                            color:
+                              allowance === 0
+                                ? "inherit"
+                                : remaining <= 0
+                                ? "#10b981"
+                                : "#f59e0b",
                           }}
                         >
                           {allowance === 0
-                            ? "No Target Set"
+                            ? "Flexible Support"
                             : remaining <= 0
                             ? "Target Met ✓"
                             : `${formatINR(remaining)} Left`}
@@ -1102,30 +1189,58 @@ export default function FamilySection() {
                       </div>
                     </div>
 
-                    {/* Contact / Notes */}
-                    {(member.phone || member.email || member.notes) && (
-                      <div className="mt-3 text-[11px] space-y-1 opacity-70">
+                    {/* Member Notes / Memo */}
+                    {member.notes && (
+                      <div
+                        className="mt-3 px-3 py-2 rounded-xl border flex items-start gap-2 text-xs"
+                        style={{
+                          borderColor: "var(--app-border-subtle)",
+                          backgroundColor: "var(--app-bg)",
+                        }}
+                      >
+                        <FileText size={13} className="text-sky-400 flex-shrink-0 mt-0.5 opacity-80" />
+                        <span className="opacity-80 line-clamp-2 leading-relaxed italic text-[11px]">
+                          "{member.notes}"
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Contact Badges */}
+                    {(member.phone || member.email) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-2.5">
                         {member.phone && (
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Phone size={11} className="opacity-60" />
+                          <div
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                            style={{
+                              borderColor: "var(--app-border-subtle)",
+                              backgroundColor: "var(--app-bg)",
+                            }}
+                          >
+                            <Phone size={10} className="text-emerald-400" />
                             <span>{member.phone}</span>
                           </div>
                         )}
                         {member.email && (
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Mail size={11} className="opacity-60" />
+                          <div
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                            style={{
+                              borderColor: "var(--app-border-subtle)",
+                              backgroundColor: "var(--app-bg)",
+                            }}
+                          >
+                            <Mail size={10} className="text-sky-400" />
                             <span>{member.email}</span>
                           </div>
-                        )}
-                        {member.notes && (
-                          <p className="italic text-[10px] opacity-60 line-clamp-2 mt-1">"{member.notes}"</p>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* Card Footer: Send Money / Log Transfer */}
-                  <div className="pt-4 mt-4 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--app-border-subtle)" }}>
+                  {/* Card Footer: Send Money & Counter Reset */}
+                  <div
+                    className="relative z-10 pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2"
+                    style={{ borderColor: "var(--app-border-subtle)" }}
+                  >
                     <button
                       onClick={() => {
                         setTransferMember(member);
@@ -1135,28 +1250,25 @@ export default function FamilySection() {
                         setTransferAccountId(accounts[0]?.id || "");
                         setTransferModalOpen(true);
                       }}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer shadow-sm hover:scale-[1.01]"
-                      style={{
-                        backgroundColor: "var(--app-fg)",
-                        color: "var(--app-bg)",
-                        borderColor: "var(--app-border)",
-                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md bg-white text-black hover:bg-neutral-100 hover:scale-[1.01] active:scale-[0.98]"
                     >
-                      <Send size={12} />
-                      Send Money
+                      <Send size={13} className="text-emerald-600" />
+                      <span>Send Money</span>
                     </button>
+
                     <button
                       onClick={() => {
                         setResetMember(member);
                         setResetModalOpen(true);
                       }}
-                      className="px-2.5 py-2 text-xs font-medium rounded-lg border transition-opacity opacity-60 hover:opacity-100 cursor-pointer"
+                      className="w-9 h-9 rounded-xl border flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
                       style={{
                         borderColor: "var(--app-border-subtle)",
+                        backgroundColor: "var(--app-bg)",
                       }}
                       title="Reset monthly spending counter to ₹0"
                     >
-                      <RefreshCw size={12} />
+                      <RotateCcw size={13} />
                     </button>
                   </div>
                 </div>

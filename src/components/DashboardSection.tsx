@@ -4,10 +4,6 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   PieChart as PieChartIcon,
   Loader2,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
   Layers,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -15,7 +11,6 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getFromLocalCache, saveToCache } from "@/utils/cacheClient";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
 
 interface AccountItem {
   id: string;
@@ -23,15 +18,6 @@ interface AccountItem {
   type: string;
   balance: number;
   classification?: "asset" | "liability";
-}
-
-interface MonthHistoryItem {
-  key: string;
-  label: string;
-  fullLabel: string;
-  income: number;
-  expenses: number;
-  net: number;
 }
 
 function getInitialTimeGreeting(): { text: string; period: "morning" | "afternoon" | "evening" } {
@@ -73,8 +59,6 @@ export default function DashboardSection() {
   const [name, setName] = useState<string>(profile?.name || initialCache?.name || "");
   const [netWorth, setNetWorth] = useState<number>(initialCache?.netWorth || 0);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
-  const [monthlyHistory, setMonthlyHistory] = useState<MonthHistoryItem[]>([]);
-  const [trajectoryMode, setTrajectoryMode] = useState<"net" | "income" | "expenses">("net");
   const [loading, setLoading] = useState<boolean>(!initialCache);
 
   const displayName = profile?.name || name;
@@ -115,26 +99,11 @@ export default function DashboardSection() {
     try {
       const supabase = createClient();
 
-      const now = new Date();
-      // Calculate earliest date for the 6-month trajectory window (1st of 5 months ago)
-      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
-        .toISOString()
-        .split("T")[0];
-
-      // Parallel concurrent burst: accounts and filtered 6-month historical telemetry
-      const [accountsRes, expensesRes, incomeRes] = await Promise.all([
-        supabase.from("accounts").select("id, name, type, balance, classification").eq("user_id", user.id),
-        supabase
-          .from("expenses")
-          .select("amount, expense_date")
-          .eq("user_id", user.id)
-          .gte("expense_date", sixMonthsAgo),
-        supabase
-          .from("income")
-          .select("amount, received_date")
-          .eq("user_id", user.id)
-          .gte("received_date", sixMonthsAgo),
-      ]);
+      // Parallel concurrent burst: accounts
+      const accountsRes = await supabase
+        .from("accounts")
+        .select("id, name, type, balance, classification")
+        .eq("user_id", user.id);
 
       // 1. Resolve user display name from existing profile context
       const resolvedName =
@@ -174,48 +143,7 @@ export default function DashboardSection() {
       setAccounts(mapped);
       setNetWorth(total);
 
-      // 3. Compute 6-Month Trajectory History
-      const months: MonthHistoryItem[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const label = d.toLocaleString("default", { month: "short" });
-        const fullLabel = d.toLocaleString("default", { month: "long", year: "numeric" });
-        months.push({ key, label, fullLabel, income: 0, expenses: 0, net: 0 });
-      }
-
-      if (incomeRes.data) {
-        incomeRes.data.forEach((inc: { received_date?: string; amount?: number }) => {
-          if (inc.received_date) {
-            const incKey = inc.received_date.substring(0, 7);
-            const target = months.find((m) => m.key === incKey);
-            if (target) {
-              target.income += Number(inc.amount) || 0;
-            }
-          }
-        });
-      }
-
-      if (expensesRes.data) {
-        expensesRes.data.forEach((exp: { expense_date?: string; amount?: number }) => {
-          if (exp.expense_date) {
-            const expKey = exp.expense_date.substring(0, 7);
-            const target = months.find((m) => m.key === expKey);
-            if (target) {
-              target.expenses += Number(exp.amount) || 0;
-            }
-          }
-        });
-      }
-
-      // Compute Net Cash Flow per month (unclamped to represent real financial truth)
-      months.forEach((m) => {
-        m.net = m.income - m.expenses;
-      });
-
-      setMonthlyHistory(months);
-
-      // 4. Update multi-tier cache
+      // 3. Update multi-tier cache
       saveToCache(redisPortfolioKey, {
         name: resolvedName,
         netWorth: total,
@@ -226,7 +154,7 @@ export default function DashboardSection() {
     } finally {
       setLoading(false);
     }
-  }, [user, redisPortfolioKey]);
+  }, [user, redisPortfolioKey, profile?.name, name]);
 
   useEffect(() => {
     // Determine greeting & time period symbol
@@ -256,16 +184,6 @@ export default function DashboardSection() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "accounts", filter: `user_id=eq.${user.id}` },
-        () => fetchDashboardData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${user.id}` },
-        () => fetchDashboardData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "income", filter: `user_id=eq.${user.id}` },
         () => fetchDashboardData()
       )
       .on(
@@ -315,25 +233,6 @@ export default function DashboardSection() {
       value: catBalance,
       color: chartPalette[index % chartPalette.length],
     }));
-
-  // Line chart data points based on selected trajectory mode
-  const linePoints: LinePoint[] = useMemo(() => {
-    return monthlyHistory.map((m) => ({
-      key: m.key,
-      label: m.label,
-      fullLabel: m.fullLabel,
-      value:
-        trajectoryMode === "net"
-          ? m.net
-          : trajectoryMode === "income"
-          ? m.income
-          : m.expenses,
-    }));
-  }, [monthlyHistory, trajectoryMode]);
-
-  const total6MonthInflow = monthlyHistory.reduce((acc, curr) => acc + curr.income, 0);
-  const total6MonthOutflow = monthlyHistory.reduce((acc, curr) => acc + curr.expenses, 0);
-  const total6MonthSavings = Math.max(0, total6MonthInflow - total6MonthOutflow);
 
   return (
     <main
@@ -438,145 +337,6 @@ export default function DashboardSection() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* CARD 2: Interactive 6-Month Cash Flow & Capital Trajectory Line Chart */}
-        <div
-          className="rounded-2xl p-4 sm:p-6 md:p-8 border transition-colors shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          {/* Top Bar with Trajectory Mode Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-            <div>
-              <h3 className="text-base font-bold tracking-tight">6-Month Capital Trajectory</h3>
-              <p className="text-xs opacity-60 font-mono mt-0.5">
-                Monthly Inflow, Outflow & Savings Trend
-              </p>
-            </div>
-
-            {/* Mode Switcher Segmented Control */}
-            <div
-              className="flex items-center p-1 rounded-xl border self-start sm:self-auto max-w-full overflow-x-auto"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              <button
-                onClick={() => setTrajectoryMode("net")}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  trajectoryMode === "net"
-                    ? "shadow-sm text-emerald-400 font-bold"
-                    : "opacity-60 hover:opacity-100"
-                }`}
-                style={{
-                  backgroundColor: trajectoryMode === "net" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "net" ? "#10b981" : "inherit",
-                }}
-              >
-                Net Savings
-              </button>
-              <button
-                onClick={() => setTrajectoryMode("income")}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  trajectoryMode === "income"
-                    ? "shadow-sm text-emerald-400 font-bold"
-                    : "opacity-60 hover:opacity-100"
-                }`}
-                style={{
-                  backgroundColor: trajectoryMode === "income" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "income" ? "#10b981" : "inherit",
-                }}
-              >
-                Inflow
-              </button>
-              <button
-                onClick={() => setTrajectoryMode("expenses")}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  trajectoryMode === "expenses"
-                    ? "shadow-sm text-rose-400 font-bold"
-                    : "opacity-60 hover:opacity-100"
-                }`}
-                style={{
-                  backgroundColor: trajectoryMode === "expenses" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "expenses" ? "#f43f5e" : "inherit",
-                }}
-              >
-                Outflow
-              </button>
-            </div>
-          </div>
-
-          {/* Quick 6-Month Summary Statistics Pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <div
-              className="p-3.5 rounded-xl border flex items-center justify-between"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Inflow</span>
-                <div className="text-base font-extrabold font-mono text-emerald-400 mt-0.5">
-                  {formatINR(total6MonthInflow)}
-                </div>
-              </div>
-              <ArrowUpRight size={18} className="text-emerald-400 opacity-80" />
-            </div>
-
-            <div
-              className="p-3.5 rounded-xl border flex items-center justify-between"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Outflow</span>
-                <div className="text-base font-extrabold font-mono text-rose-400 mt-0.5">
-                  {formatINR(total6MonthOutflow)}
-                </div>
-              </div>
-              <ArrowDownRight size={18} className="text-rose-400 opacity-80" />
-            </div>
-
-            <div
-              className="p-3.5 rounded-xl border flex items-center justify-between"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Net Retained</span>
-                <div className="text-base font-extrabold font-mono text-emerald-400 mt-0.5">
-                  {formatINR(total6MonthSavings)}
-                </div>
-              </div>
-              <TrendingUp size={18} className="text-emerald-400 opacity-80" />
-            </div>
-          </div>
-
-          {/* Interactive Line Chart Component */}
-          {loading ? (
-            <div className="flex items-center justify-center h-48 w-full">
-              <Loader2 size={24} className="animate-spin opacity-50" />
-            </div>
-          ) : (
-            <InteractiveLineChart
-              data={linePoints}
-              color={trajectoryMode === "expenses" ? "#f43f5e" : "#10b981"}
-              gradientId="dashboardTrajectoryGradient"
-              formatter={formatINR}
-              type={trajectoryMode === "expenses" ? "expense" : "income"}
-              emptyMessage="No financial transaction records recorded in the past 6 months."
-            />
-          )}
         </div>
       </div>
     </main>

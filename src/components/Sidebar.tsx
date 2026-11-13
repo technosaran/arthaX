@@ -160,47 +160,33 @@ export default function Sidebar({
               </button>
             );
           })}
-
-          {/* Clean Sign Out Button */}
-          <div className="pt-3 border-t mt-3" style={{ borderColor: "var(--app-border-subtle)" }}>
-            <button
-              onClick={() => {
-                if (typeof window !== "undefined" && window.innerWidth < 768) {
-                  setCollapsed(true);
-                }
-                signOut();
-              }}
-              title={collapsed ? "Sign Out" : undefined}
-              className={`group relative flex items-center w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 ${
-                collapsed ? "justify-center" : "gap-3"
-              }`}
-              style={{
-                borderColor: "transparent",
-              }}
-            >
-              <LogOut size={16} className="flex-shrink-0 transition-transform duration-150 group-hover:-translate-x-0.5" />
-              {!collapsed && <span className="truncate text-xs">Sign Out</span>}
-            </button>
-          </div>
         </nav>
 
-        {/* Footer / System Status */}
-        {!collapsed ? (
-          <div
-            className="p-3 border-t flex items-center justify-between text-[11px] font-mono opacity-60 flex-shrink-0"
-            style={{ borderColor: "var(--app-border)" }}
+        {/* Static Bottom Footer / Sign Out */}
+        <div
+          className={`p-2.5 border-t flex-shrink-0 space-y-1.5 ${collapsed ? "flex flex-col items-center" : ""}`}
+          style={{ borderColor: "var(--app-border)" }}
+        >
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined" && window.innerWidth < 768) {
+                setCollapsed(true);
+              }
+              signOut();
+            }}
+            title={collapsed ? "Sign Out" : undefined}
+            className={`group relative flex items-center w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 ${
+              collapsed ? "justify-center px-2" : "gap-3"
+            }`}
+            style={{
+              borderColor: "transparent",
+            }}
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
-              <span className="text-[10px] uppercase tracking-wider">Synced & Encrypted</span>
-            </div>
-            <span className="text-[10px]">v1.0</span>
-          </div>
-        ) : (
-          <div
-            className="p-2 flex justify-center border-t flex-shrink-0"
-            style={{ borderColor: "var(--app-border)" }}
-          >
+            <LogOut size={16} className="flex-shrink-0 transition-transform duration-150 group-hover:-translate-x-0.5" />
+            {!collapsed && <span className="truncate text-xs">Sign Out</span>}
+          </button>
+
+          {collapsed && (
             <button
               onClick={() => setCollapsed(false)}
               className="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105"
@@ -214,8 +200,8 @@ export default function Sidebar({
             >
               <ChevronRight size={14} />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </aside>
     </>
   );

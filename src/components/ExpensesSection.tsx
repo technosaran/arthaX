@@ -12,7 +12,6 @@ import {
   Wallet,
   ArrowDownRight,
   Pencil,
-  Sparkles,
   PieChart as PieChartIcon,
   ChevronLeft,
   ChevronRight,
@@ -132,17 +131,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Personal & Education": "#D97706",
   Other: "#71717A",
 };
-
-const QUICK_PRESETS = [
-  { label: "Groceries", title: "Monthly Groceries & Supermarket", amount: 3500, category: "Groceries & Essentials" },
-  { label: "Dining / Swiggy", title: "Dining & Food Delivery", amount: 650, category: "Food & Dining" },
-  { label: "Rent & Maintenance", title: "House Rent & Maintenance", amount: 18000, category: "Housing & Rent" },
-  { label: "Electricity / Wifi", title: "Electricity & Fiber Internet", amount: 1800, category: "Utilities & Bills" },
-  { label: "Fuel / Commute", title: "Fuel & Transit", amount: 2000, category: "Transport & Fuel" },
-  { label: "OTT Subscription", title: "OTT Streaming Subscriptions", amount: 649, category: "Entertainment & OTT" },
-  { label: "EMI / Loan", title: "Monthly Loan / Card EMI", amount: 12500, category: "Debt & Loan EMI" },
-  { label: "Health / Pharma", title: "Medicines & Doctor Consultation", amount: 1200, category: "Health & Medical" },
-];
 
 export default function ExpensesSection() {
   const { user } = useAuth();
@@ -408,12 +396,6 @@ export default function ExpensesSection() {
     setDeductFromAccount(false); // Default false on edit
     setNotes(item.notes || "");
     setIsModalOpen(true);
-  };
-
-  const applyPreset = (preset: (typeof QUICK_PRESETS)[0]) => {
-    setTitle(preset.title);
-    setAmount(preset.amount.toString());
-    setCategory(preset.category);
   };
 
   const handleSubmitExpense = async (e: React.FormEvent) => {
@@ -1127,9 +1109,9 @@ export default function ExpensesSection() {
 
       {/* POPUP MODAL: Add / Edit Expense */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md rounded-2xl border p-4 sm:p-5 shadow-2xl relative max-h-[95vh] overflow-y-auto"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",
@@ -1138,74 +1120,44 @@ export default function ExpensesSection() {
           >
             {/* Modal Header */}
             <div
-              className="flex items-center justify-between pb-4 border-b"
+              className="flex items-center justify-between pb-3 mb-3 border-b"
               style={{ borderColor: "var(--app-border-subtle)" }}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className="w-9 h-9 rounded-lg border flex items-center justify-center"
+                  className="w-7 h-7 rounded-lg border flex items-center justify-center"
                   style={{
                     borderColor: "var(--app-border)",
                     backgroundColor: "var(--app-bg)",
                   }}
                 >
-                  <TrendingDown size={18} className="text-rose-400" />
+                  <TrendingDown size={15} className="text-rose-400" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight">
-                    {editingExpense ? "Edit Expense Record" : "Record Outflow Expense"}
-                  </h3>
-                  <p className="text-xs opacity-60">
-                    {editingExpense ? "Update existing transaction details." : "Log an outflow or expenditure item."}
-                  </p>
-                </div>
+                <h3 className="text-base font-bold tracking-tight">
+                  {editingExpense ? "Edit Expense" : "Add Expense"}
+                </h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer"
+                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer opacity-70 hover:opacity-100"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Quick Presets (Only for New Expense) */}
-            {!editingExpense && (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-wider opacity-60">
-                  <Sparkles size={11} className="text-amber-400" />
-                  <span>Quick Presets</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => applyPreset(preset)}
-                      className="text-[11px] px-2.5 py-1 rounded-lg border transition-all hover:scale-105 cursor-pointer opacity-80 hover:opacity-100"
-                      style={{
-                        borderColor: "var(--app-border-subtle)",
-                        backgroundColor: "var(--app-bg)",
-                      }}
-                    >
-                      {preset.label} (₹{preset.amount})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitExpense} className="space-y-4">
+            <form onSubmit={handleSubmitExpense} className="space-y-3">
+              {/* Row 1: Title */}
               <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
                   Expense Title or Payee
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Swiggy Groceries, Flat Maintenance, Electricity Bill"
+                  placeholder="e.g. Groceries, Rent, Dinner"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors"
+                  className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
                   style={{
                     backgroundColor: "var(--app-bg)",
                     borderColor: "var(--app-border)",
@@ -1214,15 +1166,60 @@ export default function ExpensesSection() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Row 2: Amount & Date */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Amount (₹ INR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs sm:text-sm font-mono opacity-60">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      className="w-full rounded-lg pl-7 pr-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: "var(--app-bg)",
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-fg)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Expense Date
+                  </label>
+                  <input
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Category & Paid From Account */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
                     Category
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors cursor-pointer"
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
                     style={{
                       backgroundColor: "var(--app-bg)",
                       borderColor: "var(--app-border)",
@@ -1238,93 +1235,40 @@ export default function ExpensesSection() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Expense Date
+                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                    Paid From (Optional)
                   </label>
-                  <input
-                    type="date"
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    className="w-full rounded-lg px-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
                     style={{
                       backgroundColor: "var(--app-bg)",
                       borderColor: "var(--app-border)",
                       color: "var(--app-fg)",
                     }}
-                  />
+                  >
+                    <option value="">None / Cash</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({formatINR(acc.balance)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
+              {/* Row 4: Notes / Memo */}
               <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Amount (₹ INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-sm font-mono opacity-60">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                    className="w-full rounded-lg pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border)",
-                      color: "var(--app-fg)",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Paid From Account */}
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Paid From Account (Optional)
-                </label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors cursor-pointer"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                >
-                  <option value="">None / Unlinked (Direct Cash)</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} — {acc.type} ({formatINR(acc.balance)})
-                    </option>
-                  ))}
-                </select>
-
-                {!editingExpense && accountId && (
-                  <label className="flex items-center gap-2 mt-2 text-xs opacity-80 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={deductFromAccount}
-                      onChange={(e) => setDeductFromAccount(e.target.checked)}
-                      className="rounded accent-rose-500 cursor-pointer"
-                    />
-                    <span>Automatically deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
-                  </label>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Notes or Memo (Optional)
+                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
+                  Notes (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Paid via UPI QR / GPay transaction ID"
+                  placeholder="e.g. Paid via UPI / GPay"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors"
+                  className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
                   style={{
                     backgroundColor: "var(--app-bg)",
                     borderColor: "var(--app-border)",
@@ -1333,14 +1277,28 @@ export default function ExpensesSection() {
                 />
               </div>
 
+              {/* Checkbox: auto deduct from account */}
+              {!editingExpense && accountId && (
+                <label className="flex items-center gap-2 pt-0.5 text-xs opacity-80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deductFromAccount}
+                    onChange={(e) => setDeductFromAccount(e.target.checked)}
+                    className="rounded accent-rose-500 cursor-pointer"
+                  />
+                  <span>Deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
+                </label>
+              )}
+
+              {/* Actions */}
               <div
-                className="flex items-center justify-end gap-3 pt-4 border-t"
+                className="flex items-center justify-end gap-2.5 pt-3 border-t"
                 style={{ borderColor: "var(--app-border-subtle)" }}
               >
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
                   style={{ borderColor: "var(--app-border)" }}
                 >
                   Cancel
@@ -1348,14 +1306,14 @@ export default function ExpensesSection() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
                   style={{
                     backgroundColor: "var(--app-fg)",
                     color: "var(--app-bg)",
                   }}
                 >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  {editingExpense ? "Update Expense" : "Save Expense"}
+                  {submitting && <Loader2 size={12} className="animate-spin" />}
+                  {editingExpense ? "Update" : "Save Expense"}
                 </button>
               </div>
             </form>

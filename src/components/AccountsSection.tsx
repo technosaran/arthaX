@@ -1,7 +1,23 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, X, PieChart as PieChartIcon, Banknote, ArrowRightLeft, ShieldCheck } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Plus,
+  Loader2,
+  X,
+  PieChart as PieChartIcon,
+  Banknote,
+  ArrowRightLeft,
+  ShieldCheck,
+  History,
+  Search,
+  ArrowUpRight,
+  ArrowDownRight,
+  Trash2,
+  Wallet,
+  Calendar,
+  Filter,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +39,24 @@ interface Account {
   created_at?: string;
 }
 
+export interface AccountActivity {
+  id: string;
+  sourceType: "transfer" | "expense" | "income";
+  type: "TRANSFER" | "DEBIT" | "CREDIT";
+  title: string;
+  amount: number;
+  date: string;
+  notes?: string | null;
+  category?: string | null;
+  accountId?: string | null;
+  accountName?: string | null;
+  fromAccountId?: string | null;
+  fromAccountName?: string | null;
+  toAccountId?: string | null;
+  toAccountName?: string | null;
+  created_at?: string;
+}
+
 export default function AccountsSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -36,11 +70,24 @@ export default function AccountsSection() {
     return getFromLocalCache<Account[]>(redisKey) || [];
   }, [redisKey]);
 
+  const initialHistory = React.useMemo(() => {
+    return getFromLocalCache<AccountActivity[]>(redisTransfersKey) || [];
+  }, [redisTransfersKey]);
+
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [loading, setLoading] = useState<boolean>(initialAccounts.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // History and Activity State
+  const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(initialHistory.length === 0);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "transfers" | "expenses" | "income">("all");
+  const [historySearch, setHistorySearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(25);
+  const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
 
   // Cash in hand editing state
   const [isEditingCash, setIsEditingCash] = useState(false);
@@ -90,20 +137,45 @@ export default function AccountsSection() {
         setAccounts(cached);
         setLoading(false);
       }
+      const cachedHistory = getFromLocalCache<AccountActivity[]>(redisTransfersKey);
+      if (cachedHistory && Array.isArray(cachedHistory)) {
+        setActivityHistory(cachedHistory);
+        setHistoryLoading(false);
+      }
     }
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [accountsRes, transfersRes, expensesRes, incomeRes] = await Promise.all([
+        supabase
+          .from("accounts")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("transfers")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("transfer_date", { ascending: false })
+          .limit(200),
+        supabase
+          .from("expenses")
+          .select("id, title, amount, category, account_id, expense_date, notes, created_at")
+          .eq("user_id", user.id)
+          .order("expense_date", { ascending: false })
+          .limit(200),
+        supabase
+          .from("income")
+          .select("id, title, amount, category, account_id, received_date, notes, created_at")
+          .eq("user_id", user.id)
+          .order("received_date", { ascending: false })
+          .limit(200),
+      ]);
 
-      if (error) {
+      if (accountsRes.error) {
         setErrorMsg("Unable to retrieve accounts. Please try again.");
-      } else if (data) {
-        const mapped: Account[] = data.map((item) => ({
+      } else if (accountsRes.data) {
+        const mapped: Account[] = accountsRes.data.map((item) => ({
           id: item.id,
           name: item.name,
           type: item.type,
@@ -153,25 +225,88 @@ export default function AccountsSection() {
         });
 
         setAccounts(mapped);
-
-        // Update Multi-Tier Cache (Local 0ms + Redis background)
         saveToCache(redisKey, mapped, 3600);
+
+        // Build account ID -> Name lookup map
+        const accountMap = new Map(mapped.map((a) => [a.id, a.name]));
+
+        // Map Transfers
+        const transferActivities: AccountActivity[] = (transfersRes.data || []).map((t) => {
+          const fromName = accountMap.get(t.from_account_id) || "Source Account";
+          const toName = accountMap.get(t.to_account_id) || "Destination Account";
+          return {
+            id: t.id,
+            sourceType: "transfer",
+            type: "TRANSFER",
+            title: t.notes ? `Transfer: ${t.notes}` : `Transfer to ${toName}`,
+            amount: Number(t.amount) || 0,
+            date: t.transfer_date,
+            notes: t.notes,
+            category: "Internal Transfer",
+            fromAccountId: t.from_account_id,
+            fromAccountName: fromName,
+            toAccountId: t.to_account_id,
+            toAccountName: toName,
+            created_at: t.created_at,
+          };
+        });
+
+        // Map Expenses (Debits)
+        const expenseActivities: AccountActivity[] = (expensesRes.data || []).map((e) => ({
+          id: e.id,
+          sourceType: "expense",
+          type: "DEBIT",
+          title: e.title || "Expense",
+          amount: Number(e.amount) || 0,
+          date: e.expense_date,
+          notes: e.notes,
+          category: e.category,
+          accountId: e.account_id,
+          accountName: e.account_id ? (accountMap.get(e.account_id) || "Account") : "Unlinked Account",
+          created_at: e.created_at,
+        }));
+
+        // Map Income (Credits)
+        const incomeActivities: AccountActivity[] = (incomeRes.data || []).map((i) => ({
+          id: i.id,
+          sourceType: "income",
+          type: "CREDIT",
+          title: i.title || "Income",
+          amount: Number(i.amount) || 0,
+          date: i.received_date,
+          notes: i.notes,
+          category: i.category,
+          accountId: i.account_id,
+          accountName: i.account_id ? (accountMap.get(i.account_id) || "Account") : "Unlinked Account",
+          created_at: i.created_at,
+        }));
+
+        const combinedActivities: AccountActivity[] = [
+          ...transferActivities,
+          ...expenseActivities,
+          ...incomeActivities,
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.created_at && a.created_at ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime() : 0));
+
+        setActivityHistory(combinedActivities);
+        setHistoryLoading(false);
+        saveToCache(redisTransfersKey, combinedActivities, 3600);
       }
     } catch {
       setErrorMsg("Unable to load accounts. Please check your connection.");
     } finally {
       setLoading(false);
+      setHistoryLoading(false);
     }
-  }, [user, redisKey]);
+  }, [user, redisKey, redisTransfersKey]);
 
   useEffect(() => {
     if (!user) return;
     fetchAccounts();
 
-    // Cross-device Realtime synchronization scoped to current user
+    // Cross-device Realtime synchronization scoped to current user across accounts, transfers, expenses, income
     const supabase = createClient();
     const channel = supabase
-      .channel(`realtime-accounts-${user.id}`)
+      .channel(`realtime-accounts-and-history-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -180,9 +315,37 @@ export default function AccountsSection() {
           table: "accounts",
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          fetchAccounts(true);
-        }
+        () => fetchAccounts(true)
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "transfers",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => fetchAccounts(true)
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => fetchAccounts(true)
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "income",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => fetchAccounts(true)
       )
       .subscribe();
 
@@ -190,6 +353,122 @@ export default function AccountsSection() {
       supabase.removeChannel(channel);
     };
   }, [user, fetchAccounts]);
+
+  const handleDeleteTransfer = async (transferId: string) => {
+    if (!user) return;
+    if (!confirm("Are you sure you want to reverse this transfer? Balances will be restored to both accounts.")) {
+      return;
+    }
+
+    setDeletingTransferId(transferId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("fn_delete_transfer_atomic", {
+        p_transfer_id: transferId,
+        p_user_id: user.id,
+      });
+
+      if (error) {
+        showToast("Reversal Failed", error.message || "Failed to reverse transfer.", "error");
+      } else {
+        showToast("Transfer Reversed", "Transfer rolled back and account balances restored successfully.", "success");
+        await invalidateCacheKeys([
+          redisKey,
+          redisLedgerKey,
+          redisTransfersKey,
+        ]);
+        await fetchAccounts(true);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error reversing transfer";
+      showToast("Reversal Error", msg, "error");
+    } finally {
+      setDeletingTransferId(null);
+    }
+  };
+
+  const formatHistoryDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const filteredHistory = useMemo(() => {
+    return activityHistory.filter((item) => {
+      // 1. Account filter
+      if (selectedAccountId) {
+        if (item.sourceType === "transfer") {
+          if (item.fromAccountId !== selectedAccountId && item.toAccountId !== selectedAccountId) {
+            return false;
+          }
+        } else {
+          if (item.accountId !== selectedAccountId) {
+            return false;
+          }
+        }
+      }
+
+      // 2. Type filter
+      if (historyTypeFilter === "transfers" && item.sourceType !== "transfer") return false;
+      if (historyTypeFilter === "expenses" && item.sourceType !== "expense") return false;
+      if (historyTypeFilter === "income" && item.sourceType !== "income") return false;
+
+      // 3. Search query
+      if (historySearch.trim()) {
+        const query = historySearch.toLowerCase();
+        const matchTitle = item.title.toLowerCase().includes(query);
+        const matchNotes = item.notes?.toLowerCase().includes(query);
+        const matchCategory = item.category?.toLowerCase().includes(query);
+        const matchAccount = item.accountName?.toLowerCase().includes(query);
+        const matchFrom = item.fromAccountName?.toLowerCase().includes(query);
+        const matchTo = item.toAccountName?.toLowerCase().includes(query);
+        if (!matchTitle && !matchNotes && !matchCategory && !matchAccount && !matchFrom && !matchTo) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [activityHistory, selectedAccountId, historyTypeFilter, historySearch]);
+
+  const historyStats = useMemo(() => {
+    let totalInflow = 0;
+    let totalOutflow = 0;
+    let transferCount = 0;
+
+    for (const item of filteredHistory) {
+      if (item.sourceType === "income") {
+        totalInflow += item.amount;
+      } else if (item.sourceType === "expense") {
+        totalOutflow += item.amount;
+      } else if (item.sourceType === "transfer") {
+        transferCount++;
+        if (selectedAccountId) {
+          if (item.toAccountId === selectedAccountId) {
+            totalInflow += item.amount;
+          } else if (item.fromAccountId === selectedAccountId) {
+            totalOutflow += item.amount;
+          }
+        }
+      }
+    }
+
+    return {
+      totalInflow,
+      totalOutflow,
+      netFlow: totalInflow - totalOutflow,
+      transferCount,
+      totalCount: filteredHistory.length,
+    };
+  }, [filteredHistory, selectedAccountId]);
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,15 +839,28 @@ export default function AccountsSection() {
 
       {/* Holdings & Connected Debit Cards Section */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider">
               Holdings & Accounts ({accounts.length})
             </h2>
             <p className="text-xs opacity-60 mt-0.5">
-              Your accounts and liquid assets with running balances.
+              Click any card to filter history to that account.
             </p>
           </div>
+          {selectedAccountId && (
+            <button
+              onClick={() => setSelectedAccountId(null)}
+              className="self-start sm:self-auto text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-all cursor-pointer font-medium"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-card)",
+              }}
+            >
+              <X size={12} />
+              <span>Clear Filter ({accounts.find((a) => a.id === selectedAccountId)?.name})</span>
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -592,8 +884,355 @@ export default function AccountsSection() {
                 onEditCash={handleOpenEditCash}
                 onDelete={handleDeleteAccount}
                 formatCurrency={formatINR}
+                isSelected={selectedAccountId === acc.id}
+                onSelect={(card) => {
+                  setSelectedAccountId((prev) => (prev === card.id ? null : card.id));
+                }}
               />
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ACCOUNT HISTORY & RECENT ACTIVITY SECTION */}
+      <div className="mt-10 sm:mt-12 space-y-4">
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b" style={{ borderColor: "var(--app-border)" }}>
+          <div>
+            <div className="flex items-center gap-2">
+              <History size={17} className="text-sky-400" />
+              <h2 className="text-base font-bold tracking-tight">
+                Account History & Activity
+              </h2>
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border"
+                style={{
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-card)",
+                  color: "var(--app-fg)",
+                }}
+              >
+                {filteredHistory.length}
+              </span>
+            </div>
+            <p className="text-xs opacity-60 mt-0.5">
+              {selectedAccountId
+                ? `Filtered activity for ${accounts.find((a) => a.id === selectedAccountId)?.name || "selected account"}.`
+                : "Chronological log of internal transfers, card debits, and credited income across your accounts."}
+            </p>
+          </div>
+
+          {/* Top Controls: Account Selector + Search */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <select
+              value={selectedAccountId || ""}
+              onChange={(e) => setSelectedAccountId(e.target.value || null)}
+              className="px-3 py-1.5 text-xs rounded-xl border focus:outline-none transition-colors cursor-pointer font-medium"
+              style={{
+                backgroundColor: "var(--app-card)",
+                borderColor: "var(--app-border)",
+                color: "var(--app-fg)",
+              }}
+            >
+              <option value="">All Accounts ({accounts.length})</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({formatINR(a.balance)})
+                </option>
+              ))}
+            </select>
+
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-2.5 opacity-50" />
+              <input
+                type="text"
+                placeholder="Search history..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs rounded-xl border focus:outline-none transition-colors w-36 sm:w-44 font-medium"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                  color: "var(--app-fg)",
+                }}
+              />
+              {historySearch && (
+                <button
+                  onClick={() => setHistorySearch("")}
+                  className="absolute right-2 top-2 opacity-50 hover:opacity-100 cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Tabs & Quick Inflow/Outflow Statistics Bar */}
+        <div
+          className="p-3 sm:p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+          style={{
+            borderColor: "var(--app-border-subtle)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          {/* Activity Category Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {[
+              { id: "all", label: "All Activity" },
+              { id: "transfers", label: "Transfers" },
+              { id: "expenses", label: "Debits" },
+              { id: "income", label: "Credits" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setHistoryTypeFilter(tab.id as any)}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                  historyTypeFilter === tab.id
+                    ? "border-sky-500/50 bg-sky-500/10 text-sky-400 font-bold shadow-xs"
+                    : "border-transparent opacity-60 hover:opacity-100 hover:bg-[var(--app-bg)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="flex items-center gap-3 font-mono text-xs flex-wrap self-end sm:self-auto">
+            <div className="flex items-center gap-1.5 opacity-80">
+              <span className="text-[10px] uppercase opacity-60 font-medium">Inflow:</span>
+              <span className="text-emerald-400 font-bold">{formatINR(historyStats.totalInflow)}</span>
+            </div>
+            <span className="opacity-20">•</span>
+            <div className="flex items-center gap-1.5 opacity-80">
+              <span className="text-[10px] uppercase opacity-60 font-medium">Outflow:</span>
+              <span className="text-rose-400 font-bold">{formatINR(historyStats.totalOutflow)}</span>
+            </div>
+            <span className="opacity-20">•</span>
+            <div className="flex items-center gap-1.5 opacity-80">
+              <span className="text-[10px] uppercase opacity-60 font-medium">Net:</span>
+              <span
+                className={`font-bold ${
+                  historyStats.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"
+                }`}
+              >
+                {formatINR(historyStats.netFlow)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* History Records Container */}
+        {historyLoading ? (
+          <div
+            className="flex items-center justify-center p-16 rounded-xl border"
+            style={{
+              borderColor: "var(--app-border-subtle)",
+              backgroundColor: "var(--app-card)",
+            }}
+          >
+            <Loader2 size={24} className="animate-spin opacity-50" />
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div
+            className="p-12 sm:p-16 rounded-2xl border text-center space-y-3"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-card)",
+            }}
+          >
+            <History size={36} className="mx-auto opacity-30 text-sky-400" />
+            <h3 className="text-base font-bold">No Account Activity Found</h3>
+            <p className="text-xs opacity-60 max-w-sm mx-auto">
+              {selectedAccountId || historyTypeFilter !== "all" || historySearch
+                ? "No transactions or transfers match your current filter settings."
+                : "Transactions, transfers, and card expenditures will appear here automatically."}
+            </p>
+            {(selectedAccountId || historyTypeFilter !== "all" || historySearch) && (
+              <button
+                onClick={() => {
+                  setSelectedAccountId(null);
+                  setHistoryTypeFilter("all");
+                  setHistorySearch("");
+                }}
+                className="mt-2 text-xs px-3.5 py-1.5 rounded-lg border font-semibold opacity-80 hover:opacity-100 cursor-pointer"
+                style={{
+                  borderColor: "var(--app-border)",
+                  backgroundColor: "var(--app-bg)",
+                }}
+              >
+                Clear All Filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border)",
+            }}
+          >
+            {/* Desktop Table Header */}
+            <div
+              className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-mono uppercase tracking-wider opacity-60 border-b select-none font-semibold"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <div className="col-span-2">Date</div>
+              <div className="col-span-2">Type</div>
+              <div className="col-span-3">Description</div>
+              <div className="col-span-3">Account Flow</div>
+              <div className="col-span-2 text-right">Amount & Action</div>
+            </div>
+
+            {/* Rows */}
+            <div className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
+              {filteredHistory.slice(0, visibleCount).map((item) => {
+                const isTransfer = item.sourceType === "transfer";
+                const isIncome = item.sourceType === "income";
+                const isExpense = item.sourceType === "expense";
+
+                // Determine display color and direction for transfers relative to filtered account
+                let isTransferOutgoing = false;
+                let isTransferIncoming = false;
+                if (isTransfer && selectedAccountId) {
+                  if (item.fromAccountId === selectedAccountId) isTransferOutgoing = true;
+                  if (item.toAccountId === selectedAccountId) isTransferIncoming = true;
+                }
+
+                return (
+                  <div
+                    key={`${item.sourceType}-${item.id}`}
+                    className="p-4 sm:px-5 sm:py-3.5 flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-start md:items-center hover:bg-[var(--app-card-hover)] transition-colors"
+                  >
+                    {/* Date */}
+                    <div className="col-span-2 flex items-center gap-2">
+                      <span className="text-xs font-mono opacity-80">
+                        {formatHistoryDate(item.date)}
+                      </span>
+                    </div>
+
+                    {/* Type Badge */}
+                    <div className="col-span-2">
+                      {isTransfer ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-sky-500/10 border border-sky-500/30 text-sky-400">
+                          <ArrowRightLeft size={10} />
+                          Transfer
+                        </span>
+                      ) : isIncome ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                          <ArrowUpRight size={10} />
+                          Credit
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                          <ArrowDownRight size={10} />
+                          Debit
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Description & Category */}
+                    <div className="col-span-3 min-w-0">
+                      <div className="text-xs font-semibold truncate capitalize" title={item.title}>
+                        {item.title}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-mono opacity-50 truncate">
+                          {item.category || (isTransfer ? "Internal Transfer" : "General")}
+                        </span>
+                        {item.notes && (
+                          <span className="text-[10px] opacity-40 truncate" title={item.notes}>
+                            • {item.notes}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Account Flow */}
+                    <div className="col-span-3 min-w-0">
+                      {isTransfer ? (
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          <span className="truncate opacity-80 font-mono text-[11px]" title={item.fromAccountName || ""}>
+                            {item.fromAccountName}
+                          </span>
+                          <span className="text-sky-400 flex-shrink-0">➔</span>
+                          <span className="truncate opacity-80 font-mono text-[11px]" title={item.toAccountName || ""}>
+                            {item.toAccountName}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-mono opacity-80 truncate text-[11px]">
+                          {item.accountName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Amount & Actions */}
+                    <div className="col-span-2 w-full md:w-auto flex items-center justify-between md:justify-end gap-3 self-end md:self-auto">
+                      <div
+                        className={`font-mono text-xs sm:text-sm font-bold tracking-tight ${
+                          isIncome || isTransferIncoming
+                            ? "text-emerald-400"
+                            : isExpense || isTransferOutgoing
+                            ? "text-rose-400"
+                            : "text-sky-400"
+                        }`}
+                      >
+                        {isIncome || isTransferIncoming
+                          ? `+${formatINR(item.amount)}`
+                          : isExpense || isTransferOutgoing
+                          ? `-${formatINR(item.amount)}`
+                          : formatINR(item.amount)}
+                      </div>
+
+                      {/* Transfer Delete / Rollback Action */}
+                      {isTransfer && (
+                        <button
+                          onClick={() => handleDeleteTransfer(item.id)}
+                          disabled={deletingTransferId === item.id}
+                          title="Reverse transfer and restore balances"
+                          className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 hover:text-rose-400 hover:border-rose-500/30 transition-all cursor-pointer disabled:opacity-30"
+                          style={{
+                            borderColor: "var(--app-border-subtle)",
+                            backgroundColor: "var(--app-bg)",
+                          }}
+                        >
+                          {deletingTransferId === item.id ? (
+                            <Loader2 size={12} className="animate-spin text-rose-400" />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Load More Button if items exceed visibleCount */}
+            {filteredHistory.length > visibleCount && (
+              <div
+                className="p-3 text-center border-t"
+                style={{ borderColor: "var(--app-border-subtle)" }}
+              >
+                <button
+                  onClick={() => setVisibleCount((prev) => prev + 25)}
+                  className="text-xs font-semibold px-4 py-1.5 rounded-lg border opacity-80 hover:opacity-100 transition-all cursor-pointer font-mono"
+                  style={{
+                    borderColor: "var(--app-border)",
+                    backgroundColor: "var(--app-bg)",
+                  }}
+                >
+                  Load More ({filteredHistory.length - visibleCount} remaining)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
