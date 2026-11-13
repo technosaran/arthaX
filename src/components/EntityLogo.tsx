@@ -334,11 +334,11 @@ export default function EntityLogo({
   const [failedSources, setFailedSources] = useState<Record<string, number>>({});
   const domain = getEntityDomain(name);
 
-  // Multi-tier candidate URLs in order of clarity & speed
+  // Multi-tier candidate URLs in order of clarity & speed (Logo.dev API #1 priority)
   const candidateUrls: string[] = domain
     ? [
-        getEntityVectorLogo(domain),
         getEntityLogoDev(domain, size),
+        getEntityVectorLogo(domain),
         getEntityGoogleFavicon(domain, 128),
       ]
     : [];

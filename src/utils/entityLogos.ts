@@ -340,7 +340,7 @@ export function getEntityLogoDev(domain: string, size: number = 100): string {
     "pk_bIuq9jRhRO-QRCdxlZWt4Q";
   const params = new URLSearchParams();
   if (token) params.set("token", token);
-  params.set("size", String(Math.max(size * 2, 120)));
+  params.set("size", String(Math.max(size * 3, 200)));
   params.set("format", "png");
   params.set("retina", "true");
   return `https://img.logo.dev/${encodeURIComponent(domain)}?${params.toString()}`;

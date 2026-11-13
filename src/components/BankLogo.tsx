@@ -445,36 +445,22 @@ export default function BankLogo({
   const knownMark = getKnownBankMark(name);
   const domain = getBankDomain(name);
 
-  // If matched to an authentic vector mark, render it immediately
-  if (knownMark) {
+  // Cash / Vault has no domain; render authentic Apple Cash mark immediately
+  if (knownMark === "cash") {
     return (
       <div className={`flex items-center gap-2 flex-shrink-0 ${className}`}>
-        {knownMark === "cash" && <CashMark size={size} />}
-        {knownMark === "sbi" && <SbiMark size={size} />}
-        {knownMark === "hdfc" && <HdfcMark size={size} />}
-        {knownMark === "icici" && <IciciMark size={size} />}
-        {knownMark === "axis" && <AxisMark size={size} />}
-        {knownMark === "kotak" && <KotakMark size={size} />}
-        {knownMark === "zerodha" && <ZerodhaMark size={size} />}
-        {knownMark === "groww" && <GrowwMark size={size} />}
-        {knownMark === "paytm" && <PaytmMark size={size} />}
-        {knownMark === "bob" && <BobMark size={size} />}
-        {knownMark === "pnb" && <PnbMark size={size} />}
-
-        {showDomain && domain && (
-          <span className="text-[11px] font-mono opacity-60 truncate">
-            {domain}
-          </span>
-        )}
+        <CashMark size={size} />
       </div>
     );
   }
 
-  // Multi-tier candidate URLs for other international or domestic institutions:
+  // Tier 1: User's configured Logo.dev API (#1 Priority)
+  // Tier 2: Vector SVG (Unavatar)
+  // Tier 3: Google Favicon service
   const candidateUrls: string[] = domain
     ? [
-        getVectorLogoUrl(domain),
         getLogosDevUrl(domain, size),
+        getVectorLogoUrl(domain),
         getGoogleFaviconUrl(domain, 128),
       ]
     : [];
@@ -491,7 +477,7 @@ export default function BankLogo({
 
   const isSmall = size < 20;
   const isMedium = size >= 20 && size < 32;
-  const padding = isSmall ? 1 : isMedium ? 2 : 3.5;
+  const padding = isSmall ? 0 : isMedium ? 1 : 2;
   const borderRadius = isSmall ? 4 : isMedium ? 6 : 8;
   const monogramFontSize = Math.max(7, Math.floor(size * 0.38));
 
@@ -512,10 +498,7 @@ export default function BankLogo({
           width: size,
           height: size,
           borderRadius: `${borderRadius}px`,
-          backgroundColor: activeUrl ? "#ffffff" : "var(--app-bg)",
-          borderColor: "var(--app-border-subtle)",
-          borderWidth: "1px",
-          borderStyle: "solid",
+          backgroundColor: activeUrl ? "transparent" : "var(--app-bg)",
         }}
       >
         {activeUrl ? (
@@ -534,6 +517,19 @@ export default function BankLogo({
               imageRendering: "-webkit-optimize-contrast",
             }}
           />
+        ) : knownMark ? (
+          <>
+            {knownMark === "sbi" && <SbiMark size={size} />}
+            {knownMark === "hdfc" && <HdfcMark size={size} />}
+            {knownMark === "icici" && <IciciMark size={size} />}
+            {knownMark === "axis" && <AxisMark size={size} />}
+            {knownMark === "kotak" && <KotakMark size={size} />}
+            {knownMark === "zerodha" && <ZerodhaMark size={size} />}
+            {knownMark === "groww" && <GrowwMark size={size} />}
+            {knownMark === "paytm" && <PaytmMark size={size} />}
+            {knownMark === "bob" && <BobMark size={size} />}
+            {knownMark === "pnb" && <PnbMark size={size} />}
+          </>
         ) : (
           <span
             className="font-bold font-mono tracking-tight select-none leading-none"

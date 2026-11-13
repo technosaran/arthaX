@@ -15,6 +15,15 @@ export const updateSession = async (request: NextRequest) => {
     return NextResponse.next();
   }
 
+  // Handle OAuth code landing on any route (e.g. root /?code=...)
+  if (url.searchParams.has("code")) {
+    const code = url.searchParams.get("code")!;
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("next", pathname === "/login" ? "/" : pathname);
+    return NextResponse.redirect(callbackUrl);
+  }
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
