@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react";
 const TabLoadingFallback = () => (
   <div className="h-full w-full flex items-center justify-center p-8">
     <div className="flex items-center gap-2.5 text-xs font-mono opacity-50">
-      <Loader2 size={16} className="animate-spin text-[#4bb473]" />
+      <Loader2 size={16} className="animate-spin text-emerald-400" />
       <span>Loading section...</span>
     </div>
   </div>
@@ -81,7 +81,7 @@ export default function HomeClient() {
       >
         <Logo size={52} showText={false} />
         <div className="flex items-center gap-2.5 text-xs font-mono opacity-60">
-          <Loader2 size={16} className="animate-spin text-[#4bb473]" />
+          <Loader2 size={16} className="animate-spin text-emerald-400" />
           <span>Loading your workspace...</span>
         </div>
       </div>
@@ -106,7 +106,7 @@ export default function HomeClient() {
       />
 
       {/* Main Viewport Container with 0ms Instant Tab Switching */}
-      <div className="flex-1 h-screen flex flex-col overflow-hidden relative">
+      <div className="flex-1 h-screen flex flex-col overflow-hidden relative w-full min-w-0">
         {/* Universal Top Header Bar with Theme Switcher & Profile Avatar (Always Visible Across ALL Tabs) */}
         <TopNav
           activeTab={activeTab}
@@ -116,7 +116,7 @@ export default function HomeClient() {
         />
 
         {/* Content Viewport */}
-        <div className="flex-1 h-full overflow-hidden relative">
+        <div className="flex-1 h-full overflow-hidden relative w-full min-w-0">
           <div className={`h-full w-full ${activeTab === "dashboard" ? "block" : "hidden"}`}>
             <DashboardSection />
           </div>

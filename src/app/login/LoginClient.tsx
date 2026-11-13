@@ -367,7 +367,7 @@ export default function LoginClient() {
         {/* Right Column: Authentication Card */}
         <div className="w-full lg:col-span-6 flex justify-center">
           <div
-            className="w-full max-w-md border rounded-3xl p-7 sm:p-9 shadow-2xl backdrop-blur-2xl space-y-6 transition-all"
+            className="w-full max-w-md border rounded-3xl p-5 sm:p-7 md:p-9 shadow-2xl backdrop-blur-2xl space-y-6 transition-all"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",

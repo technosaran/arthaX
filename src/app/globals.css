@@ -1,102 +1,85 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   arthaX FinTech Design System — Zerodha Kite & Institutional Typography
+   arthaX Modern FinTech Design System — Minimalist, Clean & Luminous
    ========================================================================== */
 
 @theme {
-  --color-emerald-300: #62c789;
-  --color-emerald-400: #4bb473;
-  --color-emerald-500: #4bb473;
-  --color-emerald-600: #3ea064;
-
-  --color-green-300: #62c789;
-  --color-green-400: #4bb473;
-  --color-green-500: #4bb473;
-  --color-green-600: #3ea064;
-
-  --color-rose-300: #e66965;
-  --color-rose-400: #df514c;
-  --color-rose-500: #df514c;
-  --color-rose-600: #c9403b;
-
-  --color-red-300: #e66965;
-  --color-red-400: #df514c;
-  --color-red-500: #df514c;
-  --color-red-600: #c9403b;
-
   --font-mono: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root,
 [data-theme="ultra"] {
-  /* Institutional Obsidian Pro (OLED Pitch Black) */
+  /* Obsidian Pro (Ultra-clean OLED Dark Minimalist) */
   color-scheme: dark;
-  --app-bg: #000000;
-  --app-card: #090b10;
-  --app-card-hover: #12151c;
-  --app-fg: #ffffff;
-  --app-border: #1a1e28;
-  --app-border-subtle: rgba(255, 255, 255, 0.08);
-  --app-muted: #808b9e;
-  --app-accent: #4bb473;
-  --app-accent-hover: #3ea064;
-  --app-accent-subtle: rgba(75, 180, 115, 0.12);
-  --app-profit: #4bb473;
-  --app-loss: #df514c;
-  --app-ring: #4bb473;
-  --app-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
-  --app-badge-bg: rgba(75, 180, 115, 0.12);
-  --app-badge-fg: #4bb473;
-  --app-track-bg: rgba(255, 255, 255, 0.08);
+  --app-bg: #090a0f;
+  --app-card: #10131c;
+  --app-card-hover: #161a26;
+  --app-card-elevated: #1a1e2c;
+  --app-fg: #f8fafc;
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-border-subtle: rgba(255, 255, 255, 0.04);
+  --app-muted: #94a3b8;
+  --app-accent: #10b981;
+  --app-accent-hover: #34d399;
+  --app-accent-subtle: rgba(16, 185, 129, 0.12);
+  --app-profit: #10b981;
+  --app-loss: #f43f5e;
+  --app-ring: rgba(16, 185, 129, 0.35);
+  --app-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.65);
+  --app-badge-bg: rgba(16, 185, 129, 0.12);
+  --app-badge-fg: #34d399;
+  --app-track-bg: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] {
-  /* Midnight FinTech Terminal (Zerodha Kite Dark Standard) */
+  /* Midnight Titanium (Sophisticated Deep Slate) */
   color-scheme: dark;
-  --app-bg: #15181f;
-  --app-card: #1c202a;
-  --app-card-hover: #242936;
-  --app-fg: #f3f5f8;
-  --app-border: #2b3140;
-  --app-border-subtle: rgba(255, 255, 255, 0.08);
-  --app-muted: #949db0;
-  --app-accent: #4bb473;
-  --app-accent-hover: #3ea064;
-  --app-accent-subtle: rgba(75, 180, 115, 0.14);
-  --app-profit: #4bb473;
-  --app-loss: #df514c;
-  --app-ring: #4bb473;
-  --app-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
-  --app-badge-bg: rgba(75, 180, 115, 0.14);
-  --app-badge-fg: #4bb473;
-  --app-track-bg: rgba(255, 255, 255, 0.08);
+  --app-bg: #0e1219;
+  --app-card: #151a24;
+  --app-card-hover: #1b2230;
+  --app-card-elevated: #1f2736;
+  --app-fg: #f8fafc;
+  --app-border: rgba(255, 255, 255, 0.09);
+  --app-border-subtle: rgba(255, 255, 255, 0.05);
+  --app-muted: #94a3b8;
+  --app-accent: #10b981;
+  --app-accent-hover: #34d399;
+  --app-accent-subtle: rgba(16, 185, 129, 0.14);
+  --app-profit: #10b981;
+  --app-loss: #f43f5e;
+  --app-ring: rgba(16, 185, 129, 0.35);
+  --app-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.45);
+  --app-badge-bg: rgba(16, 185, 129, 0.14);
+  --app-badge-fg: #34d399;
+  --app-track-bg: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="light"] {
-  /* Modern High-Trust Light FinTech (Zerodha Kite Light Canvas & Crisp Cards) */
+  /* Studio Minimalist (Crisp Slate-50 Canvas, Snow White Cards) */
   color-scheme: light;
-  --app-bg: #f2f4f7;
+  --app-bg: #f8fafc;
   --app-card: #ffffff;
-  --app-card-hover: #f8fafc;
-  --app-fg: #111827;
-  --app-border: #d2d7e0;
-  --app-border-subtle: #e5e8ee;
+  --app-card-hover: #f1f5f9;
+  --app-card-elevated: #ffffff;
+  --app-fg: #0f172a;
+  --app-border: #e2e8f0;
+  --app-border-subtle: #f1f5f9;
   --app-muted: #64748b;
-  --app-accent: #4bb473;
-  --app-accent-hover: #3ea064;
-  --app-accent-subtle: rgba(75, 180, 115, 0.12);
-  --app-profit: #4bb473;
-  --app-loss: #df514c;
-  --app-ring: #4bb473;
-  --app-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-  --app-badge-bg: rgba(75, 180, 115, 0.12);
-  --app-badge-fg: #2e8b54;
+  --app-accent: #059669;
+  --app-accent-hover: #047857;
+  --app-accent-subtle: rgba(5, 150, 105, 0.08);
+  --app-profit: #059669;
+  --app-loss: #e11d48;
+  --app-ring: rgba(5, 150, 105, 0.25);
+  --app-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --app-badge-bg: rgba(5, 150, 105, 0.08);
+  --app-badge-fg: #059669;
   --app-track-bg: #e2e8f0;
 }
 
 /* ==========================================================================
-   FinTech Typography Rules (Plus Jakarta Sans + Zerodha Kite Tabular Inter)
+   Typography & Rendering Rules
    ========================================================================== */
 
 body {
@@ -108,7 +91,7 @@ body {
   overflow-x: hidden;
   margin: 0;
   padding: 0;
-  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Headings with crisp fintech geometric tracking */
@@ -118,7 +101,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-/* Tabular Financial Numerics (Zerodha Kite & Stripe institutional standard) */
+/* Tabular Financial Numerics */
 .font-mono,
 .tabular-nums,
 [data-numeric="true"],
@@ -145,10 +128,34 @@ pre {
   border-color: var(--app-border);
 }
 
+/* Frosted Glass Panels */
+.glass-panel {
+  background-color: rgba(16, 19, 28, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--app-border);
+}
+
+[data-theme="light"] .glass-panel {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--app-border);
+}
+
+/* Ambient Glow Accents */
+.ambient-glow-emerald {
+  background: radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.15) 0%, transparent 60%);
+}
+
+.ambient-glow-rose {
+  background: radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.15) 0%, transparent 60%);
+}
+
 /* Custom Sleek Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Sparkles } from "lucide-react";
 
 export interface LinePoint {
   key?: string;
@@ -12,7 +12,7 @@ export interface LinePoint {
 
 export interface InteractiveLineChartProps {
   data: LinePoint[];
-  color?: string; // Default: Zerodha green "#4bb473" or red "#df514c"
+  color?: string; // Default: Modern emerald "#10b981" or rose "#f43f5e"
   gradientId?: string;
   title?: string;
   subtitle?: string;
@@ -33,7 +33,7 @@ function abbreviateINR(val: number): string {
 
 export default function InteractiveLineChart({
   data,
-  color = "#4bb473",
+  color = "#10b981",
   gradientId = "interactiveChartGradient",
   title,
   subtitle,
@@ -50,13 +50,13 @@ export default function InteractiveLineChart({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // Layout boundaries for SVG coordinate system (520 x 170)
-  const svgWidth = 520;
-  const svgHeight = 170;
-  const paddingLeft = 52;
-  const paddingRight = 24;
-  const paddingTop = 22;
-  const paddingBottom = 38;
+  // Layout boundaries for SVG coordinate system (560 x 185)
+  const svgWidth = 560;
+  const svgHeight = 185;
+  const paddingLeft = 56;
+  const paddingRight = 28;
+  const paddingTop = 26;
+  const paddingBottom = 42;
   const plotWidth = svgWidth - paddingLeft - paddingRight;
   const plotHeight = svgHeight - paddingTop - paddingBottom;
   const baselineY = paddingTop + plotHeight;
@@ -67,7 +67,7 @@ export default function InteractiveLineChart({
   }, [data]);
 
   const maxVal = useMemo(() => {
-    return rawMax > 0 ? rawMax * 1.18 : 10000;
+    return rawMax > 0 ? rawMax * 1.2 : 10000;
   }, [rawMax]);
 
   // Peak and average calculations for telemetry badges
@@ -98,6 +98,12 @@ export default function InteractiveLineChart({
       };
     });
   }, [data, maxVal, plotWidth, plotHeight, paddingLeft, paddingTop]);
+
+  // Identify index of peak point for pinned badge
+  const peakPointIndex = useMemo(() => {
+    if (!peakPoint || peakPoint.value <= 0) return -1;
+    return points.findIndex((pt) => pt.value === peakPoint.value);
+  }, [peakPoint, points]);
 
   // Generate smooth cubic bezier path through all data points
   const linePath = useMemo(() => {
@@ -179,7 +185,12 @@ export default function InteractiveLineChart({
           style={{ borderColor: "var(--app-border-subtle)" }}
         >
           <div>
-            {title && <h3 className="text-sm font-bold tracking-tight">{title}</h3>}
+            {title && (
+              <h3 className="text-sm font-extrabold tracking-tight flex items-center gap-2">
+                <span>{title}</span>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+              </h3>
+            )}
             {subtitle && (
               <p className="text-[11px] opacity-60 font-mono mt-0.5">{subtitle}</p>
             )}
@@ -188,38 +199,39 @@ export default function InteractiveLineChart({
           <div className="flex items-center gap-2">
             {peakPoint && peakPoint.value > 0 && (
               <div
-                className="px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold flex items-center gap-1.5"
+                className="px-2.5 py-1 rounded-lg border text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-xs"
                 style={{
                   borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
+                  backgroundColor: "var(--app-card)",
                   color: color,
                 }}
               >
-                <span className="opacity-60 text-[9px] uppercase">Peak:</span>
+                <span className="opacity-60 text-[9px] uppercase tracking-wider">Peak:</span>
                 <span>{formatter(peakPoint.value).replace(".00", "")}</span>
               </div>
             )}
             {averageVal > 0 && (
               <div
-                className="hidden sm:flex px-2 py-1 rounded-md border text-[10px] font-mono font-medium opacity-70"
+                className="hidden sm:flex px-2.5 py-1 rounded-lg border text-[10px] font-mono font-medium opacity-75 shadow-xs"
                 style={{
                   borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
+                  backgroundColor: "var(--app-card)",
                 }}
               >
-                <span>Avg: {formatter(averageVal).replace(".00", "")}</span>
+                <span className="opacity-60 uppercase text-[9px] mr-1">Avg:</span>
+                <span>{formatter(averageVal).replace(".00", "")}</span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Interactive SVG Canvas */}
+      {/* Interactive SVG Canvas with Volumetric Ambient Illumination */}
       <div className="relative w-full overflow-visible">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full h-44 sm:h-48 overflow-visible cursor-crosshair touch-none"
+          className="w-full h-48 sm:h-52 overflow-visible cursor-crosshair touch-none"
           onMouseMove={(e) => handlePointerMove(e.clientX)}
           onMouseLeave={() => setHoveredIdx(null)}
           onTouchMove={(e) => {
@@ -228,17 +240,25 @@ export default function InteractiveLineChart({
           onTouchEnd={() => setHoveredIdx(null)}
         >
           <defs>
-            {/* Soft Ambient Area Gradient */}
+            {/* Rich multi-stop volumetric area gradient */}
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-              <stop offset="85%" stopColor={color} stopOpacity="0.02" />
+              <stop offset="0%" stopColor={color} stopOpacity="0.38" />
+              <stop offset="45%" stopColor={color} stopOpacity="0.14" />
+              <stop offset="85%" stopColor={color} stopOpacity="0.03" />
               <stop offset="100%" stopColor={color} stopOpacity="0.0" />
             </linearGradient>
 
-            {/* Subtle glow filter for the main stroke */}
+            {/* Glowing neon cathode cathode drop-shadow filter */}
             <filter id={`lineGlow-${gradientId}`} x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor={color} floodOpacity="0.3" />
+              <feDropShadow dx="0" dy="2" stdDeviation="5" floodColor={color} floodOpacity="0.5" />
             </filter>
+
+            {/* Vertical crosshair scanning beam gradient */}
+            <linearGradient id={`crosshairBeam-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.1" />
+              <stop offset="50%" stopColor={color} stopOpacity="0.85" />
+              <stop offset="100%" stopColor={color} stopOpacity="0.15" />
+            </linearGradient>
           </defs>
 
           {/* Horizontal Reference Grid Lines & Y-Axis Abbreviated Ticks */}
@@ -250,90 +270,160 @@ export default function InteractiveLineChart({
                 x2={svgWidth - paddingRight}
                 y2={tick.y}
                 stroke="var(--app-border-subtle)"
-                strokeDasharray={idx === yTicks.length - 1 ? undefined : "3 3"}
+                strokeDasharray={idx === yTicks.length - 1 ? undefined : "3 4"}
                 strokeWidth={idx === yTicks.length - 1 ? 1 : 0.75}
+                opacity={idx === yTicks.length - 1 ? 0.8 : 0.5}
               />
               <text
-                x={paddingLeft - 8}
-                y={tick.y + 3}
+                x={paddingLeft - 10}
+                y={tick.y + 3.5}
                 textAnchor="end"
-                className="text-[9px] font-mono fill-current opacity-45 select-none"
+                className="text-[9px] font-mono fill-current opacity-50 select-none font-semibold"
               >
                 {tick.label}
               </text>
             </g>
           ))}
 
-          {/* Area Fill Under Curve */}
+          {/* Volumetric Area Fill Under Curve */}
           {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
 
-          {/* Smooth Trend Spline Line */}
+          {/* Layer 1: Ambient Neon Glow Under-Path */}
           {linePath && (
             <path
               d={linePath}
               fill="none"
               stroke={color}
-              strokeWidth="2.5"
+              strokeWidth="5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              opacity="0.3"
               filter={`url(#lineGlow-${gradientId})`}
             />
           )}
 
-          {/* Static Month Labels along the X-Axis */}
-          {points.map((pt, idx) => (
-            <text
-              key={idx}
-              x={pt.x}
-              y={svgHeight - 14}
-              textAnchor="middle"
-              className={`text-[10px] font-mono transition-all duration-150 select-none ${
-                hoveredIdx === idx ? "font-bold fill-current opacity-100" : "fill-current opacity-55"
-              }`}
-            >
-              {pt.label}
-            </text>
-          ))}
+          {/* Layer 2: Precision Foreground Trend Vector Path */}
+          {linePath && (
+            <path
+              d={linePath}
+              fill="none"
+              stroke={color}
+              strokeWidth="2.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
 
-          {/* Data Points on Line */}
+          {/* Pinned Peak Callout Tag (When no hover is active) */}
+          {hoveredIdx === null && peakPointIndex >= 0 && points[peakPointIndex] && (
+            <g className="transition-opacity duration-200">
+              {/* Outer pulsing ring at peak point */}
+              <circle
+                cx={points[peakPointIndex].x}
+                cy={points[peakPointIndex].y}
+                r="7"
+                fill={color}
+                opacity="0.2"
+                className="animate-ping"
+              />
+              <circle
+                cx={points[peakPointIndex].x}
+                cy={points[peakPointIndex].y}
+                r="4.5"
+                fill={color}
+                stroke="var(--app-card)"
+                strokeWidth="2"
+              />
+            </g>
+          )}
+
+          {/* Static Month Labels along the X-Axis */}
           {points.map((pt, idx) => {
             const isHovered = hoveredIdx === idx;
             return (
               <g key={idx}>
-                {/* Subtle base dot */}
+                {isHovered && (
+                  <rect
+                    x={pt.x - 18}
+                    y={svgHeight - 26}
+                    width={36}
+                    height={18}
+                    rx={5}
+                    fill="var(--app-card)"
+                    stroke="var(--app-border)"
+                    strokeWidth="1"
+                  />
+                )}
+                <text
+                  x={pt.x}
+                  y={svgHeight - 14}
+                  textAnchor="middle"
+                  className={`text-[10px] font-mono transition-all duration-150 select-none ${
+                    isHovered
+                      ? "font-bold fill-current opacity-100"
+                      : "fill-current opacity-55"
+                  }`}
+                  style={isHovered ? { fill: color } : undefined}
+                >
+                  {pt.label}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Data Points on Line with Polished Bezel */}
+          {points.map((pt, idx) => {
+            const isHovered = hoveredIdx === idx;
+            const isPeak = idx === peakPointIndex;
+            return (
+              <g key={idx}>
                 <circle
                   cx={pt.x}
                   cy={pt.y}
-                  r={isHovered ? 5.5 : pt.value > 0 ? 3.5 : 2}
-                  fill={color}
-                  stroke="var(--app-card)"
-                  strokeWidth={isHovered ? 2.5 : 1.5}
+                  r={isHovered ? 6 : isPeak ? 4.5 : pt.value > 0 ? 3.5 : 2}
+                  fill={isHovered ? color : "var(--app-card)"}
+                  stroke={color}
+                  strokeWidth={isHovered ? 2.5 : 2}
                   className="transition-all duration-200"
+                  style={{
+                    filter: isHovered ? `drop-shadow(0 0 6px ${color})` : "none",
+                  }}
                 />
               </g>
             );
           })}
 
-          {/* Active Hover Crosshair Guideline & Pulsing Ring */}
+          {/* Active Hover Crosshair Guideline & Pulsing Scanning Beacon */}
           {activePoint && (
             <g className="transition-all duration-100 pointer-events-none">
-              {/* Vertical Guide Crosshair Line */}
+              {/* Vertical Guide Crosshair Scanning Beam */}
               <line
                 x1={activePoint.x}
-                y1={paddingTop}
+                y1={paddingTop - 6}
                 x2={activePoint.x}
                 y2={baselineY}
+                stroke={`url(#crosshairBeam-${gradientId})`}
+                strokeWidth="1.5"
+                strokeDasharray="2 3"
+              />
+
+              {/* Horizontal projection line to Y-axis */}
+              <line
+                x1={paddingLeft}
+                y1={activePoint.y}
+                x2={activePoint.x}
+                y2={activePoint.y}
                 stroke={color}
-                strokeWidth="1.2"
+                strokeWidth="1"
                 strokeDasharray="2 2"
-                opacity="0.6"
+                opacity="0.35"
               />
 
               {/* Glowing outer pulse ring */}
               <circle
                 cx={activePoint.x}
                 cy={activePoint.y}
-                r="11"
+                r="13"
                 fill={color}
                 opacity="0.25"
                 className="animate-pulse"
@@ -341,43 +431,58 @@ export default function InteractiveLineChart({
               <circle
                 cx={activePoint.x}
                 cy={activePoint.y}
-                r="6"
+                r="7"
                 fill={color}
-                stroke="var(--app-card)"
+                opacity="0.5"
+              />
+              <circle
+                cx={activePoint.x}
+                cy={activePoint.y}
+                r="4.5"
+                fill="#ffffff"
+                stroke={color}
                 strokeWidth="2.5"
               />
             </g>
           )}
         </svg>
 
-        {/* Dynamic Glassmorphic Floating Tooltip Card */}
+        {/* Dynamic Glassmorphic Floating HUD Tooltip Card */}
         {activePoint && (
           <div
             className="absolute pointer-events-none z-20 flex flex-col items-center transition-transform duration-75 ease-out"
             style={{
               left: `${(activePoint.x / svgWidth) * 100}%`,
-              top: `${Math.max(10, (activePoint.y / svgHeight) * 100 - 35)}%`,
+              top: `${Math.max(10, (activePoint.y / svgHeight) * 100 - 32)}%`,
               transform: `translate(${
-                activePoint.x > svgWidth * 0.75 ? "-90%" : activePoint.x < svgWidth * 0.25 ? "-10%" : "-50%"
+                activePoint.x > svgWidth * 0.75
+                  ? "-90%"
+                  : activePoint.x < svgWidth * 0.25
+                  ? "-10%"
+                  : "-50%"
               }, -100%)`,
             }}
           >
             <div
-              className="px-3 py-2 rounded-xl border shadow-xl backdrop-blur-md flex flex-col gap-1 min-w-[130px]"
+              className="px-3.5 py-2.5 rounded-2xl border shadow-2xl backdrop-blur-xl flex flex-col gap-1 min-w-[145px]"
               style={{
                 backgroundColor: "var(--app-card)",
                 borderColor: "var(--app-border)",
                 color: "var(--app-fg)",
+                boxShadow: `0 12px 32px -4px rgba(0,0,0,0.5), 0 0 16px ${color}20`,
               }}
             >
               {/* Tooltip Header: Month Label & Optional Peak Tag */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold opacity-70 uppercase tracking-wider font-mono">
-                  {activePoint.fullLabel || activePoint.label}
-                </span>
+              <div className="flex items-center justify-between gap-2 border-b pb-1" style={{ borderColor: "var(--app-border-subtle)" }}>
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={11} className="opacity-60 text-[var(--app-accent)]" />
+                  <span className="text-[10px] font-bold opacity-80 uppercase tracking-wider font-mono">
+                    {activePoint.fullLabel || activePoint.label}
+                  </span>
+                </div>
                 {peakPoint && activePoint.value === peakPoint.value && activePoint.value > 0 && (
                   <span
-                    className="text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tight"
+                    className="text-[8px] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-tight"
                     style={{ backgroundColor: `${color}25`, color }}
                   >
                     Peak
@@ -386,30 +491,39 @@ export default function InteractiveLineChart({
               </div>
 
               {/* Tooltip Primary Currency Value */}
-              <div className="text-sm font-extrabold font-mono tracking-tight" style={{ color }}>
+              <div
+                className="text-base font-extrabold font-mono tracking-tight leading-tight mt-0.5"
+                style={{ color }}
+              >
                 {formatter(activePoint.value)}
               </div>
 
               {/* Month-over-Month Delta / Growth Pill */}
               {momGrowth !== null && (
-                <div className="flex items-center gap-1 text-[9px] font-mono font-bold mt-0.5">
+                <div className="flex items-center gap-1 text-[10px] font-mono font-bold pt-0.5">
                   {momGrowth > 0 ? (
                     <span
-                      className="inline-flex items-center gap-0.5"
-                      style={{ color: type === "expense" ? "#df514c" : "#4bb473" }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: type === "expense" ? "rgba(244,63,94,0.12)" : "rgba(16,185,129,0.12)",
+                        color: type === "expense" ? "#f43f5e" : "#10b981",
+                      }}
                     >
-                      <TrendingUp size={10} /> +{momGrowth.toFixed(1)}% vs prev
+                      <TrendingUp size={11} /> +{momGrowth.toFixed(1)}% vs prev
                     </span>
                   ) : momGrowth < 0 ? (
                     <span
-                      className="inline-flex items-center gap-0.5"
-                      style={{ color: type === "expense" ? "#4bb473" : "#df514c" }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: type === "expense" ? "rgba(16,185,129,0.12)" : "rgba(244,63,94,0.12)",
+                        color: type === "expense" ? "#10b981" : "#f43f5e",
+                      }}
                     >
-                      <TrendingDown size={10} /> {momGrowth.toFixed(1)}% vs prev
+                      <TrendingDown size={11} /> {momGrowth.toFixed(1)}% vs prev
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-0.5 opacity-60">
-                      <Minus size={10} /> Flat (0.0%)
+                    <span className="inline-flex items-center gap-1 opacity-60 px-1.5 py-0.5">
+                      <Minus size={11} /> Flat (0.0%)
                     </span>
                   )}
                 </div>
@@ -417,7 +531,7 @@ export default function InteractiveLineChart({
             </div>
             {/* Subtle Tooltip Pointer Down Arrow */}
             <div
-              className="w-2 h-2 rotate-45 -mt-1 border-r border-b"
+              className="w-2.5 h-2.5 rotate-45 -mt-1.5 border-r border-b"
               style={{
                 backgroundColor: "var(--app-card)",
                 borderColor: "var(--app-border)",

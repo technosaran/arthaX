@@ -534,12 +534,12 @@ export default function LedgerSection() {
 
   return (
     <main
-      className="flex-1 h-full p-6 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* SECTION HEADER */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8"
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
@@ -954,7 +954,7 @@ export default function LedgerSection() {
       {selectedVoucher && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 space-y-5 shadow-2xl transition-all select-text"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-6 space-y-5 shadow-2xl transition-all select-text"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",

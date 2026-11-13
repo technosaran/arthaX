@@ -9,9 +9,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Layers,
-  Sun,
-  SunMedium,
-  Moon,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -43,6 +40,19 @@ function getInitialTimeGreeting(): { text: string; period: "morning" | "afternoo
   return { text: "Good evening", period: "evening" };
 }
 
+function formatDisplayName(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .trim()
+    .split(/\s+/)
+    .map((part) => {
+      // Keep initials uppercase e.g. "R", "K."
+      if (part.length <= 2 && !/[aeiou]/i.test(part)) return part.toUpperCase();
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 export default function DashboardSection() {
   const { user, profile } = useAuth();
   const [greeting, setGreeting] = useState(() => getInitialTimeGreeting().text);
@@ -67,6 +77,10 @@ export default function DashboardSection() {
   const [loading, setLoading] = useState<boolean>(!initialCache);
 
   const displayName = profile?.name || name;
+
+  const formattedName = useMemo(() => {
+    return formatDisplayName(displayName);
+  }, [displayName]);
 
   const initials = useMemo(() => {
     const source = displayName || user?.user_metadata?.full_name || user?.email || "";
@@ -260,15 +274,15 @@ export default function DashboardSection() {
     };
   }, [user, fetchDashboardData]);
 
-  // Vibrant high-contrast fintech color palette (Zerodha Kite Green & Red standard)
+  // Vibrant high-contrast modern fintech color palette
   const chartPalette = [
-    "#4bb473", // Zerodha Kite Green (Cash / Savings)
+    "#10B981", // Emerald (Cash / Savings)
     "#3B82F6", // Royal Blue (HDFC / Banking)
     "#8B5CF6", // Purple / Violet (Fixed Deposits)
     "#06B6D4", // Neon Cyan (Investments / Demat)
     "#F59E0B", // Bright Amber / Gold
     "#EC4899", // Vivid Pink
-    "#df514c", // Zerodha Kite Red
+    "#F43F5E", // Vibrant Rose / Red
     "#14B8A6", // Teal
   ];
 
@@ -308,49 +322,41 @@ export default function DashboardSection() {
 
   return (
     <main
-      className="flex-1 h-full p-4 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Header */}
       <div
-        className="pb-6 mb-8 border-b"
+        className="pb-5 sm:pb-6 mb-6 sm:mb-8 border-b"
         style={{ borderColor: "var(--app-border)" }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl sm:text-4xl md:text-[2.5rem] font-extrabold tracking-tight flex items-center gap-3">
-              <span>{greeting}{displayName ? `, ${displayName}` : ""}</span>
-              <span
-                className="inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl border select-none flex-shrink-0 shadow-sm"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-card)",
-                }}
-                title={timePeriod === "morning" ? "Morning" : timePeriod === "afternoon" ? "Afternoon" : "Evening"}
-              >
-                {timePeriod === "morning" && <Sun size={22} className="text-amber-400" />}
-                {timePeriod === "afternoon" && <SunMedium size={22} className="text-amber-400" />}
-                {timePeriod === "evening" && <Moon size={22} className="text-indigo-400" />}
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm opacity-70 mt-2 font-medium">
-              Overview of your accounts, income, and spending.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight flex items-center gap-2 flex-wrap">
+            <span>{greeting},</span>
+            <span style={{ color: "var(--app-accent)" }}>
+              {formattedName || "User"}
+            </span>
+            <span className="text-2xl select-none inline-block">
+              {timePeriod === "evening" ? "🌙" : timePeriod === "morning" ? "☀️" : "🌤️"}
+            </span>
+          </h1>
+          <p className="text-xs sm:text-sm opacity-70 mt-1.5 font-medium">
+            Overview of your accounts, income, and spending.
+          </p>
         </div>
       </div>
 
       <div className="max-w-7xl space-y-6">
         {/* CARD 1: Big Total Net Worth Card with Interactive Pie Chart on Right */}
         <div
-          className="rounded-2xl p-6 sm:p-8 border transition-colors shadow-sm"
+          className="rounded-2xl p-4 sm:p-6 md:p-8 border transition-colors shadow-sm"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
             color: "var(--app-fg)",
           }}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
             {/* Left Column: Total Net Worth Summary */}
             <div className="lg:col-span-5 space-y-4">
               <div className="flex items-center justify-between">
@@ -370,7 +376,7 @@ export default function DashboardSection() {
               </div>
 
               <div>
-                <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight">
+                <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight break-all sm:break-normal">
                   {loading ? "..." : formatINR(netWorth)}
                 </div>
                 <p className="text-xs opacity-60 mt-1.5">
@@ -387,7 +393,7 @@ export default function DashboardSection() {
                     backgroundColor: "var(--app-bg)",
                   }}
                 >
-                  <Layers size={13} className="text-[#4bb473]" />
+                  <Layers size={13} className="text-emerald-400" />
                   <span className="font-bold">{accounts.length}</span>
                   <span className="opacity-60">{accounts.length === 1 ? "Account" : "Accounts"}</span>
                 </div>
@@ -421,7 +427,7 @@ export default function DashboardSection() {
 
         {/* CARD 2: Interactive 6-Month Cash Flow & Capital Trajectory Line Chart */}
         <div
-          className="rounded-2xl p-6 sm:p-8 border transition-colors shadow-sm"
+          className="rounded-2xl p-4 sm:p-6 md:p-8 border transition-colors shadow-sm"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -439,7 +445,7 @@ export default function DashboardSection() {
 
             {/* Mode Switcher Segmented Control */}
             <div
-              className="flex items-center p-1 rounded-xl border self-start sm:self-auto"
+              className="flex items-center p-1 rounded-xl border self-start sm:self-auto max-w-full overflow-x-auto"
               style={{
                 borderColor: "var(--app-border-subtle)",
                 backgroundColor: "var(--app-bg)",
@@ -449,12 +455,12 @@ export default function DashboardSection() {
                 onClick={() => setTrajectoryMode("net")}
                 className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   trajectoryMode === "net"
-                    ? "shadow-sm"
+                    ? "shadow-sm text-emerald-400 font-bold"
                     : "opacity-60 hover:opacity-100"
                 }`}
                 style={{
                   backgroundColor: trajectoryMode === "net" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "net" ? "#4bb473" : "inherit",
+                  color: trajectoryMode === "net" ? "#10b981" : "inherit",
                 }}
               >
                 Net Savings
@@ -463,12 +469,12 @@ export default function DashboardSection() {
                 onClick={() => setTrajectoryMode("income")}
                 className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   trajectoryMode === "income"
-                    ? "shadow-sm"
+                    ? "shadow-sm text-emerald-400 font-bold"
                     : "opacity-60 hover:opacity-100"
                 }`}
                 style={{
                   backgroundColor: trajectoryMode === "income" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "income" ? "#4bb473" : "inherit",
+                  color: trajectoryMode === "income" ? "#10b981" : "inherit",
                 }}
               >
                 Inflow
@@ -477,12 +483,12 @@ export default function DashboardSection() {
                 onClick={() => setTrajectoryMode("expenses")}
                 className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   trajectoryMode === "expenses"
-                    ? "shadow-sm"
+                    ? "shadow-sm text-rose-400 font-bold"
                     : "opacity-60 hover:opacity-100"
                 }`}
                 style={{
                   backgroundColor: trajectoryMode === "expenses" ? "var(--app-card)" : "transparent",
-                  color: trajectoryMode === "expenses" ? "#df514c" : "inherit",
+                  color: trajectoryMode === "expenses" ? "#f43f5e" : "inherit",
                 }}
               >
                 Outflow
@@ -501,11 +507,11 @@ export default function DashboardSection() {
             >
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Inflow</span>
-                <div className="text-base font-extrabold font-mono text-[#4bb473] mt-0.5">
+                <div className="text-base font-extrabold font-mono text-emerald-400 mt-0.5">
                   {formatINR(total6MonthInflow)}
                 </div>
               </div>
-              <ArrowUpRight size={18} className="text-[#4bb473] opacity-80" />
+              <ArrowUpRight size={18} className="text-emerald-400 opacity-80" />
             </div>
 
             <div
@@ -517,11 +523,11 @@ export default function DashboardSection() {
             >
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Gross Outflow</span>
-                <div className="text-base font-extrabold font-mono text-[#df514c] mt-0.5">
+                <div className="text-base font-extrabold font-mono text-rose-400 mt-0.5">
                   {formatINR(total6MonthOutflow)}
                 </div>
               </div>
-              <ArrowDownRight size={18} className="text-[#df514c] opacity-80" />
+              <ArrowDownRight size={18} className="text-rose-400 opacity-80" />
             </div>
 
             <div
@@ -533,11 +539,11 @@ export default function DashboardSection() {
             >
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">6-Mo Net Retained</span>
-                <div className="text-base font-extrabold font-mono text-[#4bb473] mt-0.5">
+                <div className="text-base font-extrabold font-mono text-emerald-400 mt-0.5">
                   {formatINR(total6MonthSavings)}
                 </div>
               </div>
-              <TrendingUp size={18} className="text-[#4bb473] opacity-80" />
+              <TrendingUp size={18} className="text-emerald-400 opacity-80" />
             </div>
           </div>
 
@@ -549,7 +555,7 @@ export default function DashboardSection() {
           ) : (
             <InteractiveLineChart
               data={linePoints}
-              color={trajectoryMode === "expenses" ? "#df514c" : "#4bb473"}
+              color={trajectoryMode === "expenses" ? "#f43f5e" : "#10b981"}
               gradientId="dashboardTrajectoryGradient"
               formatter={formatINR}
               type={trajectoryMode === "expenses" ? "expense" : "income"}

@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Repeat,
-  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -69,12 +68,12 @@ const INCOME_CATEGORIES = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Salary: "#4bb473", // Zerodha Kite Green
+  Salary: "#10B981", // Modern Vibrant Emerald
   Freelance: "#8B5CF6", // Violet
   Business: "#F59E0B", // Amber
   Dividends: "#06B6D4", // Cyan
   Interest: "#3B82F6", // Royal Blue
-  Rental: "#df514c", // Zerodha Kite Red
+  Rental: "#F43F5E", // Modern Coral / Rose
   "Capital Gains": "#EC4899", // Pink
   Bonus: "#14B8A6", // Teal
   "Crypto & Web3": "#F97316", // Orange
@@ -535,7 +534,7 @@ export default function IncomeSection() {
       .map(([cat, val]) => ({
         label: cat,
         value: val,
-        color: CATEGORY_COLORS[cat] || "#4bb473",
+        color: CATEGORY_COLORS[cat] || "#10B981",
       }));
   }, [categoryTotals]);
 
@@ -566,12 +565,12 @@ export default function IncomeSection() {
 
   return (
     <main
-      className="flex-1 h-full p-6 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Top Header */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8"
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
@@ -681,11 +680,11 @@ export default function IncomeSection() {
         </div>
       )}
 
-      {/* ROW 1: SEPARATE KPI CARDS (LEFT TO RIGHT) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+      {/* ROW 1: 4 SEPARATE KPI CARDS (RESPONSIVE 4-COLUMN GRID) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
         {/* Card 1: Estimated Monthly Inflow */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -696,17 +695,17 @@ export default function IncomeSection() {
             <span>Estimated Monthly Inflow</span>
             <ArrowUpRight size={16} className="text-emerald-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono tracking-tight mt-2 text-emerald-400">
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-emerald-400">
             {loading ? "..." : formatINR(totalMonthlyIncome)}
           </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono">
-            Projected Annual Run-Rate: {loading ? "..." : formatINR(totalAnnualInflow)}
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
+            ~{formatINR(totalMonthlyIncome / 30)} /day inflow pace
           </p>
         </div>
 
         {/* Card 2: Top Inflow Source */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -717,10 +716,10 @@ export default function IncomeSection() {
             <span>Top Inflow Source</span>
             <TrendingUp size={16} className="text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold tracking-tight mt-2 truncate">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight mt-2 truncate">
             {topCategoryEntry ? topCategoryEntry[0] : "None"}
           </div>
-          <p className="text-[11px] opacity-60 mt-1 font-mono text-emerald-400">
+          <p className="text-[11px] opacity-60 mt-1 font-mono text-emerald-400 truncate">
             {topCategoryEntry ? formatINR(topCategoryEntry[1]) : "₹0.00"} (
             {topCategoryEntry && totalRawIncome > 0
               ? `${((topCategoryEntry[1] / totalRawIncome) * 100).toFixed(1)}%`
@@ -731,7 +730,7 @@ export default function IncomeSection() {
 
         {/* Card 3: Active Revenue Streams */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -742,11 +741,32 @@ export default function IncomeSection() {
             <span>Active Streams</span>
             <Wallet size={16} className="opacity-70" />
           </div>
-          <div className="text-3xl font-extrabold font-mono tracking-tight mt-2">
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2">
             {loading ? "..." : `${incomes.length} Streams`}
           </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono">
-            Gross Cumulative Inflow: {formatINR(totalRawIncome)}
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
+            Gross Inflow: {formatINR(totalRawIncome)}
+          </p>
+        </div>
+
+        {/* Card 4 (NEW): Projected Annual Run-Rate */}
+        <div
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+            color: "var(--app-fg)",
+          }}
+        >
+          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
+            <span>Annual Run-Rate</span>
+            <Sparkles size={16} className="text-amber-400" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-amber-400">
+            {loading ? "..." : formatINR(totalAnnualInflow)}
+          </div>
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
+            12-Month recurring run-rate projection
           </p>
         </div>
       </div>
@@ -766,7 +786,7 @@ export default function IncomeSection() {
             title="Inflow Trajectory"
             subtitle="6-Month Monthly Inflow Trend"
             data={lineChartData}
-            color="#4bb473"
+            color="#10B981"
             gradientId="incomeTrendGradient"
             formatter={formatINR}
             type="income"
@@ -785,7 +805,7 @@ export default function IncomeSection() {
         >
           <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
             <div className="flex items-center gap-1.5">
-              <PieChartIcon size={14} className="text-[#4bb473]" />
+              <PieChartIcon size={14} className="text-emerald-400" />
               <h3 className="text-sm font-bold tracking-tight">Inflow Allocation</h3>
             </div>
             <span className="text-[10px] font-mono opacity-50">
@@ -804,10 +824,10 @@ export default function IncomeSection() {
                 totalValue={totalMonthlyIncome}
                 segments={donutSegments}
                 formatter={formatINR}
-                centerColor="#4bb473"
+                centerColor="#10B981"
                 emptyMessage="No income data available."
                 emptySubMessage="Record your first income to view stream allocation."
-                icon={<PieChartIcon size={24} className="opacity-50 text-[#4bb473]" />}
+                icon={<PieChartIcon size={24} className="opacity-50 text-emerald-400" />}
               />
             )}
           </div>
@@ -825,36 +845,11 @@ export default function IncomeSection() {
             style={{
               borderColor: "var(--app-border-subtle)",
               backgroundColor: "var(--app-card)",
-              color: "#4bb473",
+              color: "#10B981",
             }}
           >
             {displayedIncomes.length}
           </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              fetchIncome();
-              fetchAccounts();
-            }}
-            className="flex items-center gap-1.5 text-xs opacity-70 hover:opacity-100 transition-opacity cursor-pointer font-mono"
-            title="Refresh Income Data"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            <span>Refresh</span>
-          </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
-            style={{
-              backgroundColor: "var(--app-fg)",
-              color: "var(--app-bg)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <Plus size={13} />
-            Add Stream
-          </button>
         </div>
       </div>
 
@@ -922,7 +917,7 @@ export default function IncomeSection() {
           {/* Transaction Rows */}
           <div className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
             {displayedIncomes.map((item) => {
-              const catColor = CATEGORY_COLORS[item.category] || "#4bb473";
+              const catColor = CATEGORY_COLORS[item.category] || "#10B981";
               const account = accounts.find((a) => a.id === item.account_id);
 
               return (

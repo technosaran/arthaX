@@ -84,8 +84,8 @@ export interface CategoryMeta {
 }
 
 export const BUDGET_CATEGORIES: CategoryMeta[] = [
-  { name: "Housing & Rent", color: "#df514c", icon: Home, defaultAmount: 20000 },
-  { name: "Groceries & Essentials", color: "#4bb473", icon: ShoppingCart, defaultAmount: 10000 },
+  { name: "Housing & Rent", color: "#F43F5E", icon: Home, defaultAmount: 20000 },
+  { name: "Groceries & Essentials", color: "#10B981", icon: ShoppingCart, defaultAmount: 10000 },
   { name: "Food & Dining", color: "#F59E0B", icon: Utensils, defaultAmount: 6000 },
   { name: "Utilities & Bills", color: "#3B82F6", icon: Zap, defaultAmount: 4500 },
   { name: "Transport & Fuel", color: "#8B5CF6", icon: Car, defaultAmount: 4500 },
@@ -93,7 +93,7 @@ export const BUDGET_CATEGORIES: CategoryMeta[] = [
   { name: "Shopping & Lifestyle", color: "#EC4899", icon: ShoppingBag, defaultAmount: 5000 },
   { name: "Electronics & Gadgets", color: "#38BDF8", icon: Laptop, defaultAmount: 5000 },
   { name: "Health & Medical", color: "#06B6D4", icon: HeartPulse, defaultAmount: 3500 },
-  { name: "Fitness & Sports", color: "#4bb473", icon: Dumbbell, defaultAmount: 2500 },
+  { name: "Fitness & Sports", color: "#10B981", icon: Dumbbell, defaultAmount: 2500 },
   { name: "Entertainment & OTT", color: "#A855F7", icon: Film, defaultAmount: 2000 },
   { name: "Travel & Vacations", color: "#6366F1", icon: Plane, defaultAmount: 8000 },
   { name: "Subscriptions & SaaS", color: "#14B8A6", icon: Layers, defaultAmount: 1500 },
@@ -109,11 +109,11 @@ export const BUDGET_CATEGORIES: CategoryMeta[] = [
   { name: "Home & Maintenance", color: "#78716C", icon: Wrench, defaultAmount: 3000 },
   { name: "Pet Care & Vet", color: "#E879F9", icon: Heart, defaultAmount: 2500 },
   { name: "Emergency Reserve", color: "#22C55E", icon: ShieldCheck, defaultAmount: 5000 },
-  { name: "Charity & Community", color: "#df514c", icon: Heart, defaultAmount: 1500 },
+  { name: "Charity & Community", color: "#F43F5E", icon: Heart, defaultAmount: 1500 },
   { name: "Books & Courses", color: "#F59E0B", icon: BookOpen, defaultAmount: 1500 },
   { name: "Hobbies & Creative", color: "#8B5CF6", icon: Activity, defaultAmount: 2000 },
   { name: "Office & Coworking", color: "#64748B", icon: Laptop, defaultAmount: 3000 },
-  { name: "Alcohol & Nightlife", color: "#df514c", icon: Utensils, defaultAmount: 3500 },
+  { name: "Alcohol & Nightlife", color: "#F43F5E", icon: Utensils, defaultAmount: 3500 },
   { name: "Other & Contingency", color: "#71717A", icon: CircleDollarSign, defaultAmount: 2500 },
 ];
 
@@ -653,7 +653,7 @@ export default function BudgetsSection() {
 
   return (
     <main
-      className="flex-1 h-full overflow-y-auto px-4 sm:px-8 py-6 transition-colors select-none"
+      className="flex-1 h-full overflow-y-auto px-3.5 sm:px-6 md:px-8 py-5 sm:py-6 transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* 1. TOP HEADER & MONTH CONTROLS */}
@@ -740,9 +740,9 @@ export default function BudgetsSection() {
         <div
           className="mb-6 p-3.5 rounded-xl text-xs border flex items-center justify-between"
           style={{
-            borderColor: "rgba(223, 81, 76, 0.4)",
+            borderColor: "rgba(244, 63, 94, 0.4)",
             backgroundColor: "var(--app-card)",
-            color: "#df514c",
+            color: "#f43f5e",
           }}
         >
           <div className="flex items-center gap-2">
@@ -820,7 +820,7 @@ export default function BudgetsSection() {
           </div>
           <div
             className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight"
-            style={{ color: totalRemaining >= 0 ? "#4bb473" : "#df514c" }}
+            style={{ color: totalRemaining >= 0 ? "#10b981" : "#f43f5e" }}
           >
             {loading
               ? "..."
@@ -875,17 +875,17 @@ export default function BudgetsSection() {
               style={{
                 borderColor: `${
                   overallPercentUsed > 100
-                    ? "#df514c"
+                    ? "#f43f5e"
                     : overallPercentUsed > 80
                     ? "#F59E0B"
-                    : "#4bb473"
+                    : "#10b981"
                 }40`,
                 color:
                   overallPercentUsed > 100
-                    ? "#df514c"
+                    ? "#f43f5e"
                     : overallPercentUsed > 80
                     ? "#F59E0B"
-                    : "#4bb473",
+                    : "#10b981",
               }}
             >
               {overallPercentUsed.toFixed(1)}% burned
@@ -923,20 +923,20 @@ export default function BudgetsSection() {
               width: `${Math.min(100, overallPercentUsed)}%`,
               backgroundColor:
                 overallPercentUsed > 100
-                  ? "#df514c"
+                  ? "#f43f5e"
                   : overallPercentUsed > 80
                   ? "#F59E0B"
-                  : "#4bb473",
+                  : "#10b981",
             }}
           />
         </div>
       </div>
 
       {/* 3. INTERACTIVE CATEGORY CARDS TOOLBAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         {/* Card Filter Modes: All Cards / Active Limits / Available to Set */}
         <div
-          className="flex items-center rounded-xl border p-1 text-xs font-medium"
+          className="flex items-center rounded-xl border p-1 text-xs font-medium max-w-full overflow-x-auto"
           style={{
             borderColor: "var(--app-border-subtle)",
             backgroundColor: "var(--app-card)",
@@ -994,7 +994,7 @@ export default function BudgetsSection() {
         </div>
 
         {/* Search, Status & View Mode */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {/* Search Box */}
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
@@ -1142,10 +1142,10 @@ export default function BudgetsSection() {
             const Icon = item.IconComponent;
             const progress = Math.min(100, item.percentUsed);
             const statusColor = item.isOverBudget
-              ? "#df514c"
+              ? "#f43f5e"
               : item.isWarning
               ? "#F59E0B"
-              : "#4bb473";
+              : "#10b981";
 
             // If budget is ALREADY ACTIVE
             if (item.isBudgeted) {
@@ -1156,7 +1156,7 @@ export default function BudgetsSection() {
                   style={{
                     backgroundColor: "var(--app-card)",
                     borderColor: item.isOverBudget
-                      ? "rgba(223, 81, 76, 0.4)"
+                      ? "rgba(244, 63, 94, 0.4)"
                       : item.isWarning
                       ? "rgba(245, 158, 11, 0.3)"
                       : "var(--app-border-subtle)",
@@ -1200,7 +1200,7 @@ export default function BudgetsSection() {
                       <div className="flex items-baseline justify-between">
                         <span
                           className="text-lg font-extrabold tracking-tight"
-                          style={{ color: item.isOverBudget ? "#df514c" : "var(--app-fg)" }}
+                          style={{ color: item.isOverBudget ? "#f43f5e" : "var(--app-fg)" }}
                         >
                           {formatINR(item.spentAmount)}
                         </span>
@@ -1232,7 +1232,7 @@ export default function BudgetsSection() {
                   >
                     <span
                       className="font-medium truncate"
-                      style={{ color: item.isOverBudget ? "#df514c" : "#4bb473" }}
+                      style={{ color: item.isOverBudget ? "#f43f5e" : "#10b981" }}
                     >
                       {item.isOverBudget
                         ? `Exceeded +${formatINR(Math.abs(item.remainingAmount))}`
@@ -1373,10 +1373,10 @@ export default function BudgetsSection() {
                 {displayedCards.map((item) => {
                   const progress = Math.min(100, item.percentUsed);
                   const statusColor = item.isOverBudget
-                    ? "#df514c"
+                    ? "#f43f5e"
                     : item.isWarning
                     ? "#F59E0B"
-                    : "#4bb473";
+                    : "#10b981";
 
                   const Icon = item.IconComponent;
 
@@ -1407,13 +1407,13 @@ export default function BudgetsSection() {
                       </td>
                       <td
                         className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#df514c" : "var(--app-fg)" }}
+                        style={{ color: item.isOverBudget ? "#f43f5e" : "var(--app-fg)" }}
                       >
                         {formatINR(item.spentAmount)}
                       </td>
                       <td
                         className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#df514c" : "#4bb473" }}
+                        style={{ color: item.isOverBudget ? "#f43f5e" : "#10b981" }}
                       >
                         {item.isBudgeted ? (
                           item.isOverBudget

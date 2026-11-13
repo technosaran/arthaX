@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Flame,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -94,8 +95,8 @@ const EXPENSE_CATEGORIES = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  "Housing & Rent": "#df514c",
-  "Groceries & Essentials": "#4bb473",
+  "Housing & Rent": "#F43F5E",
+  "Groceries & Essentials": "#10B981",
   "Food & Dining": "#F59E0B",
   "Utilities & Bills": "#3B82F6",
   "Transport & Fuel": "#8B5CF6",
@@ -103,7 +104,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Shopping & Lifestyle": "#EC4899",
   "Electronics & Gadgets": "#38BDF8",
   "Health & Medical": "#06B6D4",
-  "Fitness & Sports": "#4bb473",
+  "Fitness & Sports": "#10B981",
   "Entertainment & OTT": "#A855F7",
   "Travel & Vacations": "#6366F1",
   "Subscriptions & SaaS": "#14B8A6",
@@ -119,11 +120,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Home & Maintenance": "#78716C",
   "Pet Care & Vet": "#E879F9",
   "Emergency Reserve": "#22C55E",
-  "Charity & Community": "#df514c",
+  "Charity & Community": "#F43F5E",
   "Books & Courses": "#F59E0B",
   "Hobbies & Creative": "#8B5CF6",
   "Office & Coworking": "#64748B",
-  "Alcohol & Nightlife": "#df514c",
+  "Alcohol & Nightlife": "#F43F5E",
   "Other & Contingency": "#71717A",
   // Legacy
   Travel: "#6366F1",
@@ -562,6 +563,28 @@ export default function ExpensesSection() {
   const averageExpense = displayedExpenses.length > 0 ? totalExpenses / displayedExpenses.length : 0;
   const maxExpense = displayedExpenses.length > 0 ? Math.max(...displayedExpenses.map((i) => i.amount)) : 0;
 
+  const dailyBurnRate = useMemo(() => {
+    if (displayedExpenses.length === 0 || totalExpenses <= 0) return 0;
+    if (isAllTime) {
+      const dates = displayedExpenses
+        .map((e) => (e.expense_date ? new Date(e.expense_date).getTime() : NaN))
+        .filter((t) => !isNaN(t));
+      if (dates.length <= 1) return totalExpenses;
+      const days = Math.max(1, Math.round((Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24)) + 1);
+      return totalExpenses / days;
+    }
+    const [yearStr, monthStr] = selectedMonthYear.split("-");
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const totalDaysInMonth = new Date(year, month, 0).getDate();
+    const now = new Date();
+    let elapsedDays = totalDaysInMonth;
+    if (isCurrentMonth) {
+      elapsedDays = Math.max(1, now.getDate());
+    }
+    return totalExpenses / elapsedDays;
+  }, [displayedExpenses, totalExpenses, isAllTime, selectedMonthYear, isCurrentMonth]);
+
   // Donut/Pie Chart Segments
   const donutSegments: DonutSegment[] = useMemo(() => {
     return Object.entries(categoryTotals)
@@ -600,12 +623,12 @@ export default function ExpensesSection() {
 
   return (
     <main
-      className="flex-1 h-full p-6 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Top Header */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8"
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
@@ -715,11 +738,11 @@ export default function ExpensesSection() {
         </div>
       )}
 
-      {/* ROW 1: SEPARATE KPI CARDS (LEFT TO RIGHT) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+      {/* ROW 1: 4 SEPARATE KPI CARDS (RESPONSIVE 4-COLUMN GRID) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
         {/* Card 1: Total Logged Outflow */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -730,17 +753,17 @@ export default function ExpensesSection() {
             <span>Total Logged Outflow</span>
             <ArrowDownRight size={16} className="text-rose-400" />
           </div>
-          <div className="text-3xl font-extrabold font-mono tracking-tight mt-2 text-rose-400">
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-rose-400">
             {loading ? "..." : formatINR(totalExpenses)}
           </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono">
-            Aggregated across {expenses.length} recorded items
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
+            Aggregated across {displayedExpenses.length} recorded items
           </p>
         </div>
 
         {/* Card 2: Largest Outflow Category */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -751,10 +774,10 @@ export default function ExpensesSection() {
             <span>Largest Outflow Category</span>
             <TrendingDown size={16} className="text-amber-400" />
           </div>
-          <div className="text-2xl font-bold tracking-tight mt-2 truncate">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight mt-2 truncate">
             {topCategoryEntry ? topCategoryEntry[0] : "None"}
           </div>
-          <p className="text-[11px] opacity-60 mt-1 font-mono text-amber-400">
+          <p className="text-[11px] opacity-60 mt-1 font-mono text-amber-400 truncate">
             {topCategoryEntry ? formatINR(topCategoryEntry[1]) : "₹0.00"} (
             {topCategoryEntry && totalExpenses > 0
               ? `${((topCategoryEntry[1] / totalExpenses) * 100).toFixed(1)}%`
@@ -765,7 +788,7 @@ export default function ExpensesSection() {
 
         {/* Card 3: Expense Volume & Averages */}
         <div
-          className="rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
@@ -776,11 +799,33 @@ export default function ExpensesSection() {
             <span>Expense Volume</span>
             <CreditCard size={16} className="opacity-70" />
           </div>
-          <div className="text-3xl font-extrabold font-mono tracking-tight mt-2">
-            {loading ? "..." : `${expenses.length} Items`}
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2">
+            {loading ? "..." : `${displayedExpenses.length} Items`}
           </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono">
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
             Avg: {formatINR(averageExpense)} • Peak: {formatINR(maxExpense)}
+          </p>
+        </div>
+
+        {/* Card 4 (NEW): Daily Burn Rate */}
+        <div
+          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+            color: "var(--app-fg)",
+          }}
+        >
+          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
+            <span>Daily Burn Rate</span>
+            <Flame size={16} className="text-orange-400" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-orange-400">
+            {loading ? "..." : formatINR(dailyBurnRate)}
+            <span className="text-xs font-normal opacity-60"> /day</span>
+          </div>
+          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
+            {isAllTime ? "All-time average burn pace" : `Paced across active days in ${monthDisplayTitle}`}
           </p>
         </div>
       </div>
@@ -800,7 +845,7 @@ export default function ExpensesSection() {
             title="Spending Trajectory"
             subtitle="6-Month Monthly Outflow Trend"
             data={lineChartData}
-            color="#df514c"
+            color="#f43f5e"
             gradientId="expenseTrendGradient"
             formatter={formatINR}
             type="expense"
@@ -819,7 +864,7 @@ export default function ExpensesSection() {
         >
           <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
             <div className="flex items-center gap-1.5">
-              <PieChartIcon size={14} className="text-[#df514c]" />
+              <PieChartIcon size={14} className="text-rose-400" />
               <h3 className="text-sm font-bold tracking-tight">Category Breakdown</h3>
             </div>
             <span className="text-[10px] font-mono opacity-50">
@@ -838,10 +883,10 @@ export default function ExpensesSection() {
                 totalValue={totalExpenses}
                 segments={donutSegments}
                 formatter={formatINR}
-                centerColor="#df514c"
+                centerColor="#f43f5e"
                 emptyMessage="No expense data available."
                 emptySubMessage="Log your first expense to view category allocation."
-                icon={<PieChartIcon size={24} className="opacity-50 text-[#df514c]" />}
+                icon={<PieChartIcon size={24} className="opacity-50 text-rose-400" />}
               />
             )}
           </div>
@@ -859,36 +904,11 @@ export default function ExpensesSection() {
             style={{
               borderColor: "var(--app-border-subtle)",
               backgroundColor: "var(--app-card)",
-              color: "#df514c",
+              color: "#f43f5e",
             }}
           >
             {displayedExpenses.length}
           </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              fetchExpenses();
-              fetchAccounts();
-            }}
-            className="flex items-center gap-1.5 text-xs opacity-70 hover:opacity-100 transition-opacity cursor-pointer font-mono"
-            title="Refresh Expenses Data"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            <span>Refresh</span>
-          </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
-            style={{
-              backgroundColor: "var(--app-fg)",
-              color: "var(--app-bg)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <Plus size={13} />
-            Add Expense
-          </button>
         </div>
       </div>
 

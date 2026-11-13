@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { PieChart as PieChartIcon } from "lucide-react";
+import { PieChart as PieChartIcon, Sparkles } from "lucide-react";
 
 export interface DonutSegment {
   label: string;
@@ -16,8 +16,8 @@ export interface InteractiveDonutChartProps {
   totalLabel?: string;
   totalValue: number;
   segments: DonutSegment[];
-  size?: number; // Diameter in px (default: 160)
-  strokeWidth?: number; // Donut thickness (default: 14)
+  size?: number; // Diameter in px (default: 170)
+  strokeWidth?: number; // Donut thickness (default: 16)
   formatter?: (val: number) => string;
   emptyMessage?: string;
   emptySubMessage?: string;
@@ -32,8 +32,8 @@ export default function InteractiveDonutChart({
   totalLabel = "Total Assets",
   totalValue,
   segments,
-  size = 160,
-  strokeWidth = 14,
+  size = 170,
+  strokeWidth = 16,
   formatter = (val: number) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -45,11 +45,12 @@ export default function InteractiveDonutChart({
   variant = "standard",
   icon,
   centerColor,
-  maxLegendHeight = "max-h-48",
+  maxLegendHeight = "max-h-52",
 }: InteractiveDonutChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const radius = (size - strokeWidth * 2) / 2;
+  const innerRadius = radius - strokeWidth / 2;
   const circumference = 2 * Math.PI * radius;
 
   // Filter valid positive segments and compute exact percentages
@@ -66,13 +67,17 @@ export default function InteractiveDonutChart({
     });
   }, [segments, totalValue]);
 
-  // Compute strokeDasharray and strokeDashoffset for each segment
+  // Compute strokeDasharray and strokeDashoffset for each segment with clean gaps
   const renderedSegments = useMemo(() => {
     let accumulatedOffset = 0;
+    const gapAngle = validSegments.length > 1 ? 2.5 : 0; // 2.5px micro-gap between slices
+    const gapPerSegment = (gapAngle / 360) * circumference;
+
     return validSegments.map((seg, idx) => {
-      const strokeDash = (seg.percentage / 100) * circumference;
+      const rawDash = (seg.percentage / 100) * circumference;
+      const strokeDash = Math.max(1, rawDash - gapPerSegment);
       const offset = accumulatedOffset;
-      accumulatedOffset += strokeDash;
+      accumulatedOffset += rawDash;
 
       return {
         ...seg,
@@ -84,56 +89,109 @@ export default function InteractiveDonutChart({
   }, [validSegments, circumference]);
 
   // Active highlighted segment (if hovered)
-  const activeSegment = hoveredIndex !== null && renderedSegments[hoveredIndex]
-    ? renderedSegments[hoveredIndex]
-    : null;
+  const activeSegment =
+    hoveredIndex !== null && renderedSegments[hoveredIndex]
+      ? renderedSegments[hoveredIndex]
+      : null;
 
   if (validSegments.length === 0 || totalValue <= 0) {
     return (
-      <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs opacity-60 w-full select-none">
-        <div className="p-3 rounded-full mb-2" style={{ backgroundColor: "var(--app-track-bg)" }}>
-          {icon || <PieChartIcon size={24} className="opacity-50" />}
+      <div className="h-48 flex flex-col items-center justify-center text-center p-6 text-xs opacity-60 w-full select-none">
+        <div
+          className="relative p-4 rounded-full mb-3 border"
+          style={{
+            borderColor: "var(--app-border-subtle)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          {icon || <PieChartIcon size={26} className="opacity-50 text-[var(--app-accent)]" />}
+          <div className="absolute inset-0 rounded-full border border-dashed border-white/15 animate-spin" style={{ animationDuration: "14s" }} />
         </div>
-        <p className="font-semibold text-xs">{emptyMessage}</p>
-        <p className="text-[11px] mt-1 opacity-75 max-w-xs">{emptySubMessage}</p>
+        <p className="font-bold text-xs tracking-tight">{emptyMessage}</p>
+        <p className="text-[11px] mt-1 opacity-70 max-w-xs leading-relaxed">{emptySubMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col ${variant === "compact" ? "items-center gap-4" : "sm:flex-row items-center gap-6 lg:gap-8"} w-full`}>
-      {/* Donut SVG Ring Container */}
-      <div className="flex justify-center items-center relative flex-shrink-0 select-none">
+    <div
+      className={`flex flex-col ${
+        variant === "compact"
+          ? "items-center gap-5"
+          : "sm:flex-row items-center gap-6 lg:gap-10"
+      } w-full`}
+    >
+      {/* Donut SVG Ring Container with Luminescent Bloom */}
+      <div className="flex justify-center items-center relative flex-shrink-0 select-none group">
+        {/* Ambient radial blur halo matching active segment color */}
+        <div
+          className="absolute inset-0 rounded-full blur-2xl pointer-events-none transition-all duration-300 -z-10"
+          style={{
+            backgroundColor: activeSegment ? activeSegment.color : "transparent",
+            opacity: activeSegment ? 0.22 : 0,
+            transform: "scale(1.2)",
+          }}
+        />
+
         <svg
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           className="transform -rotate-90 overflow-visible"
         >
-          {/* Outer glow filter for hovered slice */}
           <defs>
-            <filter id={`donutGlow-${size}`} x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
+            {/* High-intensity outer bloom filter for active slice */}
+            <filter id={`donutGlow-${size}`} x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="4.5" result="blur" />
+              <feDropShadow dx="0" dy="0" stdDeviation="6" floodOpacity="0.45" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
+
+            {/* Inner subtle bevel mask */}
+            <radialGradient id={`centerLens-${size}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--app-card)" stopOpacity="0.9" />
+              <stop offset="85%" stopColor="var(--app-bg)" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="var(--app-border)" stopOpacity="0.4" />
+            </radialGradient>
           </defs>
 
-          {/* Background track circle */}
+          {/* Precision outer hairline guide circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius + strokeWidth / 2 + 3}
+            fill="none"
+            stroke="var(--app-border-subtle)"
+            strokeWidth="0.75"
+            strokeDasharray="2 3"
+            opacity="0.4"
+          />
+
+          {/* Background track circle with rich subtle contrast */}
           <circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="var(--app-track-bg)"
+            stroke="var(--app-card)"
             strokeWidth={strokeWidth}
           />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--app-border)"
+            strokeWidth={strokeWidth}
+            opacity="0.45"
+          />
 
-          {/* Render individual donut segments */}
+          {/* Render individual donut segments with precision arcs */}
           {renderedSegments.map((seg, idx) => {
             const isHovered = hoveredIndex === idx;
             const isAnyHovered = hoveredIndex !== null;
             const currentStrokeWidth = isHovered ? strokeWidth + 4 : strokeWidth;
-            const currentOpacity = isHovered ? 1 : isAnyHovered ? 0.35 : 1;
+            const currentOpacity = isHovered ? 1 : isAnyHovered ? 0.28 : 0.95;
 
             return (
               <circle
@@ -146,24 +204,50 @@ export default function InteractiveDonutChart({
                 strokeWidth={currentStrokeWidth}
                 strokeDasharray={seg.strokeDasharray}
                 strokeDashoffset={seg.strokeDashoffset}
-                className="transition-all duration-300 ease-out cursor-pointer"
+                strokeLinecap="round"
+                className="transition-all duration-200 ease-out cursor-pointer"
                 style={{
                   opacity: currentOpacity,
                   filter: isHovered ? `url(#donutGlow-${size})` : "none",
+                  transformOrigin: "center",
                 }}
                 onMouseEnter={() => setHoveredIndex(idx)}
                 onMouseLeave={() => setHoveredIndex(null)}
               />
             );
           })}
+
+          {/* Precision inner hairline guide circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={Math.max(4, innerRadius - 2)}
+            fill="none"
+            stroke="var(--app-border-subtle)"
+            strokeWidth="0.75"
+            strokeDasharray="2 3"
+            opacity="0.4"
+          />
         </svg>
 
-        {/* Dynamic Center Label */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none px-2 transition-all duration-200">
+        {/* Dynamic Center Crystal Lens Display */}
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none rounded-full transition-all duration-200"
+          style={{
+            margin: strokeWidth + 6,
+            background: `radial-gradient(circle, var(--app-card) 60%, var(--app-bg) 100%)`,
+            boxShadow: activeSegment
+              ? `inset 0 0 16px ${activeSegment.color}25, 0 4px 12px rgba(0,0,0,0.3)`
+              : "inset 0 0 12px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.2)",
+            border: activeSegment
+              ? `1px solid ${activeSegment.color}45`
+              : "1px solid var(--app-border-subtle)",
+          }}
+        >
           {activeSegment ? (
-            <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150 px-2">
               <span
-                className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[100px] mb-0.5"
+                className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[95px] mb-0.5"
                 style={{ color: activeSegment.color }}
               >
                 {activeSegment.label}
@@ -172,17 +256,18 @@ export default function InteractiveDonutChart({
                 {formatter(activeSegment.value).replace(".00", "")}
               </span>
               <span
-                className="text-[9px] font-bold font-mono px-1.5 py-0.2 mt-0.5 rounded-full"
+                className="text-[9px] font-bold font-mono px-2 py-0.5 mt-1 rounded-full border tracking-tight"
                 style={{
-                  backgroundColor: `${activeSegment.color}22`,
+                  backgroundColor: `${activeSegment.color}20`,
                   color: activeSegment.color,
+                  borderColor: `${activeSegment.color}40`,
                 }}
               >
                 {activeSegment.percentage.toFixed(1)}%
               </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center animate-in fade-in duration-150">
+            <div className="flex flex-col items-center animate-in fade-in duration-150 px-2">
               <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60">
                 {totalLabel}
               </span>
@@ -192,34 +277,40 @@ export default function InteractiveDonutChart({
               >
                 {formatter(totalValue).replace(".00", "")}
               </span>
-              <span className="text-[9px] font-mono opacity-50 mt-0.5">
-                {validSegments.length} {validSegments.length === 1 ? "Item" : "Items"}
+              <span className="text-[9px] font-mono opacity-50 mt-0.5 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {validSegments.length} {validSegments.length === 1 ? "Class" : "Classes"}
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Legend Column with Interactive Hover Highlight */}
-      <div className="w-full sm:max-w-xs space-y-2">
+      {/* Rich Interactive Legend with Proportional Progress Meters */}
+      <div className="w-full sm:max-w-xs space-y-2.5">
         {title && (
           <div
-            className="flex items-center justify-between pb-1.5 border-b select-none"
+            className="flex items-center justify-between pb-2 border-b select-none"
             style={{ borderColor: "var(--app-border-subtle)" }}
           >
-            <div className="flex items-center gap-1.5">
-              {icon || <PieChartIcon size={13} className="opacity-70" />}
-              <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">
+            <div className="flex items-center gap-2">
+              {icon || <PieChartIcon size={14} className="opacity-70 text-[var(--app-accent)]" />}
+              <span className="text-[11px] uppercase font-bold tracking-wider opacity-80">
                 {title}
               </span>
             </div>
-            <span className="text-[10px] font-mono opacity-50">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border opacity-70"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-card)",
+              }}
+            >
               {validSegments.length} {validSegments.length === 1 ? "Class" : "Classes"}
             </span>
           </div>
         )}
 
-        <div className={`space-y-1 ${maxLegendHeight} overflow-y-auto pr-1`}>
+        <div className={`space-y-1.5 ${maxLegendHeight} overflow-y-auto pr-1`}>
           {renderedSegments.map((seg, idx) => {
             const isHovered = hoveredIndex === idx;
             const isAnyHovered = hoveredIndex !== null;
@@ -229,35 +320,61 @@ export default function InteractiveDonutChart({
                 key={idx}
                 onMouseEnter={() => setHoveredIndex(idx)}
                 onMouseLeave={() => setHoveredIndex(null)}
-                className={`flex items-center justify-between text-xs py-1 px-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`group relative flex flex-col gap-1 text-xs p-2 rounded-xl border transition-all cursor-pointer ${
                   isHovered
-                    ? "bg-[var(--app-card-hover)] scale-[1.01]"
+                    ? "scale-[1.02] shadow-md"
                     : isAnyHovered
-                    ? "opacity-40"
+                    ? "opacity-35"
                     : "opacity-90 hover:opacity-100"
                 }`}
+                style={{
+                  backgroundColor: isHovered ? "var(--app-card-hover)" : "var(--app-card)",
+                  borderColor: isHovered ? `${seg.color}50` : "var(--app-border-subtle)",
+                }}
               >
-                {/* Segment Color Dot & Label */}
-                <div className="flex items-center gap-2 overflow-hidden truncate pr-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-transform duration-200"
+                {/* Top Row: Color indicator, Label, and Monetary Amount */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 overflow-hidden truncate">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all duration-200"
+                      style={{
+                        backgroundColor: seg.color,
+                        transform: isHovered ? "scale(1.3)" : "scale(1)",
+                        boxShadow: isHovered ? `0 0 8px ${seg.color}` : "none",
+                      }}
+                    />
+                    <span className="truncate text-[11px] font-semibold">{seg.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-mono flex-shrink-0 text-right">
+                    <span className="text-[11px] font-bold">
+                      {formatter(seg.value).replace(".00", "")}
+                    </span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.2 rounded font-mono"
+                      style={{
+                        backgroundColor: `${seg.color}18`,
+                        color: seg.color,
+                      }}
+                    >
+                      {seg.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Micro Progress Distribution Bar */}
+                <div
+                  className="w-full h-1 rounded-full overflow-hidden"
+                  style={{ backgroundColor: "var(--app-track-bg)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
                     style={{
+                      width: `${Math.max(3, seg.percentage)}%`,
                       backgroundColor: seg.color,
-                      transform: isHovered ? "scale(1.25)" : "scale(1)",
                       boxShadow: isHovered ? `0 0 6px ${seg.color}` : "none",
                     }}
                   />
-                  <span className="truncate text-[11px] font-medium">{seg.label}</span>
-                </div>
-
-                {/* Percentage & INR Amount in Kite Tabular Num */}
-                <div className="flex items-center gap-2 font-mono flex-shrink-0 text-right">
-                  <span className="text-[11px] font-bold">
-                    {seg.percentage.toFixed(1)}%
-                  </span>
-                  <span className="opacity-50 text-[10px]">
-                    ({formatter(seg.value).replace(".00", "")})
-                  </span>
                 </div>
               </div>
             );

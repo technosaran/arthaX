@@ -4,40 +4,40 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Users,
   UserPlus,
-  Home,
   Plus,
   Trash2,
   Pencil,
   Loader2,
   X,
-  Search,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  TrendingUp,
-  Wallet,
-  Calendar,
   Phone,
   Mail,
-  Sparkles,
-  Check,
-  ArrowRight,
   Send,
   RefreshCw,
   Coins,
+  Wallet,
+  Calendar,
+  CheckCircle2,
+  ArrowUpRight,
+  TrendingUp,
+  PieChart as PieChartIcon,
+  ChevronLeft,
   ChevronRight,
-  Info,
-  ShieldCheck,
-  ShieldAlert,
-  HeartPulse,
-  Key,
-  FileText,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { getFromLocalCache, saveToLocalCache } from "@/utils/cacheClient";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import BankLogo from "@/components/BankLogo";
+import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
+import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
+import {
+  getCurrentMonthYear,
+  formatMonthDisplay,
+  getEarliestDataMonth,
+  computeNextMonth,
+  computePrevMonth,
+} from "@/utils/monthUtils";
 
 // ==========================================
 // TypeScript Interfaces
@@ -49,8 +49,8 @@ export interface FamilyMember {
   name: string;
   relationship: string;
   avatar_color: string;
-  monthly_allowance: number;
-  current_spending: number;
+  monthly_allowance: number; // Target monthly support
+  current_spending: number;  // Total money sent this cycle
   role: string;
   email?: string | null;
   phone?: string | null;
@@ -58,18 +58,20 @@ export interface FamilyMember {
   created_at?: string;
 }
 
-export interface FamilyResponsibility {
+interface AccountItem {
   id: string;
-  user_id: string;
-  title: string;
-  assigned_to?: string | null;
+  name: string;
+  type: string;
+  balance: number;
+}
+
+interface FamilyExpenseItem {
+  id: string;
   amount: number;
-  frequency: string;
-  due_date?: string | null;
-  category: string;
-  is_completed: boolean;
+  expense_date: string;
+  title?: string | null;
   notes?: string | null;
-  created_at?: string;
+  account_id?: string | null;
 }
 
 // ==========================================
@@ -77,137 +79,64 @@ export interface FamilyResponsibility {
 // ==========================================
 
 const RELATIONSHIPS = [
-  "Spouse",
-  "Partner",
-  "Child",
   "Parent",
+  "Spouse",
+  "Child",
   "Sibling",
-  "Household Staff",
+  "Grandparent",
+  "In-law",
+  "Relative",
   "Other Dependent",
 ];
 
-const ROLES = [
-  { value: "co-manager", label: "Co-Manager (Full Access)" },
-  { value: "member", label: "Member (Standard)" },
-  { value: "dependent", label: "Dependent / Child" },
-];
-
 const AVATAR_COLORS = [
-  "#4bb473", // Emerald
+  "#10B981", // Modern Vibrant Emerald
   "#3B82F6", // Blue
   "#8B5CF6", // Purple
   "#EC4899", // Pink
   "#F59E0B", // Amber
   "#06B6D4", // Cyan
-  "#df514c", // Red
+  "#F43F5E", // Modern Rose / Red
   "#14B8A6", // Teal
   "#E11D48", // Rose
-];
-
-const RESPONSIBILITY_CATEGORIES = [
-  "Society & Rent",
-  "Bills & Utilities",
-  "Groceries & Food",
-  "Tuition & Education",
-  "Domestic Staff",
-  "Medical & Health",
-  "Vehicle & Fuel",
-  "Other Household",
-];
-
-// Starter template for new users
-const STARTER_MEMBERS: Omit<FamilyMember, "id" | "user_id">[] = [
-  {
-    name: "Priya (Spouse)",
-    relationship: "Spouse",
-    avatar_color: "#EC4899",
-    monthly_allowance: 25000,
-    current_spending: 14200,
-    role: "co-manager",
-    email: "priya@example.com",
-    phone: "+91 98765 43210",
-    notes: "Manages household groceries and utilities",
-  },
-  {
-    name: "Aarav (Kid)",
-    relationship: "Child",
-    avatar_color: "#3B82F6",
-    monthly_allowance: 5000,
-    current_spending: 2800,
-    role: "dependent",
-    email: null,
-    phone: null,
-    notes: "School stationery, hobbies, and sports activities",
-  },
-];
-
-const STARTER_RESPONSIBILITIES: Omit<FamilyResponsibility, "id" | "user_id">[] = [
-  {
-    title: "Apartment Society Maintenance",
-    assigned_to: "Self",
-    amount: 5200,
-    frequency: "monthly",
-    due_date: "05th of every month",
-    category: "Society & Rent",
-    is_completed: true,
-    notes: "Pay via MyGate app before the 10th to avoid late penalty",
-  },
-  {
-    title: "Electricity & Water Bill (BESCOM)",
-    assigned_to: "Priya (Spouse)",
-    amount: 3800,
-    frequency: "monthly",
-    due_date: "14th of every month",
-    category: "Bills & Utilities",
-    is_completed: false,
-    notes: "Auto-pay debit linked to HDFC account",
-  },
-  {
-    title: "House Cook & Housekeeping Salary",
-    assigned_to: "Priya (Spouse)",
-    amount: 12000,
-    frequency: "monthly",
-    due_date: "01st of every month",
-    category: "Domestic Staff",
-    is_completed: true,
-    notes: "Direct UPI transfer on 1st morning",
-  },
 ];
 
 export default function FamilySection() {
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  // Active sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<"members" | "planning">("members");
-
   // Multi-tier cache keys
   const membersKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_MEMBERS);
-  const responsibilitiesKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_RESPONSIBILITIES);
+
+  // Active month in YYYY-MM format with strict boundary constraints
+  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
+  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
+  const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   // States initialized from 0ms Tier 1/2 Local Cache
   const [members, setMembers] = useState<FamilyMember[]>(() => getFromLocalCache<FamilyMember[]>(membersKey) || []);
-  const [responsibilities, setResponsibilities] = useState<FamilyResponsibility[]>(() => getFromLocalCache<FamilyResponsibility[]>(responsibilitiesKey) || []);
-
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [familyExpenses, setFamilyExpenses] = useState<FamilyExpenseItem[]>([]);
+  const [chartMode, setChartMode] = useState<"spending" | "allowance">("spending");
   const [loading, setLoading] = useState<boolean>(() => members.length === 0);
   const [submitting, setSubmitting] = useState(false);
-  const [seedingTemplate, setSeedingTemplate] = useState(false);
 
-  // Filter for Household Planning
-  const [planningFilter, setPlanningFilter] = useState<"all" | "pending" | "completed">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Modals
+  // Add / Edit Member Modal
   const [memberModalOpen, setMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
 
-  const [spendModalOpen, setSpendModalOpen] = useState(false);
-  const [spendMember, setSpendMember] = useState<FamilyMember | null>(null);
-  const [spendAmountInput, setSpendAmountInput] = useState("");
-  const [spendActionType, setSpendActionType] = useState<"add" | "reset">("add");
+  // Send Money / Log Transfer Modal
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferMember, setTransferMember] = useState<FamilyMember | null>(null);
+  const [transferAmountInput, setTransferAmountInput] = useState("");
+  const [transferDate, setTransferDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [transferAccountId, setTransferAccountId] = useState("");
+  const [transferNotes, setTransferNotes] = useState("");
+  const [recordInExpenses, setRecordInExpenses] = useState(true);
 
-  const [respModalOpen, setRespModalOpen] = useState(false);
-  const [editingResp, setEditingResp] = useState<FamilyResponsibility | null>(null);
+  // Reset Spending Cycle Modal
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetMember, setResetMember] = useState<FamilyMember | null>(null);
 
   // Currency Formatter
   const formatINR = useCallback((val: number) => {
@@ -219,20 +148,26 @@ export default function FamilySection() {
   }, []);
 
   // ==========================================
-  // Fetch All Family Data
+  // Fetch Family Members & Accounts
   // ==========================================
   const fetchAllData = useCallback(async () => {
     if (!user) return;
     try {
       const supabase = createClient();
 
-      const [mRes, rRes] = await Promise.all([
+      const [mRes, aRes, expRes] = await Promise.all([
         supabase.from("family_members").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
-        supabase.from("family_responsibilities").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
+        supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id).order("name", { ascending: true }),
+        supabase
+          .from("expenses")
+          .select("id, amount, expense_date, title, notes, account_id")
+          .eq("user_id", user.id)
+          .or("category.eq.Family & Child Care,title.ilike.%Money sent to%")
+          .order("expense_date", { ascending: true }),
       ]);
 
       if (mRes.data) {
-        const mappedMembers: FamilyMember[] = mRes.data.map((item) => ({
+        const mappedMembers: FamilyMember[] = mRes.data.map((item: any) => ({
           ...item,
           monthly_allowance: Number(item.monthly_allowance) || 0,
           current_spending: Number(item.current_spending) || 0,
@@ -241,21 +176,35 @@ export default function FamilySection() {
         saveToLocalCache(membersKey, mappedMembers, 3600);
       }
 
-      if (rRes.data) {
-        const mappedResp: FamilyResponsibility[] = rRes.data.map((item) => ({
-          ...item,
-          amount: Number(item.amount) || 0,
-          is_completed: !!item.is_completed,
-        }));
-        setResponsibilities(mappedResp);
-        saveToLocalCache(responsibilitiesKey, mappedResp, 3600);
+      if (aRes.data) {
+        setAccounts(
+          aRes.data.map((acc: any) => ({
+            id: acc.id,
+            name: acc.name,
+            type: acc.type,
+            balance: Number(acc.balance) || 0,
+          }))
+        );
+      }
+
+      if (expRes.data) {
+        setFamilyExpenses(
+          expRes.data.map((e: any) => ({
+            id: e.id,
+            amount: Number(e.amount) || 0,
+            expense_date: e.expense_date,
+            title: e.title,
+            notes: e.notes,
+            account_id: e.account_id,
+          }))
+        );
       }
     } catch (err) {
       console.error("[FamilySection] Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
-  }, [user, membersKey, responsibilitiesKey]);
+  }, [user, membersKey]);
 
   useEffect(() => {
     fetchAllData();
@@ -268,7 +217,7 @@ export default function FamilySection() {
     const channel = supabase
       .channel("family_realtime_sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "family_members" }, () => fetchAllData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "family_responsibilities" }, () => fetchAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => fetchAllData())
       .subscribe();
 
     return () => {
@@ -277,62 +226,177 @@ export default function FamilySection() {
   }, [user, fetchAllData]);
 
   // ==========================================
-  // Calculated Metrics
+  // Month Stepper Constraints & Navigation
   // ==========================================
+  const earliestMonthYear = useMemo(() => {
+    const dates = [
+      ...familyExpenses.map((e) => e.expense_date).filter(Boolean),
+      ...members.map((m) => m.created_at?.substring(0, 10)).filter(Boolean) as string[],
+    ];
+    return getEarliestDataMonth(dates, currentMonthYear);
+  }, [familyExpenses, members, currentMonthYear]);
+
+  // Clamp selectedMonthYear so it cannot be in the future or before earliest data
+  useEffect(() => {
+    if (selectedMonthYear > currentMonthYear) {
+      setSelectedMonthYear(currentMonthYear);
+    } else if (earliestMonthYear && selectedMonthYear < earliestMonthYear) {
+      setSelectedMonthYear(earliestMonthYear);
+    }
+  }, [selectedMonthYear, currentMonthYear, earliestMonthYear]);
+
+  const canGoPrev = selectedMonthYear > earliestMonthYear;
+  const canGoNext = selectedMonthYear < currentMonthYear;
+  const isCurrentMonth = selectedMonthYear === currentMonthYear;
+
+  const monthDisplayTitle = useMemo(() => {
+    return formatMonthDisplay(selectedMonthYear);
+  }, [selectedMonthYear]);
+
+  const handlePrevMonth = () => {
+    if (!canGoPrev) return;
+    setIsAllTime(false);
+    setSelectedMonthYear((prev) => computePrevMonth(prev, earliestMonthYear));
+  };
+
+  const handleNextMonth = () => {
+    if (!canGoNext) return;
+    setIsAllTime(false);
+    setSelectedMonthYear((prev) => computeNextMonth(prev, currentMonthYear));
+  };
+
+  const handleResetToCurrentMonth = () => {
+    setIsAllTime(false);
+    setSelectedMonthYear(currentMonthYear);
+  };
+
+  // ==========================================
+  // Calculated Metrics by Selected Month
+  // ==========================================
+
+  // Calculate spending for a specific member according to selected month or all-time
+  const getMemberSpendingForMonth = useCallback(
+    (member: FamilyMember) => {
+      const memberName = (member.name || "").trim().toLowerCase();
+      const matchingExpenses = familyExpenses.filter((e) => {
+        const t = (e.title || "").toLowerCase();
+        const n = (e.notes || "").toLowerCase();
+        return t.includes(memberName) || n.includes(memberName);
+      });
+
+      if (isAllTime) {
+        const expSum = matchingExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        return Math.max(expSum, Number(member.current_spending) || 0);
+      }
+
+      const monthExpenses = matchingExpenses.filter(
+        (e) => e.expense_date && e.expense_date.startsWith(selectedMonthYear)
+      );
+      const expSum = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+      // If viewing current month, ensure it reflects at least member.current_spending counter
+      if (isCurrentMonth) {
+        return Math.max(expSum, Number(member.current_spending) || 0);
+      }
+
+      return expSum;
+    },
+    [familyExpenses, isAllTime, selectedMonthYear, isCurrentMonth]
+  );
+
+  const displayedFamilyExpenses = useMemo(() => {
+    if (isAllTime) return familyExpenses;
+    return familyExpenses.filter((e) => e.expense_date && e.expense_date.startsWith(selectedMonthYear));
+  }, [familyExpenses, isAllTime, selectedMonthYear]);
+
+  const totalCurrentSpending = useMemo(() => {
+    if (members.length > 0) {
+      const membersSum = members.reduce((sum, m) => sum + getMemberSpendingForMonth(m), 0);
+      const expenseSum = displayedFamilyExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      return Math.max(membersSum, expenseSum);
+    }
+    return displayedFamilyExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  }, [members, getMemberSpendingForMonth, displayedFamilyExpenses]);
+
   const totalMonthlyAllowance = useMemo(
     () => members.reduce((sum, m) => sum + (Number(m.monthly_allowance) || 0), 0),
     [members]
   );
 
-  const totalCurrentSpending = useMemo(
-    () => members.reduce((sum, m) => sum + (Number(m.current_spending) || 0), 0),
-    [members]
+  const overallPercent = useMemo(
+    () => (totalMonthlyAllowance > 0 ? Math.round((totalCurrentSpending / totalMonthlyAllowance) * 100) : 0),
+    [totalMonthlyAllowance, totalCurrentSpending]
   );
 
-  const totalHouseholdBills = useMemo(
-    () => responsibilities.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
-    [responsibilities]
-  );
-
-  const paidHouseholdBills = useMemo(
-    () =>
-      responsibilities
-        .filter((r) => r.is_completed)
-        .reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
-    [responsibilities]
-  );
-
-  const pendingHouseholdBillsCount = useMemo(
-    () => responsibilities.filter((r) => !r.is_completed).length,
-    [responsibilities]
+  const remainingBudget = useMemo(
+    () => totalMonthlyAllowance - totalCurrentSpending,
+    [totalMonthlyAllowance, totalCurrentSpending]
   );
 
   // ==========================================
-  // Seed Starter Template
+  // Visual Charts Calculations (Pie & Line)
   // ==========================================
-  const handleSeedTemplate = async () => {
-    if (!user) return;
-    setSeedingTemplate(true);
-    try {
-      const supabase = createClient();
 
-      const memberPayloads = STARTER_MEMBERS.map((m) => ({ ...m, user_id: user.id }));
-      const respPayloads = STARTER_RESPONSIBILITIES.map((r) => ({ ...r, user_id: user.id }));
+  // 1. Pie / Donut Chart: Member Support Allocation
+  const donutSegments: DonutSegment[] = useMemo(() => {
+    if (members.length === 0) return [];
 
-      await Promise.all([
-        supabase.from("family_members").insert(memberPayloads),
-        supabase.from("family_responsibilities").insert(respPayloads),
-      ]);
+    const isSpending = chartMode === "spending";
 
-      showToast("Family starter workspace loaded successfully!", "success");
-      await fetchAllData();
-    } catch (err) {
-      console.error("Failed to seed template:", err);
-      showToast("Unable to load starter template. Please try again.", "error");
-    } finally {
-      setSeedingTemplate(false);
+    return members
+      .map((m) => {
+        const val = isSpending
+          ? getMemberSpendingForMonth(m)
+          : (Number(m.monthly_allowance) || 0);
+
+        return {
+          label: m.name,
+          value: val,
+          color: m.avatar_color || "#10B981",
+          subtitle: `${m.relationship} • ${formatINR(val)}`,
+        };
+      })
+      .filter((s) => s.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [members, chartMode, getMemberSpendingForMonth, formatINR]);
+
+  const donutTotal = useMemo(() => {
+    return chartMode === "spending" ? totalCurrentSpending : totalMonthlyAllowance;
+  }, [chartMode, totalCurrentSpending, totalMonthlyAllowance]);
+
+  // 2. Line Chart: 6-Month Timeline Trajectory of Family Support
+  const lineChartData: LinePoint[] = useMemo(() => {
+    const months: { key: string; label: string; fullLabel: string; value: number }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleString("default", { month: "short" });
+      const fullLabel = d.toLocaleString("default", { month: "long", year: "numeric" });
+      months.push({ key, label, fullLabel, value: 0 });
     }
-  };
+
+    if (familyExpenses && familyExpenses.length > 0) {
+      familyExpenses.forEach((item) => {
+        if (item.expense_date) {
+          const itemKey = item.expense_date.substring(0, 7);
+          const target = months.find((m) => m.key === itemKey);
+          if (target) {
+            target.value += Number(item.amount) || 0;
+          }
+        }
+      });
+    }
+
+    // Ensure current month displays at least current cycle spending
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const currentMonthObj = months.find((m) => m.key === currentKey);
+    if (currentMonthObj && currentMonthObj.value < totalCurrentSpending && isCurrentMonth) {
+      currentMonthObj.value = totalCurrentSpending;
+    }
+
+    return months;
+  }, [familyExpenses, totalCurrentSpending, isCurrentMonth]);
 
   // ==========================================
   // Member Operations
@@ -344,12 +408,11 @@ export default function FamilySection() {
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name")?.toString().trim() || "";
-    const relationship = formData.get("relationship")?.toString() || "Spouse";
-    const role = formData.get("role")?.toString() || "member";
+    const relationship = formData.get("relationship")?.toString() || "Parent";
     const monthly_allowance = parseFloat(formData.get("monthly_allowance")?.toString() || "0") || 0;
-    const avatar_color = formData.get("avatar_color")?.toString() || "#4bb473";
-    const email = formData.get("email")?.toString().trim() || null;
+    const avatar_color = formData.get("avatar_color")?.toString() || "#10B981";
     const phone = formData.get("phone")?.toString().trim() || null;
+    const email = formData.get("email")?.toString().trim() || null;
     const notes = formData.get("notes")?.toString().trim() || null;
 
     if (!name) {
@@ -367,11 +430,10 @@ export default function FamilySection() {
           .update({
             name,
             relationship,
-            role,
             monthly_allowance,
             avatar_color,
-            email,
             phone,
+            email,
             notes,
           })
           .eq("id", editingMember.id)
@@ -384,12 +446,12 @@ export default function FamilySection() {
           user_id: user.id,
           name,
           relationship,
-          role,
+          role: "member",
           monthly_allowance,
           current_spending: 0,
           avatar_color,
-          email,
           phone,
+          email,
           notes,
         });
 
@@ -409,7 +471,7 @@ export default function FamilySection() {
   };
 
   const handleDeleteMember = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove ${name} from your family space?`)) return;
+    if (!confirm(`Are you sure you want to remove ${name} from your family tracker?`)) return;
     if (!user) return;
 
     try {
@@ -424,190 +486,104 @@ export default function FamilySection() {
     }
   };
 
-  const handleAdjustSpending = async (e: React.FormEvent) => {
+  // ==========================================
+  // Log Money Sent / Transfer Operation
+  // ==========================================
+  const handleLogTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !spendMember) return;
+    if (!user || !transferMember) return;
     setSubmitting(true);
 
-    const val = parseFloat(spendAmountInput) || 0;
-    if (spendActionType === "add" && val <= 0) {
-      showToast("Please enter a valid amount", "error");
+    const val = parseFloat(transferAmountInput) || 0;
+    if (val <= 0) {
+      showToast("Please enter a valid transfer amount", "error");
       setSubmitting(false);
       return;
     }
 
     try {
       const supabase = createClient();
-      const newSpending =
-        spendActionType === "reset"
-          ? 0
-          : Number((Number(spendMember.current_spending || 0) + val).toFixed(2));
+      const newSpending = Number((Number(transferMember.current_spending || 0) + val).toFixed(2));
 
-      const { error } = await supabase
+      // 1. Update family member's current spending / total sent
+      const { error: memberError } = await supabase
         .from("family_members")
         .update({ current_spending: newSpending })
-        .eq("id", spendMember.id)
+        .eq("id", transferMember.id)
         .eq("user_id", user.id);
 
-      if (error) throw error;
-      showToast(
-        spendActionType === "reset"
-          ? `Spending counter reset for ${spendMember.name}`
-          : `Added ${formatINR(val)} spend for ${spendMember.name}`,
-        "success"
-      );
+      if (memberError) throw memberError;
 
-      setSpendModalOpen(false);
-      setSpendMember(null);
-      setSpendAmountInput("");
+      // 2. Optionally record as an expense in user's ledger
+      if (recordInExpenses) {
+        const expensePayload = {
+          user_id: user.id,
+          title: `Money sent to ${transferMember.name}`,
+          amount: val,
+          category: "Family & Child Care",
+          account_id: transferAccountId || null,
+          expense_date: transferDate || new Date().toISOString().split("T")[0],
+          notes: transferNotes || `Family support transfer to ${transferMember.name} (${transferMember.relationship})`,
+        };
+
+        await supabase.from("expenses").insert(expensePayload);
+
+        // 3. If an account was selected, deduct balance from account
+        if (transferAccountId) {
+          const selectedAcc = accounts.find((a) => a.id === transferAccountId);
+          if (selectedAcc) {
+            const newBalance = Number((selectedAcc.balance - val).toFixed(2));
+            await supabase.from("accounts").update({ balance: newBalance }).eq("id", transferAccountId).eq("user_id", user.id);
+          }
+        }
+      }
+
+      showToast(`Recorded ${formatINR(val)} sent to ${transferMember.name}`, "success");
+
+      setTransferModalOpen(false);
+      setTransferMember(null);
+      setTransferAmountInput("");
+      setTransferNotes("");
+      setTransferAccountId("");
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to adjust spending", "error");
+      showToast("Failed to record money transfer", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
   // ==========================================
-  // Household Planning / Responsibilities
+  // Reset Spending Cycle to ₹0
   // ==========================================
-  const handleToggleResp = async (resp: FamilyResponsibility) => {
-    if (!user) return;
-    const newStatus = !resp.is_completed;
-
-    // Optimistic UI update
-    setResponsibilities((prev) =>
-      prev.map((r) => (r.id === resp.id ? { ...r, is_completed: newStatus } : r))
-    );
+  const handleResetSpending = async () => {
+    if (!user || !resetMember) return;
+    setSubmitting(true);
 
     try {
       const supabase = createClient();
       const { error } = await supabase
-        .from("family_responsibilities")
-        .update({ is_completed: newStatus })
-        .eq("id", resp.id)
+        .from("family_members")
+        .update({ current_spending: 0 })
+        .eq("id", resetMember.id)
         .eq("user_id", user.id);
 
       if (error) throw error;
-      showToast(
-        newStatus ? `Marked "${resp.title}" as completed` : `Marked "${resp.title}" as pending`,
-        "success"
-      );
-      saveToLocalCache(
-        responsibilitiesKey,
-        responsibilities.map((r) => (r.id === resp.id ? { ...r, is_completed: newStatus } : r))
-      );
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to update status", "error");
-      await fetchAllData();
-    }
-  };
+      showToast(`Spending cycle reset to ₹0 for ${resetMember.name}`, "success");
 
-  const handleSaveResp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user) return;
-    setSubmitting(true);
-
-    const formData = new FormData(e.currentTarget);
-    const title = formData.get("title")?.toString().trim() || "";
-    const assigned_to = formData.get("assigned_to")?.toString() || "Self";
-    const amount = parseFloat(formData.get("amount")?.toString() || "0") || 0;
-    const frequency = formData.get("frequency")?.toString() || "monthly";
-    const due_date = formData.get("due_date")?.toString().trim() || null;
-    const category = formData.get("category")?.toString() || "Bills & Utilities";
-    const notes = formData.get("notes")?.toString().trim() || null;
-
-    if (!title) {
-      showToast("Please enter a title for the responsibility", "error");
-      setSubmitting(false);
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-
-      if (editingResp) {
-        const { error } = await supabase
-          .from("family_responsibilities")
-          .update({
-            title,
-            assigned_to,
-            amount,
-            frequency,
-            due_date,
-            category,
-            notes,
-          })
-          .eq("id", editingResp.id)
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-        showToast("Household duty updated", "success");
-      } else {
-        const { error } = await supabase.from("family_responsibilities").insert({
-          user_id: user.id,
-          title,
-          assigned_to,
-          amount,
-          frequency,
-          due_date,
-          category,
-          is_completed: false,
-          notes,
-        });
-
-        if (error) throw error;
-        showToast("New household duty added", "success");
-      }
-
-      setRespModalOpen(false);
-      setEditingResp(null);
+      setResetModalOpen(false);
+      setResetMember(null);
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to save duty", "error");
+      showToast("Failed to reset spending cycle", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteResp = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}"?`)) return;
-    if (!user) return;
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.from("family_responsibilities").delete().eq("id", id).eq("user_id", user.id);
-      if (error) throw error;
-      showToast("Responsibility removed", "success");
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to delete item", "error");
-    }
-  };
-
-  // Filtered responsibilities
-  const filteredResponsibilities = useMemo(() => {
-    return responsibilities.filter((r) => {
-      const matchesFilter =
-        planningFilter === "all" ||
-        (planningFilter === "pending" && !r.is_completed) ||
-        (planningFilter === "completed" && r.is_completed);
-
-      const matchesSearch =
-        !searchQuery ||
-        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.assigned_to && r.assigned_to.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (r.category && r.category.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      return matchesFilter && matchesSearch;
-    });
-  }, [responsibilities, planningFilter, searchQuery]);
-
-  // Loading indicator for initial empty state
+  // Loading state
   if (loading) {
     return (
       <main
@@ -616,7 +592,7 @@ export default function FamilySection() {
       >
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={24} className="animate-spin text-emerald-400" />
-          <p className="text-xs font-mono opacity-60">Synchronizing family workspace...</p>
+          <p className="text-xs font-mono opacity-60">Synchronizing family support tracker...</p>
         </div>
       </main>
     );
@@ -624,19 +600,19 @@ export default function FamilySection() {
 
   return (
     <main
-      className="flex-1 h-full p-4 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* =========================================================================
-          Top Header Bar
+          Top Header Bar with Month Stepper & Action Buttons
           ========================================================================= */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6"
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Family Finance Hub</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Family Money Tracker</h1>
             <span
               className="text-[10px] font-mono px-2 py-0.5 rounded-full border uppercase tracking-wider font-semibold"
               style={{
@@ -645,61 +621,97 @@ export default function FamilySection() {
                 borderColor: "var(--app-border-subtle)",
               }}
             >
-              Collaborative Space
+              Support & Transfers
+            </span>
+            <span
+              className="hidden sm:inline-flex text-[11px] font-mono px-2 py-0.5 rounded-md border opacity-80"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-card)",
+              }}
+            >
+              {members.length} Members • {isAllTime ? "All Time" : monthDisplayTitle}
             </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Household allowances and recurring duties.
+            Track monthly allowances, financial support, and money sent to family members.
           </p>
         </div>
 
-        {/* Global Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          {members.length === 0 && (
+        {/* Action Buttons & Month Stepper on Top Right */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Month Stepper */}
+          <div
+            className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
+            style={{
+              borderColor: "var(--app-border-subtle)",
+              backgroundColor: "var(--app-card)",
+            }}
+          >
             <button
-              onClick={handleSeedTemplate}
-              disabled={seedingTemplate}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer opacity-90 hover:opacity-100"
-              style={{
-                borderColor: "var(--app-accent)",
-                color: "var(--app-accent)",
-                backgroundColor: "var(--app-accent-subtle)",
-              }}
-              title="Prepopulate sample family members and recurring duties"
+              onClick={handlePrevMonth}
+              disabled={!canGoPrev}
+              title={!canGoPrev ? "No earlier transfer records" : "Previous Month"}
+              className={`p-1.5 rounded-lg transition-all ${
+                !canGoPrev
+                  ? "opacity-25 cursor-not-allowed"
+                  : "opacity-70 hover:opacity-100 cursor-pointer"
+              }`}
             >
-              {seedingTemplate ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              Load Example Household
+              <ChevronLeft size={14} />
             </button>
-          )}
+            <span className="px-3 font-semibold min-w-[110px] text-center">
+              {monthDisplayTitle}
+            </span>
+            <button
+              onClick={handleNextMonth}
+              disabled={!canGoNext}
+              title={!canGoNext ? "Future months are not yet available" : "Next Month"}
+              className={`p-1.5 rounded-lg transition-all ${
+                !canGoNext
+                  ? "opacity-25 cursor-not-allowed"
+                  : "opacity-70 hover:opacity-100 cursor-pointer"
+              }`}
+            >
+              <ChevronRight size={14} />
+            </button>
+            {!isCurrentMonth && !isAllTime && (
+              <button
+                onClick={handleResetToCurrentMonth}
+                className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
+                style={{ borderColor: "var(--app-border-subtle)" }}
+              >
+                Today
+              </button>
+            )}
+          </div>
 
-          {/* Dynamic Add Button depending on active tab */}
-          {activeSubTab === "members" && (
-            <button
-              onClick={() => {
-                setEditingMember(null);
-                setMemberModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-              style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-            >
-              <UserPlus size={14} />
-              Add Member
-            </button>
-          )}
+          {/* All Time Toggle */}
+          <button
+            onClick={() => setIsAllTime(!isAllTime)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-all ${
+              isAllTime ? "shadow-sm font-bold" : "opacity-60 hover:opacity-100"
+            }`}
+            style={{
+              backgroundColor: isAllTime ? "var(--app-fg)" : "var(--app-card)",
+              color: isAllTime ? "var(--app-bg)" : "var(--app-fg)",
+              borderColor: isAllTime ? "var(--app-fg)" : "var(--app-border-subtle)",
+            }}
+          >
+            All Time
+          </button>
 
-          {activeSubTab === "planning" && (
-            <button
-              onClick={() => {
-                setEditingResp(null);
-                setRespModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-              style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-            >
-              <Plus size={14} />
-              Add Duty
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setEditingMember(null);
+              setMemberModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
+            style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
+          >
+            <UserPlus size={14} />
+            Add Member
+          </button>
         </div>
       </div>
 
@@ -707,7 +719,7 @@ export default function FamilySection() {
           Top 3 KPI Metric Summary Cards
           ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {/* Card 1: Family Roster */}
+        {/* Card 1: Family Members */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
           style={{
@@ -716,7 +728,7 @@ export default function FamilySection() {
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Household Roster</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Family Members</span>
             <span
               className="w-7 h-7 rounded-lg border flex items-center justify-center"
               style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-accent-subtle)" }}
@@ -726,15 +738,17 @@ export default function FamilySection() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold tracking-tight font-mono">{members.length} Members</div>
-            <div className="text-xs opacity-60 mt-1 flex items-center gap-1.5">
-              <span>{members.filter((m) => m.role === "co-manager" || m.role === "admin").length} Co-Managers</span>
+            <div className="text-xs opacity-60 mt-1 flex items-center gap-1.5 flex-wrap">
+              <span>{members.filter((m) => m.relationship === "Parent").length} Parents</span>
               <span>•</span>
-              <span>{members.filter((m) => m.relationship === "Child" || m.role === "dependent").length} Dependents</span>
+              <span>{members.filter((m) => m.relationship === "Spouse").length} Spouse</span>
+              <span>•</span>
+              <span>{members.filter((m) => m.relationship === "Child").length} Children</span>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Monthly Allowances */}
+        {/* Card 2: Total Money Sent This Cycle / Selected Month */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
           style={{
@@ -743,7 +757,38 @@ export default function FamilySection() {
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Monthly Allowance Pool</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
+              {isAllTime ? "All-Time Money Sent" : `Total Money Sent (${monthDisplayTitle})`}
+            </span>
+            <span
+              className="w-7 h-7 rounded-lg border flex items-center justify-center text-emerald-400"
+              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(16, 185, 129, 0.12)" }}
+            >
+              <Send size={14} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
+              {formatINR(totalCurrentSpending)}
+            </div>
+            <div className="text-xs opacity-60 mt-1">
+              {isAllTime
+                ? `Transferred across all recorded months`
+                : `Transferred across ${members.filter((m) => getMemberSpendingForMonth(m) > 0).length} of ${members.length} members`}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Monthly Support Target / Budget */}
+        <div
+          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Monthly Support Target</span>
             <span
               className="w-7 h-7 rounded-lg border flex items-center justify-center text-amber-400"
               style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(245, 158, 11, 0.12)" }}
@@ -752,16 +797,16 @@ export default function FamilySection() {
             </span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono">{formatINR(totalMonthlyAllowance)}</div>
-            <div className="text-xs opacity-60 mt-1 flex items-center justify-between">
-              <span>Spent: {formatINR(totalCurrentSpending)}</span>
-              <span className="font-mono font-medium">
-                {totalMonthlyAllowance > 0
-                  ? `${Math.round((totalCurrentSpending / totalMonthlyAllowance) * 100)}%`
-                  : "0%"}
+            <div className="text-2xl font-bold tracking-tight font-mono">
+              {formatINR(totalMonthlyAllowance)}
+            </div>
+            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
+              <span>{overallPercent}% fulfilled</span>
+              <span className="font-mono font-medium" style={{ color: remainingBudget <= 0 ? "var(--app-accent)" : "#F59E0B" }}>
+                {remainingBudget <= 0 ? "Target Met ✓" : `${formatINR(remainingBudget)} Remaining`}
               </span>
             </div>
-            {/* Mini Progress */}
+            {/* Progress Bar */}
             <div
               className="w-full h-1.5 rounded-full mt-2 overflow-hidden"
               style={{ backgroundColor: "var(--app-track-bg)" }}
@@ -769,11 +814,11 @@ export default function FamilySection() {
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
-                  width: `${Math.min(100, totalMonthlyAllowance > 0 ? (totalCurrentSpending / totalMonthlyAllowance) * 100 : 0)}%`,
+                  width: `${Math.min(100, overallPercent)}%`,
                   backgroundColor:
                     totalCurrentSpending > totalMonthlyAllowance
                       ? "var(--app-loss)"
-                      : totalCurrentSpending > totalMonthlyAllowance * 0.8
+                      : totalCurrentSpending >= totalMonthlyAllowance * 0.8
                       ? "#F59E0B"
                       : "var(--app-accent)",
                 }}
@@ -781,525 +826,353 @@ export default function FamilySection() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Card 3: Household Monthly Bills */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Household Monthly Bills</span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "rgba(245, 158, 11, 0.12)",
-                color: "#F59E0B",
-              }}
-            >
-              <Calendar size={14} />
-            </span>
+      {/* =========================================================================
+          ROW 2: VISUAL CHARTS (LINE CHART + PIE / DONUT CHART SIDE BY SIDE)
+          ========================================================================= */}
+      {members.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+          {/* Left Card: 6-Month Support Line Chart */}
+          <div
+            className="lg:col-span-7 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-fg)",
+            }}
+          >
+            <InteractiveLineChart
+              title="Family Support Trajectory"
+              subtitle="6-Month Monthly Outflow & Transfers Trend"
+              data={lineChartData}
+              color="#10B981"
+              gradientId="familySupportGradient"
+              formatter={formatINR}
+              type="expense"
+              emptyMessage="No family transfers recorded in the last 6 months."
+            />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono">
-              {formatINR(totalHouseholdBills)}
-            </div>
-            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
-              <span>Paid: {formatINR(paidHouseholdBills)}</span>
-              <span className="font-medium" style={{ color: pendingHouseholdBillsCount === 0 ? "var(--app-accent)" : "#F59E0B" }}>
-                {pendingHouseholdBillsCount === 0 ? "All Clear ✓" : `${pendingHouseholdBillsCount} Due`}
-              </span>
-            </div>
+
+          {/* Right Card: Member Allocation Pie / Donut Chart */}
+          <div
+            className="lg:col-span-5 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-fg)",
+            }}
+          >
             <div
-              className="w-full h-1.5 rounded-full overflow-hidden mt-2.5"
-              style={{ backgroundColor: "var(--app-track-bg)" }}
+              className="flex items-center justify-between pb-3 border-b flex-wrap gap-2"
+              style={{ borderColor: "var(--app-border-subtle)" }}
             >
+              <div className="flex items-center gap-1.5">
+                <PieChartIcon size={14} className="text-emerald-400" />
+                <h3 className="text-sm font-bold tracking-tight">Support Allocation</h3>
+              </div>
+
+              {/* Mode Toggle: Spending vs Allowance */}
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="flex items-center p-0.5 rounded-lg border text-[11px] font-mono"
                 style={{
-                  width: `${totalHouseholdBills > 0 ? Math.min(100, Math.round((paidHouseholdBills / totalHouseholdBills) * 100)) : 0}%`,
-                  backgroundColor: "#F59E0B",
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-bg)",
                 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setChartMode("spending")}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                    chartMode === "spending"
+                      ? "bg-[var(--app-card)] font-bold text-emerald-400 shadow-sm border border-[var(--app-border)]"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  Sent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartMode("allowance")}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                    chartMode === "allowance"
+                      ? "bg-[var(--app-card)] font-bold text-amber-400 shadow-sm border border-[var(--app-border)]"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  Target
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 flex items-center justify-center">
+              <InteractiveDonutChart
+                title="Member Breakdown"
+                totalLabel={
+                  chartMode === "spending"
+                    ? isAllTime
+                      ? "All-Time Sent"
+                      : `Sent in ${monthDisplayTitle}`
+                    : "Monthly Target"
+                }
+                totalValue={donutTotal}
+                segments={donutSegments}
+                formatter={formatINR}
+                emptyMessage="No spending recorded yet"
+                emptySubMessage="Switch to 'Target' view or record transfers to populate."
+                size={160}
+                strokeWidth={14}
               />
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          Sub-Navigation Segmented Tabs
-          ========================================================================= */}
-      <div className="flex items-center gap-2 border-b pb-4 mb-6 overflow-x-auto" style={{ borderColor: "var(--app-border)" }}>
-        <button
-          onClick={() => setActiveSubTab("members")}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer whitespace-nowrap ${
-            activeSubTab === "members" ? "font-bold shadow-sm" : "opacity-70 hover:opacity-100"
-          }`}
-          style={{
-            backgroundColor: activeSubTab === "members" ? "var(--app-card)" : "transparent",
-            borderColor: activeSubTab === "members" ? "var(--app-border)" : "transparent",
-            color: activeSubTab === "members" ? "var(--app-accent)" : "var(--app-fg)",
-          }}
-        >
-          <Users size={14} />
-          <span>Members & Allowances</span>
-          <span
-            className="text-[10px] font-mono px-1.5 py-0.2 rounded-full"
-            style={{ backgroundColor: "var(--app-border)", color: "var(--app-fg)" }}
-          >
-            {members.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab("planning")}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer whitespace-nowrap ${
-            activeSubTab === "planning" ? "font-bold shadow-sm" : "opacity-70 hover:opacity-100"
-          }`}
-          style={{
-            backgroundColor: activeSubTab === "planning" ? "var(--app-card)" : "transparent",
-            borderColor: activeSubTab === "planning" ? "var(--app-border)" : "transparent",
-            color: activeSubTab === "planning" ? "#F59E0B" : "var(--app-fg)",
-          }}
-        >
-          <Home size={14} />
-          <span>Household Duties & Bills</span>
-          {pendingHouseholdBillsCount > 0 && (
-            <span
-              className="text-[10px] font-mono px-1.5 py-0.2 rounded-full text-white"
-              style={{ backgroundColor: "#df514c" }}
-            >
-              {pendingHouseholdBillsCount} Due
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* =========================================================================
-          TAB 1: FAMILY MEMBERS & ALLOWANCES
-          ========================================================================= */}
-      {activeSubTab === "members" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          {members.length === 0 ? (
-            <div
-              className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
-              style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl border flex items-center justify-center"
-                style={{ backgroundColor: "var(--app-accent-subtle)", borderColor: "var(--app-border-subtle)" }}
-              >
-                <Users size={28} style={{ color: "var(--app-accent)" }} />
-              </div>
-              <div className="max-w-md">
-                <h3 className="text-base font-bold">No Family Members Added Yet</h3>
-                <p className="text-xs opacity-70 mt-1">
-                  Add your partner, children, or household members to manage monthly allowances, oversee spending limits, and coordinate shared household wealth.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setEditingMember(null);
-                    setMemberModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  <UserPlus size={14} />
-                  Add First Member
-                </button>
-                <button
-                  onClick={handleSeedTemplate}
-                  disabled={seedingTemplate}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border transition-opacity hover:opacity-100 opacity-80"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Load Example Household
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.map((member) => {
-                const initials = member.name
-                  .split(" ")
-                  .map((p) => p[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
-
-                const allowance = Number(member.monthly_allowance) || 0;
-                const spending = Number(member.current_spending) || 0;
-                const remaining = allowance - spending;
-                const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
-
-                return (
-                  <div
-                    key={member.id}
-                    className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-[var(--app-accent)]"
-                    style={{
-                      backgroundColor: "var(--app-card)",
-                      borderColor: "var(--app-border)",
-                    }}
-                  >
-                    <div>
-                      {/* Member Header */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-sm flex-shrink-0"
-                            style={{ backgroundColor: member.avatar_color || "#4bb473" }}
-                          >
-                            {initials}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-bold tracking-tight">{member.name}</h3>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] opacity-60 mt-0.5">
-                              <span>{member.relationship}</span>
-                              <span>•</span>
-                              <span className="capitalize">{member.role}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingMember(member);
-                              setMemberModalOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                            style={{ borderColor: "var(--app-border-subtle)" }}
-                            title="Edit Member"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMember(member.id, member.name)}
-                            className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
-                            style={{ borderColor: "var(--app-border-subtle)" }}
-                            title="Remove Member"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Allowance & Spending Metric */}
-                      <div
-                        className="mt-4 p-3.5 rounded-xl border space-y-2"
-                        style={{
-                          backgroundColor: "var(--app-bg)",
-                          borderColor: "var(--app-border-subtle)",
-                        }}
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="opacity-70">Monthly Allowance</span>
-                          <span className="font-mono font-bold">{formatINR(allowance)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="opacity-70">Current Spending</span>
-                          <span
-                            className="font-mono font-semibold"
-                            style={{
-                              color: spending > allowance ? "var(--app-loss)" : "inherit",
-                            }}
-                          >
-                            {formatINR(spending)}
-                          </span>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div
-                          className="w-full h-2 rounded-full overflow-hidden"
-                          style={{ backgroundColor: "var(--app-track-bg)" }}
-                        >
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${Math.min(100, percentSpent)}%`,
-                              backgroundColor:
-                                spending > allowance
-                                  ? "var(--app-loss)"
-                                  : percentSpent > 80
-                                  ? "#F59E0B"
-                                  : member.avatar_color || "var(--app-accent)",
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] pt-1">
-                          <span className="opacity-60">{percentSpent}% utilized</span>
-                          <span
-                            className="font-mono font-medium"
-                            style={{
-                              color: remaining < 0 ? "var(--app-loss)" : "var(--app-accent)",
-                            }}
-                          >
-                            {remaining < 0 ? `${formatINR(Math.abs(remaining))} Over` : `${formatINR(remaining)} Left`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Contact / Notes */}
-                      {(member.phone || member.email || member.notes) && (
-                        <div className="mt-3 text-[11px] space-y-1 opacity-70">
-                          {member.phone && (
-                            <div className="flex items-center gap-1.5 truncate">
-                              <Phone size={11} className="opacity-60" />
-                              <span>{member.phone}</span>
-                            </div>
-                          )}
-                          {member.email && (
-                            <div className="flex items-center gap-1.5 truncate">
-                              <Mail size={11} className="opacity-60" />
-                              <span>{member.email}</span>
-                            </div>
-                          )}
-                          {member.notes && (
-                            <p className="italic text-[10px] opacity-60 line-clamp-2 mt-1">"{member.notes}"</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card Footer: Quick Adjust / Record Spend */}
-                    <div className="pt-4 mt-4 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--app-border-subtle)" }}>
-                      <button
-                        onClick={() => {
-                          setSpendMember(member);
-                          setSpendActionType("add");
-                          setSpendModalOpen(true);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg border transition-opacity hover:opacity-100 cursor-pointer"
-                        style={{
-                          borderColor: "var(--app-border)",
-                          backgroundColor: "var(--app-bg)",
-                        }}
-                      >
-                        <Plus size={12} />
-                        Log Spend
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSpendMember(member);
-                          setSpendActionType("reset");
-                          setSpendModalOpen(true);
-                        }}
-                        className="px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-opacity opacity-60 hover:opacity-100 cursor-pointer"
-                        style={{
-                          borderColor: "var(--app-border-subtle)",
-                        }}
-                        title="Reset spending counter for the month"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
       {/* =========================================================================
-          TAB 2: HOUSEHOLD DUTIES & BILLS
+          FAMILY MEMBERS LIST / MONEY TRACKING CARDS
           ========================================================================= */}
-      {activeSubTab === "planning" && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          {/* Filters & Search */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPlanningFilter("all")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                  planningFilter === "all" ? "font-bold shadow-sm" : "opacity-60"
-                }`}
-                style={{
-                  backgroundColor: planningFilter === "all" ? "var(--app-card)" : "transparent",
-                  borderColor: planningFilter === "all" ? "var(--app-border)" : "transparent",
-                }}
-              >
-                All ({responsibilities.length})
-              </button>
-              <button
-                onClick={() => setPlanningFilter("pending")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                  planningFilter === "pending" ? "font-bold text-rose-400" : "opacity-60"
-                }`}
-                style={{
-                  backgroundColor: planningFilter === "pending" ? "var(--app-card)" : "transparent",
-                  borderColor: planningFilter === "pending" ? "var(--app-border)" : "transparent",
-                }}
-              >
-                Pending ({responsibilities.filter((r) => !r.is_completed).length})
-              </button>
-              <button
-                onClick={() => setPlanningFilter("completed")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                  planningFilter === "completed" ? "font-bold text-emerald-400" : "opacity-60"
-                }`}
-                style={{
-                  backgroundColor: planningFilter === "completed" ? "var(--app-card)" : "transparent",
-                  borderColor: planningFilter === "completed" ? "var(--app-border)" : "transparent",
-                }}
-              >
-                Completed ({responsibilities.filter((r) => r.is_completed).length})
-              </button>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search size={14} className="absolute left-3 top-2.5 opacity-40" />
-              <input
-                type="text"
-                placeholder="Search duties or bills..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg pl-8.5 pr-3 py-1.5 text-xs border focus:outline-none transition-colors"
-                style={{
-                  backgroundColor: "var(--app-card)",
-                  borderColor: "var(--app-border)",
-                  color: "var(--app-fg)",
-                }}
-              />
-            </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider">Family Members ({members.length})</h2>
           </div>
+          <button
+            onClick={() => fetchAllData()}
+            className="flex items-center gap-1.5 text-xs opacity-60 hover:opacity-100 transition-opacity cursor-pointer font-mono"
+            title="Refresh family data"
+          >
+            <RefreshCw size={12} />
+            <span>Refresh</span>
+          </button>
+        </div>
 
-          {/* Duties Table / List */}
-          {filteredResponsibilities.length === 0 ? (
+        {members.length === 0 ? (
+          <div
+            className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
+            style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
+          >
             <div
-              className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-3"
-              style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
+              className="w-14 h-14 rounded-2xl border flex items-center justify-center"
+              style={{ backgroundColor: "var(--app-accent-subtle)", borderColor: "var(--app-border-subtle)" }}
             >
-              <Home size={28} className="opacity-40" />
-              <p className="text-xs opacity-60">No household responsibilities match your filter.</p>
+              <Users size={28} style={{ color: "var(--app-accent)" }} />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-base font-bold">No Family Members Tracked Yet</h3>
+              <p className="text-xs opacity-70 mt-1">
+                Add your parents, spouse, children, or relatives to track regular financial support, allowances, and money sent to them.
+              </p>
+            </div>
+            <div className="flex items-center justify-center pt-2">
               <button
                 onClick={() => {
-                  setEditingResp(null);
-                  setRespModalOpen(true);
+                  setEditingMember(null);
+                  setMemberModalOpen(true);
                 }}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-opacity hover:opacity-100"
-                style={{ borderColor: "var(--app-border)" }}
+                className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
               >
-                Add Household Duty
+                <UserPlus size={15} />
+                Add First Member
               </button>
             </div>
-          ) : (
-            <div
-              className="rounded-2xl border divide-y overflow-hidden shadow-sm"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-                borderBottomColor: "var(--app-border)",
-              }}
-            >
-              {filteredResponsibilities.map((resp) => (
-                <div
-                  key={resp.id}
-                  className={`p-4 flex items-center justify-between gap-4 transition-colors hover:bg-[var(--app-card-hover)] ${
-                    resp.is_completed ? "opacity-60" : ""
-                  }`}
-                  style={{ borderColor: "var(--app-border-subtle)" }}
-                >
-                  {/* Left: Checkbox & Info */}
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <button
-                      onClick={() => handleToggleResp(resp)}
-                      className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
-                        resp.is_completed ? "bg-emerald-500 border-emerald-500 text-black font-bold" : "border-gray-500/40"
-                      }`}
-                      title={resp.is_completed ? "Mark pending" : "Mark as paid/done"}
-                    >
-                      {resp.is_completed && <Check size={14} />}
-                    </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.map((member) => {
+              const initials = member.name
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`text-sm font-semibold truncate ${
-                            resp.is_completed ? "line-through opacity-80" : ""
-                          }`}
+              const allowance = Number(member.monthly_allowance) || 0;
+              const spending = getMemberSpendingForMonth(member);
+              const remaining = allowance - spending;
+              const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
+
+              return (
+                <div
+                  key={member.id}
+                  className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-[var(--app-accent)] shadow-sm"
+                  style={{
+                    backgroundColor: "var(--app-card)",
+                    borderColor: "var(--app-border)",
+                  }}
+                >
+                  <div>
+                    {/* Member Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: member.avatar_color || "#10B981" }}
                         >
-                          {resp.title}
+                          {initials}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold tracking-tight">{member.name}</h3>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] opacity-60 mt-0.5">
+                            <span
+                              className="px-2 py-0.2 rounded-full text-[10px] font-semibold border"
+                              style={{
+                                borderColor: "var(--app-border-subtle)",
+                                backgroundColor: "var(--app-bg)",
+                              }}
+                            >
+                              {member.relationship}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingMember(member);
+                            setMemberModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          style={{ borderColor: "var(--app-border-subtle)" }}
+                          title="Edit Member"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMember(member.id, member.name)}
+                          className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
+                          style={{ borderColor: "var(--app-border-subtle)" }}
+                          title="Remove Member"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Money Tracking Box */}
+                    <div
+                      className="mt-4 p-3.5 rounded-xl border space-y-2.5"
+                      style={{
+                        backgroundColor: "var(--app-bg)",
+                        borderColor: "var(--app-border-subtle)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="opacity-70">Monthly Target Support</span>
+                        <span className="font-mono font-bold">{formatINR(allowance)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="opacity-70">
+                          {isAllTime ? "Money Sent (All Time)" : `Sent in ${monthDisplayTitle}`}
                         </span>
-                        <span
-                          className="text-[10px] font-mono px-2 py-0.5 rounded-full border opacity-75"
+                        <span className="font-mono font-bold text-emerald-400">
+                          {formatINR(spending)}
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div
+                        className="w-full h-2 rounded-full overflow-hidden"
+                        style={{ backgroundColor: "var(--app-track-bg)" }}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
                           style={{
-                            borderColor: "var(--app-border-subtle)",
-                            backgroundColor: "var(--app-bg)",
+                            width: `${Math.min(100, percentSpent)}%`,
+                            backgroundColor:
+                              spending > allowance && allowance > 0
+                                ? "var(--app-loss)"
+                                : percentSpent >= 80
+                                ? "#10B981"
+                                : member.avatar_color || "var(--app-accent)",
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] pt-0.5">
+                        <span className="opacity-60">{percentSpent}% of target</span>
+                        <span
+                          className="font-mono font-medium"
+                          style={{
+                            color: remaining <= 0 && allowance > 0 ? "var(--app-accent)" : "#F59E0B",
                           }}
                         >
-                          {resp.category}
+                          {allowance === 0
+                            ? "No Target Set"
+                            : remaining <= 0
+                            ? "Target Met ✓"
+                            : `${formatINR(remaining)} Left`}
                         </span>
                       </div>
-
-                      <div className="flex items-center gap-2 text-[11px] opacity-60 mt-0.5 flex-wrap">
-                        {resp.assigned_to && <span>Assigned to: {resp.assigned_to}</span>}
-                        {resp.due_date && (
-                          <>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar size={10} />
-                              {resp.due_date}
-                            </span>
-                          </>
-                        )}
-                        <span>•</span>
-                        <span className="capitalize">{resp.frequency}</span>
-                      </div>
                     </div>
+
+                    {/* Contact / Notes */}
+                    {(member.phone || member.email || member.notes) && (
+                      <div className="mt-3 text-[11px] space-y-1 opacity-70">
+                        {member.phone && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Phone size={11} className="opacity-60" />
+                            <span>{member.phone}</span>
+                          </div>
+                        )}
+                        {member.email && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Mail size={11} className="opacity-60" />
+                            <span>{member.email}</span>
+                          </div>
+                        )}
+                        {member.notes && (
+                          <p className="italic text-[10px] opacity-60 line-clamp-2 mt-1">"{member.notes}"</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Right: Amount & Actions */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="text-right">
-                      <div className="text-sm font-bold font-mono tracking-tight">{formatINR(resp.amount)}</div>
-                      <span
-                        className={`text-[10px] font-mono ${
-                          resp.is_completed ? "text-emerald-400 font-semibold" : "text-rose-400"
-                        }`}
-                      >
-                        {resp.is_completed ? "Paid ✓" : "Pending"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          setEditingResp(resp);
-                          setRespModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                        style={{ borderColor: "var(--app-border-subtle)" }}
-                        title="Edit duty"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteResp(resp.id, resp.title)}
-                        className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
-                        style={{ borderColor: "var(--app-border-subtle)" }}
-                        title="Delete duty"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+                  {/* Card Footer: Send Money / Log Transfer */}
+                  <div className="pt-4 mt-4 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--app-border-subtle)" }}>
+                    <button
+                      onClick={() => {
+                        setTransferMember(member);
+                        setTransferAmountInput("");
+                        setTransferDate(new Date().toISOString().split("T")[0]);
+                        setTransferNotes("");
+                        setTransferAccountId(accounts[0]?.id || "");
+                        setTransferModalOpen(true);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer shadow-sm hover:scale-[1.01]"
+                      style={{
+                        backgroundColor: "var(--app-fg)",
+                        color: "var(--app-bg)",
+                        borderColor: "var(--app-border)",
+                      }}
+                    >
+                      <Send size={12} />
+                      Send Money
+                    </button>
+                    <button
+                      onClick={() => {
+                        setResetMember(member);
+                        setResetModalOpen(true);
+                      }}
+                      className="px-2.5 py-2 text-xs font-medium rounded-lg border transition-opacity opacity-60 hover:opacity-100 cursor-pointer"
+                      style={{
+                        borderColor: "var(--app-border-subtle)",
+                      }}
+                      title="Reset monthly spending counter to ₹0"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* =========================================================================
           POPUP MODAL 1: ADD / EDIT FAMILY MEMBER
@@ -1326,7 +1199,7 @@ export default function FamilySection() {
                   <h3 className="text-base font-bold tracking-tight">
                     {editingMember ? "Edit Family Member" : "Add Family Member"}
                   </h3>
-                  <p className="text-xs opacity-60">Set role, allowance, and household profile.</p>
+                  <p className="text-xs opacity-60">Set relationship, monthly support target, and notes.</p>
                 </div>
               </div>
               <button
@@ -1344,46 +1217,30 @@ export default function FamilySection() {
                   type="text"
                   name="name"
                   required
-                  placeholder="e.g. Priya Sharma"
+                  placeholder="e.g. Amma / Mom, Dad, Priya"
                   defaultValue={editingMember?.name || ""}
                   className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
                   style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Relationship</label>
-                  <select
-                    name="relationship"
-                    defaultValue={editingMember?.relationship || "Spouse"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    {RELATIONSHIPS.map((rel) => (
-                      <option key={rel} value={rel}>{rel}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Household Role</label>
-                  <select
-                    name="role"
-                    defaultValue={editingMember?.role || "member"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Relationship</label>
+                <select
+                  name="relationship"
+                  defaultValue={editingMember?.relationship || "Parent"}
+                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
+                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+                >
+                  {RELATIONSHIPS.map((rel) => (
+                    <option key={rel} value={rel}>{rel}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Monthly Allowance (₹ INR)
+                  Monthly Support Target / Allowance (₹ INR)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs font-mono opacity-60">₹</span>
@@ -1402,7 +1259,7 @@ export default function FamilySection() {
 
               <div>
                 <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Avatar Theme Color
+                  Avatar Color
                 </label>
                 <div className="flex items-center gap-2 flex-wrap">
                   {AVATAR_COLORS.map((col) => (
@@ -1411,7 +1268,7 @@ export default function FamilySection() {
                         type="radio"
                         name="avatar_color"
                         value={col}
-                        defaultChecked={(editingMember?.avatar_color || "#4bb473") === col}
+                        defaultChecked={(editingMember?.avatar_color || "#10B981") === col}
                         className="peer sr-only"
                       />
                       <div
@@ -1425,7 +1282,7 @@ export default function FamilySection() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Phone / WhatsApp</label>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Phone / UPI Number</label>
                   <input
                     type="tel"
                     name="phone"
@@ -1440,7 +1297,7 @@ export default function FamilySection() {
                   <input
                     type="email"
                     name="email"
-                    placeholder="priya@example.com"
+                    placeholder="name@example.com"
                     defaultValue={editingMember?.email || ""}
                     className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
                     style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
@@ -1449,11 +1306,11 @@ export default function FamilySection() {
               </div>
 
               <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Notes / Responsibilities</label>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Notes / Bank / Transfer Details</label>
                 <textarea
                   name="notes"
                   rows={2}
-                  placeholder="e.g. In charge of groceries and school fee payments"
+                  placeholder="e.g. Monthly medical support, HDFC UPI transfer, or bank account number"
                   defaultValue={editingMember?.notes || ""}
                   className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors resize-none"
                   style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
@@ -1485,12 +1342,12 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          POPUP MODAL 2: LOG SPEND / RESET ALLOWANCE
+          POPUP MODAL 2: SEND MONEY / LOG TRANSFER
           ========================================================================= */}
-      {spendModalOpen && spendMember && (
+      {transferModalOpen && transferMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
           <div
-            className="w-full max-w-sm rounded-2xl border p-6 space-y-5 shadow-2xl relative"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-6 space-y-5 shadow-2xl relative"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",
@@ -1498,54 +1355,115 @@ export default function FamilySection() {
             }}
           >
             <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">
-                  {spendActionType === "reset" ? "Reset Spending Counter" : `Log Spend: ${spendMember.name}`}
-                </h3>
-                <p className="text-xs opacity-60">
-                  Allowance: {formatINR(spendMember.monthly_allowance)} (Spent: {formatINR(spendMember.current_spending)})
-                </p>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-emerald-400"
+                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
+                >
+                  <Send size={15} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">
+                    Log Money Sent to {transferMember.name}
+                  </h3>
+                  <p className="text-xs opacity-60">
+                    Target: {formatINR(transferMember.monthly_allowance)} • Sent: {formatINR(transferMember.current_spending)}
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setSpendModalOpen(false)}
+                onClick={() => setTransferModalOpen(false)}
                 className="p-1 rounded opacity-60 hover:opacity-100 cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleAdjustSpending} className="space-y-4">
-              {spendActionType === "add" ? (
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Amount Spent (₹ INR)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs font-mono opacity-60">₹</span>
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      placeholder="0"
-                      value={spendAmountInput}
-                      onChange={(e) => setSpendAmountInput(e.target.value)}
-                      required
-                      autoFocus
-                      className="w-full rounded-lg pl-7 pr-3 py-2 text-sm font-mono border focus:outline-none transition-colors"
-                      style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                    />
-                  </div>
+            <form onSubmit={handleLogTransfer} className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  Amount Sent (₹ INR) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-mono opacity-60">₹</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    placeholder="0"
+                    value={transferAmountInput}
+                    onChange={(e) => setTransferAmountInput(e.target.value)}
+                    required
+                    autoFocus
+                    className="w-full rounded-lg pl-7 pr-3 py-2 text-sm font-mono font-bold border focus:outline-none transition-colors"
+                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+                  />
                 </div>
-              ) : (
-                <p className="text-xs opacity-70 leading-relaxed">
-                  Resetting will set <strong>{spendMember.name}&apos;s</strong> current monthly spending back to ₹0 for the new billing cycle.
-                </p>
-              )}
+              </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  Transfer Date
+                </label>
+                <input
+                  type="date"
+                  value={transferDate}
+                  onChange={(e) => setTransferDate(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
+                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  Payment Account
+                </label>
+                <select
+                  value={transferAccountId}
+                  onChange={(e) => setTransferAccountId(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
+                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+                >
+                  <option value="">Unlinked / Direct Cash</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.type}) — {formatINR(acc.balance)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  Purpose / Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Monthly maintenance, Medical support, Gift"
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
+                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="recordInExpensesCheck"
+                  checked={recordInExpenses}
+                  onChange={(e) => setRecordInExpenses(e.target.checked)}
+                  className="rounded border-zinc-700 text-emerald-500 focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="recordInExpensesCheck" className="text-xs opacity-80 cursor-pointer select-none">
+                  Record in Expenses ledger as <strong>Family & Child Care</strong>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
                 <button
                   type="button"
-                  onClick={() => setSpendModalOpen(false)}
+                  onClick={() => setTransferModalOpen(false)}
                   className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
                   style={{ borderColor: "var(--app-border)" }}
                 >
@@ -1558,7 +1476,7 @@ export default function FamilySection() {
                   style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
                 >
                   {submitting && <Loader2 size={13} className="animate-spin" />}
-                  {spendActionType === "reset" ? "Reset to ₹0" : "Record Spend"}
+                  Record Transfer
                 </button>
               </div>
             </form>
@@ -1567,12 +1485,12 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          POPUP MODAL 3: ADD / EDIT HOUSEHOLD DUTY
+          POPUP MODAL 3: RESET SPENDING CYCLE
           ========================================================================= */}
-      {respModalOpen && (
+      {resetModalOpen && resetMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-sm rounded-2xl border p-6 space-y-4 shadow-2xl relative"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",
@@ -1580,148 +1498,39 @@ export default function FamilySection() {
             }}
           >
             <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-amber-400"
-                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <Home size={16} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight">
-                    {editingResp ? "Edit Household Duty" : "Add Recurring Duty / Bill"}
-                  </h3>
-                  <p className="text-xs opacity-60">Assign recurring responsibilities to family members.</p>
-                </div>
-              </div>
+              <h3 className="text-sm font-bold tracking-tight">Reset Monthly Cycle</h3>
               <button
-                onClick={() => setRespModalOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 cursor-pointer"
+                onClick={() => setResetModalOpen(false)}
+                className="p-1 rounded opacity-60 hover:opacity-100 cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveResp} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Duty / Bill Title *</label>
-                <input
-                  type="text"
-                  name="title"
-                  required
-                  placeholder="e.g. Society Maintenance / Electricity Bill"
-                  defaultValue={editingResp?.title || ""}
-                  className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
+            <p className="text-xs opacity-70 leading-relaxed">
+              Resetting will set <strong>{resetMember.name}&apos;s</strong> current monthly spending counter from{" "}
+              <strong>{formatINR(resetMember.current_spending)}</strong> back to <strong>₹0</strong> for the new billing cycle.
+            </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Estimated Cost (₹)</label>
-                  <input
-                    type="number"
-                    name="amount"
-                    step="50"
-                    min="0"
-                    placeholder="0"
-                    defaultValue={editingResp?.amount || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Assigned Member</label>
-                  <select
-                    name="assigned_to"
-                    defaultValue={editingResp?.assigned_to || "Self"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    <option value="Self">Self (Primary)</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.name}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Category</label>
-                  <select
-                    name="category"
-                    defaultValue={editingResp?.category || "Bills & Utilities"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    {RESPONSIBILITY_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Frequency</label>
-                  <select
-                    name="frequency"
-                    defaultValue={editingResp?.frequency || "monthly"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="one-time">One-Time</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Due Schedule / Day
-                </label>
-                <input
-                  type="text"
-                  name="due_date"
-                  placeholder="e.g. 5th of every month or 2026-11-20"
-                  defaultValue={editingResp?.due_date || ""}
-                  className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Payment Instructions / Notes</label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="e.g. Pay via UPI or BESCOM portal using Account # 89421"
-                  defaultValue={editingResp?.notes || ""}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors resize-none"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setRespModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Save Duty
-                </button>
-              </div>
-            </form>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
+                style={{ borderColor: "var(--app-border)" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSpending}
+                disabled={submitting}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50 text-white bg-rose-600 hover:bg-rose-700"
+              >
+                {submitting && <Loader2 size={13} className="animate-spin" />}
+                Reset to ₹0
+              </button>
+            </div>
           </div>
         </div>
       )}

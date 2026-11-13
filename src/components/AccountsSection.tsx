@@ -297,15 +297,15 @@ export default function AccountsSection() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Vibrant high-contrast fintech color palette (Zerodha Kite Green & Red standard)
+  // Modern minimalist fintech color palette
   const chartPalette = [
-    "#4bb473", // Zerodha Kite Green (Cash / Savings)
+    "#10B981", // Emerald (Cash / Savings)
     "#3B82F6", // Royal Blue (HDFC / Banking)
     "#8B5CF6", // Purple / Violet (Fixed Deposits)
     "#06B6D4", // Neon Cyan (Investments / Demat)
     "#F59E0B", // Bright Amber / Gold
     "#EC4899", // Vivid Pink
-    "#df514c", // Zerodha Kite Red
+    "#F43F5E", // Rose / Red
     "#14B8A6", // Teal
   ];
 
@@ -317,27 +317,27 @@ export default function AccountsSection() {
 
   return (
     <main
-      className="flex-1 h-full p-4 sm:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* Header */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8"
-        style={{ borderBottom: "1px solid var(--app-border)" }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8 border-b"
+        style={{ borderColor: "var(--app-border)" }}
       >
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Accounts</h1>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Connected accounts, liquid cash vault, and asset allocation.
+            Connected accounts, liquid cash vault, and asset allocation breakdown.
           </p>
         </div>
 
         {/* Add Account Modal Trigger */}
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 self-start sm:self-auto"
           style={{
             backgroundColor: "var(--app-fg)",
             color: "var(--app-bg)",
@@ -363,21 +363,21 @@ export default function AccountsSection() {
 
       {/* COMBINED UNIFIED CARD: Total Portfolio Value + Asset Allocation Chart */}
       <div
-        className="rounded-2xl p-6 sm:p-8 border mb-10 transition-colors shadow-sm"
+        className="rounded-2xl p-4 sm:p-6 md:p-8 border mb-8 sm:mb-10 transition-colors shadow-sm"
         style={{
           backgroundColor: "var(--app-card)",
           borderColor: "var(--app-border)",
           color: "var(--app-fg)",
         }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
           {/* Left Column: Total Portfolio Summary */}
           <div className="lg:col-span-5 space-y-4">
             <div>
               <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60">
                 Total Combined Portfolio Value
               </span>
-              <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight mt-1">
+              <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight mt-1 break-all sm:break-normal">
                 {loading ? "..." : formatINR(totalBalance)}
               </div>
             </div>
@@ -455,7 +455,7 @@ export default function AccountsSection() {
           </div>
         ) : (
           /* Responsive Apple Wallet Grid View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {accounts.map((acc) => (
               <AppleWalletCard
                 key={acc.id}
@@ -474,7 +474,7 @@ export default function AccountsSection() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-8 space-y-5 sm:space-y-6 shadow-2xl relative"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",
@@ -617,7 +617,7 @@ export default function AccountsSection() {
       {isEditingCash && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-md rounded-2xl border p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-8 space-y-5 sm:space-y-6 shadow-2xl relative"
             style={{
               backgroundColor: "var(--app-card)",
               borderColor: "var(--app-border)",

@@ -2,9 +2,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
-  Sun,
-  Moon,
-  Zap,
   User,
   Settings,
   LogOut,
@@ -16,9 +13,10 @@ import {
   Target,
   BookOpen,
   Users,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 
 interface TopNavProps {
   activeTab: string;
@@ -44,14 +42,8 @@ export default function TopNav({
   setCollapsed,
 }: TopNavProps) {
   const { user, profile, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  const cycleTheme = () => {
-    const next = theme === "light" ? "dark" : theme === "dark" ? "ultra" : "light";
-    setTheme(next);
-  };
 
   // Close profile dropdown on click outside
   useEffect(() => {
@@ -78,12 +70,12 @@ export default function TopNav({
     return displayName.slice(0, 2).toUpperCase();
   }, [displayName]);
 
-  const activeMeta = TAB_META[activeTab] || { label: "arthaX", icon: LayoutDashboard };
+  const activeMeta = TAB_META[activeTab] || { label: "Dashboard", icon: LayoutDashboard };
   const TabIcon = activeMeta.icon;
 
   return (
     <header
-      className="h-14 sm:h-16 px-4 sm:px-8 border-b flex items-center justify-between flex-shrink-0 select-none z-30 transition-colors"
+      className="h-14 sm:h-16 px-3.5 sm:px-8 border-b flex items-center justify-between flex-shrink-0 select-none z-30 transition-colors backdrop-blur-xl"
       style={{
         backgroundColor: "var(--app-bg)",
         borderColor: "var(--app-border)",
@@ -91,13 +83,13 @@ export default function TopNav({
       }}
     >
       {/* Left: Mobile Toggle & Active Section Identity */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
-          className="p-1.5 rounded-xl border transition-all cursor-pointer opacity-75 hover:opacity-100 md:hidden"
+          className="p-2 rounded-xl border transition-all cursor-pointer opacity-75 hover:opacity-100 hover:scale-105 active:scale-95 md:hidden flex-shrink-0"
           style={{
-            borderColor: "var(--app-border)",
+            borderColor: "var(--app-border-subtle)",
             backgroundColor: "var(--app-card)",
             color: "var(--app-fg)",
           }}
@@ -106,47 +98,24 @@ export default function TopNav({
           <Menu size={16} />
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono uppercase tracking-wider opacity-40 hidden sm:inline">
-            arthaX /
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-card)",
+            }}
+          >
+            <TabIcon size={15} className="text-[var(--app-accent)]" />
           </span>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center flex-shrink-0"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              <TabIcon size={14} className="opacity-80" />
-            </span>
-            <span className="text-xs sm:text-sm font-bold tracking-tight truncate">
-              {activeMeta.label}
-            </span>
-          </div>
+          <span className="text-sm font-bold tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none">
+            {activeMeta.label}
+          </span>
         </div>
       </div>
 
-      {/* Right: Appearance Logo & Small Circle Profile Avatar */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Appearance Simple Logo (Theme Switcher) */}
-        <button
-          type="button"
-          onClick={cycleTheme}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
-          style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-card)",
-            color: "var(--app-fg)",
-          }}
-          title={`Appearance: ${theme === "light" ? "Light" : theme === "dark" ? "Dark" : "Ultra Dark"} (Click to cycle)`}
-          aria-label="Toggle theme appearance"
-        >
-          {theme === "light" && <Sun size={17} className="text-amber-500" />}
-          {theme === "dark" && <Moon size={17} className="text-sky-400" />}
-          {theme === "ultra" && <Zap size={17} className="text-[#4bb473]" />}
-        </button>
-
+      {/* Right: Small Circle Profile Avatar */}
+      <div className="flex items-center gap-3">
         {/* Profile Logo in Small Circle */}
         <div className="relative" ref={profileMenuRef}>
           <button
@@ -174,12 +143,14 @@ export default function TopNav({
                 {initials || <User size={15} className="opacity-70" />}
               </div>
             )}
+            {/* Online Status Dot */}
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--app-bg)] shadow-[0_0_6px_#10b981]" />
           </button>
 
           {/* Profile Dropdown Popover */}
           {isProfileOpen && (
             <div
-              className="absolute right-0 mt-2 w-72 rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3"
+              className="absolute right-0 mt-2.5 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3 backdrop-blur-2xl"
               style={{
                 backgroundColor: "var(--app-card)",
                 borderColor: "var(--app-border)",
@@ -216,7 +187,8 @@ export default function TopNav({
                     <span
                       className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-full border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
                     >
-                      {isGoogleUser ? "Google Verified" : "Email Verified"}
+                      <ShieldCheck size={10} />
+                      {isGoogleUser ? "Google Verified" : "Private Vault"}
                     </span>
                   </div>
                 </div>
@@ -232,7 +204,7 @@ export default function TopNav({
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-bg)] transition-colors cursor-pointer text-left"
                 >
-                  <Settings size={14} className="opacity-70" />
+                  <Settings size={14} className="opacity-70 text-[var(--app-accent)]" />
                   <span>Preferences & Settings</span>
                 </button>
 

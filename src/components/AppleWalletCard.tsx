@@ -14,7 +14,7 @@ export interface AccountData {
 }
 
 export type CardThemeId =
-  | "apple-cash"
+  | "liquid-cash"
   | "sbi-sapphire"
   | "hdfc-cobalt"
   | "icici-ruby"
@@ -23,7 +23,7 @@ export type CardThemeId =
   | "demat-cyan"
   | "credit-matte"
   | "amex-gold"
-  | "apple-titanium";
+  | "titanium-slate";
 
 export type CardNetworkType = "visa" | "mastercard" | "rupay" | "cash" | "amex";
 
@@ -44,24 +44,23 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
   const clean = (name || "").trim().toLowerCase();
   const cleanType = (type || "").trim().toLowerCase();
 
-  // 1. Cash in Hand / Liquid Cash / Vault
+  // 1. Cash in Hand / Liquid Cash
   if (
     clean.includes("cash") ||
     cleanType.includes("liquid") ||
-    clean === "vault" ||
     clean.includes("in hand")
   ) {
     return {
-      id: "apple-cash",
-      name: "Apple Cash Vault",
+      id: "liquid-cash",
+      name: "Liquid Cash Holding",
       bgGradient: "linear-gradient(145deg, #051910 0%, #0d2e20 48%, #04140d 100%)",
       ambientGlow: "radial-gradient(circle at 82% 18%, rgba(16, 185, 129, 0.28) 0%, transparent 62%)",
       borderColor: "rgba(16, 185, 129, 0.35)",
       chipVariant: "gold",
       network: "cash",
       accentColor: "#10b981",
-      badgeText: "PERMANENT VAULT",
-      subLabel: "LIQUID CASH RESERVE",
+      badgeText: "LIQUID CASH",
+      subLabel: "PHYSICAL CURRENCY",
     };
   }
 
@@ -201,10 +200,10 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
     };
   }
 
-  // 10. Default Apple Titanium Space Card
+  // 10. Default Slate Titanium Space Card
   return {
-    id: "apple-titanium",
-    name: "Apple Space Titanium",
+    id: "titanium-slate",
+    name: "Slate Titanium Card",
     bgGradient: "linear-gradient(145deg, #141518 0%, #20232a 48%, #0e0f11 100%)",
     ambientGlow: "radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.14) 0%, transparent 62%)",
     borderColor: "rgba(255, 255, 255, 0.22)",
@@ -336,7 +335,7 @@ function ContactlessWave({ className = "" }: { className?: string }) {
 }
 
 /**
- * Card Network Logos: RuPay, Visa, Mastercard, Apple Cash
+ * Card Network Logos: RuPay, Visa, Mastercard, Cash
  */
 function RuPayLogo() {
   return (
@@ -377,12 +376,12 @@ function AmexLogo() {
   );
 }
 
-function AppleCashBadge() {
+function CashBadge() {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md select-none">
+    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md select-none">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
       <span className="text-[9px] font-mono font-bold tracking-wider text-emerald-300 uppercase">
-        VAULT CASH
+        LIQUID CASH
       </span>
     </div>
   );
@@ -518,11 +517,11 @@ export default function AppleWalletCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] sm:text-[10px] font-mono tracking-[0.2em] uppercase font-semibold text-white/55">
-                {isCash ? "APPLE CASH • VAULT" : `DEBIT • ${account.type}`}
+                {isCash ? "LIQUID CASH • IN HAND" : `DEBIT • ${account.type}`}
               </span>
               {isCash && (
                 <span className="px-1.5 py-0.2 rounded-full text-[8px] font-mono font-bold tracking-wider bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
-                  BUILT-IN
+                  PHYSICAL
                 </span>
               )}
             </div>
@@ -534,7 +533,7 @@ export default function AppleWalletCard({
 
         {/* Top Right Controls: Contactless Wave + Frosted Actions */}
         <div className="flex items-center gap-2.5">
-          <ContactlessWave className="text-white/60 drop-shadow-sm" />
+          {!isCash && <ContactlessWave className="text-white/60 drop-shadow-sm" />}
 
           {isCash ? (
             <button
@@ -567,7 +566,14 @@ export default function AppleWalletCard({
       {/* 5. Middle Section: Authentic EMV Chip & Masked Card Digits */}
       <div className="relative z-10 my-auto pt-3">
         <div className="flex items-center justify-between">
-          <EMVChip variant={theme.chipVariant} />
+          {isCash ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+              <Banknote size={15} />
+              <span className="text-[9px] font-mono tracking-widest font-bold uppercase">PHYSICAL CURRENCY</span>
+            </div>
+          ) : (
+            <EMVChip variant={theme.chipVariant} />
+          )}
 
           <span className="text-[9px] font-mono tracking-[0.24em] uppercase text-white/40 font-medium">
             {isCash ? "LIQUID TENDER" : "SECURE CONTACTLESS"}
@@ -577,7 +583,7 @@ export default function AppleWalletCard({
         {/* Card Number Mask */}
         <div className="font-mono text-xs sm:text-sm tracking-[0.22em] font-medium text-white/85 select-all drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] mt-2.5">
           {isCash ? (
-            <span>••••  ••••  CASH  HOLD</span>
+            <span>••••  ••••  LIQUID  CASH</span>
           ) : (
             <span>••••  ••••  ••••  {account.last_four || "8821"}</span>
           )}
@@ -598,7 +604,7 @@ export default function AppleWalletCard({
         <div className="flex flex-col items-end gap-1.5">
           {/* Authentic Network Badge */}
           {theme.network === "cash" ? (
-            <AppleCashBadge />
+            <CashBadge />
           ) : theme.network === "rupay" ? (
             <RuPayLogo />
           ) : theme.network === "mastercard" ? (
