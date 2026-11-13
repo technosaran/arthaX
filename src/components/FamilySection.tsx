@@ -4,10 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Users,
   UserPlus,
-  HeartHandshake,
   Home,
-  ShieldCheck,
-  Target,
   Plus,
   Trash2,
   Pencil,
@@ -22,19 +19,9 @@ import {
   Calendar,
   Phone,
   Mail,
-  FileText,
   Sparkles,
   Copy,
   Check,
-  Share2,
-  PiggyBank,
-  Car,
-  Plane,
-  GraduationCap,
-  Building,
-  HeartPulse,
-  Key,
-  ShieldAlert,
   ArrowRight,
   Send,
   RefreshCw,
@@ -63,21 +50,6 @@ export interface FamilyMember {
   role: string;
   email?: string | null;
   phone?: string | null;
-  notes?: string | null;
-  created_at?: string;
-}
-
-export interface FamilyGoal {
-  id: string;
-  user_id: string;
-  title: string;
-  target_amount: number;
-  current_amount: number;
-  target_date?: string | null;
-  category: string;
-  icon: string;
-  assigned_members: string[]; // member names or IDs
-  status: "active" | "completed" | "paused";
   notes?: string | null;
   created_at?: string;
 }
@@ -147,16 +119,6 @@ const AVATAR_COLORS = [
   "#E11D48", // Rose
 ];
 
-const GOAL_CATEGORIES = [
-  { label: "Vacation & Travel", icon: Plane, color: "#3B82F6" },
-  { label: "House & Property", icon: Building, color: "#8B5CF6" },
-  { label: "Child Education", icon: GraduationCap, color: "#EC4899" },
-  { label: "Vehicle & Car", icon: Car, color: "#F59E0B" },
-  { label: "Emergency Buffer", icon: ShieldCheck, color: "#4bb473" },
-  { label: "Festive & Shopping", icon: PiggyBank, color: "#06B6D4" },
-  { label: "General Milestone", icon: HeartHandshake, color: "#14B8A6" },
-];
-
 const RESPONSIBILITY_CATEGORIES = [
   "Society & Rent",
   "Bills & Utilities",
@@ -200,31 +162,6 @@ const STARTER_MEMBERS: Omit<FamilyMember, "id" | "user_id">[] = [
     email: null,
     phone: null,
     notes: "School stationery, hobbies, and sports activities",
-  },
-];
-
-const STARTER_GOALS: Omit<FamilyGoal, "id" | "user_id">[] = [
-  {
-    title: "Annual Family Vacation to Goa",
-    target_amount: 150000,
-    current_amount: 85000,
-    target_date: "2026-12-20",
-    category: "Vacation & Travel",
-    icon: "Plane",
-    assigned_members: ["Priya (Spouse)", "Self"],
-    status: "active",
-    notes: "Flights, beach resort booking, and local activities fund",
-  },
-  {
-    title: "Kid's Higher Education Fund",
-    target_amount: 500000,
-    current_amount: 240000,
-    target_date: "2028-06-30",
-    category: "Child Education",
-    icon: "GraduationCap",
-    assigned_members: ["Priya (Spouse)", "Self"],
-    status: "active",
-    notes: "Long term college and competitive coaching reserve",
   },
 ];
 
@@ -293,23 +230,21 @@ export default function FamilySection() {
   const { showToast } = useToast();
 
   // Active sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<"members" | "goals" | "planning" | "safety">("members");
+  const [activeSubTab, setActiveSubTab] = useState<"members" | "planning" | "safety">("members");
 
   // Multi-tier cache keys
   const membersKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_MEMBERS);
-  const goalsKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_GOALS);
   const responsibilitiesKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_RESPONSIBILITIES);
   const vaultKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_VAULT);
   const accountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
 
   // States initialized from 0ms Tier 1/2 Local Cache
   const [members, setMembers] = useState<FamilyMember[]>(() => getFromLocalCache<FamilyMember[]>(membersKey) || []);
-  const [goals, setGoals] = useState<FamilyGoal[]>(() => getFromLocalCache<FamilyGoal[]>(goalsKey) || []);
   const [responsibilities, setResponsibilities] = useState<FamilyResponsibility[]>(() => getFromLocalCache<FamilyResponsibility[]>(responsibilitiesKey) || []);
   const [vaultItems, setVaultItems] = useState<EmergencyVaultItem[]>(() => getFromLocalCache<EmergencyVaultItem[]>(vaultKey) || []);
   const [accounts, setAccounts] = useState<AccountItem[]>(() => getFromLocalCache<AccountItem[]>(accountsKey) || []);
 
-  const [loading, setLoading] = useState<boolean>(() => members.length === 0 && goals.length === 0);
+  const [loading, setLoading] = useState<boolean>(() => members.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [seedingTemplate, setSeedingTemplate] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -326,13 +261,6 @@ export default function FamilySection() {
   const [spendMember, setSpendMember] = useState<FamilyMember | null>(null);
   const [spendAmountInput, setSpendAmountInput] = useState("");
   const [spendActionType, setSpendActionType] = useState<"add" | "reset">("add");
-
-  const [goalModalOpen, setGoalModalOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<FamilyGoal | null>(null);
-
-  const [contributeModalOpen, setContributeModalOpen] = useState(false);
-  const [contributeGoal, setContributeGoal] = useState<FamilyGoal | null>(null);
-  const [contributeAmountInput, setContributeAmountInput] = useState("");
 
   const [respModalOpen, setRespModalOpen] = useState(false);
   const [editingResp, setEditingResp] = useState<FamilyResponsibility | null>(null);
@@ -357,9 +285,8 @@ export default function FamilySection() {
     try {
       const supabase = createClient();
 
-      const [mRes, gRes, rRes, vRes, aRes] = await Promise.all([
+      const [mRes, rRes, vRes, aRes] = await Promise.all([
         supabase.from("family_members").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
-        supabase.from("family_goals").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
         supabase.from("family_responsibilities").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
         supabase.from("family_emergency_vault").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
         supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
@@ -373,17 +300,6 @@ export default function FamilySection() {
         }));
         setMembers(mappedMembers);
         saveToLocalCache(membersKey, mappedMembers, 3600);
-      }
-
-      if (gRes.data) {
-        const mappedGoals: FamilyGoal[] = gRes.data.map((item) => ({
-          ...item,
-          target_amount: Number(item.target_amount) || 0,
-          current_amount: Number(item.current_amount) || 0,
-          assigned_members: Array.isArray(item.assigned_members) ? item.assigned_members : [],
-        }));
-        setGoals(mappedGoals);
-        saveToLocalCache(goalsKey, mappedGoals, 3600);
       }
 
       if (rRes.data) {
@@ -414,7 +330,7 @@ export default function FamilySection() {
     } finally {
       setLoading(false);
     }
-  }, [user, membersKey, goalsKey, responsibilitiesKey, vaultKey, accountsKey]);
+  }, [user, membersKey, responsibilitiesKey, vaultKey, accountsKey]);
 
   useEffect(() => {
     fetchAllData();
@@ -427,7 +343,6 @@ export default function FamilySection() {
     const channel = supabase
       .channel("family_realtime_sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "family_members" }, () => fetchAllData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "family_goals" }, () => fetchAllData())
       .on("postgres_changes", { event: "*", schema: "public", table: "family_responsibilities" }, () => fetchAllData())
       .on("postgres_changes", { event: "*", schema: "public", table: "family_emergency_vault" }, () => fetchAllData())
       .subscribe();
@@ -449,21 +364,6 @@ export default function FamilySection() {
     () => members.reduce((sum, m) => sum + (Number(m.current_spending) || 0), 0),
     [members]
   );
-
-  const totalGoalsTarget = useMemo(
-    () => goals.reduce((sum, g) => sum + (Number(g.target_amount) || 0), 0),
-    [goals]
-  );
-
-  const totalGoalsSaved = useMemo(
-    () => goals.reduce((sum, g) => sum + (Number(g.current_amount) || 0), 0),
-    [goals]
-  );
-
-  const goalsProgressPercent = useMemo(() => {
-    if (totalGoalsTarget <= 0) return 0;
-    return Math.min(100, Math.round((totalGoalsSaved / totalGoalsTarget) * 100));
-  }, [totalGoalsSaved, totalGoalsTarget]);
 
   const totalHouseholdBills = useMemo(
     () => responsibilities.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
@@ -533,13 +433,11 @@ export default function FamilySection() {
       const supabase = createClient();
 
       const memberPayloads = STARTER_MEMBERS.map((m) => ({ ...m, user_id: user.id }));
-      const goalPayloads = STARTER_GOALS.map((g) => ({ ...g, user_id: user.id }));
       const respPayloads = STARTER_RESPONSIBILITIES.map((r) => ({ ...r, user_id: user.id }));
       const vaultPayloads = STARTER_VAULT.map((v) => ({ ...v, user_id: user.id }));
 
       await Promise.all([
         supabase.from("family_members").insert(memberPayloads),
-        supabase.from("family_goals").insert(goalPayloads),
         supabase.from("family_responsibilities").insert(respPayloads),
         supabase.from("family_emergency_vault").insert(vaultPayloads),
       ]);
@@ -551,23 +449,6 @@ export default function FamilySection() {
       showToast("Unable to load starter template. Please try again.", "error");
     } finally {
       setSeedingTemplate(false);
-    }
-  };
-
-  // ==========================================
-  // Copy Household Overview for WhatsApp / Family
-  // ==========================================
-  const handleShareSummary = () => {
-    const summary = `🏡 *arthaX Household Pulse*\n` +
-      `👥 Family Members: ${members.length}\n` +
-      `💰 Monthly Allowance Pool: ${formatINR(totalMonthlyAllowance)} (Spent: ${formatINR(totalCurrentSpending)})\n` +
-      `🎯 Shared Goals Saved: ${formatINR(totalGoalsSaved)} of ${formatINR(totalGoalsTarget)} (${goalsProgressPercent}%)\n` +
-      `📋 Pending Bills: ${pendingHouseholdBillsCount} (${formatINR(totalHouseholdBills - paidHouseholdBills)} remaining)\n` +
-      `🛡️ Emergency Runway: ${emergencyRunwayMonths} months covered`;
-
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(summary);
-      showToast("Household summary copied for sharing!", "success");
     }
   };
 
@@ -703,144 +584,6 @@ export default function FamilySection() {
       showToast("Failed to adjust spending", "error");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // ==========================================
-  // Goal Operations
-  // ==========================================
-  const handleSaveGoal = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user) return;
-    setSubmitting(true);
-
-    const formData = new FormData(e.currentTarget);
-    const title = formData.get("title")?.toString().trim() || "";
-    const target_amount = parseFloat(formData.get("target_amount")?.toString() || "0") || 0;
-    const current_amount = parseFloat(formData.get("current_amount")?.toString() || "0") || 0;
-    const target_date = formData.get("target_date")?.toString() || null;
-    const category = formData.get("category")?.toString() || "General Milestone";
-    const status = (formData.get("status")?.toString() || "active") as "active" | "completed" | "paused";
-    const notes = formData.get("notes")?.toString().trim() || null;
-
-    // Collect selected members
-    const selectedMembers = formData.getAll("assigned_members").map(String);
-
-    if (!title || target_amount <= 0) {
-      showToast("Please enter a title and valid target amount", "error");
-      setSubmitting(false);
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-
-      if (editingGoal) {
-        const { error } = await supabase
-          .from("family_goals")
-          .update({
-            title,
-            target_amount,
-            current_amount,
-            target_date,
-            category,
-            assigned_members: selectedMembers,
-            status,
-            notes,
-          })
-          .eq("id", editingGoal.id)
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-        showToast("Shared goal updated", "success");
-      } else {
-        const { error } = await supabase.from("family_goals").insert({
-          user_id: user.id,
-          title,
-          target_amount,
-          current_amount,
-          target_date,
-          category,
-          icon: "Target",
-          assigned_members: selectedMembers,
-          status,
-          notes,
-        });
-
-        if (error) throw error;
-        showToast("New shared goal created", "success");
-      }
-
-      setGoalModalOpen(false);
-      setEditingGoal(null);
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to save goal", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleContributeGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !contributeGoal) return;
-    setSubmitting(true);
-
-    const val = parseFloat(contributeAmountInput) || 0;
-    if (val <= 0) {
-      showToast("Please enter an amount to contribute", "error");
-      setSubmitting(false);
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-      const updatedSaved = Number((Number(contributeGoal.current_amount || 0) + val).toFixed(2));
-      const isReached = updatedSaved >= contributeGoal.target_amount;
-
-      const { error } = await supabase
-        .from("family_goals")
-        .update({
-          current_amount: updatedSaved,
-          status: isReached ? "completed" : contributeGoal.status,
-        })
-        .eq("id", contributeGoal.id)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-      showToast(
-        isReached
-          ? `🎉 Goal reached! Contributed ${formatINR(val)} to ${contributeGoal.title}!`
-          : `Contributed ${formatINR(val)} to ${contributeGoal.title}`,
-        "success"
-      );
-
-      setContributeModalOpen(false);
-      setContributeGoal(null);
-      setContributeAmountInput("");
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to record contribution", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteGoal = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete goal: "${title}"?`)) return;
-    if (!user) return;
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.from("family_goals").delete().eq("id", id).eq("user_id", user.id);
-      if (error) throw error;
-      showToast("Goal deleted", "success");
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to delete goal", "error");
     }
   };
 
@@ -1107,13 +850,13 @@ export default function FamilySection() {
             </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Household allowances, shared savings goals, recurring duties, and emergency vault.
+            Household allowances, recurring duties, and emergency vault.
           </p>
         </div>
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          {members.length === 0 && goals.length === 0 && (
+          {members.length === 0 && (
             <button
               onClick={handleSeedTemplate}
               disabled={seedingTemplate}
@@ -1123,26 +866,12 @@ export default function FamilySection() {
                 color: "var(--app-accent)",
                 backgroundColor: "var(--app-accent-subtle)",
               }}
-              title="Prepopulate sample family members, goals, and recurring duties"
+              title="Prepopulate sample family members and recurring duties"
             >
               {seedingTemplate ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
               Load Example Household
             </button>
           )}
-
-          <button
-            onClick={handleShareSummary}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer opacity-80 hover:opacity-100"
-            style={{
-              borderColor: "var(--app-border)",
-              backgroundColor: "var(--app-card)",
-              color: "var(--app-fg)",
-            }}
-            title="Copy household summary text for WhatsApp family group"
-          >
-            <Share2 size={13} />
-            <span className="hidden sm:inline">Share Summary</span>
-          </button>
 
           {/* Dynamic Add Button depending on active tab */}
           {activeSubTab === "members" && (
@@ -1156,20 +885,6 @@ export default function FamilySection() {
             >
               <UserPlus size={14} />
               Add Member
-            </button>
-          )}
-
-          {activeSubTab === "goals" && (
-            <button
-              onClick={() => {
-                setEditingGoal(null);
-                setGoalModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-              style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-            >
-              <Plus size={14} />
-              New Goal
             </button>
           )}
 
@@ -1204,9 +919,9 @@ export default function FamilySection() {
       </div>
 
       {/* =========================================================================
-          Top 4 KPI Metric Summary Cards
+          Top 3 KPI Metric Summary Cards
           ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {/* Card 1: Family Roster */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
@@ -1282,46 +997,7 @@ export default function FamilySection() {
           </div>
         </div>
 
-        {/* Card 3: Goals Progress */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Joint Goals Saved</span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-sky-400"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(56, 189, 248, 0.12)" }}
-            >
-              <HeartHandshake size={14} />
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono">{formatINR(totalGoalsSaved)}</div>
-            <div className="text-xs opacity-60 mt-1 flex items-center justify-between">
-              <span>Target: {formatINR(totalGoalsTarget)}</span>
-              <span className="font-mono font-medium">{goalsProgressPercent}%</span>
-            </div>
-            {/* Mini Progress */}
-            <div
-              className="w-full h-1.5 rounded-full mt-2 overflow-hidden"
-              style={{ backgroundColor: "var(--app-track-bg)" }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${goalsProgressPercent}%`,
-                  backgroundColor: "#38BDF8",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Emergency Runway */}
+        {/* Card 3: Emergency Runway */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
           style={{
@@ -1379,27 +1055,6 @@ export default function FamilySection() {
             style={{ backgroundColor: "var(--app-border)", color: "var(--app-fg)" }}
           >
             {members.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab("goals")}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer whitespace-nowrap ${
-            activeSubTab === "goals" ? "font-bold shadow-sm" : "opacity-70 hover:opacity-100"
-          }`}
-          style={{
-            backgroundColor: activeSubTab === "goals" ? "var(--app-card)" : "transparent",
-            borderColor: activeSubTab === "goals" ? "var(--app-border)" : "transparent",
-            color: activeSubTab === "goals" ? "#38BDF8" : "var(--app-fg)",
-          }}
-        >
-          <HeartHandshake size={14} />
-          <span>Shared Goals & Plans</span>
-          <span
-            className="text-[10px] font-mono px-1.5 py-0.2 rounded-full"
-            style={{ backgroundColor: "var(--app-border)", color: "var(--app-fg)" }}
-          >
-            {goals.length}
           </span>
         </button>
 
@@ -1681,203 +1336,7 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          TAB 2: SHARED GOALS & MILESTONES
-          ========================================================================= */}
-      {activeSubTab === "goals" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          {goals.length === 0 ? (
-            <div
-              className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
-              style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl border flex items-center justify-center text-sky-400"
-                style={{ backgroundColor: "rgba(56, 189, 248, 0.12)", borderColor: "var(--app-border-subtle)" }}
-              >
-                <HeartHandshake size={28} />
-              </div>
-              <div className="max-w-md">
-                <h3 className="text-base font-bold">No Shared Family Goals Yet</h3>
-                <p className="text-xs opacity-70 mt-1">
-                  Create savings milestones together: annual family vacation, kid's education fund, emergency reserve, or dream car downpayment.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setEditingGoal(null);
-                  setGoalModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm"
-                style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-              >
-                <Plus size={14} />
-                Create First Goal
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {goals.map((goal) => {
-                const target = Number(goal.target_amount) || 0;
-                const saved = Number(goal.current_amount) || 0;
-                const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-                const remaining = Math.max(0, target - saved);
-
-                const catMeta = GOAL_CATEGORIES.find((c) => c.label === goal.category) || {
-                  label: goal.category,
-                  icon: Target,
-                  color: "#3B82F6",
-                };
-                const CatIcon = catMeta.icon;
-
-                return (
-                  <div
-                    key={goal.id}
-                    className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-sky-400/50"
-                    style={{
-                      backgroundColor: "var(--app-card)",
-                      borderColor: "var(--app-border)",
-                    }}
-                  >
-                    <div>
-                      {/* Goal Header */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0"
-                            style={{
-                              borderColor: "var(--app-border-subtle)",
-                              backgroundColor: `${catMeta.color}18`,
-                              color: catMeta.color,
-                            }}
-                          >
-                            <CatIcon size={18} />
-                          </span>
-                          <div>
-                            <h3 className="text-sm font-bold tracking-tight line-clamp-1">{goal.title}</h3>
-                            <div className="flex items-center gap-2 text-[11px] opacity-60 mt-0.5">
-                              <span>{goal.category}</span>
-                              {goal.target_date && (
-                                <>
-                                  <span>•</span>
-                                  <span>Target: {new Date(goal.target_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingGoal(goal);
-                              setGoalModalOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                            style={{ borderColor: "var(--app-border-subtle)" }}
-                            title="Edit Goal"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGoal(goal.id, goal.title)}
-                            className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
-                            style={{ borderColor: "var(--app-border-subtle)" }}
-                            title="Delete Goal"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Amount Progress */}
-                      <div
-                        className="mt-4 p-3.5 rounded-xl border space-y-2.5"
-                        style={{
-                          backgroundColor: "var(--app-bg)",
-                          borderColor: "var(--app-border-subtle)",
-                        }}
-                      >
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-lg font-bold font-mono tracking-tight">{formatINR(saved)}</span>
-                          <span className="text-xs font-mono opacity-60">of {formatINR(target)}</span>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div
-                          className="w-full h-2.5 rounded-full overflow-hidden"
-                          style={{ backgroundColor: "var(--app-track-bg)" }}
-                        >
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: pct >= 100 ? "var(--app-accent)" : catMeta.color,
-                            }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-semibold" style={{ color: pct >= 100 ? "var(--app-accent)" : catMeta.color }}>
-                            {pct}% achieved
-                          </span>
-                          <span className="opacity-60 font-mono">
-                            {remaining === 0 ? "Goal Reached! 🎉" : `${formatINR(remaining)} to go`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Contributing Members */}
-                      {goal.assigned_members && goal.assigned_members.length > 0 && (
-                        <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] uppercase font-mono opacity-60">Contributors:</span>
-                          {goal.assigned_members.map((m, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[10px] font-medium px-2 py-0.5 rounded-full border"
-                              style={{
-                                borderColor: "var(--app-border-subtle)",
-                                backgroundColor: "var(--app-card)",
-                              }}
-                            >
-                              {m}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {goal.notes && (
-                        <p className="italic text-[10px] opacity-60 line-clamp-2 mt-2">"{goal.notes}"</p>
-                      )}
-                    </div>
-
-                    {/* Contribute Button */}
-                    <div className="pt-4 mt-4 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                      <button
-                        onClick={() => {
-                          setContributeGoal(goal);
-                          setContributeModalOpen(true);
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg border transition-opacity hover:opacity-100 cursor-pointer"
-                        style={{
-                          borderColor: "var(--app-border)",
-                          backgroundColor: "var(--app-bg)",
-                          color: catMeta.color,
-                        }}
-                      >
-                        <Plus size={13} />
-                        Deposit / Contribute Funds
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* =========================================================================
-          TAB 3: HOUSEHOLD DUTIES & BILLS
+          TAB 2: HOUSEHOLD DUTIES & BILLS
           ========================================================================= */}
       {activeSubTab === "planning" && (
         <div className="space-y-4 animate-in fade-in duration-150">
@@ -2068,7 +1527,7 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          TAB 4: EMERGENCY VAULT & SAFETY NET
+          TAB 3: EMERGENCY VAULT & SAFETY NET
           ========================================================================= */}
       {activeSubTab === "safety" && (
         <div className="space-y-6 animate-in fade-in duration-150">
@@ -2524,257 +1983,7 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          POPUP MODAL 3: CREATE / EDIT SHARED GOAL
-          ========================================================================= */}
-      {goalModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-sky-400"
-                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <HeartHandshake size={16} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight">
-                    {editingGoal ? "Edit Shared Goal" : "Create Shared Family Goal"}
-                  </h3>
-                  <p className="text-xs opacity-60">Set joint savings targets, target date, and contributors.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setGoalModalOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveGoal} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Goal Title *</label>
-                <input
-                  type="text"
-                  name="title"
-                  required
-                  placeholder="e.g. Annual Vacation to Goa"
-                  defaultValue={editingGoal?.title || ""}
-                  className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Target Amount (₹) *</label>
-                  <input
-                    type="number"
-                    name="target_amount"
-                    step="1000"
-                    min="1"
-                    required
-                    placeholder="150000"
-                    defaultValue={editingGoal?.target_amount || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Initial Saved (₹)</label>
-                  <input
-                    type="number"
-                    name="current_amount"
-                    step="500"
-                    min="0"
-                    placeholder="0"
-                    defaultValue={editingGoal?.current_amount || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Category</label>
-                  <select
-                    name="category"
-                    defaultValue={editingGoal?.category || "Vacation & Travel"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    {GOAL_CATEGORIES.map((cat) => (
-                      <option key={cat.label} value={cat.label}>{cat.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Target Date</label>
-                  <input
-                    type="date"
-                    name="target_date"
-                    defaultValue={editingGoal?.target_date || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              {members.length > 0 && (
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Contributing Members
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg border" style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}>
-                    <label className="flex items-center gap-2 text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="assigned_members"
-                        value="Self"
-                        defaultChecked={editingGoal?.assigned_members?.includes("Self") ?? true}
-                        className="rounded"
-                      />
-                      <span>Self (Primary)</span>
-                    </label>
-                    {members.map((m) => (
-                      <label key={m.id} className="flex items-center gap-2 text-xs cursor-pointer truncate">
-                        <input
-                          type="checkbox"
-                          name="assigned_members"
-                          value={m.name}
-                          defaultChecked={editingGoal?.assigned_members?.includes(m.name)}
-                          className="rounded"
-                        />
-                        <span className="truncate">{m.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Notes & Milestones</label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="e.g. Flight bookings scheduled for Diwali holiday season"
-                  defaultValue={editingGoal?.notes || ""}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors resize-none"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setGoalModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Save Goal
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          POPUP MODAL 4: DEPOSIT / CONTRIBUTE TO GOAL
-          ========================================================================= */}
-      {contributeModalOpen && contributeGoal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-sm rounded-2xl border p-6 space-y-5 shadow-2xl relative"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Deposit to Goal</h3>
-                <p className="text-xs opacity-60 line-clamp-1">{contributeGoal.title}</p>
-              </div>
-              <button
-                onClick={() => setContributeModalOpen(false)}
-                className="p-1 rounded opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleContributeGoal} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Deposit Amount (₹ INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-mono opacity-60">₹</span>
-                  <input
-                    type="number"
-                    step="100"
-                    min="1"
-                    placeholder="5000"
-                    value={contributeAmountInput}
-                    onChange={(e) => setContributeAmountInput(e.target.value)}
-                    required
-                    autoFocus
-                    className="w-full rounded-lg pl-7 pr-3 py-2 text-sm font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] opacity-60 mt-1.5">
-                  <span>Current: {formatINR(contributeGoal.current_amount)}</span>
-                  <span>Target: {formatINR(contributeGoal.target_amount)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setContributeModalOpen(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Confirm Deposit
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          POPUP MODAL 5: ADD / EDIT HOUSEHOLD DUTY
+          POPUP MODAL 3: ADD / EDIT HOUSEHOLD DUTY
           ========================================================================= */}
       {respModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
@@ -2934,7 +2143,7 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          POPUP MODAL 6: ADD / EDIT EMERGENCY VAULT
+          POPUP MODAL 4: ADD / EDIT EMERGENCY VAULT
           ========================================================================= */}
       {vaultModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">

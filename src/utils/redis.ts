@@ -15,7 +15,6 @@ export const CACHE_KEYS = {
   LEDGER: "ledger",
   BUDGETS: "budgets",
   FAMILY_MEMBERS: "family_members",
-  FAMILY_GOALS: "family_goals",
   FAMILY_RESPONSIBILITIES: "family_responsibilities",
   FAMILY_VAULT: "family_vault",
 } as const;

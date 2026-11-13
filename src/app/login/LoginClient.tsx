@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
@@ -789,11 +790,22 @@ export default function LoginClient() {
 
             {/* Privacy & Tenant Isolation Assurance */}
             <div
-              className="pt-4 border-t flex items-center justify-center gap-2 text-[11px] opacity-50 text-center"
+              className="pt-4 border-t flex flex-col items-center justify-center gap-2 text-[11px] opacity-60 text-center"
               style={{ borderColor: "var(--app-border-subtle)" }}
             >
-              <ShieldCheck size={14} className="text-emerald-400 flex-shrink-0" />
-              <span>Isolated Vault • End-to-End Encrypted Sessions</span>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                <span>Isolated Vault • End-to-End Encrypted Sessions</span>
+              </div>
+              <div className="flex items-center gap-3 text-[10px] opacity-75">
+                <Link href="/privacy" className="hover:underline hover:text-emerald-400 transition-colors">
+                  Privacy Policy
+                </Link>
+                <span>•</span>
+                <Link href="/terms" className="hover:underline hover:text-emerald-400 transition-colors">
+                  Terms of Service
+                </Link>
+              </div>
             </div>
           </div>
         </div>

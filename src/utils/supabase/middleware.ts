@@ -5,10 +5,12 @@ export const updateSession = async (request: NextRequest) => {
   const url = request.nextUrl.clone();
   const pathname = url.pathname;
 
-  // Fast bypass for API routes, auth callbacks, and static files
+  // Fast bypass for API routes, auth callbacks, privacy, terms, and static files
   if (
     pathname.startsWith("/api") ||
     pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/privacy") ||
+    pathname.startsWith("/terms") ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
