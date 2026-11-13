@@ -118,7 +118,7 @@ export default function HomeClient() {
         {/* Content Viewport */}
         <div className="flex-1 h-full overflow-hidden relative w-full min-w-0">
           <div className={`h-full w-full ${activeTab === "dashboard" ? "block" : "hidden"}`}>
-            <DashboardSection />
+            <DashboardSection onNavigate={handleTabChange} />
           </div>
           {visitedTabs.accounts && (
             <div className={`h-full w-full ${activeTab === "accounts" ? "block" : "hidden"}`}>

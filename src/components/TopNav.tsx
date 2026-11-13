@@ -15,6 +15,9 @@ import {
   Users,
   ShieldCheck,
   Check,
+  RotateCw,
+  Eye,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -82,7 +85,7 @@ export default function TopNav({
         color: "var(--app-fg)",
       }}
     >
-      {/* Left: Mobile Toggle & Active Section Identity */}
+      {/* Left: Mobile Toggle & Reference-Grade Breadcrumbs */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
         <button
           type="button"
@@ -98,24 +101,56 @@ export default function TopNav({
           <Menu size={16} />
         </button>
 
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className="w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 shadow-sm"
-            style={{
-              borderColor: "var(--app-border)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <TabIcon size={15} className="text-[var(--app-accent)]" />
+        <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0 font-medium">
+          <span className="font-bold text-white tracking-tight flex items-center">
+            <span>artha</span>
+            <span className="text-amber-400 font-extrabold ml-0.5">X</span>
           </span>
-          <span className="text-sm font-bold tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none">
+          <span className="text-zinc-600 font-light text-xs select-none">&gt;</span>
+          <span className="text-zinc-400 truncate">
             {activeMeta.label}
           </span>
         </div>
       </div>
 
-      {/* Right: Small Circle Profile Avatar */}
-      <div className="flex items-center gap-3">
+      {/* Right: Action Pills (Refresh, Eye, Grid) & Circular Profile Avatar */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Refresh Action */}
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+          title="Refresh Workspace"
+          aria-label="Refresh Workspace"
+        >
+          <RotateCw size={14} />
+        </button>
+
+        {/* Privacy Mask Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            const root = document.documentElement;
+            root.classList.toggle("privacy-masked");
+          }}
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+          title="Toggle Privacy Mode"
+          aria-label="Toggle Privacy Mode"
+        >
+          <Eye size={14} />
+        </button>
+
+        {/* Overview Layout Grid */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("dashboard")}
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+          title="Overview Grid"
+          aria-label="Overview Grid"
+        >
+          <LayoutGrid size={14} />
+        </button>
+
         {/* Profile Logo in Small Circle */}
         <div className="relative" ref={profileMenuRef}>
           <button

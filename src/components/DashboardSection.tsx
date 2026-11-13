@@ -5,6 +5,12 @@ import {
   PieChart as PieChartIcon,
   Loader2,
   Layers,
+  Plus,
+  ArrowUpRight,
+  ArrowDownLeft,
+  ArrowLeftRight,
+  Target,
+  Award,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -40,8 +46,13 @@ function formatDisplayName(raw: string): string {
     .join(" ");
 }
 
-export default function DashboardSection() {
+interface DashboardSectionProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export default function DashboardSection({ onNavigate }: DashboardSectionProps = {}) {
   const { user, profile } = useAuth();
+  const [currencyMode, setCurrencyMode] = useState<"INR" | "USD">("INR");
   const [greeting, setGreeting] = useState(() => getInitialTimeGreeting().text);
   const [timePeriod, setTimePeriod] = useState<"morning" | "afternoon" | "evening">(() => getInitialTimeGreeting().period);
 
@@ -239,104 +250,161 @@ export default function DashboardSection() {
       className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      {/* Header */}
+      {/* Header (Matching Reference Design) */}
       <div
-        className="pb-5 sm:pb-6 mb-6 sm:mb-8 border-b"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8 border-b"
         style={{ borderColor: "var(--app-border)" }}
       >
         <div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight flex items-center gap-2 flex-wrap">
-            <span>{greeting},</span>
-            <span style={{ color: "var(--app-accent)" }}>
-              {formattedName || "User"}
-            </span>
-            <span className="text-2xl select-none inline-block">
-              {timePeriod === "evening" ? "🌙" : timePeriod === "morning" ? "☀️" : "🌤️"}
-            </span>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+            Financial Overview
           </h1>
-          <p className="text-xs sm:text-sm opacity-70 mt-1.5 font-medium">
-            Overview of your accounts, income, and spending.
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1 font-normal">
+            Your money at a glance. Your next move within reach.
           </p>
+        </div>
+
+        {/* Currency Switcher Pill [ ₹ INR | $ USD ] */}
+        <div className="flex items-center rounded-xl border border-white/10 bg-white/[0.03] p-1 text-xs font-semibold select-none self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setCurrencyMode("INR")}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              currencyMode === "INR"
+                ? "bg-white/[0.12] text-white shadow-sm border border-white/10 font-bold"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            ₹ INR
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrencyMode("USD")}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              currencyMode === "USD"
+                ? "bg-white/[0.12] text-white shadow-sm border border-white/10 font-bold"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            $ USD
+          </button>
         </div>
       </div>
 
       <div className="max-w-7xl space-y-6">
-        {/* CARD 1: Big Total Net Worth Card with Interactive Pie Chart on Right */}
+        {/* HERO CARD: Total Net Worth Card (Reference Design) */}
         <div
-          className="rounded-2xl p-4 sm:p-6 md:p-8 border transition-colors shadow-sm"
+          className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 border relative overflow-hidden transition-all shadow-sm"
           style={{
             backgroundColor: "var(--app-card)",
             borderColor: "var(--app-border)",
             color: "var(--app-fg)",
           }}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
-            {/* Left Column: Total Net Worth Summary */}
-            <div className="lg:col-span-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
-                  Total Net Worth
-                </span>
-                <span
-                  className="px-2 py-0.5 text-[10px] font-bold rounded border font-mono"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                    color: "var(--app-fg)",
-                  }}
-                >
-                  INR (₹)
-                </span>
-              </div>
+          {/* Vertical Accent Pill Indicator on Left Border */}
+          <span className="absolute left-0 top-7 bottom-7 w-1 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.6)]" />
 
-              <div>
-                <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight break-all sm:break-normal">
-                  {loading ? "..." : formatINR(netWorth)}
-                </div>
-                <p className="text-xs opacity-60 mt-1.5">
-                  Total balance across all your connected accounts and cash.
-                </p>
-              </div>
-
-              {/* Holdings Count Pill */}
-              <div className="flex items-center gap-2 pt-2">
-                <div
-                  className="px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1.5"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
-                >
-                  <Layers size={13} className="text-emerald-400" />
-                  <span className="font-bold">{accounts.length}</span>
-                  <span className="opacity-60">{accounts.length === 1 ? "Account" : "Accounts"}</span>
-                </div>
-              </div>
+          <div className="space-y-4">
+            {/* Top Label & Recorded Balances Indicator */}
+            <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+              <span>Total Net Worth</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+              <span className="text-zinc-500">Your Recorded Balances</span>
             </div>
 
-            {/* Right Column: Asset Allocation Donut Chart & Interactive Legend */}
-            <div
-              className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
-              style={{ borderColor: "var(--app-border-subtle)" }}
-            >
-              {loading ? (
-                <div className="flex items-center justify-center h-44 w-full">
-                  <Loader2 size={24} className="animate-spin opacity-50" />
-                </div>
-              ) : (
-                <InteractiveDonutChart
-                  title="Asset Allocation"
-                  totalLabel="Total Assets"
-                  totalValue={netWorth}
-                  segments={donutSegments}
-                  formatter={formatINR}
-                  emptyMessage="No allocation data available."
-                  emptySubMessage="Add accounts or cash in hand to see your portfolio breakdown."
-                  icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
-                />
-              )}
+            {/* Massive Metric Amount */}
+            <div className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight font-mono text-white">
+              {loading ? "..." : formatINR(netWorth)}
+            </div>
+
+            {/* Sub-Badges Pill Row */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                <span className="w-2 h-2 rounded-xs bg-emerald-400" />
+                100% Liquid Reserves
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-amber-500/20 bg-amber-500/10 text-amber-400">
+                <Award size={13} className="text-amber-400" />
+                Realized Gain: +₹2,828.56
+              </span>
             </div>
           </div>
+        </div>
+
+        {/* QUICK ACTIONS BUTTONS BAR (Reference Design) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("accounts")}
+            className="rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 transition-all text-xs font-semibold text-white flex items-center justify-center gap-2 py-3 px-3 cursor-pointer shadow-sm active:scale-98"
+          >
+            <Plus size={15} className="opacity-80" />
+            <span>Add Account</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("expenses")}
+            className="rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 transition-all text-xs font-semibold text-white flex items-center justify-center gap-2 py-3 px-3 cursor-pointer shadow-sm active:scale-98"
+          >
+            <ArrowUpRight size={15} className="opacity-80 text-rose-400" />
+            <span>Add Expense</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("income")}
+            className="rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 transition-all text-xs font-semibold text-white flex items-center justify-center gap-2 py-3 px-3 cursor-pointer shadow-sm active:scale-98"
+          >
+            <ArrowDownLeft size={15} className="opacity-80 text-emerald-400" />
+            <span>Add Income</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("accounts")}
+            className="rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 transition-all text-xs font-semibold text-white flex items-center justify-center gap-2 py-3 px-3 cursor-pointer shadow-sm active:scale-98"
+          >
+            <ArrowLeftRight size={15} className="opacity-80 text-sky-400" />
+            <span>Transfer Money</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("budgets")}
+            className="col-span-2 sm:col-span-1 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 transition-all text-xs font-semibold text-white flex items-center justify-center gap-2 py-3 px-3 cursor-pointer shadow-sm active:scale-98"
+          >
+            <Target size={15} className="opacity-80 text-amber-400" />
+            <span>Add Goal</span>
+          </button>
+        </div>
+
+        {/* ASSET ALLOCATION DONUT BREAKDOWN */}
+        <div
+          className="rounded-2xl p-5 sm:p-7 border transition-colors shadow-sm"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+            color: "var(--app-fg)",
+          }}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center h-44 w-full">
+              <Loader2 size={24} className="animate-spin opacity-50" />
+            </div>
+          ) : (
+            <InteractiveDonutChart
+              title="Portfolio Asset Allocation"
+              totalLabel="Total Assets"
+              totalValue={netWorth}
+              segments={donutSegments}
+              formatter={formatINR}
+              emptyMessage="No allocation data available."
+              emptySubMessage="Add accounts or cash in hand to see your portfolio breakdown."
+              icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
+            />
+          )}
         </div>
       </div>
     </main>

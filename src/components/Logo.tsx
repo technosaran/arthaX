@@ -265,14 +265,14 @@ export default function Logo({
         >
           <span
             style={{ color: "var(--app-fg)" }}
-            className="transition-colors"
+            className="transition-colors tracking-tight text-white font-bold"
           >
             artha
           </span>
           <span
-            className="ml-0.5 font-black bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent"
+            className="ml-0.5 font-black bg-gradient-to-tr from-amber-400 via-amber-300 to-yellow-300 bg-clip-text text-transparent"
             style={{
-              filter: "drop-shadow(0 0 10px rgba(16, 185, 129, 0.35))",
+              filter: "drop-shadow(0 0 10px rgba(245, 158, 11, 0.4))",
             }}
           >
             X

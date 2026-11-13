@@ -10,46 +10,46 @@
 
 :root,
 [data-theme="ultra"] {
-  /* Obsidian Pro (Ultra-clean OLED Dark Minimalist) */
+  /* Obsidian Pro (Ultra-clean OLED Dark Minimalist - Pitch Black) */
   color-scheme: dark;
-  --app-bg: #090a0f;
-  --app-card: #10131c;
-  --app-card-hover: #161a26;
-  --app-card-elevated: #1a1e2c;
-  --app-fg: #f8fafc;
+  --app-bg: #000000;
+  --app-card: #0a0b0e;
+  --app-card-hover: #12141a;
+  --app-card-elevated: #161822;
+  --app-fg: #ffffff;
   --app-border: rgba(255, 255, 255, 0.08);
   --app-border-subtle: rgba(255, 255, 255, 0.04);
-  --app-muted: #94a3b8;
+  --app-muted: #8e8e93;
   --app-accent: #10b981;
   --app-accent-hover: #34d399;
   --app-accent-subtle: rgba(16, 185, 129, 0.12);
   --app-profit: #10b981;
   --app-loss: #f43f5e;
   --app-ring: rgba(16, 185, 129, 0.35);
-  --app-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.65);
+  --app-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.75);
   --app-badge-bg: rgba(16, 185, 129, 0.12);
   --app-badge-fg: #34d399;
   --app-track-bg: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] {
-  /* Midnight Titanium (Sophisticated Deep Slate) */
+  /* Midnight Titanium (Deep Stealth Black) */
   color-scheme: dark;
-  --app-bg: #0e1219;
-  --app-card: #151a24;
-  --app-card-hover: #1b2230;
-  --app-card-elevated: #1f2736;
-  --app-fg: #f8fafc;
+  --app-bg: #050608;
+  --app-card: #0c0d12;
+  --app-card-hover: #14161f;
+  --app-card-elevated: #191c26;
+  --app-fg: #ffffff;
   --app-border: rgba(255, 255, 255, 0.09);
   --app-border-subtle: rgba(255, 255, 255, 0.05);
-  --app-muted: #94a3b8;
+  --app-muted: #8e8e93;
   --app-accent: #10b981;
   --app-accent-hover: #34d399;
   --app-accent-subtle: rgba(16, 185, 129, 0.14);
   --app-profit: #10b981;
   --app-loss: #f43f5e;
   --app-ring: rgba(16, 185, 129, 0.35);
-  --app-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.45);
+  --app-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.55);
   --app-badge-bg: rgba(16, 185, 129, 0.14);
   --app-badge-fg: #34d399;
   --app-track-bg: rgba(255, 255, 255, 0.06);
