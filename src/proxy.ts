@@ -15,6 +15,6 @@ export const config = {
      * - api routes (internal API routes handle their own auth if needed)
      * - static image extensions
      */
-    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html|txt)$).*)",
   ],
 };
