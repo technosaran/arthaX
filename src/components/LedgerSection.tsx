@@ -457,73 +457,51 @@ export default function LedgerSection() {
     setIsDeleteModalOpen(true);
   };
 
-  // 6. Unconditional Delete & Reverse Transaction
-  // When an entry is deleted from the ledger, its impact on the account balance is ALWAYS reversed
+  // 6. Atomic Delete & Reverse Transaction
+  // When an entry is deleted from the ledger, its impact on the account balance is ALWAYS reversed atomically
   const confirmDeleteAndReverse = async () => {
     if (!entryToDelete || !user) return;
 
     setDeleting(true);
     const supabase = createClient();
-    const table = entryToDelete.sourceType === "income" ? "income" : "expenses";
 
     try {
-      // Step A: If an account was linked, fetch its latest balance and reverse the transaction
-      let accountName = "Account";
-      let reversalMessage = `${entryToDelete.title} (${formatINR(entryToDelete.amount)}) deleted from ledger.`;
+      if (entryToDelete.sourceType === "expense") {
+        const { error: rpcError } = await supabase.rpc("fn_delete_expense_atomic", {
+          p_expense_id: entryToDelete.id,
+          p_user_id: user.id,
+        });
 
-      if (entryToDelete.account_id) {
-        const { data: accData } = await supabase
-          .from("accounts")
-          .select("id, name, balance")
-          .eq("id", entryToDelete.account_id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (accData) {
-          accountName = accData.name;
-          const currentBal = Number(accData.balance) || 0;
-          let newBal = currentBal;
-
-          if (entryToDelete.type === "DEBIT") {
-            // Deleted expense -> refund money back into the account!
-            newBal = currentBal + entryToDelete.amount;
-            reversalMessage = `${formatINR(entryToDelete.amount)} refunded back to ${accountName}. New balance: ${formatINR(newBal)}.`;
-          } else {
-            // Deleted income -> remove/deduct money back from the account!
-            newBal = Math.max(0, currentBal - entryToDelete.amount);
-            reversalMessage = `${formatINR(entryToDelete.amount)} deducted back from ${accountName}. New balance: ${formatINR(newBal)}.`;
+        if (rpcError) {
+          showToast("Delete Failed", rpcError.message || "Could not delete entry.", "error");
+        } else {
+          showToast("Reversed & Deleted", `${entryToDelete.title} deleted and balance restored to account.`, "info");
+          setIsDeleteModalOpen(false);
+          if (selectedVoucher?.id === entryToDelete.id) {
+            setSelectedVoucher(null);
           }
-
-          const { error: accError } = await supabase
-            .from("accounts")
-            .update({ balance: newBal })
-            .eq("id", entryToDelete.account_id)
-            .eq("user_id", user.id);
-
-          if (accError) {
-            console.error("Account balance update failed:", accError);
-          }
+          setEntryToDelete(null);
+          await invalidateAllCaches();
+          await fetchAllData(true);
         }
-      }
-
-      // Step B: Delete the transaction record from its table
-      const { error: deleteError } = await supabase
-        .from(table)
-        .delete()
-        .eq("id", entryToDelete.id)
-        .eq("user_id", user.id);
-
-      if (deleteError) {
-        showToast("Delete Failed", deleteError.message || "Could not delete entry.", "error");
       } else {
-        showToast("Reversed & Deleted", reversalMessage, "info");
-        setIsDeleteModalOpen(false);
-        if (selectedVoucher?.id === entryToDelete.id) {
-          setSelectedVoucher(null);
+        const { error: rpcError } = await supabase.rpc("fn_delete_income_atomic", {
+          p_income_id: entryToDelete.id,
+          p_user_id: user.id,
+        });
+
+        if (rpcError) {
+          showToast("Delete Failed", rpcError.message || "Could not delete entry.", "error");
+        } else {
+          showToast("Reversed & Deleted", `${entryToDelete.title} deleted and balance reversed.`, "info");
+          setIsDeleteModalOpen(false);
+          if (selectedVoucher?.id === entryToDelete.id) {
+            setSelectedVoucher(null);
+          }
+          setEntryToDelete(null);
+          await invalidateAllCaches();
+          await fetchAllData(true);
         }
-        setEntryToDelete(null);
-        await invalidateAllCaches();
-        await fetchAllData(true);
       }
     } catch {
       showToast("Error", "Failed to reverse and delete entry.", "error");

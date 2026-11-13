@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedData, setCachedData, invalidateCachedData } from "@/utils/redis";
+import { getAuthenticatedUser } from "@/utils/auth";
+import { z } from "zod";
 
 const NO_CACHE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
@@ -7,14 +9,29 @@ const NO_CACHE_HEADERS = {
   Expires: "0",
 };
 
-// Safe cache key validator: must start with arthax:cache: and contain only safe chars
-function isValidKey(key: string): boolean {
+// Safe cache key validator: must start with arthax:cache:<userId>:
+function isUserKeyAllowed(key: string, userId: string): boolean {
   if (!key || typeof key !== "string") return false;
   if (key.length > 256) return false;
-  return /^arthax:cache:[a-zA-Z0-9_\-:]+$/.test(key);
+  const userPrefix = `arthax:cache:${userId}:`;
+  return key.startsWith(userPrefix);
 }
 
+const PostCacheSchema = z.object({
+  key: z.string().min(1).max(256),
+  value: z.unknown(),
+  ttl: z.number().int().positive().max(86400 * 7).default(3600),
+});
+
 export async function GET(req: NextRequest) {
+  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !userId) {
+    return NextResponse.json(
+      { error: "Unauthorized: Active session required to access cache", details: authError },
+      { status: 401, headers: NO_CACHE_HEADERS }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const rawKey = searchParams.get("key");
 
@@ -26,10 +43,10 @@ export async function GET(req: NextRequest) {
   }
 
   const key = rawKey.trim();
-  if (!isValidKey(key)) {
+  if (!isUserKeyAllowed(key, userId)) {
     return NextResponse.json(
-      { error: "Invalid cache key format" },
-      { status: 400, headers: NO_CACHE_HEADERS }
+      { error: "Forbidden: Access to another tenant's cache is denied." },
+      { status: 403, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -41,10 +58,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !userId) {
+    return NextResponse.json(
+      { error: "Unauthorized: Active session required to write to cache", details: authError },
+      { status: 401, headers: NO_CACHE_HEADERS }
+    );
+  }
+
   try {
-    let body: any;
+    let jsonBody: unknown;
     try {
-      body = await req.json();
+      jsonBody = await req.json();
     } catch {
       return NextResponse.json(
         { error: "Invalid JSON body" },
@@ -52,39 +77,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { key, value, ttl = 3600 } = body;
-
-    if (!key || typeof key !== "string") {
+    const parseResult = PostCacheSchema.safeParse(jsonBody);
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "Missing or invalid cache key" },
+        { error: "Validation failed", details: parseResult.error.format() },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
+    const { key, value, ttl } = parseResult.data;
     const trimmedKey = key.trim();
-    if (!isValidKey(trimmedKey)) {
+
+    if (!isUserKeyAllowed(trimmedKey, userId)) {
       return NextResponse.json(
-        { error: "Invalid cache key format" },
-        { status: 400, headers: NO_CACHE_HEADERS }
+        { error: "Forbidden: Cannot write into another tenant's cache partition." },
+        { status: 403, headers: NO_CACHE_HEADERS }
       );
     }
 
-    const numericTtl = typeof ttl === "number" && ttl > 0 && ttl <= 86400 * 7 ? ttl : 3600;
-    await setCachedData(trimmedKey, value, numericTtl);
+    await setCachedData(trimmedKey, value, ttl);
 
     return NextResponse.json(
       { success: true, key: trimmedKey },
       { headers: NO_CACHE_HEADERS }
     );
-  } catch (err) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Cache set failed";
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Cache set failed" },
+      { error: message },
       { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !userId) {
+    return NextResponse.json(
+      { error: "Unauthorized: Active session required to invalidate cache", details: authError },
+      { status: 401, headers: NO_CACHE_HEADERS }
+    );
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
@@ -97,11 +131,10 @@ export async function DELETE(req: NextRequest) {
     } else if (key) {
       keysToDelete = [key.trim()];
     } else {
-      // Try body JSON
       try {
         const body = await req.json();
         if (Array.isArray(body?.keys)) {
-          keysToDelete = body.keys.map((k: any) => String(k).trim()).filter(Boolean);
+          keysToDelete = body.keys.map((k: unknown) => String(k).trim()).filter(Boolean);
         } else if (body?.key) {
           keysToDelete = [String(body.key).trim()];
         }
@@ -110,11 +143,12 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    const validatedKeys = keysToDelete.filter(isValidKey);
+    // Only allow deletion of keys that strictly belong to the current authenticated user
+    const validatedKeys = keysToDelete.filter((k) => isUserKeyAllowed(k, userId));
 
     if (validatedKeys.length === 0) {
       return NextResponse.json(
-        { error: "Missing or invalid cache keys" },
+        { error: "No authorized cache keys provided for invalidation" },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
@@ -124,9 +158,10 @@ export async function DELETE(req: NextRequest) {
       { success: true, invalidated: validatedKeys },
       { headers: NO_CACHE_HEADERS }
     );
-  } catch (err) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Cache invalidation failed";
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Cache invalidation failed" },
+      { error: message },
       { status: 500, headers: NO_CACHE_HEADERS }
     );
   }

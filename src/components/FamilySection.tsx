@@ -514,28 +514,20 @@ export default function FamilySection() {
 
       if (memberError) throw memberError;
 
-      // 2. Optionally record as an expense in user's ledger
+      // 2. Atomically record as an expense in user's ledger and deduct from account
       if (recordInExpenses) {
-        const expensePayload = {
-          user_id: user.id,
-          title: `Money sent to ${transferMember.name}`,
-          amount: val,
-          category: "Family & Child Care",
-          account_id: transferAccountId || null,
-          expense_date: transferDate || new Date().toISOString().split("T")[0],
-          notes: transferNotes || `Family support transfer to ${transferMember.name} (${transferMember.relationship})`,
-        };
+        const { error: expError } = await supabase.rpc("fn_record_expense_atomic", {
+          p_user_id: user.id,
+          p_title: `Money sent to ${transferMember.name}`,
+          p_amount: val,
+          p_category: "Family & Child Care",
+          p_account_id: transferAccountId || null,
+          p_expense_date: transferDate || new Date().toISOString().split("T")[0],
+          p_notes: transferNotes || `Family support transfer to ${transferMember.name} (${transferMember.relationship})`,
+          p_tags: ["family", "transfer"],
+        });
 
-        await supabase.from("expenses").insert(expensePayload);
-
-        // 3. If an account was selected, deduct balance from account
-        if (transferAccountId) {
-          const selectedAcc = accounts.find((a) => a.id === transferAccountId);
-          if (selectedAcc) {
-            const newBalance = Number((selectedAcc.balance - val).toFixed(2));
-            await supabase.from("accounts").update({ balance: newBalance }).eq("id", transferAccountId).eq("user_id", user.id);
-          }
-        }
+        if (expError) throw expError;
       }
 
       showToast(`Recorded ${formatINR(val)} sent to ${transferMember.name}`, "success");

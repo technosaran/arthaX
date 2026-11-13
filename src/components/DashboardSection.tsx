@@ -22,6 +22,7 @@ interface AccountItem {
   name: string;
   type: string;
   balance: number;
+  classification?: "asset" | "liability";
 }
 
 interface MonthHistoryItem {
@@ -122,7 +123,7 @@ export default function DashboardSection() {
 
       // Parallel concurrent burst: accounts and filtered 6-month historical telemetry
       const [accountsRes, expensesRes, incomeRes] = await Promise.all([
-        supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
+        supabase.from("accounts").select("id, name, type, balance, classification").eq("user_id", user.id),
         supabase
           .from("expenses")
           .select("amount, expense_date")
@@ -144,7 +145,7 @@ export default function DashboardSection() {
         "User";
       setName(resolvedName);
 
-      // 2. Resolve accounts and net worth
+      // 2. Resolve accounts and accurate net worth (Assets - Liabilities)
       let mapped: AccountItem[] = [];
       let total = 0;
       if (accountsRes.data && accountsRes.data.length > 0) {
@@ -153,8 +154,22 @@ export default function DashboardSection() {
           name: item.name,
           type: item.type,
           balance: Number(item.balance) || 0,
+          classification: item.classification || (
+            (item.type?.toLowerCase().includes("credit") || item.name?.toLowerCase().includes("credit") || item.type?.toLowerCase().includes("loan"))
+              ? "liability"
+              : "asset"
+          ),
         }));
-        total = mapped.reduce((acc, curr) => acc + curr.balance, 0);
+
+        const totalAssets = mapped
+          .filter((a) => a.classification !== "liability")
+          .reduce((acc, curr) => acc + curr.balance, 0);
+
+        const totalLiabilities = mapped
+          .filter((a) => a.classification === "liability")
+          .reduce((acc, curr) => acc + curr.balance, 0);
+
+        total = totalAssets - totalLiabilities;
       }
       setAccounts(mapped);
       setNetWorth(total);
@@ -170,7 +185,7 @@ export default function DashboardSection() {
       }
 
       if (incomeRes.data) {
-        incomeRes.data.forEach((inc: any) => {
+        incomeRes.data.forEach((inc: { received_date?: string; amount?: number }) => {
           if (inc.received_date) {
             const incKey = inc.received_date.substring(0, 7);
             const target = months.find((m) => m.key === incKey);
@@ -182,7 +197,7 @@ export default function DashboardSection() {
       }
 
       if (expensesRes.data) {
-        expensesRes.data.forEach((exp: any) => {
+        expensesRes.data.forEach((exp: { expense_date?: string; amount?: number }) => {
           if (exp.expense_date) {
             const expKey = exp.expense_date.substring(0, 7);
             const target = months.find((m) => m.key === expKey);
@@ -193,9 +208,9 @@ export default function DashboardSection() {
         });
       }
 
-      // Compute Net Cash Flow per month
+      // Compute Net Cash Flow per month (unclamped to represent real financial truth)
       months.forEach((m) => {
-        m.net = Math.max(0, m.income - m.expenses);
+        m.net = m.income - m.expenses;
       });
 
       setMonthlyHistory(months);

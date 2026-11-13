@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, X, PieChart as PieChartIcon, Banknote } from "lucide-react";
+import { Plus, Loader2, X, PieChart as PieChartIcon, Banknote, ArrowRightLeft, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +19,7 @@ interface Account {
   type: string;
   balance: number;
   last_four?: string;
+  classification?: "asset" | "liability";
   created_at?: string;
 }
 
@@ -28,6 +29,7 @@ export default function AccountsSection() {
 
   const redisKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
   const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
+  const redisTransfersKey = getUserCacheKey(user?.id, CACHE_KEYS.TRANSFERS);
 
   // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
   const initialAccounts = React.useMemo(() => {
@@ -48,8 +50,18 @@ export default function AccountsSection() {
   // Form states for new accounts
   const [name, setName] = useState("");
   const [type, setType] = useState("Savings Account");
+  const [classification, setClassification] = useState<"asset" | "liability">("asset");
   const [balance, setBalance] = useState("");
   const [lastFour, setLastFour] = useState("");
+
+  // Internal Transfer State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferFromId, setTransferFromId] = useState("");
+  const [transferToId, setTransferToId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDate, setTransferDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [transferNotes, setTransferNotes] = useState("");
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
 
   const formatINR = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -97,6 +109,11 @@ export default function AccountsSection() {
           type: item.type,
           balance: Number(item.balance) || 0,
           last_four: item.last_four,
+          classification: item.classification || (
+            (item.type?.toLowerCase().includes("credit") || item.name?.toLowerCase().includes("credit") || item.type?.toLowerCase().includes("loan"))
+              ? "liability"
+              : "asset"
+          ),
           created_at: item.created_at,
         }));
 
@@ -187,6 +204,7 @@ export default function AccountsSection() {
         user_id: user.id,
         name: name.trim(),
         type,
+        classification,
         balance: parseFloat(balance) || 0,
         last_four: lastFour.trim() || null,
       },
@@ -200,6 +218,7 @@ export default function AccountsSection() {
       setName("");
       setBalance("");
       setLastFour("");
+      setClassification("asset");
       setIsModalOpen(false);
       showToast("Card Linked Successfully", `${addedName} is now active in your portfolio.`, "success");
 
@@ -207,12 +226,57 @@ export default function AccountsSection() {
       await invalidateCacheKeys([
         redisKey,
         redisLedgerKey,
-        "arthax:cache:accounts",
-        "arthax:cache:ledger",
       ]);
       await fetchAccounts(true);
     }
     setSubmitting(false);
+  };
+
+  const handleExecuteTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const parsedAmount = parseFloat(transferAmount);
+    if (!transferFromId || !transferToId || isNaN(parsedAmount) || parsedAmount <= 0) {
+      showToast("Invalid Transfer", "Please select source and destination accounts and a positive amount.", "error");
+      return;
+    }
+    if (transferFromId === transferToId) {
+      showToast("Invalid Transfer", "Source and destination accounts must be distinct.", "error");
+      return;
+    }
+
+    setTransferSubmitting(true);
+    const supabase = createClient();
+    try {
+      const { data: res, error } = await supabase.rpc("fn_record_transfer_atomic", {
+        p_user_id: user.id,
+        p_from_account_id: transferFromId,
+        p_to_account_id: transferToId,
+        p_amount: parsedAmount,
+        p_transfer_date: transferDate,
+        p_notes: transferNotes.trim() || null,
+      });
+
+      if (error) {
+        showToast("Transfer Failed", error.message || "Failed to execute transfer.", "error");
+      } else {
+        showToast("Transfer Complete", `Transferred ${formatINR(parsedAmount)} from ${res?.from_account || "account"} to ${res?.to_account || "account"}.`, "success");
+        setIsTransferModalOpen(false);
+        setTransferAmount("");
+        setTransferNotes("");
+        await invalidateCacheKeys([
+          redisKey,
+          redisLedgerKey,
+          redisTransfersKey,
+        ]);
+        await fetchAccounts(true);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected transfer error occurred.";
+      showToast("Transfer Failed", msg, "error");
+    } finally {
+      setTransferSubmitting(false);
+    }
   };
 
   const handleDeleteAccount = async (id: string) => {
@@ -289,7 +353,16 @@ export default function AccountsSection() {
     setSavingCash(false);
   };
 
-  const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
+  const totalAssets = accounts
+    .filter((a) => a.classification !== "liability")
+    .reduce((acc, curr) => acc + curr.balance, 0);
+
+  const totalLiabilities = accounts
+    .filter((a) => a.classification === "liability")
+    .reduce((acc, curr) => acc + curr.balance, 0);
+
+  const netWorth = totalAssets - totalLiabilities;
+  const totalBalance = totalAssets;
 
   // Group portfolio assets for the colorful allocation chart
   const typeMap = accounts.reduce((acc, curr) => {
@@ -330,23 +403,47 @@ export default function AccountsSection() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Accounts</h1>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Connected accounts, liquid cash vault, and asset allocation breakdown.
+            Connected accounts, liquid cash vault, liabilities, and asset allocation breakdown.
           </p>
         </div>
 
-        {/* Add Account Modal Trigger */}
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 self-start sm:self-auto"
-          style={{
-            backgroundColor: "var(--app-fg)",
-            color: "var(--app-bg)",
-            border: "1px solid var(--app-border)",
-          }}
-        >
-          <Plus size={15} />
-          Add Account
-        </button>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          {/* Transfer Money Button */}
+          <button
+            onClick={() => {
+              if (accounts.length < 2) {
+                showToast("Need 2 Accounts", "Please create at least 2 accounts to transfer funds.", "info");
+                return;
+              }
+              setTransferFromId(accounts[0]?.id || "");
+              setTransferToId(accounts[1]?.id || "");
+              setIsTransferModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-card)",
+              color: "var(--app-fg)",
+            }}
+          >
+            <ArrowRightLeft size={14} className="text-sky-400" />
+            Transfer Funds
+          </button>
+
+          {/* Add Account Modal Trigger */}
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+            style={{
+              backgroundColor: "var(--app-fg)",
+              color: "var(--app-bg)",
+              border: "1px solid var(--app-border)",
+            }}
+          >
+            <Plus size={15} />
+            Add Account
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
@@ -371,18 +468,49 @@ export default function AccountsSection() {
         }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
-          {/* Left Column: Total Portfolio Summary */}
+          {/* Left Column: Total Portfolio Summary with Assets & Liabilities */}
           <div className="lg:col-span-5 space-y-4">
             <div>
               <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60">
-                Total Combined Portfolio Value
+                Net Portfolio Value (Assets - Liabilities)
               </span>
               <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight mt-1 break-all sm:break-normal">
-                {loading ? "..." : formatINR(totalBalance)}
+                {loading ? "..." : formatINR(netWorth)}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div
+                className="p-3 rounded-xl border"
+                style={{
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-bg)",
+                }}
+              >
+                <div className="text-[10px] uppercase font-mono tracking-wider opacity-60">
+                  Total Assets
+                </div>
+                <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5">
+                  {formatINR(totalAssets)}
+                </div>
+              </div>
+              <div
+                className="p-3 rounded-xl border"
+                style={{
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-bg)",
+                }}
+              >
+                <div className="text-[10px] uppercase font-mono tracking-wider opacity-60">
+                  Total Liabilities
+                </div>
+                <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5">
+                  {formatINR(totalLiabilities)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <span
                 className="px-3 py-1 rounded-md border text-[11px] font-mono font-bold"
                 style={{
@@ -562,29 +690,59 @@ export default function AccountsSection() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Initial Balance (₹ INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-sm font-mono opacity-60">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={balance}
-                    onChange={(e) => setBalance(e.target.value)}
-                    required
-                    className="w-full rounded-lg pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border)",
-                      color: "var(--app-fg)",
-                    }}
-                  />
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    Account Classification
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setClassification("asset")}
+                      className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                        classification === "asset"
+                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold"
+                          : "opacity-60 border-[var(--app-border)]"
+                      }`}
+                    >
+                      Asset (Bank/Cash)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClassification("liability")}
+                      className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                        classification === "liability"
+                          ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold"
+                          : "opacity-60 border-[var(--app-border)]"
+                      }`}
+                    >
+                      Liability (Credit/Loan)
+                    </button>
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    Initial Balance (₹ INR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-sm font-mono opacity-60">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={balance}
+                      onChange={(e) => setBalance(e.target.value)}
+                      required
+                      className="w-full rounded-lg pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: "var(--app-bg)",
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-fg)",
+                      }}
+                    />
+                  </div>
+                </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
                 <button
@@ -694,6 +852,181 @@ export default function AccountsSection() {
                 >
                   {savingCash && <Loader2 size={13} className="animate-spin" />}
                   Save Cash
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL: Account-to-Account Internal Transfer */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-8 space-y-5 sm:space-y-6 shadow-2xl relative"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-fg)",
+            }}
+          >
+            <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-lg border flex items-center justify-center"
+                  style={{
+                    borderColor: "var(--app-border)",
+                    backgroundColor: "var(--app-bg)",
+                  }}
+                >
+                  <ArrowRightLeft size={18} className="text-sky-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold tracking-tight">Internal Account Transfer</h3>
+                  <p className="text-xs opacity-60">Move money between accounts without altering income or expenses.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTransferModalOpen(false)}
+                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteTransfer} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    From Account (Debit)
+                  </label>
+                  <select
+                    value={transferFromId}
+                    onChange={(e) => setTransferFromId(e.target.value)}
+                    required
+                    className="w-full rounded-lg px-3.5 py-2.5 text-sm font-medium border focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  >
+                    <option value="" disabled>Select source account</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id} disabled={a.id === transferToId}>
+                        {a.name} ({formatINR(a.balance)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    To Account (Credit)
+                  </label>
+                  <select
+                    value={transferToId}
+                    onChange={(e) => setTransferToId(e.target.value)}
+                    required
+                    className="w-full rounded-lg px-3.5 py-2.5 text-sm font-medium border focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  >
+                    <option value="" disabled>Select destination account</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id} disabled={a.id === transferFromId}>
+                        {a.name} ({formatINR(a.balance)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    Amount (₹ INR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-sm font-mono opacity-60">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0.00"
+                      value={transferAmount}
+                      onChange={(e) => setTransferAmount(e.target.value)}
+                      required
+                      className="w-full rounded-lg pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
+                      style={{
+                        backgroundColor: "var(--app-bg)",
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-fg)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                    Transfer Date
+                  </label>
+                  <input
+                    type="date"
+                    value={transferDate}
+                    onChange={(e) => setTransferDate(e.target.value)}
+                    required
+                    className="w-full rounded-lg px-3.5 py-2.5 text-sm font-mono border focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-bg)",
+                      borderColor: "var(--app-border)",
+                      color: "var(--app-fg)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+                  Transfer Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. ATM withdrawal / Credit card bill payoff"
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  className="w-full rounded-lg px-3.5 py-2.5 text-sm border focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: "var(--app-bg)",
+                    borderColor: "var(--app-border)",
+                    color: "var(--app-fg)",
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsTransferModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
+                  style={{ borderColor: "var(--app-border)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={transferSubmitting}
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  style={{
+                    backgroundColor: "var(--app-fg)",
+                    color: "var(--app-bg)",
+                  }}
+                >
+                  {transferSubmitting && <Loader2 size={13} className="animate-spin" />}
+                  Execute Transfer
                 </button>
               </div>
             </form>

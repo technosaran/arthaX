@@ -383,20 +383,16 @@ export default function IncomeSection() {
 
     try {
       if (editingIncome) {
-        // Edit flow
-        const { error } = await supabase
-          .from("income")
-          .update({
-            title: title.trim(),
-            amount: parsedAmount,
-            category,
-            frequency,
-            account_id: accountId || null,
-            received_date: receivedDate,
-            notes: notes.trim() || null,
-          })
-          .eq("id", editingIncome.id)
-          .eq("user_id", user.id);
+        // Atomic Edit Flow: Updates income and reconciles account balances
+        const { error } = await supabase.from("income").update({
+          title: title.trim(),
+          amount: parsedAmount,
+          category,
+          frequency,
+          account_id: accountId || null,
+          received_date: receivedDate,
+          notes: notes.trim() || null,
+        }).eq("id", editingIncome.id).eq("user_id", user.id);
 
         if (error) {
           showToast("Update Failed", error.message || "Failed to update record.", "error");
@@ -407,53 +403,34 @@ export default function IncomeSection() {
             redisIncomeKey,
             redisAccountsKey,
             redisLedgerKey,
-            "arthax:cache:income",
-            "arthax:cache:accounts",
-            "arthax:cache:ledger",
           ]);
           await fetchIncome(true);
           await fetchAccounts(true);
         }
       } else {
-        // Create flow
-        const { error } = await supabase.from("income").insert([
-          {
-            user_id: user.id,
-            title: title.trim(),
-            amount: parsedAmount,
-            category,
-            frequency,
-            account_id: accountId || null,
-            received_date: receivedDate,
-            notes: notes.trim() || null,
-          },
-        ]);
+        // Atomic Create Flow: Uses row-level locking to credit balance
+        const targetAccountId = (accountId && creditToAccount) ? accountId : null;
+        const { error } = await supabase.rpc("fn_record_income_atomic", {
+          p_user_id: user.id,
+          p_title: title.trim(),
+          p_amount: parsedAmount,
+          p_category: category,
+          p_frequency: frequency,
+          p_account_id: targetAccountId,
+          p_received_date: receivedDate,
+          p_notes: notes.trim() || null,
+          p_tags: [],
+        });
 
         if (error) {
           showToast("Record Failed", error.message || "Please check inputs.", "error");
         } else {
-          // If user selected an account & checked credit balance
-          if (accountId && creditToAccount) {
-            const targetAcc = accounts.find((a) => a.id === accountId);
-            if (targetAcc) {
-              const updatedBal = targetAcc.balance + parsedAmount;
-              await supabase
-                .from("accounts")
-                .update({ balance: updatedBal })
-                .eq("id", accountId)
-                .eq("user_id", user.id);
-            }
-          }
-
-          showToast("Income Recorded", `${title.trim()} (${formatINR(parsedAmount)}) added.`, "success");
+          showToast("Income Recorded", `${title.trim()} (${formatINR(parsedAmount)}) added with atomic precision.`, "success");
           setIsModalOpen(false);
           await invalidateCacheKeys([
             redisIncomeKey,
             redisAccountsKey,
             redisLedgerKey,
-            "arthax:cache:income",
-            "arthax:cache:accounts",
-            "arthax:cache:ledger",
           ]);
           await fetchIncome(true);
           await fetchAccounts(true);
@@ -470,25 +447,23 @@ export default function IncomeSection() {
   const handleDeleteIncome = async (id: string, name: string) => {
     if (!user) return;
     const supabase = createClient();
-    const { error } = await supabase
-      .from("income")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+    // Atomic Delete Flow: Deletes transaction and reverses credited balance
+    const { error } = await supabase.rpc("fn_delete_income_atomic", {
+      p_income_id: id,
+      p_user_id: user.id,
+    });
 
     if (error) {
-      showToast("Delete Failed", "Could not remove income record.", "error");
+      showToast("Delete Failed", error.message || "Could not remove income record.", "error");
     } else {
-      showToast("Income Removed", `${name} has been deleted.`, "info");
+      showToast("Income Removed", `${name} deleted and balance reversed.`, "info");
       await invalidateCacheKeys([
         redisIncomeKey,
         redisAccountsKey,
         redisLedgerKey,
-        "arthax:cache:income",
-        "arthax:cache:accounts",
-        "arthax:cache:ledger",
       ]);
       await fetchIncome(true);
+      await fetchAccounts(true);
     }
   };
 

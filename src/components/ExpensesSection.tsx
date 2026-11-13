@@ -431,75 +431,55 @@ export default function ExpensesSection() {
 
     try {
       if (editingExpense) {
-        // Edit flow
-        const { error } = await supabase
-          .from("expenses")
-          .update({
-            title: title.trim(),
-            amount: parsedAmount,
-            category,
-            account_id: accountId || null,
-            expense_date: expenseDate,
-            notes: notes.trim() || null,
-          })
-          .eq("id", editingExpense.id)
-          .eq("user_id", user.id);
+        // Atomic Edit Flow: Updates expense and automatically reconciles balance differences
+        const { error } = await supabase.rpc("fn_update_expense_atomic", {
+          p_expense_id: editingExpense.id,
+          p_user_id: user.id,
+          p_title: title.trim(),
+          p_amount: parsedAmount,
+          p_category: category,
+          p_account_id: accountId || null,
+          p_expense_date: expenseDate,
+          p_notes: notes.trim() || null,
+          p_tags: [],
+        });
 
         if (error) {
           showToast("Update Failed", error.message || "Failed to update record.", "error");
         } else {
-          showToast("Expense Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated.`, "success");
+          showToast("Expense Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated and balances reconciled.`, "success");
           setIsModalOpen(false);
           await invalidateCacheKeys([
             redisExpensesKey,
             redisAccountsKey,
             redisLedgerKey,
-            "arthax:cache:expenses",
-            "arthax:cache:accounts",
-            "arthax:cache:ledger",
           ]);
           await fetchExpenses(true);
           await fetchAccounts(true);
         }
       } else {
-        // Create flow
-        const { error } = await supabase.from("expenses").insert([
-          {
-            user_id: user.id,
-            title: title.trim(),
-            amount: parsedAmount,
-            category,
-            account_id: accountId || null,
-            expense_date: expenseDate,
-            notes: notes.trim() || null,
-          },
-        ]);
+        // Atomic Create Flow: Uses row-level locking to deduct balance without race conditions
+        const targetAccountId = (accountId && deductFromAccount) ? accountId : null;
+        const { error } = await supabase.rpc("fn_record_expense_atomic", {
+          p_user_id: user.id,
+          p_title: title.trim(),
+          p_amount: parsedAmount,
+          p_category: category,
+          p_account_id: targetAccountId,
+          p_expense_date: expenseDate,
+          p_notes: notes.trim() || null,
+          p_tags: [],
+        });
 
         if (error) {
           showToast("Record Failed", error.message || "Please check inputs.", "error");
         } else {
-          // If user selected an account & checked deduct balance
-          if (accountId && deductFromAccount) {
-            const targetAcc = accounts.find((a) => a.id === accountId);
-            if (targetAcc) {
-              const updatedBal = Math.max(0, targetAcc.balance - parsedAmount);
-              await supabase
-                .from("accounts")
-                .update({ balance: updatedBal })
-                .eq("id", accountId)
-                .eq("user_id", user.id);
-            }
-          }
-
-          showToast("Expense Logged", `${title.trim()} (${formatINR(parsedAmount)}) recorded.`, "success");
+          showToast("Expense Logged", `${title.trim()} (${formatINR(parsedAmount)}) recorded with atomic precision.`, "success");
           setIsModalOpen(false);
           await invalidateCacheKeys([
             redisExpensesKey,
             redisAccountsKey,
             redisLedgerKey,
-            "arthax:cache:expenses",
-            "arthax:cache:accounts",
-            "arthax:cache:ledger",
           ]);
           await fetchExpenses(true);
           await fetchAccounts(true);
@@ -516,25 +496,23 @@ export default function ExpensesSection() {
   const handleDeleteExpense = async (id: string, name: string) => {
     if (!user) return;
     const supabase = createClient();
-    const { error } = await supabase
-      .from("expenses")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+    // Atomic Delete Flow: Deletes transaction and automatically refunds deducted balance
+    const { error } = await supabase.rpc("fn_delete_expense_atomic", {
+      p_expense_id: id,
+      p_user_id: user.id,
+    });
 
     if (error) {
-      showToast("Delete Failed", "Could not remove expense record.", "error");
+      showToast("Delete Failed", error.message || "Could not remove expense record.", "error");
     } else {
-      showToast("Expense Removed", `${name} has been deleted.`, "info");
+      showToast("Expense Removed", `${name} deleted and balance restored to account.`, "info");
       await invalidateCacheKeys([
         redisExpensesKey,
         redisAccountsKey,
         redisLedgerKey,
-        "arthax:cache:expenses",
-        "arthax:cache:accounts",
-        "arthax:cache:ledger",
       ]);
       await fetchExpenses(true);
+      await fetchAccounts(true);
     }
   };
 

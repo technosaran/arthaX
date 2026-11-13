@@ -4,6 +4,14 @@ import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expen
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString } from "@/utils/monthUtils";
 
+interface ShortcutRequestBody {
+  text?: string;
+  query?: string;
+  expense?: string;
+  api_key?: string;
+  user_id?: string;
+}
+
 /**
  * Apple Siri & iOS Shortcuts Voice Logging Endpoint
  * Supports voice logging via "Hey Siri, Log Expense" or iOS Shortcuts automation.
@@ -11,9 +19,9 @@ import { getLocalDateString } from "@/utils/monthUtils";
  */
 export async function POST(req: NextRequest) {
   try {
-    let body: any;
+    let body: ShortcutRequestBody;
     try {
-      body = await req.json();
+      body = (await req.json()) as ShortcutRequestBody;
     } catch {
       return NextResponse.json(
         {
@@ -42,14 +50,21 @@ export async function POST(req: NextRequest) {
     // 1. Authenticate Request
     // -------------------------------------------------------------
     const authHeader = req.headers.get("authorization") || "";
-    const apiKeyHeader = req.headers.get("x-api-key") || req.nextUrl.searchParams.get("key") || body.api_key || "";
-    const configuredApiKey = process.env.SHORTCUTS_API_KEY || process.env.WHATSAPP_VERIFY_TOKEN;
+    const apiKeyHeader =
+      req.headers.get("x-api-key") ||
+      req.nextUrl.searchParams.get("key") ||
+      body.api_key ||
+      "";
+    const configuredApiKey = process.env.SHORTCUTS_API_KEY;
 
     let userId: string | null = null;
 
     if (authHeader.startsWith("Bearer ")) {
       const token = authHeader.replace("Bearer ", "").trim();
-      const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+      const {
+        data: { user },
+        error: authErr,
+      } = await supabaseAdmin.auth.getUser(token);
       if (user && !authErr) {
         userId = user.id;
       }
@@ -57,13 +72,6 @@ export async function POST(req: NextRequest) {
 
     if (!userId && configuredApiKey && apiKeyHeader === configuredApiKey) {
       userId = body.user_id || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
-    }
-
-    // Fallback for local development or configured single-user instance
-    if (!userId) {
-      if (process.env.NODE_ENV === "development" || !configuredApiKey) {
-        userId = body.user_id || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
-      }
     }
 
     if (!userId) {
@@ -85,7 +93,6 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (!userRecord) {
-      // Check if accounts exist for this user ID
       const { data: accCheck } = await supabaseAdmin
         .from("accounts")
         .select("user_id")
@@ -110,7 +117,7 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------
     const { data: accounts, error: accErr } = await supabaseAdmin
       .from("accounts")
-      .select("id, name, type, balance, last_four")
+      .select("id, name, type, balance, last_four, classification")
       .eq("user_id", userId);
 
     if (accErr) {
@@ -144,57 +151,38 @@ export async function POST(req: NextRequest) {
     const targetAccount = matchAccount(parsed.accountQuery, userAccounts);
 
     // -------------------------------------------------------------
-    // 5. Record Expense with Timezone-Aware Local Date
+    // 5. Record Expense via ATOMIC RPC (Row-locked balance deduction & audit log)
     // -------------------------------------------------------------
     const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
 
-    const { data: insertedExpense, error: expErr } = await supabaseAdmin
-      .from("expenses")
-      .insert([
-        {
-          user_id: userId,
-          title: parsed.title,
-          amount: parsed.amount,
-          category: parsed.category,
-          account_id: targetAccount?.id || null,
-          expense_date: expenseDate,
-          notes: `Logged via Siri Voice Shortcut: "${rawText}"`,
-        },
-      ])
-      .select()
-      .single();
+    const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
+      p_user_id: userId,
+      p_title: parsed.title,
+      p_amount: parsed.amount,
+      p_category: parsed.category,
+      p_account_id: targetAccount?.id || null,
+      p_expense_date: expenseDate,
+      p_notes: `Logged via Siri Voice Shortcut: "${rawText}"`,
+      p_tags: ["siri", "voice", "automated"],
+    });
 
-    if (expErr) {
-      console.error("[Siri Endpoint] Failed to insert expense:", expErr);
+    if (rpcErr) {
+      console.error("[Siri Endpoint] Atomic expense insertion failed:", rpcErr);
       return NextResponse.json(
         {
           success: false,
           speech: "Sorry, I ran into an error saving that expense to your database.",
-          details: expErr.message,
+          details: rpcErr.message,
         },
         { status: 500 }
       );
     }
 
-    // -------------------------------------------------------------
-    // 6. Deduct Balance (Atomic Precision, preserves negative/credit balances)
-    // -------------------------------------------------------------
-    let updatedBalance = 0;
-    if (targetAccount) {
-      updatedBalance = Number((Number(targetAccount.balance) - parsed.amount).toFixed(2));
-      const { error: updErr } = await supabaseAdmin
-        .from("accounts")
-        .update({ balance: updatedBalance })
-        .eq("id", targetAccount.id)
-        .eq("user_id", userId);
-
-      if (updErr) {
-        console.error("[Siri Endpoint] Failed to update account balance:", updErr);
-      }
-    }
+    const updatedBalance = rpcResult?.new_balance ?? 0;
+    const accountName = rpcResult?.account_name || (targetAccount ? targetAccount.name : "Unassigned");
 
     // -------------------------------------------------------------
-    // 7. Invalidate Multi-Tier Cache Keys
+    // 6. Invalidate Multi-Tier Cache Keys
     // -------------------------------------------------------------
     try {
       await invalidateCachedData([
@@ -203,9 +191,6 @@ export async function POST(req: NextRequest) {
         getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
         getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
-        "arthax:cache:expenses",
-        "arthax:cache:accounts",
-        "arthax:cache:ledger",
       ]);
     } catch (cErr) {
       console.warn("[Siri Endpoint] Redis cache invalidation warning:", cErr);
@@ -219,7 +204,6 @@ export async function POST(req: NextRequest) {
 
     const formattedAmount = currencyFormatter.format(parsed.amount);
     const formattedBalance = currencyFormatter.format(updatedBalance);
-    const accountName = targetAccount ? targetAccount.name : "Unassigned";
 
     const speechText = targetAccount
       ? `Logged ${parsed.amount} rupees for ${parsed.title}. Deducted from ${accountName}. Remaining balance is ${Math.round(updatedBalance)} rupees.`
@@ -234,7 +218,7 @@ export async function POST(req: NextRequest) {
       speech: speechText,
       display: displayText,
       data: {
-        expense: insertedExpense,
+        expense_id: rpcResult?.expense_id,
         account: accountName,
         deducted: parsed.amount,
         remaining_balance: updatedBalance,

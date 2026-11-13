@@ -1,15 +1,29 @@
 import { Redis } from "@upstash/redis";
 
-// Initialize Upstash Redis client
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || "https://glad-chigger-197326.upstash.io",
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || "gQAAAAAAAwLOAAIgcDJhZTVmYTczN2I2MGM0MDM5YjhmMTkyN2ViYzNlOTI3Mg",
-});
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+export const isRedisConfigured = Boolean(redisUrl && redisToken);
+
+// Safe initialization: Only create Upstash client if valid credentials exist
+export const redis: Redis | null = isRedisConfigured
+  ? new Redis({
+      url: redisUrl!,
+      token: redisToken!,
+    })
+  : null;
+
+if (!isRedisConfigured && process.env.NODE_ENV !== "test") {
+  console.warn(
+    "[Redis Config] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is missing. Redis caching is operating in graceful bypass mode."
+  );
+}
 
 export const CACHE_KEYS = {
   ACCOUNTS: "accounts",
   INCOME: "income",
   EXPENSES: "expenses",
+  TRANSFERS: "transfers",
   SETTINGS: "settings",
   PORTFOLIO: "portfolio",
   LEDGER: "ledger",
@@ -18,26 +32,30 @@ export const CACHE_KEYS = {
   FAMILY_RESPONSIBILITIES: "family_responsibilities",
 } as const;
 
-// Helper to scope cache keys per user for complete multi-tenant isolation
-export const getUserCacheKey = (userId: string | undefined | null, resource: string) => {
-  const safeId = userId || "default_user";
-  return `arthax:cache:${safeId}:${resource}`;
+/**
+ * Helper to scope cache keys per user for complete multi-tenant isolation.
+ * Throws if userId is not provided to strictly prevent cross-tenant key leakage.
+ */
+export const getUserCacheKey = (userId: string | undefined | null, resource: string): string => {
+  if (!userId || typeof userId !== "string" || !userId.trim()) {
+    return `arthax:cache:anonymous:${resource}`;
+  }
+  return `arthax:cache:${userId.trim()}:${resource}`;
 };
 
 /**
  * Get cached item from Upstash Redis with timeout fallback (max 1000ms)
  */
 export async function getCachedData<T>(key: string): Promise<T | null> {
-  if (!key) return null;
+  if (!key || !redis) return null;
   try {
     const fetchPromise = redis.get<T>(key);
-    // Attach catch handler so background failure doesn't cause unhandled rejection
     fetchPromise.catch(() => {});
     const timeoutPromise = new Promise<null>((resolve) =>
       setTimeout(() => resolve(null), 1000)
     );
     const data = await Promise.race([fetchPromise, timeoutPromise]);
-    return data;
+    return data ?? null;
   } catch (err) {
     console.warn(`[Redis Cache] Failed to get ${key}:`, err);
     return null;
@@ -52,7 +70,7 @@ export async function setCachedData<T>(
   value: T,
   ttlSeconds: number = 3600
 ): Promise<void> {
-  if (!key || value === undefined) return;
+  if (!key || value === undefined || !redis) return;
   try {
     const setPromise = redis.set(key, value, { ex: ttlSeconds });
     setPromise.catch(() => {});
@@ -69,10 +87,11 @@ export async function setCachedData<T>(
  * Invalidate one or multiple cached items in Upstash Redis with timeout safeguard
  */
 export async function invalidateCachedData(keys: string | string[]): Promise<void> {
+  if (!redis) return;
   const keyList = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
   if (keyList.length === 0) return;
   try {
-    const delPromise = Promise.all(keyList.map((k) => redis.del(k)));
+    const delPromise = Promise.all(keyList.map((k) => redis!.del(k)));
     delPromise.catch(() => {});
     const timeoutPromise = new Promise<void>((resolve) =>
       setTimeout(() => resolve(), 1500)

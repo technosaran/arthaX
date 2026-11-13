@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expenseParser";
 import { sendWhatsAppTextMessage } from "@/utils/whatsapp";
@@ -27,15 +28,49 @@ export async function GET(req: NextRequest) {
 }
 
 /**
+ * Validates Meta WhatsApp HMAC-SHA256 signature
+ */
+function verifyMetaSignature(rawBody: string, signatureHeader: string | null, appSecret: string): boolean {
+  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) {
+    return false;
+  }
+  const expectedHash = signatureHeader.replace("sha256=", "").trim();
+  const hmac = crypto.createHmac("sha256", appSecret);
+  const calculatedHash = hmac.update(rawBody).digest("hex");
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedHash, "hex"),
+      Buffer.from(calculatedHash, "hex")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Incoming Webhook Message Handler (POST)
- * Receives messages from WhatsApp Cloud API, parses them, logs expenses,
- * deducts balances, updates caches, and sends a WhatsApp confirmation.
+ * Receives messages from WhatsApp Cloud API, parses them, logs expenses atomically,
+ * updates caches, and sends a WhatsApp confirmation.
  */
 export async function POST(req: NextRequest) {
   try {
-    let body: any;
+    const rawBody = await req.text();
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    const signature = req.headers.get("x-hub-signature-256");
+
+    // Enforce HMAC-SHA256 signature verification in production if app secret is configured
+    if (appSecret) {
+      const isValid = verifyMetaSignature(rawBody, signature, appSecret);
+      if (!isValid) {
+        console.warn("[WhatsApp Webhook] Invalid HMAC signature detected.");
+        return NextResponse.json({ error: "Unauthorized: Invalid webhook signature." }, { status: 401 });
+      }
+    }
+
+    let body: Record<string, unknown>;
     try {
-      body = await req.json();
+      body = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
@@ -47,44 +82,43 @@ export async function POST(req: NextRequest) {
     let explicitUserId = "";
     let messageId: string | null = null;
 
-    if (body.text) {
-      // Direct testing from test suite, curl, or shortcut
+    if (typeof body.text === "string") {
       messageText = body.text;
-      senderPhone = body.phone || "test_user";
-      explicitUserId = body.user_id || "";
-      messageId = body.message_id || `direct_${Date.now()}`;
-    } else if (body.entry && body.entry[0]?.changes && body.entry[0].changes[0]?.value) {
-      // Official Meta WhatsApp Cloud API Payload
-      const value = body.entry[0].changes[0].value;
-      phoneNumberId = value.metadata?.phone_number_id || phoneNumberId;
+      senderPhone = typeof body.phone === "string" ? body.phone : "test_user";
+      explicitUserId = typeof body.user_id === "string" ? body.user_id : "";
+      messageId = typeof body.message_id === "string" ? body.message_id : `direct_${Date.now()}`;
+    } else if (Array.isArray(body.entry) && body.entry[0]) {
+      const entryObj = body.entry[0] as { changes?: Array<{ value?: { metadata?: { phone_number_id?: string }; messages?: Array<{ id?: string; from?: string; type?: string; text?: { body?: string } }> } }> };
+      const changeVal = entryObj.changes?.[0]?.value;
+      if (changeVal) {
+        phoneNumberId = changeVal.metadata?.phone_number_id || phoneNumberId;
+        const messageObj = changeVal.messages?.[0];
 
-      const messageObj = value.messages?.[0];
-      if (!messageObj) {
-        // Acknowledge status updates (sent, delivered, read) without processing
-        return NextResponse.json({ status: "acknowledged_status_update" });
-      }
-
-      senderPhone = messageObj.from || "";
-      messageId = messageObj.id || null;
-
-      if (messageObj.type === "text" && messageObj.text?.body) {
-        messageText = messageObj.text.body;
-      } else {
-        // Non-text message (voice note, image, sticker, location)
-        if (senderPhone) {
-          await sendWhatsAppTextMessage({
-            phoneNumberId,
-            to: senderPhone,
-            message:
-              "Please send text messages or copy-paste transaction SMS to log expenses.\n\n" +
-              "*Examples:*\n" +
-              "• *Dinner 500 HDFC*\n" +
-              "• *Petrol 1200 Cash*\n" +
-              "• *Groceries 450 SBI*\n" +
-              "• *Uber 320*",
-          });
+        if (!messageObj) {
+          return NextResponse.json({ status: "acknowledged_status_update" });
         }
-        return NextResponse.json({ status: "ignored_non_text_message" });
+
+        senderPhone = messageObj.from || "";
+        messageId = messageObj.id || null;
+
+        if (messageObj.type === "text" && messageObj.text?.body) {
+          messageText = messageObj.text.body;
+        } else {
+          if (senderPhone) {
+            await sendWhatsAppTextMessage({
+              phoneNumberId,
+              to: senderPhone,
+              message:
+                "Please send text messages or copy-paste transaction SMS to log expenses.\n\n" +
+                "*Examples:*\n" +
+                "• *Dinner 500 HDFC*\n" +
+                "• *Petrol 1200 Cash*\n" +
+                "• *Groceries 450 SBI*\n" +
+                "• *Uber 320*",
+            });
+          }
+          return NextResponse.json({ status: "ignored_non_text_message" });
+        }
       }
     }
 
@@ -93,32 +127,35 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 2. Resolve User ID (Guaranteed Multi-Tenant Safety)
+    // 2. Resolve User ID strictly (Eliminated unsafe limit(1) fallback)
     // -------------------------------------------------------------
     let userId = explicitUserId || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
 
-    if (!userId) {
-      // Fallback for single-user self-hosted instance
-      const { data: defaultUser } = await supabaseAdmin
-        .from("user_settings")
-        .select("id")
+    // Check if phone matches user in user_settings or family_members
+    if (!userId && senderPhone && senderPhone !== "test_user") {
+      const { data: memberRecord } = await supabaseAdmin
+        .from("family_members")
+        .select("user_id")
+        .eq("phone", senderPhone)
         .limit(1)
         .maybeSingle();
 
-      userId = defaultUser?.id || null;
+      if (memberRecord?.user_id) {
+        userId = memberRecord.user_id;
+      }
     }
 
     if (!userId) {
-      console.warn("[WhatsApp Webhook] No registered user found to assign expense.");
+      console.warn(`[WhatsApp Webhook] Unmapped sender phone: ${senderPhone}. Rejecting to prevent cross-tenant corruption.`);
       if (senderPhone && senderPhone !== "test_user") {
         await sendWhatsAppTextMessage({
           phoneNumberId,
           to: senderPhone,
           message:
-            "Your WhatsApp number is not linked to an active ArthaX account. Please sign in to ArthaX and configure your user settings.",
+            "Your WhatsApp number is not linked to an active ArthaX account. Please configure your phone number in ArthaX Settings.",
         });
       }
-      return NextResponse.json({ error: "User resolution failed" }, { status: 400 });
+      return NextResponse.json({ error: "User resolution failed. Phone not linked." }, { status: 403 });
     }
 
     // -------------------------------------------------------------
@@ -134,7 +171,6 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (existingExpense) {
-        console.log(`[WhatsApp Webhook] Duplicate message ${messageId} already recorded. Skipping.`);
         return NextResponse.json({
           status: "already_processed",
           duplicate: true,
@@ -148,7 +184,7 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------
     const { data: accounts, error: accErr } = await supabaseAdmin
       .from("accounts")
-      .select("id, name, type, balance, last_four")
+      .select("id, name, type, balance, last_four, classification")
       .eq("user_id", userId);
 
     if (accErr) {
@@ -194,53 +230,34 @@ export async function POST(req: NextRequest) {
     const targetAccount = matchAccount(parsed.accountQuery, userAccounts);
 
     // -------------------------------------------------------------
-    // 7. Insert Expense into Supabase (Timezone Aware: Asia/Kolkata)
+    // 7. Insert Expense via ATOMIC RPC (Row-locked balance deduction & audit log)
     // -------------------------------------------------------------
     const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
     const notesContent = messageId
       ? `Automated via WhatsApp [${messageId}] ("${messageText}")`
       : `Automated via WhatsApp ("${messageText}")`;
 
-    const { data: insertedExpense, error: expErr } = await supabaseAdmin
-      .from("expenses")
-      .insert([
-        {
-          user_id: userId,
-          title: parsed.title,
-          amount: parsed.amount,
-          category: parsed.category,
-          account_id: targetAccount?.id || null,
-          expense_date: expenseDate,
-          notes: notesContent,
-        },
-      ])
-      .select()
-      .single();
+    const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
+      p_user_id: userId,
+      p_title: parsed.title,
+      p_amount: parsed.amount,
+      p_category: parsed.category,
+      p_account_id: targetAccount?.id || null,
+      p_expense_date: expenseDate,
+      p_notes: notesContent,
+      p_tags: ["whatsapp", "automated"],
+    });
 
-    if (expErr) {
-      console.error("[WhatsApp Webhook] Failed to insert expense:", expErr);
-      return NextResponse.json({ error: "Failed to record expense", details: expErr.message }, { status: 500 });
+    if (rpcErr) {
+      console.error("[WhatsApp Webhook] Atomic expense creation failed:", rpcErr);
+      return NextResponse.json({ error: "Failed to record expense", details: rpcErr.message }, { status: 500 });
     }
 
-    // -------------------------------------------------------------
-    // 8. Deduct Balance from Account (Preserves Overdraft & Decimal Precision)
-    // -------------------------------------------------------------
-    let updatedBalance = 0;
-    if (targetAccount) {
-      updatedBalance = Number((Number(targetAccount.balance) - parsed.amount).toFixed(2));
-      const { error: updErr } = await supabaseAdmin
-        .from("accounts")
-        .update({ balance: updatedBalance })
-        .eq("id", targetAccount.id)
-        .eq("user_id", userId);
-
-      if (updErr) {
-        console.error("[WhatsApp Webhook] Failed to deduct balance:", updErr);
-      }
-    }
+    const updatedBalance = rpcResult?.new_balance ?? 0;
+    const accountName = rpcResult?.account_name || (targetAccount ? targetAccount.name : "None (Unassigned)");
 
     // -------------------------------------------------------------
-    // 9. Invalidate Multi-Tier Redis Caches
+    // 8. Invalidate Multi-Tier Redis Caches
     // -------------------------------------------------------------
     try {
       await invalidateCachedData([
@@ -249,16 +266,13 @@ export async function POST(req: NextRequest) {
         getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
         getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
-        "arthax:cache:expenses",
-        "arthax:cache:accounts",
-        "arthax:cache:ledger",
       ]);
     } catch (cErr) {
       console.warn("[WhatsApp Webhook] Redis cache invalidation warning:", cErr);
     }
 
     // -------------------------------------------------------------
-    // 10. Format Confirmation Message & Reply to WhatsApp
+    // 9. Format Confirmation Message & Reply to WhatsApp
     // -------------------------------------------------------------
     const currencyFormatter = new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -271,7 +285,7 @@ export async function POST(req: NextRequest) {
       `*Amount:* ${currencyFormatter.format(parsed.amount)}\n` +
       `*Category:* ${parsed.category}\n` +
       `*Note:* ${parsed.title}\n` +
-      `*Account:* ${targetAccount ? targetAccount.name : "None (Unassigned)"}\n` +
+      `*Account:* ${accountName}\n` +
       (targetAccount ? `*New Balance:* ${currencyFormatter.format(updatedBalance)}\n\n` : "\n") +
       `_Logged automatically in ArthaX_`;
 
@@ -286,8 +300,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        expense: insertedExpense,
-        deducted_account: targetAccount?.name || null,
+        expense_id: rpcResult?.expense_id,
+        deducted_account: accountName,
         new_balance: updatedBalance,
         confirmation_sent: senderPhone !== "test_user",
         reply_preview: replyMsg,
