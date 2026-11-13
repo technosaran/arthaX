@@ -20,7 +20,6 @@ import {
   Phone,
   Mail,
   Sparkles,
-  Copy,
   Check,
   ArrowRight,
   Send,
@@ -28,6 +27,11 @@ import {
   Coins,
   ChevronRight,
   Info,
+  ShieldCheck,
+  ShieldAlert,
+  HeartPulse,
+  Key,
+  FileText,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -66,25 +70,6 @@ export interface FamilyResponsibility {
   is_completed: boolean;
   notes?: string | null;
   created_at?: string;
-}
-
-export interface EmergencyVaultItem {
-  id: string;
-  user_id: string;
-  title: string;
-  type: "insurance" | "medical" | "contact" | "home" | "financial" | "other";
-  provider_or_name: string;
-  reference_number?: string | null;
-  contact_number?: string | null;
-  notes?: string | null;
-  created_at?: string;
-}
-
-interface AccountItem {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
 }
 
 // ==========================================
@@ -128,15 +113,6 @@ const RESPONSIBILITY_CATEGORIES = [
   "Medical & Health",
   "Vehicle & Fuel",
   "Other Household",
-];
-
-const VAULT_TYPES = [
-  { value: "insurance", label: "Health & Life Insurance", icon: ShieldAlert },
-  { value: "medical", label: "Doctor & Hospital SOS", icon: HeartPulse },
-  { value: "home", label: "Home Security & Services", icon: Home },
-  { value: "contact", label: "Emergency Contact / Family SOS", icon: Phone },
-  { value: "financial", label: "CA / Banking / Locker", icon: Key },
-  { value: "other", label: "Other Document / Policy", icon: FileText },
 ];
 
 // Starter template for new users
@@ -198,56 +174,24 @@ const STARTER_RESPONSIBILITIES: Omit<FamilyResponsibility, "id" | "user_id">[] =
   },
 ];
 
-const STARTER_VAULT: Omit<EmergencyVaultItem, "id" | "user_id">[] = [
-  {
-    title: "Family Floater Health Insurance",
-    type: "insurance",
-    provider_or_name: "Star Health & Allied Insurance",
-    reference_number: "P/211112/01/2026/004928",
-    contact_number: "1800-425-2255",
-    notes: "₹25 Lakhs cover for self, spouse, and child. Cashless TPA card in cabinet.",
-  },
-  {
-    title: "Pediatrician & Family Clinic",
-    type: "medical",
-    provider_or_name: "Dr. Rajesh Kulkarni (Apollo Cradle)",
-    reference_number: "Reg # 48291-KA",
-    contact_number: "+91 98450 11223",
-    notes: "Available 24x7 for urgent child emergencies and vaccinations.",
-  },
-  {
-    title: "Apartment 24/7 Security & Maintenance Desk",
-    type: "home",
-    provider_or_name: "Palm Meadows Society Security Gate",
-    reference_number: "Intercom Ext: 101",
-    contact_number: "+91 80 4123 9999",
-    notes: "Emergency electrician, plumber, and main water valve cutoff.",
-  },
-];
-
 export default function FamilySection() {
   const { user } = useAuth();
   const { showToast } = useToast();
 
   // Active sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<"members" | "planning" | "safety">("members");
+  const [activeSubTab, setActiveSubTab] = useState<"members" | "planning">("members");
 
   // Multi-tier cache keys
   const membersKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_MEMBERS);
   const responsibilitiesKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_RESPONSIBILITIES);
-  const vaultKey = getUserCacheKey(user?.id, CACHE_KEYS.FAMILY_VAULT);
-  const accountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
 
   // States initialized from 0ms Tier 1/2 Local Cache
   const [members, setMembers] = useState<FamilyMember[]>(() => getFromLocalCache<FamilyMember[]>(membersKey) || []);
   const [responsibilities, setResponsibilities] = useState<FamilyResponsibility[]>(() => getFromLocalCache<FamilyResponsibility[]>(responsibilitiesKey) || []);
-  const [vaultItems, setVaultItems] = useState<EmergencyVaultItem[]>(() => getFromLocalCache<EmergencyVaultItem[]>(vaultKey) || []);
-  const [accounts, setAccounts] = useState<AccountItem[]>(() => getFromLocalCache<AccountItem[]>(accountsKey) || []);
 
   const [loading, setLoading] = useState<boolean>(() => members.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [seedingTemplate, setSeedingTemplate] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Filter for Household Planning
   const [planningFilter, setPlanningFilter] = useState<"all" | "pending" | "completed">("all");
@@ -264,9 +208,6 @@ export default function FamilySection() {
 
   const [respModalOpen, setRespModalOpen] = useState(false);
   const [editingResp, setEditingResp] = useState<FamilyResponsibility | null>(null);
-
-  const [vaultModalOpen, setVaultModalOpen] = useState(false);
-  const [editingVault, setEditingVault] = useState<EmergencyVaultItem | null>(null);
 
   // Currency Formatter
   const formatINR = useCallback((val: number) => {
@@ -285,11 +226,9 @@ export default function FamilySection() {
     try {
       const supabase = createClient();
 
-      const [mRes, rRes, vRes, aRes] = await Promise.all([
+      const [mRes, rRes] = await Promise.all([
         supabase.from("family_members").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
         supabase.from("family_responsibilities").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
-        supabase.from("family_emergency_vault").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
-        supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id),
       ]);
 
       if (mRes.data) {
@@ -311,26 +250,12 @@ export default function FamilySection() {
         setResponsibilities(mappedResp);
         saveToLocalCache(responsibilitiesKey, mappedResp, 3600);
       }
-
-      if (vRes.data) {
-        setVaultItems(vRes.data);
-        saveToLocalCache(vaultKey, vRes.data, 3600);
-      }
-
-      if (aRes.data) {
-        const mappedAccounts: AccountItem[] = aRes.data.map((item) => ({
-          ...item,
-          balance: Number(item.balance) || 0,
-        }));
-        setAccounts(mappedAccounts);
-        saveToLocalCache(accountsKey, mappedAccounts, 3600);
-      }
     } catch (err) {
       console.error("[FamilySection] Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
-  }, [user, membersKey, responsibilitiesKey, vaultKey, accountsKey]);
+  }, [user, membersKey, responsibilitiesKey]);
 
   useEffect(() => {
     fetchAllData();
@@ -344,7 +269,6 @@ export default function FamilySection() {
       .channel("family_realtime_sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "family_members" }, () => fetchAllData())
       .on("postgres_changes", { event: "*", schema: "public", table: "family_responsibilities" }, () => fetchAllData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "family_emergency_vault" }, () => fetchAllData())
       .subscribe();
 
     return () => {
@@ -383,46 +307,6 @@ export default function FamilySection() {
     [responsibilities]
   );
 
-  // Total Liquid Capital (Savings accounts + Cash)
-  const totalLiquidCash = useMemo(() => {
-    return accounts
-      .filter((a) => {
-        const t = (a.type || "").toLowerCase();
-        return (
-          t.includes("savings") ||
-          t.includes("cash") ||
-          t.includes("current") ||
-          t.includes("checking") ||
-          t.includes("liquid")
-        );
-      })
-      .reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
-  }, [accounts]);
-
-  // Monthly Family Burn Rate = Household Responsibilities + Member Allowances
-  const monthlyBurnRate = useMemo(
-    () => Math.max(1, totalHouseholdBills + totalMonthlyAllowance),
-    [totalHouseholdBills, totalMonthlyAllowance]
-  );
-
-  // Emergency runway in months
-  const emergencyRunwayMonths = useMemo(() => {
-    if (monthlyBurnRate <= 0) return 0;
-    return Number((totalLiquidCash / monthlyBurnRate).toFixed(1));
-  }, [totalLiquidCash, monthlyBurnRate]);
-
-  // ==========================================
-  // Quick Copy Helper
-  // ==========================================
-  const handleCopy = (text: string, id: string) => {
-    if (typeof window !== "undefined" && navigator?.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      showToast("Copied to clipboard", "success");
-      setTimeout(() => setCopiedId(null), 2000);
-    }
-  };
-
   // ==========================================
   // Seed Starter Template
   // ==========================================
@@ -434,12 +318,10 @@ export default function FamilySection() {
 
       const memberPayloads = STARTER_MEMBERS.map((m) => ({ ...m, user_id: user.id }));
       const respPayloads = STARTER_RESPONSIBILITIES.map((r) => ({ ...r, user_id: user.id }));
-      const vaultPayloads = STARTER_VAULT.map((v) => ({ ...v, user_id: user.id }));
 
       await Promise.all([
         supabase.from("family_members").insert(memberPayloads),
         supabase.from("family_responsibilities").insert(respPayloads),
-        supabase.from("family_emergency_vault").insert(vaultPayloads),
       ]);
 
       showToast("Family starter workspace loaded successfully!", "success");
@@ -707,89 +589,6 @@ export default function FamilySection() {
     }
   };
 
-  // ==========================================
-  // Emergency Vault Operations
-  // ==========================================
-  const handleSaveVault = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user) return;
-    setSubmitting(true);
-
-    const formData = new FormData(e.currentTarget);
-    const title = formData.get("title")?.toString().trim() || "";
-    const type = (formData.get("type")?.toString() || "insurance") as EmergencyVaultItem["type"];
-    const provider_or_name = formData.get("provider_or_name")?.toString().trim() || "";
-    const reference_number = formData.get("reference_number")?.toString().trim() || null;
-    const contact_number = formData.get("contact_number")?.toString().trim() || null;
-    const notes = formData.get("notes")?.toString().trim() || null;
-
-    if (!title || !provider_or_name) {
-      showToast("Please provide both a title and provider / contact name", "error");
-      setSubmitting(false);
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-
-      if (editingVault) {
-        const { error } = await supabase
-          .from("family_emergency_vault")
-          .update({
-            title,
-            type,
-            provider_or_name,
-            reference_number,
-            contact_number,
-            notes,
-          })
-          .eq("id", editingVault.id)
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-        showToast("Vault record updated", "success");
-      } else {
-        const { error } = await supabase.from("family_emergency_vault").insert({
-          user_id: user.id,
-          title,
-          type,
-          provider_or_name,
-          reference_number,
-          contact_number,
-          notes,
-        });
-
-        if (error) throw error;
-        showToast("New emergency record secured", "success");
-      }
-
-      setVaultModalOpen(false);
-      setEditingVault(null);
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to save emergency record", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteVault = async (id: string, title: string) => {
-    if (!confirm(`Delete vault entry: "${title}"?`)) return;
-    if (!user) return;
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.from("family_emergency_vault").delete().eq("id", id).eq("user_id", user.id);
-      if (error) throw error;
-      showToast("Emergency record deleted", "success");
-      await fetchAllData();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to delete record", "error");
-    }
-  };
-
   // Filtered responsibilities
   const filteredResponsibilities = useMemo(() => {
     return responsibilities.filter((r) => {
@@ -850,7 +649,7 @@ export default function FamilySection() {
             </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
-            Household allowances, recurring duties, and emergency vault.
+            Household allowances and recurring duties.
           </p>
         </div>
 
@@ -899,20 +698,6 @@ export default function FamilySection() {
             >
               <Plus size={14} />
               Add Duty
-            </button>
-          )}
-
-          {activeSubTab === "safety" && (
-            <button
-              onClick={() => {
-                setEditingVault(null);
-                setVaultModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-              style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-            >
-              <Plus size={14} />
-              Add Policy / SOS
             </button>
           )}
         </div>
@@ -997,7 +782,7 @@ export default function FamilySection() {
           </div>
         </div>
 
-        {/* Card 3: Emergency Runway */}
+        {/* Card 3: Household Monthly Bills */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
           style={{
@@ -1006,29 +791,40 @@ export default function FamilySection() {
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Family Emergency Runway</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Household Monthly Bills</span>
             <span
               className="w-7 h-7 rounded-lg border flex items-center justify-center"
               style={{
                 borderColor: "var(--app-border-subtle)",
-                backgroundColor: emergencyRunwayMonths >= 6 ? "var(--app-accent-subtle)" : "rgba(223, 81, 76, 0.12)",
-                color: emergencyRunwayMonths >= 6 ? "var(--app-accent)" : "var(--app-loss)",
+                backgroundColor: "rgba(245, 158, 11, 0.12)",
+                color: "#F59E0B",
               }}
             >
-              <ShieldCheck size={14} />
+              <Calendar size={14} />
             </span>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold tracking-tight font-mono">
-              {emergencyRunwayMonths} <span className="text-sm font-normal opacity-70">Months</span>
+              {formatINR(totalHouseholdBills)}
             </div>
-            <p className="text-xs opacity-60 mt-1 truncate">
-              {emergencyRunwayMonths >= 6
-                ? "Rock Solid • 6+ mo buffer"
-                : emergencyRunwayMonths >= 3
-                ? "Adequate • Aim for 6 months"
-                : "Tight buffer • Expand liquid cash"}
-            </p>
+            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
+              <span>Paid: {formatINR(paidHouseholdBills)}</span>
+              <span className="font-medium" style={{ color: pendingHouseholdBillsCount === 0 ? "var(--app-accent)" : "#F59E0B" }}>
+                {pendingHouseholdBillsCount === 0 ? "All Clear ✓" : `${pendingHouseholdBillsCount} Due`}
+              </span>
+            </div>
+            <div
+              className="w-full h-1.5 rounded-full overflow-hidden mt-2.5"
+              style={{ backgroundColor: "var(--app-track-bg)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${totalHouseholdBills > 0 ? Math.min(100, Math.round((paidHouseholdBills / totalHouseholdBills) * 100)) : 0}%`,
+                  backgroundColor: "#F59E0B",
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1079,27 +875,6 @@ export default function FamilySection() {
               {pendingHouseholdBillsCount} Due
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab("safety")}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer whitespace-nowrap ${
-            activeSubTab === "safety" ? "font-bold shadow-sm" : "opacity-70 hover:opacity-100"
-          }`}
-          style={{
-            backgroundColor: activeSubTab === "safety" ? "var(--app-card)" : "transparent",
-            borderColor: activeSubTab === "safety" ? "var(--app-border)" : "transparent",
-            color: activeSubTab === "safety" ? "var(--app-accent)" : "var(--app-fg)",
-          }}
-        >
-          <ShieldCheck size={14} />
-          <span>Emergency Vault & SOS</span>
-          <span
-            className="text-[10px] font-mono px-1.5 py-0.2 rounded-full"
-            style={{ backgroundColor: "var(--app-border)", color: "var(--app-fg)" }}
-          >
-            {vaultItems.length}
-          </span>
         </button>
       </div>
 
@@ -1527,197 +1302,6 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          TAB 3: EMERGENCY VAULT & SAFETY NET
-          ========================================================================= */}
-      {activeSubTab === "safety" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          {/* Financial Runway Insight Box */}
-          <div
-            className="rounded-2xl border p-5 sm:p-6 relative overflow-hidden"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={18} style={{ color: "var(--app-accent)" }} />
-                  <h3 className="text-sm font-bold tracking-tight">Family Emergency Financial Runway</h3>
-                </div>
-                <p className="text-xs opacity-70 max-w-xl leading-relaxed">
-                  Calculated against your total liquid cash reserves ({formatINR(totalLiquidCash)}) and monthly recurring household burn rate ({formatINR(monthlyBurnRate)}/mo).
-                </p>
-              </div>
-
-              <div className="text-left md:text-right">
-                <div className="text-2xl font-bold font-mono tracking-tight" style={{ color: emergencyRunwayMonths >= 6 ? "var(--app-accent)" : "#F59E0B" }}>
-                  {emergencyRunwayMonths} Months
-                </div>
-                <span className="text-[11px] opacity-60">
-                  {emergencyRunwayMonths >= 6 ? "Institutional Grade Buffer" : "Build toward 6 months"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Emergency Vault Cards */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider opacity-60">
-                Critical Family SOS & Policy Records ({vaultItems.length})
-              </h3>
-            </div>
-
-            {vaultItems.length === 0 ? (
-              <div
-                className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
-                style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-              >
-                <ShieldAlert size={28} className="opacity-40" />
-                <div className="max-w-md">
-                  <h3 className="text-base font-bold">Emergency Vault is Empty</h3>
-                  <p className="text-xs opacity-70 mt-1">
-                    Store cashless health insurance policy numbers, family pediatrician contact, society security desk, and term life policy details for instant access in emergencies.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setEditingVault(null);
-                    setVaultModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  <Plus size={14} />
-                  Add First Record
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {vaultItems.map((item) => {
-                  const typeMeta = VAULT_TYPES.find((t) => t.value === item.type) || VAULT_TYPES[0];
-                  const Icon = typeMeta.icon;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-2xl border p-5 flex flex-col justify-between transition-all hover:border-[var(--app-accent)]"
-                      style={{
-                        backgroundColor: "var(--app-card)",
-                        borderColor: "var(--app-border)",
-                      }}
-                    >
-                      <div>
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0"
-                              style={{
-                                borderColor: "var(--app-border-subtle)",
-                                backgroundColor: "var(--app-accent-subtle)",
-                                color: "var(--app-accent)",
-                              }}
-                            >
-                              <Icon size={16} />
-                            </span>
-                            <div>
-                              <h4 className="text-sm font-bold tracking-tight line-clamp-1">{item.title}</h4>
-                              <p className="text-[11px] opacity-60 mt-0.5">{typeMeta.label}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => {
-                                setEditingVault(item);
-                                setVaultModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                              style={{ borderColor: "var(--app-border-subtle)" }}
-                              title="Edit item"
-                            >
-                              <Pencil size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteVault(item.id, item.title)}
-                              className="p-1.5 rounded-lg border opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-rose-400"
-                              style={{ borderColor: "var(--app-border-subtle)" }}
-                              title="Delete record"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Details */}
-                        <div
-                          className="mt-3.5 p-3 rounded-xl border space-y-2 text-xs"
-                          style={{
-                            backgroundColor: "var(--app-bg)",
-                            borderColor: "var(--app-border-subtle)",
-                          }}
-                        >
-                          <div>
-                            <span className="text-[10px] uppercase font-mono opacity-60 block">Provider / Name</span>
-                            <span className="font-semibold">{item.provider_or_name}</span>
-                          </div>
-
-                          {item.reference_number && (
-                            <div>
-                              <span className="text-[10px] uppercase font-mono opacity-60 block">Policy / Ref ID</span>
-                              <div className="flex items-center justify-between gap-2 mt-0.5">
-                                <span className="font-mono text-xs select-all">{item.reference_number}</span>
-                                <button
-                                  onClick={() => handleCopy(item.reference_number || "", `ref-${item.id}`)}
-                                  className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity"
-                                  title="Copy reference number"
-                                >
-                                  {copiedId === `ref-${item.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {item.contact_number && (
-                            <div>
-                              <span className="text-[10px] uppercase font-mono opacity-60 block">Emergency Helpline</span>
-                              <div className="flex items-center justify-between gap-2 mt-0.5">
-                                <a
-                                  href={`tel:${item.contact_number.replace(/\s+/g, "")}`}
-                                  className="font-mono text-xs text-sky-400 hover:underline"
-                                >
-                                  {item.contact_number}
-                                </a>
-                                <button
-                                  onClick={() => handleCopy(item.contact_number || "", `phone-${item.id}`)}
-                                  className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity"
-                                  title="Copy phone"
-                                >
-                                  {copiedId === `phone-${item.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {item.notes && (
-                          <p className="italic text-[10px] opacity-60 line-clamp-3 mt-2.5">
-                            "{item.notes}"
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
           POPUP MODAL 1: ADD / EDIT FAMILY MEMBER
           ========================================================================= */}
       {memberModalOpen && (
@@ -2135,151 +1719,6 @@ export default function FamilySection() {
                 >
                   {submitting && <Loader2 size={13} className="animate-spin" />}
                   Save Duty
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          POPUP MODAL 4: ADD / EDIT EMERGENCY VAULT
-          ========================================================================= */}
-      {vaultModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center"
-                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <ShieldCheck size={16} style={{ color: "var(--app-accent)" }} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight">
-                    {editingVault ? "Edit Vault Entry" : "Add Emergency Vault Entry"}
-                  </h3>
-                  <p className="text-xs opacity-60">Store critical policies, physician numbers, and SOS helplines.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setVaultModalOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveVault} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Record Title *</label>
-                <input
-                  type="text"
-                  name="title"
-                  required
-                  placeholder="e.g. Star Health Family Floater"
-                  defaultValue={editingVault?.title || ""}
-                  className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Category Type</label>
-                  <select
-                    name="type"
-                    defaultValue={editingVault?.type || "insurance"}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  >
-                    {VAULT_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Provider / Person Name *</label>
-                  <input
-                    type="text"
-                    name="provider_or_name"
-                    required
-                    placeholder="e.g. Star Health & Allied Insurance"
-                    defaultValue={editingVault?.provider_or_name || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Policy # / Ref ID
-                  </label>
-                  <input
-                    type="text"
-                    name="reference_number"
-                    placeholder="e.g. P/211112/01/2026/004928"
-                    defaultValue={editingVault?.reference_number || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                    Emergency Phone / Helpline
-                  </label>
-                  <input
-                    type="tel"
-                    name="contact_number"
-                    placeholder="e.g. 1800-425-2255 or +91 98450 11223"
-                    defaultValue={editingVault?.contact_number || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Emergency Notes / Claim Instructions
-                </label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="e.g. ₹25 Lakhs cover. Cashless TPA card located in master bedroom drawer"
-                  defaultValue={editingVault?.notes || ""}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors resize-none"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setVaultModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Save Record
                 </button>
               </div>
             </form>
