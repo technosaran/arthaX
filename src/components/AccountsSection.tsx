@@ -739,9 +739,9 @@ export default function AccountsSection() {
         </div>
       )}
 
-      {/* VIEW MODE SLIDE TOGGLE BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
-        {/* Segmented Pill Slide Toggle */}
+      {/* VIEW SELECTOR TABS */}
+      <div className="flex items-center gap-3 mb-6 sm:mb-8">
+        {/* Segmented Pill View Selector */}
         <div
           className="inline-flex items-center p-1 rounded-xl border select-none shadow-xs"
           style={{
@@ -759,7 +759,7 @@ export default function AccountsSection() {
             }`}
           >
             <Wallet size={13} />
-            <span>Holdings & Cards</span>
+            <span>Holdings & Accounts</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                 viewMode === "holdings"
@@ -801,43 +801,10 @@ export default function AccountsSection() {
                 ? "bg-[var(--app-fg)] text-[var(--app-bg)] shadow-sm font-bold"
                 : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
             }`}
-            title="Show both Holdings and History together"
+            title="Show both Holdings & Accounts and History together"
           >
             <span>All</span>
           </button>
-        </div>
-
-        {/* Quick status pill with interactive slide toggle switch */}
-        <div className="flex items-center gap-3 self-start sm:self-auto text-xs">
-          <div
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border opacity-90 font-mono text-[11px]"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <span className="opacity-60">History Section:</span>
-            <span className={viewMode === "history" || viewMode === "all" ? "text-sky-400 font-bold" : "opacity-60"}>
-              {viewMode === "history" || viewMode === "all" ? "Visible" : "Hidden"}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={viewMode === "history" || viewMode === "all"}
-              onClick={() => setViewMode((prev) => (prev === "history" || prev === "all" ? "holdings" : "history"))}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                viewMode === "history" || viewMode === "all" ? "bg-sky-500" : "bg-neutral-700"
-              }`}
-              title="Slide toggle to see Account History section"
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  viewMode === "history" || viewMode === "all" ? "translate-x-4" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -891,7 +858,7 @@ export default function AccountsSection() {
             </div>
           </div>
 
-          {/* Holdings & Connected Debit Cards Section */}
+          {/* Holdings & Accounts Grid Section */}
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1049,7 +1016,7 @@ export default function AccountsSection() {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold opacity-80 hover:opacity-100 transition-opacity cursor-pointer text-sky-400 hover:underline"
               >
                 <ChevronLeft size={14} />
-                <span>Back to Holdings & Cards</span>
+                <span>Back to Holdings & Accounts</span>
               </button>
               <div className="flex items-center gap-2 text-xs opacity-70 font-mono text-[11px]">
                 <span>Showing Account History View</span>
