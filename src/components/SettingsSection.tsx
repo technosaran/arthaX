@@ -18,10 +18,6 @@ import {
   ShieldCheck,
   RotateCcw,
   LogOut,
-  Palette,
-  Sun,
-  Moon,
-  Zap,
   Copy,
   Sparkles,
   AlertTriangle,
@@ -30,7 +26,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme, ThemeMode } from "@/context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
 import {
   exportLedgerPDF,
@@ -74,11 +70,11 @@ interface DataCounts {
   total: number;
 }
 
-type SettingsTab = "profile" | "appearance" | "statements" | "security" | "danger";
+type SettingsTab = "profile" | "statements" | "security" | "danger";
 
 export default function SettingsSection() {
   const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
@@ -274,20 +270,6 @@ export default function SettingsSection() {
     const trimmed = greetingName.trim();
     if (isDirtyRef.current && trimmed && trimmed !== (profile?.name || "")) {
       handleSaveName();
-    }
-  };
-
-  const handleThemeChange = async (newTheme: ThemeMode) => {
-    if (newTheme === theme) return;
-    try {
-      await setTheme(newTheme);
-      showToast(
-        "Theme Updated",
-        `Switched to ${newTheme === "ultra" ? "Ultra Dark (Obsidian)" : newTheme === "dark" ? "Midnight Dark" : "Studio Light"}.`,
-        "success"
-      );
-    } catch {
-      showToast("Theme Error", "Failed to switch theme.", "error");
     }
   };
 
@@ -1050,7 +1032,7 @@ export default function SettingsSection() {
               </span>
             </div>
             <p className="text-xs opacity-70 mt-1">
-              Personalize your workspace identity, customize theme aesthetics, export statements, and manage account security.
+              Personalize your workspace identity, export statements, and manage account security.
             </p>
           </div>
 
@@ -1096,22 +1078,6 @@ export default function SettingsSection() {
           >
             <User size={14} className={activeTab === "profile" ? "text-emerald-400" : ""} />
             <span>Profile & Identity</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("appearance")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "appearance"
-                ? "shadow-sm text-emerald-400"
-                : "opacity-60 hover:opacity-100 hover:text-[var(--app-fg)]"
-            }`}
-            style={{
-              backgroundColor: activeTab === "appearance" ? "var(--app-bg)" : "transparent",
-            }}
-          >
-            <Palette size={14} className={activeTab === "appearance" ? "text-emerald-400" : ""} />
-            <span>Appearance & Theme</span>
           </button>
 
           <button
@@ -1340,259 +1306,7 @@ export default function SettingsSection() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 2: APPEARANCE & THEME                                      */}
-        {/* ============================================================== */}
-        {activeTab === "appearance" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div
-              className="rounded-2xl border p-6 sm:p-7 space-y-6 shadow-sm transition-all"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b"
-                style={{ borderColor: "var(--app-border-subtle)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <Palette size={16} />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight">Appearance & Theme Palette</h2>
-                    <p className="text-xs opacity-60">
-                      Choose your visual experience. Charts, cards, and reports adapt instantly.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Segmented Switcher Control */}
-                <div
-                  className="flex items-center p-1 rounded-xl border self-start sm:self-auto"
-                  style={{
-                    borderColor: "var(--app-border)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
-                  title="Switch theme"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleThemeChange("ultra")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      theme === "ultra"
-                        ? "shadow-sm text-emerald-400 bg-[var(--app-card)] border border-[var(--app-border)] font-bold"
-                        : "opacity-50 hover:opacity-100"
-                    }`}
-                    title="Ultra Dark (Obsidian)"
-                  >
-                    <Zap size={13} className={theme === "ultra" ? "text-emerald-400" : ""} />
-                    <span className="text-[11px] font-mono">Ultra</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleThemeChange("dark")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      theme === "dark"
-                        ? "shadow-sm text-sky-400 bg-[var(--app-card)] border border-[var(--app-border)] font-bold"
-                        : "opacity-50 hover:opacity-100"
-                    }`}
-                    title="Midnight Slate"
-                  >
-                    <Moon size={13} className={theme === "dark" ? "text-sky-400" : ""} />
-                    <span className="text-[11px] font-mono">Dark</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleThemeChange("light")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      theme === "light"
-                        ? "shadow-sm text-amber-500 bg-[var(--app-card)] border border-[var(--app-border)] font-bold"
-                        : "opacity-50 hover:opacity-100"
-                    }`}
-                    title="Studio Light"
-                  >
-                    <Sun size={13} className={theme === "light" ? "text-amber-500" : ""} />
-                    <span className="text-[11px] font-mono">Light</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Interactive Theme Cards with Miniature Mock UI Previews */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* 1. Ultra Dark Card */}
-                <div
-                  onClick={() => handleThemeChange("ultra")}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between gap-3 group ${
-                    theme === "ultra"
-                      ? "ring-2 ring-emerald-500/50 border-emerald-500/50 shadow-md"
-                      : "hover:border-[var(--app-border)] opacity-80 hover:opacity-100"
-                  }`}
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: theme === "ultra" ? undefined : "var(--app-border-subtle)",
-                  }}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                          <Zap size={14} />
-                        </span>
-                        <span className="font-bold text-xs tracking-tight">Obsidian Ultra</span>
-                      </div>
-                      {theme === "ultra" ? (
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-zinc-700 group-hover:border-zinc-500" />
-                      )}
-                    </div>
-                    <p className="text-[11px] opacity-60 leading-relaxed">
-                      Deep space pitch canvas (#090a0f) with luminous emerald neon highlights.
-                    </p>
-
-                    {/* Miniature Mock Dashboard Preview */}
-                    <div className="p-2.5 rounded-xl bg-[#090a0f] border border-white/10 space-y-1.5 pointer-events-none select-none">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-white">arthaX</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      </div>
-                      <div className="p-1.5 rounded-lg bg-[#10131c] border border-white/5 flex items-center justify-between">
-                        <span className="text-[8px] opacity-60 text-zinc-400">Total Net Worth</span>
-                        <span className="text-[9px] font-mono font-bold text-emerald-400">₹1,48,920</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Swatches */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--app-border-subtle)]">
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#090a0f] border border-white/20" title="Canvas" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#10131c] border border-white/20" title="Card" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#10b981]" title="Emerald Accent" />
-                    <span className="text-[10px] font-mono opacity-40 ml-auto">OLED Pitch</span>
-                  </div>
-                </div>
-
-                {/* 2. Midnight Dark Card */}
-                <div
-                  onClick={() => handleThemeChange("dark")}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between gap-3 group ${
-                    theme === "dark"
-                      ? "ring-2 ring-sky-500/50 border-sky-500/50 shadow-md"
-                      : "hover:border-[var(--app-border)] opacity-80 hover:opacity-100"
-                  }`}
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: theme === "dark" ? undefined : "var(--app-border-subtle)",
-                  }}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
-                          <Moon size={14} />
-                        </span>
-                        <span className="font-bold text-xs tracking-tight">Midnight Slate</span>
-                      </div>
-                      {theme === "dark" ? (
-                        <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-zinc-700 group-hover:border-zinc-500" />
-                      )}
-                    </div>
-                    <p className="text-[11px] opacity-60 leading-relaxed">
-                      Sophisticated titanium slate (#0e1219) with cool sky blue and emerald tones.
-                    </p>
-
-                    {/* Miniature Mock Dashboard Preview */}
-                    <div className="p-2.5 rounded-xl bg-[#0e1219] border border-white/10 space-y-1.5 pointer-events-none select-none">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-white">arthaX</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                      </div>
-                      <div className="p-1.5 rounded-lg bg-[#151a24] border border-white/5 flex items-center justify-between">
-                        <span className="text-[8px] opacity-60 text-zinc-400">Total Net Worth</span>
-                        <span className="text-[9px] font-mono font-bold text-sky-400">₹1,48,920</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Swatches */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--app-border-subtle)]">
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#0e1219] border border-white/20" title="Canvas" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#151a24] border border-white/20" title="Card" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#38bdf8]" title="Sky Accent" />
-                    <span className="text-[10px] font-mono opacity-40 ml-auto">Slate</span>
-                  </div>
-                </div>
-
-                {/* 3. Studio Light Card */}
-                <div
-                  onClick={() => handleThemeChange("light")}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between gap-3 group ${
-                    theme === "light"
-                      ? "ring-2 ring-emerald-600/50 border-emerald-600/50 shadow-md"
-                      : "hover:border-[var(--app-border)] opacity-80 hover:opacity-100"
-                  }`}
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: theme === "light" ? undefined : "var(--app-border-subtle)",
-                  }}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
-                          <Sun size={14} />
-                        </span>
-                        <span className="font-bold text-xs tracking-tight">Studio Light</span>
-                      </div>
-                      {theme === "light" ? (
-                        <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="w-3.5 h-3.5 rounded-full border border-zinc-400 group-hover:border-zinc-600" />
-                      )}
-                    </div>
-                    <p className="text-[11px] opacity-60 leading-relaxed">
-                      Clean snow white cards (#ffffff) on soft slate canvas (#f8fafc) with crisp contrast.
-                    </p>
-
-                    {/* Miniature Mock Dashboard Preview */}
-                    <div className="p-2.5 rounded-xl bg-[#f8fafc] border border-zinc-200 space-y-1.5 pointer-events-none select-none">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-slate-900">arthaX</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      </div>
-                      <div className="p-1.5 rounded-lg bg-[#ffffff] border border-zinc-200 flex items-center justify-between shadow-2xs">
-                        <span className="text-[8px] opacity-60 text-slate-600">Total Net Worth</span>
-                        <span className="text-[9px] font-mono font-bold text-emerald-600">₹1,48,920</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Swatches */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--app-border-subtle)]">
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#f8fafc] border border-zinc-300" title="Canvas" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#ffffff] border border-zinc-300" title="Card" />
-                    <span className="w-3.5 h-3.5 rounded-full bg-[#059669]" title="Emerald Accent" />
-                    <span className="text-[10px] font-mono opacity-40 ml-auto">Clean Studio</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* TAB 3: STATEMENTS & DATA REPORTS                               */}
+        {/* TAB 2: STATEMENTS & DATA REPORTS                               */}
         {/* ============================================================== */}
         {activeTab === "statements" && (
           <div className="space-y-6 animate-in fade-in duration-200">
@@ -1807,7 +1521,7 @@ export default function SettingsSection() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 4: VAULT SECURITY & CACHE SYNC                             */}
+        {/* TAB 3: VAULT SECURITY & CACHE SYNC                             */}
         {/* ============================================================== */}
         {activeTab === "security" && (
           <div className="space-y-6 animate-in fade-in duration-200">
@@ -1908,7 +1622,7 @@ export default function SettingsSection() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 5: DANGER ZONE (MASTER DATA WIPE)                          */}
+        {/* TAB 4: DANGER ZONE (MASTER DATA WIPE)                          */}
         {/* ============================================================== */}
         {activeTab === "danger" && (
           <div className="space-y-6 animate-in fade-in duration-200">
