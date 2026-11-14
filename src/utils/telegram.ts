@@ -790,3 +790,64 @@ export function getUnlinkedInlineKeyboard(webUrl: string = "https://arthax.verce
     ],
   };
 }
+
+/**
+ * Downloads a file (voice, audio, photo, document) from Telegram servers using getFile API
+ */
+export async function getTelegramFileBuffer(fileId: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+
+  try {
+    const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+    const fileData = await fileRes.json();
+    if (!fileData.ok || !fileData.result?.file_path) {
+      console.error("[Telegram getFile] Error:", fileData);
+      return null;
+    }
+    const filePath = fileData.result.file_path;
+    const downloadUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
+    const res = await fetch(downloadUrl);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    let mimeType = "application/octet-stream";
+    if (filePath.endsWith(".oga") || filePath.endsWith(".ogg")) mimeType = "audio/ogg";
+    else if (filePath.endsWith(".mp3")) mimeType = "audio/mp3";
+    else if (filePath.endsWith(".m4a")) mimeType = "audio/m4a";
+    else if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) mimeType = "image/jpeg";
+    else if (filePath.endsWith(".png")) mimeType = "image/png";
+    else if (filePath.endsWith(".pdf")) mimeType = "application/pdf";
+
+    return { buffer, mimeType };
+  } catch (err) {
+    console.error("[Telegram getTelegramFileBuffer Error]:", err);
+    return null;
+  }
+}
+
+/**
+ * Interactive 1-Tap Category Picker Keyboard for Ambiguous Expenses
+ */
+export function getAmbiguousExpenseKeyboard(expenseId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "🍔 Food", callback_data: `cat:${expenseId}:Food & Dining` },
+        { text: "🛒 Groceries", callback_data: `cat:${expenseId}:Groceries & Essentials` },
+        { text: "🚗 Fuel/Ride", callback_data: `cat:${expenseId}:Transport & Fuel` },
+      ],
+      [
+        { text: "🛍️ Shopping", callback_data: `cat:${expenseId}:Shopping & Lifestyle` },
+        { text: "⚡ Bills", callback_data: `cat:${expenseId}:Utilities & Bills` },
+        { text: "💊 Health", callback_data: `cat:${expenseId}:Health & Medical` },
+      ],
+      [
+        { text: "↩️ Undo", callback_data: `undo:expense:${expenseId}` },
+        { text: "💳 Balances", callback_data: "action:balance" },
+      ],
+    ],
+  };
+}
+

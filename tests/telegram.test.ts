@@ -19,6 +19,7 @@ import {
   getStandardInlineKeyboard,
   getExpenseActionKeyboard,
   getIncomeActionKeyboard,
+  getAmbiguousExpenseKeyboard,
 } from "@/utils/telegram";
 import { parseExpenseMessage, AccountSummary } from "@/utils/expenseParser";
 import { classifyFinancialMessage } from "@/utils/financeParser";
@@ -393,6 +394,11 @@ describe("Telegram Integration Suite", () => {
       const incKeyboard = getIncomeActionKeyboard("inc-456");
       const incBtn = incKeyboard.inline_keyboard[0][0];
       expect("callback_data" in incBtn ? incBtn.callback_data : null).toBe("undo:income:inc-456");
+
+      const ambKeyboard = getAmbiguousExpenseKeyboard("exp-789");
+      expect(ambKeyboard.inline_keyboard.length).toBe(3);
+      const foodBtn = ambKeyboard.inline_keyboard[0][0];
+      expect("callback_data" in foodBtn ? foodBtn.callback_data : null).toBe("cat:exp-789:Food & Dining");
     });
   });
 

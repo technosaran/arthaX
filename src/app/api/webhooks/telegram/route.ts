@@ -26,10 +26,12 @@ import {
   extractTelegramLinkCandidate,
   normalizeLinkTokenCandidates,
   formatCurrencyINR,
+  getTelegramFileBuffer,
+  getAmbiguousExpenseKeyboard,
 } from "@/utils/telegram";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString, getCurrentMonthYear, formatMonthDisplay } from "@/utils/monthUtils";
-import { generateFinancialAnswer } from "@/utils/gemini";
+import { generateFinancialAnswer, parseFinancialInputWithGemini, ParsedFinancialAI } from "@/utils/gemini";
 import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
 import { logger } from "@/utils/logger";
 
@@ -39,6 +41,36 @@ interface TelegramUpdate {
     message_id: number;
     date: number;
     text?: string;
+    caption?: string;
+    photo?: Array<{
+      file_id: string;
+      file_unique_id: string;
+      width: number;
+      height: number;
+      file_size?: number;
+    }>;
+    voice?: {
+      file_id: string;
+      file_unique_id: string;
+      duration: number;
+      mime_type?: string;
+      file_size?: number;
+    };
+    audio?: {
+      file_id: string;
+      file_unique_id: string;
+      duration: number;
+      mime_type?: string;
+      file_size?: number;
+      title?: string;
+    };
+    document?: {
+      file_id: string;
+      file_unique_id: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size?: number;
+    };
     chat: {
       id: number | string;
       type: string;
@@ -116,13 +148,21 @@ export async function POST(req: NextRequest) {
     const isCallback = Boolean(update.callback_query);
     const callbackId = update.callback_query?.id;
     const message = update.message || update.edited_message || update.callback_query?.message;
-    const rawText = (update.callback_query?.data || message?.text || "").trim();
+
+    const voiceObj = message?.voice;
+    const audioObj = message?.audio;
+    const photoArray = message?.photo;
+    const documentObj = message?.document;
+    const hasMedia = Boolean(voiceObj || audioObj || (photoArray && photoArray.length > 0) || documentObj);
+
+    const captionText = message?.caption || "";
+    const rawText = (update.callback_query?.data || message?.text || captionText).trim();
     const chatId = message?.chat?.id || update.callback_query?.from?.id;
     const senderUsername = message?.from?.username || update.callback_query?.from?.username || "";
     const senderFirstName = message?.from?.first_name || update.callback_query?.from?.first_name || "Friend";
     const messageId = message?.message_id;
 
-    if (!chatId || !rawText) {
+    if (!chatId || (!rawText && !hasMedia)) {
       return NextResponse.json({ status: "acknowledged_empty" });
     }
 
@@ -389,6 +429,77 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------
     // 5. Handle Interactive Inline Callback Buttons
     // -------------------------------------------------------------
+    // Interactive 1-Tap Category Update Callback
+    if (isCallback && rawText.startsWith("cat:")) {
+      const parts = rawText.split(":");
+      const expenseId = parts[1];
+      const newCategory = parts.slice(2).join(":");
+
+      if (expenseId && newCategory) {
+        const { error: updErr } = await supabaseAdmin
+          .from("expenses")
+          .update({ category: newCategory })
+          .eq("id", expenseId)
+          .eq("user_id", userId);
+
+        if (!updErr) {
+          await invalidateCachedData([
+            getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+            getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+            getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+          ]);
+
+          await sendTelegramMessage({
+            chatId,
+            text: `✅ <b>Category Updated!</b>\n\nCategorized under <b>${escapeTelegramHtml(newCategory)}</b>.`,
+            replyMarkup: getExpenseActionKeyboard(expenseId),
+          });
+          return NextResponse.json({ success: true, updated_category: newCategory });
+        }
+      }
+    }
+
+    // Conversational text undo ("undo", "cancel last", "delete last")
+    const isTextUndo = /^(undo|cancel last|delete last|remove last|undo last)$/i.test(rawText.trim());
+    if (isTextUndo) {
+      const { data: latestExp } = await supabaseAdmin
+        .from("expenses")
+        .select("id, title, amount")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestExp) {
+        const { data: delResult, error: delErr } = await supabaseAdmin.rpc("fn_delete_expense_atomic", {
+          p_expense_id: latestExp.id,
+          p_user_id: userId,
+        });
+
+        if (!delErr) {
+          await invalidateCachedData([
+            getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+            getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+            getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+            getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+            getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+          ]);
+
+          await sendTelegramMessage({
+            chatId,
+            text: formatUndoConfirmation({
+              type: "expense",
+              title: delResult?.title || latestExp.title,
+              amount: Number(delResult?.amount) || latestExp.amount,
+              accountName: delResult?.account_name || "Account",
+              restoredBalance: delResult?.new_balance,
+            }),
+          });
+          return NextResponse.json({ success: true, undone: latestExp.id });
+        }
+      }
+    }
+
     if (isCallback && rawText.startsWith("undo:")) {
       const parts = rawText.split(":");
       const undoType = parts[1]; // "expense" | "income"
@@ -768,7 +879,7 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 7. Full Financial Message Parsing (Expense, Income, Transfer, AI)
+    // 7. Full Multimodal & Financial Message Parsing (Audio, Photo, AI, Regex)
     // -------------------------------------------------------------
     const idempotencyTag = messageId ? `[telegram_${messageId}]` : null;
 
@@ -786,8 +897,221 @@ export async function POST(req: NextRequest) {
       last_four: a.last_four,
     }));
 
-    // Classify Financial Intent
-    const intent = classifyFinancialMessage(rawText, userAccounts);
+    // -------------------------------------------------------------
+    // 7A. Handle Voice Audio & Receipt Photos via Gemini Multimodal
+    // -------------------------------------------------------------
+    if (hasMedia) {
+      const fileId =
+        voiceObj?.file_id ||
+        audioObj?.file_id ||
+        photoArray?.[photoArray.length - 1]?.file_id ||
+        documentObj?.file_id;
+
+      if (fileId) {
+        const fileRes = await getTelegramFileBuffer(fileId);
+        if (fileRes) {
+          const aiMediaParsed = await parseFinancialInputWithGemini({
+            text: captionText,
+            mediaBase64: fileRes.buffer.toString("base64"),
+            mediaMimeType: fileRes.mimeType,
+            userName,
+            accountsSummary: userAccounts.map((a) => ({ name: a.name, balance: a.balance, type: a.type })),
+          });
+
+          if (aiMediaParsed && (aiMediaParsed.amount || 0) > 0) {
+            const isAudio = Boolean(voiceObj || audioObj);
+            const isPhoto = Boolean(photoArray && photoArray.length > 0);
+            const targetAccount = matchAccount(aiMediaParsed.accountQuery, userAccounts);
+            const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
+            const amt = aiMediaParsed.amount || 0;
+            const title = aiMediaParsed.title || (isPhoto ? "Receipt Scan" : "Voice Expense");
+            const category = aiMediaParsed.category || "Other & Contingency";
+
+            const notesContent = isAudio
+              ? `🎙️ Voice Note: "${aiMediaParsed.transcribedText || captionText}"`
+              : `🧾 Receipt Photo Scan`;
+
+            const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
+              p_user_id: userId,
+              p_title: title,
+              p_amount: amt,
+              p_category: category,
+              p_account_id: targetAccount?.id || null,
+              p_expense_date: expenseDate,
+              p_notes: notesContent,
+              p_tags: ["telegram", isAudio ? "voice" : "receipt", "automated"],
+            });
+
+            if (!rpcErr) {
+              await invalidateCachedData([
+                getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+                getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+                getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+                getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+                getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+              ]);
+
+              const updatedBalance = rpcResult?.new_balance;
+              const accountName = rpcResult?.account_name || (targetAccount ? targetAccount.name : "None");
+
+              const mediaHeader = isAudio
+                ? `🎙️ <b>Voice Expense Recorded!</b>\n<i>"${escapeTelegramHtml(aiMediaParsed.transcribedText || "")}"</i>\n\n`
+                : `🧾 <b>Receipt Scanned & Logged!</b>\n\n`;
+
+              await sendTelegramMessage({
+                chatId,
+                text:
+                  mediaHeader +
+                  formatExpenseConfirmation({
+                    amount: amt,
+                    category,
+                    title,
+                    accountName,
+                    newBalance: targetAccount ? updatedBalance : undefined,
+                  }),
+                replyMarkup: getExpenseActionKeyboard(rpcResult?.expense_id),
+              });
+
+              return NextResponse.json({ success: true, expense_id: rpcResult?.expense_id });
+            }
+          }
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 7B. Handle Pure Standalone Number (e.g. "623", "500") -> 1-Tap Category Keyboard
+    // -------------------------------------------------------------
+    const isPureNumber = /^(?:rs\.?|inr|₹)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:rs\.?|inr|₹)?$/i.test(rawText.trim());
+    if (isPureNumber) {
+      const pureAmount = parseFloat(rawText.replace(/[^0-9.]/g, ""));
+      if (pureAmount > 0) {
+        const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
+        const defaultAccount = userAccounts[0] || null;
+
+        const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
+          p_user_id: userId,
+          p_title: "Quick Expense",
+          p_amount: pureAmount,
+          p_category: "Other & Contingency",
+          p_account_id: defaultAccount?.id || null,
+          p_expense_date: expenseDate,
+          p_notes: `Automated via Telegram ("${rawText}")`,
+          p_tags: ["telegram", "quick_number"],
+        });
+
+        if (!rpcErr) {
+          await invalidateCachedData([
+            getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+            getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+            getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+            getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+            getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+          ]);
+
+          const accountName = rpcResult?.account_name || defaultAccount?.name || "Cash";
+          await sendTelegramMessage({
+            chatId,
+            text:
+              `⚡ <b>Logged ${formatCurrencyINR(pureAmount)}</b> from <b>${escapeTelegramHtml(accountName)}</b>\n\n` +
+              `Tap below to set the category:`,
+            replyMarkup: getAmbiguousExpenseKeyboard(rpcResult?.expense_id),
+          });
+
+          return NextResponse.json({ success: true, expense_id: rpcResult?.expense_id });
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 7C. Handle Natural Balance Inquiries (e.g. "how much in ICICI?", "what is my balance?")
+    // -------------------------------------------------------------
+    const isBalanceQuery = /^(?:what is my balance|check balance|my balance|balance|accounts|how much in|net worth)/i.test(rawText.trim());
+    if (isBalanceQuery) {
+      const targetAcc = userAccounts.find((a) => rawText.toLowerCase().includes(a.name.toLowerCase()));
+      if (targetAcc) {
+        await sendTelegramMessage({
+          chatId,
+          text: `💳 <b>${escapeTelegramHtml(targetAcc.name)} Balance:</b> ₹${targetAcc.balance.toLocaleString("en-IN")}`,
+          replyMarkup: getStandardInlineKeyboard(webAppUrl),
+        });
+        return NextResponse.json({ status: "balance_sent" });
+      }
+
+      await sendTelegramMessage({
+        chatId,
+        text: formatBalanceSummary(accounts || []),
+        replyMarkup: getStandardInlineKeyboard(webAppUrl),
+      });
+      return NextResponse.json({ status: "balance_sent" });
+    }
+
+    // -------------------------------------------------------------
+    // 7D. Handle Natural Spending Inquiries (e.g. "how much did I spend this week?", "today's spend")
+    // -------------------------------------------------------------
+    const isSpendingQuery = /^(?:how much did i spend|monthly spend|total spent|summary|my spend|spending)/i.test(rawText.trim());
+    if (isSpendingQuery) {
+      const currentMonth = getCurrentMonthYear();
+      const monthStart = `${currentMonth}-01`;
+      const today = getLocalDateString(new Date(), "Asia/Kolkata");
+      const monthName = formatMonthDisplay(currentMonth);
+
+      const { data: monthExpenses } = await supabaseAdmin
+        .from("expenses")
+        .select("amount")
+        .eq("user_id", userId)
+        .gte("expense_date", monthStart)
+        .lte("expense_date", today);
+
+      const totalSpent = (monthExpenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+      await sendTelegramMessage({
+        chatId,
+        text:
+          `📊 <b>Spending Summary (${escapeTelegramHtml(monthName)}):</b>\n\n` +
+          `You have spent <b>${formatCurrencyINR(totalSpent)}</b> so far this month across all accounts.`,
+        replyMarkup: getStandardInlineKeyboard(webAppUrl),
+      });
+      return NextResponse.json({ status: "summary_sent" });
+    }
+
+    // -------------------------------------------------------------
+    // 7E. AI Semantic Understanding & Action Resolution (Gemini)
+    // -------------------------------------------------------------
+    let aiParsed: ParsedFinancialAI | null = null;
+    if (process.env.GEMINI_API_KEY && !rawText.startsWith("/")) {
+      aiParsed = await parseFinancialInputWithGemini({
+        text: rawText,
+        userName,
+        accountsSummary: userAccounts.map((a) => ({ name: a.name, balance: a.balance, type: a.type })),
+      });
+    }
+
+    // If AI resolved advice/query
+    if (aiParsed?.intent === "advice" && aiParsed.adviceResponse) {
+      await sendTelegramMessage({
+        chatId,
+        text: `💡 <b>arthaX AI</b>\n\n${aiParsed.adviceResponse}`,
+        replyMarkup: getStandardInlineKeyboard(webAppUrl),
+      });
+      return NextResponse.json({ success: true, status: "ai_advice" });
+    }
+
+    // Fallback to classic intent classifier if AI did not return a definitive action
+    const intent = (aiParsed && aiParsed.intent && aiParsed.intent !== "unknown" && aiParsed.intent !== "advice" && (aiParsed.amount || 0) > 0)
+      ? {
+          type: aiParsed.intent as "expense" | "income" | "transfer",
+          data: {
+            amount: aiParsed.amount || 0,
+            title: aiParsed.title || "Expense",
+            category: aiParsed.category || "Other & Contingency",
+            accountQuery: aiParsed.accountQuery,
+            fromAccountQuery: aiParsed.fromAccountQuery || "",
+            toAccountQuery: aiParsed.toAccountQuery || "",
+            rawText,
+          },
+        }
+      : classifyFinancialMessage(rawText, userAccounts);
 
     // Case A: Transfer between accounts
     if (intent.type === "transfer") {
