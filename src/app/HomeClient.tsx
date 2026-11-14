@@ -8,15 +8,43 @@ import TopNav from "@/components/TopNav";
 import DashboardSection from "@/components/DashboardSection";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
+import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { Loader2 } from "lucide-react";
 
 const TabLoadingFallback = () => (
-  <div className="h-full w-full flex items-center justify-center p-8">
-    <div className="flex items-center gap-2.5 text-xs font-mono opacity-50">
-      <Loader2 size={16} className="animate-spin text-emerald-400" />
-      <span>Loading section...</span>
+  <main
+    className="flex-1 h-full p-4 sm:p-6 md:p-8 overflow-y-auto select-none space-y-6 sm:space-y-8"
+    style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
+  >
+    {/* Header Skeleton */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 border-b border-[var(--app-border)]">
+      <div className="space-y-2">
+        <Skeleton className="h-7 sm:h-9 w-48 sm:w-64 rounded-xl" />
+        <Skeleton className="h-4 w-72 sm:w-96 rounded-md" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-9 w-28 rounded-xl" />
+        <Skeleton className="h-9 w-32 rounded-xl" />
+      </div>
     </div>
-  </div>
+
+    {/* Metric Cards Skeleton */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+      <StatCardSkeleton />
+      <StatCardSkeleton />
+      <StatCardSkeleton />
+    </div>
+
+    {/* Content Cards Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+      <div className="lg:col-span-7">
+        <CardSkeleton rows={5} />
+      </div>
+      <div className="lg:col-span-5">
+        <CardSkeleton rows={4} />
+      </div>
+    </div>
+  </main>
 );
 
 const AccountsSection = dynamic(() => import("@/components/AccountsSection"), {
@@ -82,7 +110,7 @@ export default function HomeClient() {
         <Logo size={52} showText={false} />
         <div className="flex items-center gap-2.5 text-xs font-mono opacity-60">
           <Loader2 size={16} className="animate-spin text-emerald-400" />
-          <span>Loading your workspace...</span>
+          <span>Securing session credentials...</span>
         </div>
       </div>
     );
@@ -97,7 +125,7 @@ export default function HomeClient() {
       className="flex h-screen w-full overflow-hidden transition-colors"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      {/* Ultra Dark Modern Sidebar */}
+      {/* Modern Responsive Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={handleTabChange}

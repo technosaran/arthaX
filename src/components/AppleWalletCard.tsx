@@ -525,13 +525,8 @@ export default function AppleWalletCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] sm:text-[10px] font-mono tracking-[0.2em] uppercase font-semibold text-white/55">
-                {isCash ? "LIQUID CASH • IN HAND" : `DEBIT • ${account.type}`}
+                {isCash ? "CASH IN HAND" : `DEBIT • ${account.type}`}
               </span>
-              {isCash && (
-                <span className="px-1.5 py-0.2 rounded-full text-[8px] font-mono font-bold tracking-wider bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
-                  PHYSICAL
-                </span>
-              )}
             </div>
             <div className="text-base sm:text-lg font-bold tracking-tight text-white capitalize mt-0.5 truncate max-w-[160px] sm:max-w-[210px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
               {displayName}
@@ -628,14 +623,6 @@ export default function AppleWalletCard({
           ) : (
             <VisaLogo />
           )}
-
-          {/* Minimalist Live Status Dot */}
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)] animate-pulse" />
-            <span className="text-[9px] font-mono font-semibold tracking-widest text-emerald-300 uppercase">
-              ACTIVE
-            </span>
-          </div>
         </div>
       </div>
     </div>

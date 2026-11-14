@@ -14,12 +14,10 @@ import {
   BookOpen,
   Users,
   ShieldCheck,
-  Check,
   Eye,
   EyeOff,
   Sun,
   Moon,
-  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
@@ -32,15 +30,18 @@ interface TopNavProps {
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const TAB_META: Record<string, { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+const TAB_META: Record<
+  string,
+  { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }
+> = {
   dashboard: { label: "Financial Overview", icon: LayoutDashboard },
-  accounts: { label: "Accounts & Vault", icon: Landmark },
-  income: { label: "Income Streams", icon: TrendingUp },
+  accounts: { label: "Accounts & Cards", icon: Landmark },
+  income: { label: "Income & Inflows", icon: TrendingUp },
   expenses: { label: "Expenses & Outflows", icon: TrendingDown },
   budgets: { label: "Category Budgets", icon: Target },
-  family: { label: "Family Space", icon: Users },
-  ledger: { label: "Consolidated Ledger", icon: BookOpen },
-  settings: { label: "Preferences & Vault", icon: Settings },
+  family: { label: "Family Financials", icon: Users },
+  ledger: { label: "Master Ledger", icon: BookOpen },
+  settings: { label: "Settings & Vault", icon: Settings },
 };
 
 export default function TopNav({
@@ -66,21 +67,38 @@ export default function TopNav({
     }
   }, []);
 
-  // Close profile dropdown on click outside
+  // Close profile dropdown on click outside or escape key
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsProfileOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   // Compute user name and google avatar
-  const displayName = profile?.name || user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+  const displayName =
+    profile?.name ||
+    user?.user_metadata?.name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "User";
   const googleAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
-  const isGoogleUser = !!googleAvatarUrl || user?.app_metadata?.provider === "google" || user?.identities?.some((i) => i.provider === "google");
+  const isGoogleUser =
+    !!googleAvatarUrl ||
+    user?.app_metadata?.provider === "google" ||
+    user?.identities?.some((i) => i.provider === "google");
 
   const initials = useMemo(() => {
     if (!displayName) return "U";
@@ -91,7 +109,7 @@ export default function TopNav({
     return displayName.slice(0, 2).toUpperCase();
   }, [displayName]);
 
-  const activeMeta = TAB_META[activeTab] || { label: "Dashboard", icon: LayoutDashboard };
+  const activeMeta = TAB_META[activeTab] || { label: "Overview", icon: LayoutDashboard };
   const TabIcon = activeMeta.icon;
 
   const togglePrivacyMask = () => {
@@ -102,14 +120,22 @@ export default function TopNav({
       localStorage.setItem("arthax_privacy_mode", isMasked ? "true" : "false");
     }
     if (isMasked) {
-      showToast("Privacy Mode Enabled", "Sensitive financial figures and balances are now hidden.", "info");
+      showToast(
+        "Privacy Mode Enabled",
+        "Sensitive financial figures and balances are now blurred for discretion.",
+        "info"
+      );
     } else {
-      showToast("Privacy Mode Disabled", "Financial figures and balances are now visible.", "info");
+      showToast(
+        "Privacy Mode Disabled",
+        "Financial figures and balances are now visible.",
+        "info"
+      );
     }
   };
 
   const cycleTheme = () => {
-    const nextTheme: ThemeMode = theme === "ultra" ? "dark" : theme === "dark" ? "light" : "ultra";
+    const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
   };
 
@@ -122,17 +148,12 @@ export default function TopNav({
         color: "var(--app-fg)",
       }}
     >
-      {/* Left: Mobile Toggle & Reference-Grade Breadcrumbs */}
+      {/* Left: Mobile Toggle & Breadcrumbs */}
       <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 pr-2">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
-          className="p-2 rounded-xl border transition-all cursor-pointer opacity-75 hover:opacity-100 hover:scale-105 active:scale-95 md:hidden flex-shrink-0"
-          style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-card)",
-            color: "var(--app-fg)",
-          }}
+          className="p-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] transition-all cursor-pointer opacity-80 hover:opacity-100 active:scale-95 md:hidden flex-shrink-0 fintech-focus"
           aria-label="Toggle navigation menu"
         >
           <Menu size={16} />
@@ -140,11 +161,7 @@ export default function TopNav({
 
         <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0 font-medium">
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border"
-            style={{
-              borderColor: "var(--app-border)",
-              backgroundColor: "var(--app-card)",
-            }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border border-[var(--app-border)] bg-[var(--app-card)]"
           >
             <TabIcon size={14} className="text-[var(--app-accent)]" />
           </div>
@@ -158,24 +175,19 @@ export default function TopNav({
         </div>
       </div>
 
-      {/* Right: Action Pills (Theme Switcher, Privacy Mask) & Circular Profile Avatar */}
+      {/* Right: Quick Action Controls & User Avatar */}
       <div className="flex items-center gap-1.5 sm:gap-2">
         {/* Quick Theme Toggle Button */}
         <button
           type="button"
           onClick={cycleTheme}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
-          style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-card)",
-            color: "var(--app-fg)",
-          }}
-          title={`Theme: ${theme === "ultra" ? "Obsidian Pro (OLED)" : theme === "dark" ? "Midnight Titanium" : "Studio Light"} — Click to switch`}
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 fintech-focus"
+          title={`Theme: ${
+            theme === "dark" ? "Dark Mode" : "Light Mode"
+          } — Click to switch`}
           aria-label="Switch visual theme"
         >
-          {theme === "ultra" ? (
-            <Sparkles size={14} className="text-emerald-400" />
-          ) : theme === "dark" ? (
+          {theme === "dark" ? (
             <Moon size={14} className="text-sky-400" />
           ) : (
             <Sun size={14} className="text-amber-500" />
@@ -186,38 +198,30 @@ export default function TopNav({
         <button
           type="button"
           onClick={togglePrivacyMask}
-          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 fintech-focus ${
             isPrivacyMasked
               ? "ring-2 ring-emerald-500/40 bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-              : "opacity-80 hover:opacity-100"
+              : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] opacity-80 hover:opacity-100"
           }`}
-          style={
-            !isPrivacyMasked
-              ? {
-                  borderColor: "var(--app-border)",
-                  backgroundColor: "var(--app-card)",
-                  color: "var(--app-fg)",
-                }
-              : undefined
+          title={
+            isPrivacyMasked
+              ? "Privacy Mode Active (Balances Masked) — Click to reveal"
+              : "Toggle Privacy Mode (Hide Balances)"
           }
-          title={isPrivacyMasked ? "Privacy Mode Active (Balances Masked) — Click to reveal" : "Toggle Privacy Mode (Hide Balances)"}
           aria-label="Toggle Privacy Mode"
         >
           {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
 
-        {/* Profile Logo in Small Circle */}
+        {/* User Profile Avatar with Popover */}
         <div className="relative ml-1" ref={profileMenuRef}>
           <button
             type="button"
             onClick={() => setIsProfileOpen((prev) => !prev)}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border flex items-center justify-center overflow-hidden transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 relative ring-2 ring-transparent hover:ring-[var(--app-accent)]"
-            style={{
-              borderColor: "var(--app-border)",
-              backgroundColor: "var(--app-card)",
-            }}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] flex items-center justify-center overflow-hidden transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95 relative ring-2 ring-transparent hover:ring-[var(--app-accent)] fintech-focus"
             title={user?.email || displayName || "User Profile"}
-            aria-label="Open profile details"
+            aria-label="Open profile menu"
+            aria-expanded={isProfileOpen}
           >
             {googleAvatarUrl ? (
               <img
@@ -227,13 +231,11 @@ export default function TopNav({
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div
-                className="w-full h-full flex items-center justify-center font-bold text-xs font-mono uppercase bg-emerald-500/15 text-emerald-400"
-              >
+              <div className="w-full h-full flex items-center justify-center font-bold text-xs font-mono uppercase bg-emerald-500/15 text-emerald-400">
                 {initials || <User size={14} className="opacity-70" />}
               </div>
             )}
-            {/* Online Status Dot */}
+            {/* Live Status Indicator */}
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--app-bg)] shadow-[0_0_6px_#10b981]" />
           </button>
 
@@ -242,7 +244,7 @@ export default function TopNav({
             <div
               className="absolute right-0 mt-2.5 w-76 max-w-[calc(100vw-2rem)] rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3.5 backdrop-blur-2xl"
               style={{
-                backgroundColor: "var(--app-card)",
+                backgroundColor: "var(--app-card-elevated)",
                 borderColor: "var(--app-border)",
                 color: "var(--app-fg)",
                 boxShadow: "var(--app-shadow)",
@@ -250,12 +252,10 @@ export default function TopNav({
             >
               {/* Identity Header */}
               <div
-                className="flex items-center gap-3 pb-3 border-b"
-                style={{ borderColor: "var(--app-border-subtle)" }}
+                className="flex items-center gap-3 pb-3 border-b border-[var(--app-border-subtle)]"
               >
                 <div
-                  className="w-10 h-10 rounded-full border overflow-hidden flex-shrink-0 flex items-center justify-center"
-                  style={{ borderColor: "var(--app-border)" }}
+                  className="w-10 h-10 rounded-full border border-[var(--app-border)] overflow-hidden flex-shrink-0 flex items-center justify-center"
                 >
                   {googleAvatarUrl ? (
                     <img
@@ -272,14 +272,16 @@ export default function TopNav({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs truncate text-[var(--app-fg)]">{displayName || "arthaX User"}</div>
-                  <div className="text-[11px] text-[var(--app-muted)] truncate">{user?.email || "Personal Vault"}</div>
+                  <div className="font-bold text-xs truncate text-[var(--app-fg)]">
+                    {displayName || "arthaX User"}
+                  </div>
+                  <div className="text-[11px] text-[var(--app-muted)] truncate">
+                    {user?.email || "Personal Account"}
+                  </div>
                   <div className="mt-1">
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-full border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
-                    >
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-full border text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
                       <ShieldCheck size={10} />
-                      {isGoogleUser ? "Google Verified" : "Private Vault"}
+                      {isGoogleUser ? "Google Verified" : "Active Session"}
                     </span>
                   </div>
                 </div>
@@ -288,21 +290,12 @@ export default function TopNav({
               {/* Theme Selector Strip */}
               <div className="space-y-1.5">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-semibold">
-                  Appearance
+                  Visual Appearance
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl border" style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}>
-                  <button
-                    type="button"
-                    onClick={() => setTheme("ultra")}
-                    className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
-                      theme === "ultra"
-                        ? "bg-white/[0.1] text-white shadow-xs font-bold"
-                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                    }`}
-                  >
-                    <Sparkles size={12} className="mb-0.5 text-emerald-400" />
-                    <span>Obsidian</span>
-                  </button>
+                <div
+                  className="grid grid-cols-2 gap-1.5 p-1 rounded-xl border border-[var(--app-border-subtle)]"
+                  style={{ backgroundColor: "var(--app-card-subtle)" }}
+                >
                   <button
                     type="button"
                     onClick={() => setTheme("dark")}
@@ -313,7 +306,7 @@ export default function TopNav({
                     }`}
                   >
                     <Moon size={12} className="mb-0.5 text-sky-400" />
-                    <span>Midnight</span>
+                    <span>Dark</span>
                   </button>
                   <button
                     type="button"
@@ -325,13 +318,15 @@ export default function TopNav({
                     }`}
                   >
                     <Sun size={12} className="mb-0.5 text-amber-500" />
-                    <span>Studio</span>
+                    <span>Light</span>
                   </button>
                 </div>
               </div>
 
-              {/* Quick Navigation Actions */}
-              <div className="space-y-1 pt-1 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
+              {/* Actions */}
+              <div
+                className="space-y-1 pt-1 border-t border-[var(--app-border-subtle)]"
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -341,7 +336,7 @@ export default function TopNav({
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-card-hover)] transition-colors cursor-pointer text-left text-[var(--app-fg)]"
                 >
                   <Settings size={14} className="opacity-70 text-[var(--app-accent)]" />
-                  <span>Preferences & Vault</span>
+                  <span>Settings & Statements</span>
                 </button>
 
                 <button

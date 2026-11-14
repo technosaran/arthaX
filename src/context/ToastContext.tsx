@@ -32,10 +32,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const id = `${Date.now()}-${Math.random()}`;
       setToasts((prev) => [...prev, { id, title, message, type }]);
 
-      // Auto dismiss after 3.5 seconds
+      // Auto dismiss after 3.8 seconds
       setTimeout(() => {
         removeToast(id);
-      }, 3500);
+      }, 3800);
     },
     [removeToast]
   );
@@ -44,39 +44,49 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {/* Popup Notifications Container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      {/* Floating Notifications Hub */}
+      <div
+        className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+        aria-live="polite"
+      >
         {toasts.map((toast) => {
           return (
             <div
               key={toast.id}
-              className="pointer-events-auto flex items-start gap-3 rounded-xl p-4 border shadow-2xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+              className="pointer-events-auto flex items-start gap-3 rounded-2xl p-4 border shadow-2xl backdrop-blur-xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-3 group select-none"
               style={{
-                backgroundColor: "var(--app-card)",
+                backgroundColor: "var(--app-card-elevated)",
                 borderColor: "var(--app-border)",
                 color: "var(--app-fg)",
+                boxShadow: "var(--app-shadow)",
               }}
             >
               {/* Status Icon */}
               <div className="mt-0.5 flex-shrink-0">
                 {toast.type === "success" && (
-                  <CheckCircle2 size={17} className="text-emerald-400" />
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 size={15} />
+                  </div>
                 )}
                 {toast.type === "error" && (
-                  <AlertCircle size={17} className="text-red-400" />
+                  <div className="w-6 h-6 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                    <AlertCircle size={15} />
+                  </div>
                 )}
                 {toast.type === "info" && (
-                  <Info size={17} className="text-cyan-400" />
+                  <div className="w-6 h-6 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center">
+                    <Info size={15} />
+                  </div>
                 )}
               </div>
 
               {/* Message Content */}
-              <div className="flex-1 pr-2">
-                <div className="text-xs font-bold leading-tight">
+              <div className="flex-1 pr-1 min-w-0">
+                <div className="text-xs font-bold tracking-tight text-[var(--app-fg)] leading-tight">
                   {toast.title}
                 </div>
                 {toast.message && (
-                  <div className="text-[11px] opacity-70 mt-1 leading-snug">
+                  <div className="text-[11px] text-[var(--app-muted)] mt-1 leading-snug break-words">
                     {toast.message}
                   </div>
                 )}
@@ -84,11 +94,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
               {/* Dismiss Button */}
               <button
+                type="button"
                 onClick={() => removeToast(toast.id)}
-                className="opacity-50 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+                className="w-6 h-6 rounded-lg border border-[var(--app-border-subtle)] hover:border-[var(--app-border)] hover:bg-[var(--app-card-hover)] flex items-center justify-center text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-all cursor-pointer opacity-70 group-hover:opacity-100 flex-shrink-0 active:scale-95"
                 aria-label="Dismiss notification"
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             </div>
           );

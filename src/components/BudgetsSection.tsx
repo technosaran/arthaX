@@ -9,8 +9,6 @@ import {
   X,
   Search,
   Pencil,
-  LayoutGrid,
-  List,
   Sparkles,
   AlertTriangle,
   ChevronLeft,
@@ -18,7 +16,6 @@ import {
   TrendingDown,
   ShieldCheck,
   Zap,
-  SlidersHorizontal,
   Home,
   Utensils,
   ShoppingCart,
@@ -26,21 +23,9 @@ import {
   ShoppingBag,
   HeartPulse,
   Film,
-  Plane,
-  Layers,
-  CreditCard,
-  GraduationCap,
-  Users,
-  Gift,
-  TrendingUp,
-  Wrench,
   CircleDollarSign,
   Laptop,
   Dumbbell,
-  Receipt,
-  BookOpen,
-  Activity,
-  Heart,
   CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -56,6 +41,16 @@ import {
   computePrevMonth,
 } from "@/utils/monthUtils";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 export interface BudgetItem {
   id: string;
@@ -98,51 +93,11 @@ export const BUDGET_CATEGORIES: CategoryMeta[] = [
   { name: "Health & Medical", color: "#06B6D4", icon: HeartPulse, defaultAmount: 3500 },
   { name: "Fitness & Sports", color: "#10B981", icon: Dumbbell, defaultAmount: 2500 },
   { name: "Entertainment & OTT", color: "#A855F7", icon: Film, defaultAmount: 2000 },
-  { name: "Travel & Vacations", color: "#6366F1", icon: Plane, defaultAmount: 8000 },
-  { name: "Subscriptions & SaaS", color: "#14B8A6", icon: Layers, defaultAmount: 1500 },
-  { name: "Debt & Loan EMI", color: "#E11D48", icon: CreditCard, defaultAmount: 15000 },
-  { name: "Insurance & Protection", color: "#0284C7", icon: ShieldCheck, defaultAmount: 3500 },
-  { name: "Education & Learning", color: "#D97706", icon: GraduationCap, defaultAmount: 4000 },
-  { name: "Personal Care & Grooming", color: "#F472B6", icon: Sparkles, defaultAmount: 2000 },
-  { name: "Beauty & Skincare", color: "#FB7185", icon: Sparkles, defaultAmount: 2000 },
-  { name: "Family & Child Care", color: "#FB923C", icon: Users, defaultAmount: 6000 },
-  { name: "Gifts & Celebrations", color: "#FACC15", icon: Gift, defaultAmount: 3000 },
-  { name: "Investments & Wealth", color: "#059669", icon: TrendingUp, defaultAmount: 15000 },
-  { name: "Taxes & Professional Fees", color: "#64748B", icon: Receipt, defaultAmount: 5000 },
-  { name: "Home & Maintenance", color: "#78716C", icon: Wrench, defaultAmount: 3000 },
-  { name: "Pet Care & Vet", color: "#E879F9", icon: Heart, defaultAmount: 2500 },
-  { name: "Emergency Reserve", color: "#22C55E", icon: ShieldCheck, defaultAmount: 5000 },
-  { name: "Charity & Community", color: "#F43F5E", icon: Heart, defaultAmount: 1500 },
-  { name: "Books & Courses", color: "#F59E0B", icon: BookOpen, defaultAmount: 1500 },
-  { name: "Hobbies & Creative", color: "#8B5CF6", icon: Activity, defaultAmount: 2000 },
-  { name: "Office & Coworking", color: "#64748B", icon: Laptop, defaultAmount: 3000 },
-  { name: "Alcohol & Nightlife", color: "#F43F5E", icon: Utensils, defaultAmount: 3500 },
-  { name: "Other & Contingency", color: "#71717A", icon: CircleDollarSign, defaultAmount: 2500 },
 ];
-
-export const CATEGORY_MAP: Record<string, CategoryMeta> = BUDGET_CATEGORIES.reduce(
-  (acc, cat) => {
-    acc[cat.name] = cat;
-    return acc;
-  },
-  {} as Record<string, CategoryMeta>
-);
-
-export const CATEGORY_COLORS: Record<string, string> = BUDGET_CATEGORIES.reduce(
-  (acc, cat) => {
-    acc[cat.name] = cat.color;
-    return acc;
-  },
-  {} as Record<string, string>
-);
 
 export default function BudgetsSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
-
-  // Active month in YYYY-MM format with strict boundary constraints
-  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
-  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
 
   const redisBudgetsKey = getUserCacheKey(user?.id, CACHE_KEYS.BUDGETS);
 
@@ -157,20 +112,21 @@ export default function BudgetsSection() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Filters
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  // Month navigation
+  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
+  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(currentMonthYear);
+
+  // Filter & Search
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"ALL" | "ACTIVE" | "UNSET">("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ON_TRACK" | "WARNING" | "OVER">("ALL");
-  const [sortBy, setSortBy] = useState<"highest_budget" | "highest_spent" | "highest_ratio" | "category">("highest_budget");
 
-  // Modals
+  // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetItem | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
 
-  // Form states
-  const [formCategory, setFormCategory] = useState("Food & Dining");
+  // Form Fields
+  const [formCategory, setFormCategory] = useState(BUDGET_CATEGORIES[0].name);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
   const [formAmount, setFormAmount] = useState("");
@@ -185,23 +141,14 @@ export default function BudgetsSection() {
     }).format(val);
   };
 
-  // Compute earliest month that actually has budget or expense data
+  // Earliest data month
   const earliestMonthYear = useMemo(() => {
     const dates = [
       ...budgets.map((b) => b.month_year),
       ...expenses.map((e) => e.expense_date),
-    ];
-    return getEarliestDataMonth(dates, currentMonthYear);
-  }, [budgets, expenses, currentMonthYear]);
-
-  // Clamp selectedMonthYear so it cannot be in the future or before earliest data
-  useEffect(() => {
-    if (selectedMonthYear > currentMonthYear) {
-      setSelectedMonthYear(currentMonthYear);
-    } else if (earliestMonthYear && selectedMonthYear < earliestMonthYear) {
-      setSelectedMonthYear(earliestMonthYear);
-    }
-  }, [selectedMonthYear, currentMonthYear, earliestMonthYear]);
+    ].filter(Boolean);
+    return getEarliestDataMonth(dates);
+  }, [budgets, expenses]);
 
   const canGoPrev = selectedMonthYear > earliestMonthYear;
   const canGoNext = selectedMonthYear < currentMonthYear;
@@ -260,8 +207,6 @@ export default function BudgetsSection() {
           created_at: b.created_at,
         }));
         setBudgets(mapped);
-
-        // Update Multi-Tier Cache
         saveToCache(redisBudgetsKey, mapped, 3600);
       }
     } catch {
@@ -350,14 +295,13 @@ export default function BudgetsSection() {
     return budgets.filter((b) => b.month_year === selectedMonthYear);
   }, [budgets, selectedMonthYear]);
 
-  // Build the complete list of ALL category cards (both with active limits AND available to budget)
+  // Build the complete list of category cards
   const allCategoryCards = useMemo(() => {
     const budgetMap = new Map<string, BudgetItem>();
     currentMonthBudgets.forEach((b) => {
       budgetMap.set(b.category.toLowerCase(), b);
     });
 
-    // Start with all standard predefined categories
     const cards = BUDGET_CATEGORIES.map((catMeta) => {
       const budgetItem = budgetMap.get(catMeta.name.toLowerCase());
       const spentData = categorySpentMap[catMeta.name] || { total: 0, count: 0 };
@@ -386,7 +330,7 @@ export default function BudgetsSection() {
       };
     });
 
-    // Also include any custom categories that have a budget set for this month
+    // Custom categories
     currentMonthBudgets.forEach((b) => {
       const exists = cards.some((c) => c.category.toLowerCase() === b.category.toLowerCase());
       if (!exists) {
@@ -424,13 +368,8 @@ export default function BudgetsSection() {
     return cards;
   }, [currentMonthBudgets, categorySpentMap]);
 
-  // Counters
   const activeBudgetsCount = useMemo(() => {
     return allCategoryCards.filter((c) => c.isBudgeted).length;
-  }, [allCategoryCards]);
-
-  const unbudgetedCount = useMemo(() => {
-    return allCategoryCards.filter((c) => !c.isBudgeted).length;
   }, [allCategoryCards]);
 
   // High-Level KPIs
@@ -483,46 +422,22 @@ export default function BudgetsSection() {
     };
   }, [selectedMonthYear, isCurrentMonth, totalRemaining, totalSpentInBudgetedCategories, totalBudgeted]);
 
-  // Filtered & Sorted Cards
+  // Filtered Cards
   const displayedCards = useMemo(() => {
-    return allCategoryCards
-      .filter((item) => {
-        // Mode filter: ALL vs ACTIVE vs UNSET
-        if (filterMode === "ACTIVE" && !item.isBudgeted) return false;
-        if (filterMode === "UNSET" && item.isBudgeted) return false;
+    return allCategoryCards.filter((item) => {
+      if (filterMode === "ACTIVE" && !item.isBudgeted) return false;
+      if (filterMode === "UNSET" && item.isBudgeted) return false;
 
-        // Search query
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchCategory = item.category.toLowerCase().includes(q);
-          const matchNotes = item.budgetItem?.notes?.toLowerCase().includes(q);
-          if (!matchCategory && !matchNotes) return false;
-        }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchCategory = item.category.toLowerCase().includes(q);
+        const matchNotes = item.budgetItem?.notes?.toLowerCase().includes(q);
+        if (!matchCategory && !matchNotes) return false;
+      }
 
-        // Status filter (only applies to budgeted items)
-        if (statusFilter !== "ALL") {
-          if (!item.isBudgeted) return false;
-          if (statusFilter === "ON_TRACK" && (item.isOverBudget || item.isWarning)) return false;
-          if (statusFilter === "WARNING" && (!item.isWarning || item.isOverBudget)) return false;
-          if (statusFilter === "OVER" && !item.isOverBudget) return false;
-        }
-
-        return true;
-      })
-      .sort((a, b) => {
-        // Prioritize active budgets first in ALL view unless sorting alphabetically
-        if (filterMode === "ALL" && sortBy !== "category") {
-          if (a.isBudgeted && !b.isBudgeted) return -1;
-          if (!a.isBudgeted && b.isBudgeted) return 1;
-        }
-
-        if (sortBy === "highest_budget") return b.budgetAmount - a.budgetAmount;
-        if (sortBy === "highest_spent") return b.spentAmount - a.spentAmount;
-        if (sortBy === "highest_ratio") return b.percentUsed - a.percentUsed;
-        if (sortBy === "category") return a.category.localeCompare(b.category);
-        return 0;
-      });
-  }, [allCategoryCards, filterMode, searchQuery, statusFilter, sortBy]);
+      return true;
+    });
+  }, [allCategoryCards, filterMode, searchQuery]);
 
   // Modal Handlers
   const handleOpenAddModal = (presetCategory?: string, defaultAmt?: number) => {
@@ -660,248 +575,170 @@ export default function BudgetsSection() {
 
   return (
     <main
-      className="flex-1 h-full overflow-y-auto px-3.5 sm:px-6 md:px-8 py-5 sm:py-6 transition-colors select-none"
+      className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      {/* 1. TOP HEADER & MONTH CONTROLS */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 mb-6 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
-            <span
-              className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full border opacity-75"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-card)" }}
+      {/* Universal Page Header */}
+      <PageHeader
+        title="Category Budgets & Controls"
+        description="Establish spending ceilings, track real-time utilization, and prevent budget overruns."
+        badge={
+          <Badge variant="amber">
+            {activeBudgetsCount} Active / {allCategoryCards.length} Categories
+          </Badge>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Month Stepper */}
+            <div
+              className="flex items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0.5 text-xs font-mono shadow-xs"
             >
-              {activeBudgetsCount} Active / {allCategoryCards.length} Categories
-            </span>
-          </div>
-          <p className="text-xs opacity-60 mt-1">
-            Choose any category card to set or adjust its monthly spending limit.
-          </p>
-        </div>
-
-        {/* Controls Suite */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Month Stepper */}
-          <div
-            className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <button
-              onClick={handlePrevMonth}
-              disabled={!canGoPrev}
-              title={!canGoPrev ? "No earlier budget or expense records" : "Previous Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoPrev
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="px-3 font-semibold min-w-[110px] text-center">
-              {monthDisplayTitle}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              disabled={!canGoNext}
-              title={!canGoNext ? "Future months are not yet available" : "Next Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoNext
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronRight size={14} />
-            </button>
-            {!isCurrentMonth && (
               <button
-                onClick={handleResetToCurrentMonth}
-                className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
-                style={{ borderColor: "var(--app-border-subtle)" }}
+                type="button"
+                onClick={handlePrevMonth}
+                disabled={!canGoPrev}
+                title={!canGoPrev ? "No earlier records" : "Previous Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoPrev
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 hover:bg-[var(--app-card-hover)] cursor-pointer"
+                }`}
               >
-                Today
+                <ChevronLeft size={14} />
               </button>
-            )}
-          </div>
+              <span className="px-3 font-semibold min-w-[110px] text-center text-[var(--app-fg)]">
+                {monthDisplayTitle}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                disabled={!canGoNext}
+                title={!canGoNext ? "Future months are not yet available" : "Next Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoNext
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 hover:bg-[var(--app-card-hover)] cursor-pointer"
+                }`}
+              >
+                <ChevronRight size={14} />
+              </button>
+              {!isCurrentMonth && (
+                <button
+                  type="button"
+                  onClick={handleResetToCurrentMonth}
+                  className="ml-1 px-2 py-0.5 text-[10px] uppercase font-bold rounded-md border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-accent)] hover:bg-[var(--app-card-hover)] cursor-pointer"
+                >
+                  Today
+                </button>
+              )}
+            </div>
 
-          {/* Custom Budget Modal Button */}
-          <button
-            onClick={() => handleOpenAddModal()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:opacity-90 active:scale-95"
-            style={{
-              backgroundColor: "var(--app-fg)",
-              color: "var(--app-bg)",
-            }}
-          >
-            <Plus size={14} />
-            <span>Custom Category</span>
-          </button>
-        </div>
-      </div>
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Plus size={15} />}
+              onClick={() => handleOpenAddModal()}
+            >
+              Set Category Budget
+            </Button>
+          </div>
+        }
+      />
 
       {errorMsg && (
-        <div
-          className="mb-6 p-3.5 rounded-xl text-xs border flex items-center justify-between"
-          style={{
-            borderColor: "rgba(244, 63, 94, 0.4)",
-            backgroundColor: "var(--app-card)",
-            color: "#f43f5e",
-          }}
-        >
+        <div className="mb-6 p-4 rounded-xl text-xs border border-rose-500/30 bg-rose-500/10 text-rose-400 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle size={15} />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => fetchBudgets()} className="font-mono underline opacity-80 hover:opacity-100">
+          <Button size="xs" variant="ghost" onClick={() => fetchBudgets()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
       {/* 2. SEPARATE KPI TELEMETRY CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        {/* Card 1: Allocated Cap */}
-        <div
-          className="rounded-2xl p-5 space-y-2 border shadow-sm transition-all"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border-subtle)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
-              Allocated Cap
-            </span>
-            <Target size={15} className="text-amber-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight">
-            {loading ? "..." : formatINR(totalBudgeted)}
-          </div>
-          <p className="text-[11px] opacity-50 font-mono">
-            {activeBudgetsCount} categories budgeted for {monthDisplayTitle}
-          </p>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+          {/* Card 1: Allocated Cap */}
+          <StatCard
+            title="Allocated Budget Cap"
+            value={formatINR(totalBudgeted)}
+            icon={<Target size={16} />}
+            iconColor="amber"
+            subtitle={`${activeBudgetsCount} categories active for ${monthDisplayTitle}`}
+          />
 
-        {/* Card 2: Total Spent */}
-        <div
-          className="rounded-2xl p-5 space-y-2 border shadow-sm transition-all"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border-subtle)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
-              Total Spent
-            </span>
-            <TrendingDown size={15} className="text-rose-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-rose-400">
-            {loading ? "..." : formatINR(totalSpentInBudgetedCategories)}
-          </div>
-          <p className="text-[11px] opacity-50 font-mono">
-            {overallPercentUsed.toFixed(1)}% burned of cap
-          </p>
+          {/* Card 2: Total Spent */}
+          <StatCard
+            title="Total Spent of Cap"
+            value={<span className="text-rose-400">{formatINR(totalSpentInBudgetedCategories)}</span>}
+            icon={<TrendingDown size={16} />}
+            iconColor="rose"
+            subtitle={`${overallPercentUsed.toFixed(1)}% of total ceiling burned`}
+          />
+
+          {/* Card 3: Safe Balance */}
+          <StatCard
+            title={totalRemaining >= 0 ? "Safe Cushion Balance" : "Budget Exceeded"}
+            value={
+              <span className={totalRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                {totalRemaining >= 0 ? formatINR(totalRemaining) : `-${formatINR(Math.abs(totalRemaining))}`}
+              </span>
+            }
+            icon={<ShieldCheck size={16} />}
+            iconColor={totalRemaining >= 0 ? "emerald" : "rose"}
+            subtitle={totalRemaining >= 0 ? "Safe buffer remaining" : "Exceeded spending limits"}
+          />
+
+          {/* Card 4: Daily Safe Burn */}
+          <StatCard
+            title="Daily Safe Burn Pace"
+            value={
+              <span className="text-emerald-400">
+                {paceMetrics.dailyAllowance > 0 ? formatINR(paceMetrics.dailyAllowance) : "₹0"}
+                <span className="text-xs font-normal opacity-60"> /day</span>
+              </span>
+            }
+            icon={<Zap size={16} />}
+            iconColor="emerald"
+            subtitle={`${paceMetrics.daysLeft} days remaining this month`}
+          />
         </div>
+      )}
 
-        {/* Card 3: Safe Balance */}
-        <div
-          className="rounded-2xl p-5 space-y-2 border shadow-sm transition-all"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border-subtle)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
-              {totalRemaining >= 0 ? "Safe Balance" : "Budget Exceeded"}
-            </span>
-            <ShieldCheck
-              size={15}
-              className={totalRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}
-            />
-          </div>
-          <div
-            className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight"
-            style={{ color: totalRemaining >= 0 ? "#10b981" : "#f43f5e" }}
-          >
-            {loading
-              ? "..."
-              : totalRemaining >= 0
-              ? formatINR(totalRemaining)
-              : `-${formatINR(Math.abs(totalRemaining))}`}
-          </div>
-          <p className="text-[11px] opacity-50 font-mono">
-            {totalRemaining >= 0 ? "Safe buffer remaining" : "Exceeded spending limits"}
-          </p>
-        </div>
-
-        {/* Card 4: Daily Safe Burn */}
-        <div
-          className="rounded-2xl p-5 space-y-2 border shadow-sm transition-all"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border-subtle)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
-              Daily Safe Burn
-            </span>
-            <Zap size={15} className="text-emerald-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-emerald-400">
-            {paceMetrics.dailyAllowance > 0 ? formatINR(paceMetrics.dailyAllowance) : "₹0"}
-            <span className="text-xs font-normal opacity-60"> /day</span>
-          </div>
-          <p className="text-[11px] opacity-50 font-mono">
-            {paceMetrics.daysLeft} days left in month
-          </p>
-        </div>
-      </div>
-
-      {/* SEPARATE CARD: MONTH BURN PACE PROGRESS */}
+      {/* MONTH BURN PACE PROGRESS BAR */}
       <div
-        className="rounded-2xl border p-4 sm:p-5 mb-6 transition-all shadow-sm"
-        style={{
-          backgroundColor: "var(--app-card)",
-          borderColor: "var(--app-border-subtle)",
-        }}
+        className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 sm:p-5 mb-6 shadow-xs"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono mb-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60">
-              Month Burn Pace
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--app-muted)]">
+              Overall Budget Burn Pace
             </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border"
-              style={{
-                borderColor: `${
-                  overallPercentUsed > 100
-                    ? "#f43f5e"
-                    : overallPercentUsed > 80
-                    ? "#F59E0B"
-                    : "#10b981"
-                }40`,
-                color:
-                  overallPercentUsed > 100
-                    ? "#f43f5e"
-                    : overallPercentUsed > 80
-                    ? "#F59E0B"
-                    : "#10b981",
-              }}
+            <Badge
+              variant={
+                overallPercentUsed > 100
+                  ? "danger"
+                  : overallPercentUsed > 80
+                  ? "warning"
+                  : "success"
+              }
             >
-              {overallPercentUsed.toFixed(1)}% burned
-            </span>
+              {overallPercentUsed.toFixed(1)}% consumed
+            </Badge>
           </div>
 
-          <div className="text-[11px] opacity-70">
+          <div className="text-[11px] text-[var(--app-muted)]">
             Projected Spend:{" "}
-            <strong className="font-bold font-mono" style={{ color: "var(--app-fg)" }}>
+            <strong className="font-bold font-mono text-[var(--app-fg)]">
               {formatINR(paceMetrics.projectedSpend)}
             </strong>
             {totalBudgeted > 0 && (
@@ -913,17 +750,14 @@ export default function BudgetsSection() {
                 }
               >
                 ({paceMetrics.projectedDiff >= 0
-                  ? `~${formatINR(paceMetrics.projectedDiff)} under`
-                  : `~${formatINR(Math.abs(paceMetrics.projectedDiff))} over`})
+                  ? `~${formatINR(paceMetrics.projectedDiff)} safe`
+                  : `~${formatINR(Math.abs(paceMetrics.projectedDiff))} overrun`})
               </span>
             )}
           </div>
         </div>
 
-        <div
-          className="w-full h-2 rounded-full overflow-hidden"
-          style={{ backgroundColor: "var(--app-track-bg)" }}
-        >
+        <div className="w-full h-2 rounded-full bg-[var(--app-track-bg)] overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -939,40 +773,81 @@ export default function BudgetsSection() {
         </div>
       </div>
 
-      {/* 3. CARDS GRID & INTERACTIVE SELECTION */}
+      {/* FILTER & SEARCH TOOLBAR */}
+      <div
+        className="p-3 sm:p-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs"
+      >
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-md">
+          <div className="relative w-full">
+            <Search size={14} className="absolute left-3 top-2.5 text-[var(--app-muted)]" />
+            <input
+              type="text"
+              placeholder="Search category limits..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-2.5 text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+          {[
+            { id: "ALL", label: `All (${allCategoryCards.length})` },
+            { id: "ACTIVE", label: `Active (${activeBudgetsCount})` },
+            { id: "UNSET", label: `Unset (${allCategoryCards.length - activeBudgetsCount})` },
+          ].map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setFilterMode(mode.id as any)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                filterMode === mode.id
+                  ? "border-[var(--app-accent)] bg-[var(--app-accent-subtle)] text-[var(--app-accent)] font-bold shadow-xs"
+                  : "border-transparent text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. CATEGORY CARDS GRID */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 opacity-50 gap-2">
-          <Loader2 size={24} className="animate-spin" />
-          <span className="text-xs font-mono">Loading categories & budgets...</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <Skeleton className="h-44 rounded-2xl" />
+          <Skeleton className="h-44 rounded-2xl" />
+          <Skeleton className="h-44 rounded-2xl" />
+          <Skeleton className="h-44 rounded-2xl" />
         </div>
       ) : displayedCards.length === 0 ? (
-        <div
-          className="rounded-2xl border p-12 text-center space-y-3"
-          style={{
-            borderColor: "var(--app-border-subtle)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          <div className="w-10 h-10 mx-auto rounded-xl border flex items-center justify-center opacity-50">
-            <Target size={20} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold">No Budget Categories Found</h3>
-            <p className="text-xs opacity-50 mt-1 max-w-sm mx-auto">
-              Get started by setting a category budget limit.
-            </p>
-          </div>
-          <button
-            onClick={() => handleOpenAddModal()}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl border opacity-80 hover:opacity-100 cursor-pointer"
-            style={{ borderColor: "var(--app-border-subtle)" }}
-          >
-            Add Category
-          </button>
-        </div>
+        <EmptyState
+          icon={<Target size={32} className="text-amber-400" />}
+          title="No Categories Match Filter"
+          description="Try adjusting your filter or search criteria to view matching categories."
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setFilterMode("ALL");
+                setSearchQuery("");
+              }}
+            >
+              Reset Filters
+            </Button>
+          }
+        />
       ) : (
-        /* GRID OF CHOOSEABLE CATEGORY CARDS */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
           {displayedCards.map((item) => {
             const Icon = item.IconComponent;
             const progress = Math.min(100, item.percentUsed);
@@ -982,23 +857,22 @@ export default function BudgetsSection() {
               ? "#F59E0B"
               : "#10b981";
 
-            // If budget is ALREADY ACTIVE
             if (item.isBudgeted) {
               return (
                 <div
                   key={item.category}
-                  className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border)] hover:shadow-md shadow-sm group relative"
+                  className="rounded-2xl border p-5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] shadow-xs relative group"
                   style={{
                     backgroundColor: "var(--app-card)",
                     borderColor: item.isOverBudget
                       ? "rgba(244, 63, 94, 0.4)"
                       : item.isWarning
                       ? "rgba(245, 158, 11, 0.3)"
-                      : "var(--app-border-subtle)",
+                      : "var(--app-border)",
                   }}
                 >
                   <div>
-                    {/* Card Top: Icon, Category Name, Active Status Badge */}
+                    {/* Top: Icon, Name, Status Badge */}
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
@@ -1011,8 +885,8 @@ export default function BudgetsSection() {
                           <Icon size={16} />
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-xs font-bold tracking-tight truncate">{item.category}</h4>
-                          <span className="text-[10px] font-mono opacity-50 block truncate">
+                          <h4 className="text-xs font-bold tracking-tight truncate text-[var(--app-fg)]">{item.category}</h4>
+                          <span className="text-[10px] font-mono text-[var(--app-muted)] block truncate">
                             {item.expenseCount} {item.expenseCount === 1 ? "expense" : "expenses"} logged
                           </span>
                         </div>
@@ -1023,34 +897,31 @@ export default function BudgetsSection() {
                         style={{
                           borderColor: `${statusColor}40`,
                           color: statusColor,
-                          backgroundColor: `${statusColor}08`,
+                          backgroundColor: `${statusColor}10`,
                         }}
                       >
                         {item.percentUsed.toFixed(0)}%
                       </span>
                     </div>
 
-                    {/* Financial Figures: Spent vs Cap */}
+                    {/* Figures */}
                     <div className="my-3 font-mono">
                       <div className="flex items-baseline justify-between">
                         <span
-                          className="text-lg font-extrabold tracking-tight"
+                          className="text-lg font-extrabold tracking-tight tabular-nums"
                           style={{ color: item.isOverBudget ? "#f43f5e" : "var(--app-fg)" }}
                         >
                           {formatINR(item.spentAmount)}
                         </span>
-                        <span className="text-xs opacity-50 font-normal">
+                        <span className="text-xs text-[var(--app-muted)] font-normal tabular-nums">
                           of {formatINR(item.budgetAmount)}
                         </span>
                       </div>
 
                       {/* Progress Track */}
-                      <div
-                        className="w-full h-1.5 rounded-full overflow-hidden mt-2"
-                        style={{ backgroundColor: "var(--app-track-bg)" }}
-                      >
+                      <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden mt-2">
                         <div
-                          className="h-full rounded-full transition-all duration-300"
+                          className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${progress}%`,
                             backgroundColor: statusColor,
@@ -1060,32 +931,31 @@ export default function BudgetsSection() {
                     </div>
                   </div>
 
-                  {/* Card Bottom: Safe left / Exceeded & Edit / Delete */}
-                  <div
-                    className="pt-2.5 mt-2 border-t flex items-center justify-between text-[11px] font-mono"
-                    style={{ borderColor: "var(--app-border-subtle)" }}
-                  >
+                  {/* Bottom: Remaining and Actions */}
+                  <div className="pt-2.5 mt-2 border-t border-[var(--app-border-subtle)] flex items-center justify-between text-[11px] font-mono">
                     <span
-                      className="font-medium truncate"
+                      className="font-medium truncate tabular-nums"
                       style={{ color: item.isOverBudget ? "#f43f5e" : "#10b981" }}
                     >
                       {item.isOverBudget
-                        ? `Exceeded +${formatINR(Math.abs(item.remainingAmount))}`
+                        ? `Over +${formatINR(Math.abs(item.remainingAmount))}`
                         : `${formatINR(item.remainingAmount)} left`}
                     </span>
 
                     <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                       <button
+                        type="button"
                         onClick={() => item.budgetItem && handleOpenEditModal(item.budgetItem)}
                         title="Edit Limit"
-                        className="p-1 rounded opacity-70 hover:opacity-100 hover:text-amber-400 cursor-pointer"
+                        className="p-1 rounded-lg text-[var(--app-muted)] hover:text-amber-400 cursor-pointer"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
+                        type="button"
                         onClick={() => item.budgetItem && setDeleteConfirmationId(item.budgetItem.id)}
                         title="Remove Limit"
-                        className="p-1 rounded opacity-70 hover:opacity-100 hover:text-rose-400 cursor-pointer"
+                        className="p-1 rounded-lg text-[var(--app-muted)] hover:text-rose-400 cursor-pointer"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -1095,19 +965,14 @@ export default function BudgetsSection() {
               );
             }
 
-            // If budget is NOT SET YET (Available card ready to choose and set!)
+            // Unset Card ready to set
             return (
               <div
                 key={item.category}
                 onClick={() => handleOpenAddModal(item.category, item.meta.defaultAmount)}
-                className="rounded-2xl border p-4.5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border)] hover:shadow-md shadow-sm group cursor-pointer"
-                style={{
-                  backgroundColor: "var(--app-card)",
-                  borderColor: "var(--app-border-subtle)",
-                }}
+                className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-card)] p-5 transition-all duration-200 flex flex-col justify-between hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] shadow-xs group cursor-pointer"
               >
                 <div>
-                  {/* Top: Icon, Category Name, Available Badge */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div
@@ -1120,57 +985,38 @@ export default function BudgetsSection() {
                         <Icon size={16} />
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-xs font-bold tracking-tight truncate group-hover:text-amber-400 transition-colors">
+                        <h4 className="text-xs font-bold tracking-tight truncate text-[var(--app-fg)] group-hover:text-amber-400 transition-colors">
                           {item.category}
                         </h4>
-                        <span className="text-[10px] font-mono opacity-50 block truncate">
+                        <span className="text-[10px] font-mono text-[var(--app-muted)] block truncate">
                           {item.spentAmount > 0
-                            ? `${formatINR(item.spentAmount)} spent this month`
+                            ? `${formatINR(item.spentAmount)} spent`
                             : "No ceiling set"}
                         </span>
                       </div>
                     </div>
 
-                    <span
-                      className="px-2 py-0.5 rounded-full text-[10px] font-mono border opacity-50 flex-shrink-0"
-                      style={{ borderColor: "var(--app-border-subtle)" }}
-                    >
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-[var(--app-border-subtle)] text-[var(--app-muted)] flex-shrink-0">
                       Unset
                     </span>
                   </div>
 
-                  {/* Middle preview */}
                   <div className="my-3 font-mono">
-                    <div className="flex items-baseline justify-between text-[11px] opacity-60">
-                      <span>Suggested Cap:</span>
-                      <strong className="font-bold font-mono opacity-90">{formatINR(item.meta.defaultAmount)}</strong>
+                    <div className="flex items-baseline justify-between text-[11px] text-[var(--app-muted)]">
+                      <span>Suggested:</span>
+                      <strong className="font-bold text-[var(--app-fg)] tabular-nums">{formatINR(item.meta.defaultAmount)}</strong>
                     </div>
 
-                    {/* Unset indicator track */}
-                    <div
-                      className="w-full h-1.5 rounded-full overflow-hidden mt-2"
-                      style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-                    />
+                    <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] mt-2" />
                   </div>
                 </div>
 
-                {/* Card Bottom: 1-Click Set Action */}
-                <div
-                  className="pt-2.5 mt-2 border-t flex items-center justify-between"
-                  style={{ borderColor: "var(--app-border-subtle)" }}
-                >
-                  <span className="text-[10px] font-mono opacity-40">Ready to activate</span>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1 px-3 py-1 text-[11px] font-bold rounded-lg transition-all group-hover:scale-105 shadow-sm"
-                    style={{
-                      backgroundColor: "var(--app-fg)",
-                      color: "var(--app-bg)",
-                    }}
-                  >
+                <div className="pt-2.5 mt-2 border-t border-[var(--app-border-subtle)] flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-[var(--app-muted)]">Ready to set</span>
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--app-accent)] group-hover:underline">
                     <Plus size={11} />
                     <span>Set Budget</span>
-                  </button>
+                  </span>
                 </div>
               </div>
             );
@@ -1179,245 +1025,167 @@ export default function BudgetsSection() {
       )}
 
       {/* MODAL 1: ADD / EDIT BUDGET */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border-subtle)",
-              color: "var(--app-fg)",
-            }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div>
-                <h3 className="text-base font-bold tracking-tight">
-                  {editingBudget ? "Edit Category Budget" : "Set Category Spending Limit"}
-                </h3>
-                <p className="text-xs opacity-50 mt-0.5">
-                  Target Period: {monthDisplayTitle}
-                </p>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingBudget ? "Edit Category Budget" : "Set Category Spending Limit"}
+        description={`Target Period: ${monthDisplayTitle}`}
+        size="lg"
+      >
+        <form onSubmit={handleSubmitBudget} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1.5">
+              Category
+            </label>
+            <Select
+              value={isCustomCategory ? "custom" : formCategory}
+              onChange={(e) => {
+                if (e.target.value === "custom") {
+                  setIsCustomCategory(true);
+                } else {
+                  setIsCustomCategory(false);
+                  setFormCategory(e.target.value);
+                  const found = BUDGET_CATEGORIES.find((c) => c.name === e.target.value);
+                  if (found && !formAmount) {
+                    setFormAmount(found.defaultAmount.toString());
+                  }
+                }
+              }}
+            >
+              {BUDGET_CATEGORIES.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+              <option value="custom">+ Custom Category Name...</option>
+            </Select>
+
+            {isCustomCategory && (
+              <div className="mt-2">
+                <Input
+                  placeholder="Enter custom category name (e.g. Photography, Vintage)"
+                  value={customCategoryName}
+                  onChange={(e) => setCustomCategoryName(e.target.value)}
+                  required
+                />
               </div>
+            )}
+          </div>
+
+          <div>
+            <Input
+              label="Monthly Budget Ceiling (₹ INR)"
+              type="number"
+              step="1"
+              min="1"
+              placeholder="e.g. 10000"
+              value={formAmount}
+              onChange={(e) => setFormAmount(e.target.value)}
+              required
+              leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
+            />
+
+            {/* Quick Increment Chips */}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {[1000, 5000, 10000, 25000].map((inc) => (
+                <button
+                  key={inc}
+                  type="button"
+                  onClick={() => {
+                    const curr = parseFloat(formAmount) || 0;
+                    setFormAmount((curr + inc).toString());
+                  }}
+                  className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:border-[var(--app-border)] cursor-pointer"
+                >
+                  +{formatINR(inc)}
+                </button>
+              ))}
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                type="button"
+                onClick={() => setFormAmount("")}
+                className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--app-border-subtle)] text-[var(--app-muted)] hover:text-rose-400 cursor-pointer"
               >
-                <X size={16} />
+                Clear
               </button>
             </div>
-
-            <form onSubmit={handleSubmitBudget} className="space-y-4">
-              {/* Category Selector */}
-              <div>
-                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-60 mb-1.5">
-                  Category ({BUDGET_CATEGORIES.length} Available)
-                </label>
-                <select
-                  value={isCustomCategory ? "custom" : formCategory}
-                  onChange={(e) => {
-                    if (e.target.value === "custom") {
-                      setIsCustomCategory(true);
-                    } else {
-                      setIsCustomCategory(false);
-                      setFormCategory(e.target.value);
-                      const found = BUDGET_CATEGORIES.find((c) => c.name === e.target.value);
-                      if (found && !formAmount) {
-                        setFormAmount(found.defaultAmount.toString());
-                      }
-                    }
-                  }}
-                  className="w-full rounded-xl px-3.5 py-2.5 text-xs font-medium border focus:outline-none transition-colors cursor-pointer"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border-subtle)",
-                    color: "var(--app-fg)",
-                  }}
-                >
-                  {BUDGET_CATEGORIES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                  <option value="custom">+ Custom Category Name...</option>
-                </select>
-
-                {isCustomCategory && (
-                  <input
-                    type="text"
-                    placeholder="Enter custom category name (e.g. Photography, Vintage Watches)"
-                    value={customCategoryName}
-                    onChange={(e) => setCustomCategoryName(e.target.value)}
-                    required
-                    className="w-full mt-2 rounded-xl px-3.5 py-2 text-xs border focus:outline-none"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border-subtle)",
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Amount Input */}
-              <div>
-                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-60 mb-1.5">
-                  Monthly Budget Limit (INR ₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold opacity-50">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    placeholder="e.g. 10000"
-                    value={formAmount}
-                    onChange={(e) => setFormAmount(e.target.value)}
-                    required
-                    className="w-full rounded-xl pl-8 pr-3.5 py-2.5 text-sm font-mono border focus:outline-none"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border-subtle)",
-                      color: "var(--app-fg)",
-                    }}
-                  />
-                </div>
-
-                {/* Quick Addition Chips */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {[1000, 5000, 10000, 25000].map((inc) => (
-                    <button
-                      key={inc}
-                      type="button"
-                      onClick={() => {
-                        const curr = parseFloat(formAmount) || 0;
-                        setFormAmount((curr + inc).toString());
-                      }}
-                      className="text-[10px] font-mono px-2 py-0.5 rounded-lg border opacity-60 hover:opacity-100 cursor-pointer"
-                      style={{
-                        borderColor: "var(--app-border-subtle)",
-                        backgroundColor: "var(--app-bg)",
-                      }}
-                    >
-                      +{formatINR(inc)}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setFormAmount("")}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded-lg border opacity-40 hover:opacity-100 cursor-pointer"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              {/* Warning Threshold */}
-              <div>
-                <div className="flex items-center justify-between mb-1 text-xs">
-                  <span className="text-[11px] uppercase font-mono tracking-wider opacity-60">
-                    Alert Threshold
-                  </span>
-                  <span className="font-mono font-bold text-amber-400">
-                    {formThreshold}% of budget
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="50"
-                  max="100"
-                  step="5"
-                  value={formThreshold}
-                  onChange={(e) => setFormThreshold(e.target.value)}
-                  className="w-full accent-amber-400 cursor-pointer"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-60 mb-1.5">
-                  Internal Notes (Optional)
-                </label>
-                <textarea
-                  placeholder="e.g. Cap for dining out, Swiggy orders, and weekend brunches"
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border-subtle)",
-                    color: "var(--app-fg)",
-                  }}
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-3.5 py-2 text-xs font-medium rounded-xl opacity-60 hover:opacity-100 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-40"
-                  style={{
-                    backgroundColor: "var(--app-fg)",
-                    color: "var(--app-bg)",
-                  }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  {editingBudget ? "Save Changes" : "Set Limit"}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5 text-xs">
+              <span className="font-semibold text-[var(--app-fg)]">
+                Warning Alert Threshold
+              </span>
+              <span className="font-mono font-bold text-amber-400">
+                {formThreshold}% of ceiling
+              </span>
+            </div>
+            <input
+              type="range"
+              min="50"
+              max="100"
+              step="5"
+              value={formThreshold}
+              onChange={(e) => setFormThreshold(e.target.value)}
+              className="w-full accent-amber-400 cursor-pointer"
+            />
+          </div>
+
+          <Input
+            label="Internal Notes (Optional)"
+            placeholder="e.g. Monthly limit for dining out, Swiggy orders, and weekend brunches"
+            value={formNotes}
+            onChange={(e) => setFormNotes(e.target.value)}
+          />
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={submitting}
+            >
+              {editingBudget ? "Save Changes" : "Set Budget Limit"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* MODAL 2: DELETE CONFIRMATION */}
-      {deleteConfirmationId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-sm rounded-2xl border p-5 space-y-3 shadow-2xl relative"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border-subtle)",
-              color: "var(--app-fg)",
+      <Modal
+        isOpen={!!deleteConfirmationId}
+        onClose={() => setDeleteConfirmationId(null)}
+        title="Remove Category Budget?"
+        description="Are you sure you want to delete this category budget limit? Recorded transactions will remain untouched."
+        size="sm"
+      >
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setDeleteConfirmationId(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => {
+              const b = budgets.find((item) => item.id === deleteConfirmationId);
+              if (b) handleDeleteBudget(b.id, b.category);
             }}
           >
-            <div className="flex items-center gap-2 text-rose-400">
-              <AlertTriangle size={18} />
-              <h3 className="text-sm font-bold">Remove Category Budget?</h3>
-            </div>
-            <p className="text-xs opacity-60 leading-relaxed">
-              Are you sure you want to delete this category budget limit? Recorded transactions will remain untouched.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setDeleteConfirmationId(null)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg opacity-60 hover:opacity-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const b = budgets.find((item) => item.id === deleteConfirmationId);
-                  if (b) handleDeleteBudget(b.id, b.category);
-                }}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+            Delete Budget
+          </Button>
         </div>
-      )}
+      </Modal>
     </main>
   );
 }

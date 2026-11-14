@@ -6,7 +6,6 @@ import {
   Loader2,
   Trash2,
   Wallet,
-  X,
   FileText,
   TrendingUp,
   TrendingDown,
@@ -15,6 +14,10 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Search,
+  Filter,
+  CheckCircle2,
+  ArrowUpRight,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -30,6 +33,17 @@ import {
   computeNextMonth,
   computePrevMonth,
 } from "@/utils/monthUtils";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
+import { StatCard } from "@/components/ui/StatCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 const DEFAULT_CASH_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -105,6 +119,11 @@ export default function LedgerSection() {
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "CREDIT" | "DEBIT">("all");
+  const [accountFilter, setAccountFilter] = useState("all");
 
   // Active month in YYYY-MM format with strict boundary constraints
   const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
@@ -184,7 +203,7 @@ export default function LedgerSection() {
     }
   };
 
-  // Get relative date tag (Today, Yesterday)
+  // Get relative date tag
   const getRelativeDateTag = (dateStr: string) => {
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
@@ -208,12 +227,11 @@ export default function LedgerSection() {
     ]);
   };
 
-  // 1. Fetch All Ledger Telemetry
+  // Fetch All Ledger Telemetry
   const fetchAllData = useCallback(async (skipCache = false) => {
     if (!user) return;
     setErrorMsg(null);
 
-    // Instant local cache check
     if (!skipCache) {
       const cached = getFromLocalCache<{
         incomes: RawIncomeItem[];
@@ -231,7 +249,6 @@ export default function LedgerSection() {
     try {
       const supabase = createClient();
 
-      // Parallel query scoped to current user
       const [accountsRes, incomeRes, expensesRes] = await Promise.all([
         supabase.from("accounts").select("*").eq("user_id", user.id).order("name", { ascending: true }),
         supabase.from("income").select("*").eq("user_id", user.id).order("received_date", { ascending: false }),
@@ -250,7 +267,6 @@ export default function LedgerSection() {
           created_at: a.created_at,
         }));
 
-        // Sort accounts so Cash in Hand is first
         mappedAccounts.sort((a, b) => {
           if (a.id === DEFAULT_CASH_ID || a.type === "Liquid Cash") return -1;
           if (b.id === DEFAULT_CASH_ID || b.type === "Liquid Cash") return 1;
@@ -284,7 +300,6 @@ export default function LedgerSection() {
         setIncomes(mappedIncome);
         setExpenses(mappedExpenses);
 
-        // Cache combined snapshot
         saveToCache(
           redisLedgerKey,
           {
@@ -302,7 +317,6 @@ export default function LedgerSection() {
     }
   }, [user, redisLedgerKey]);
 
-  // Initial load & Supabase Realtime synchronization
   useEffect(() => {
     if (!user) return;
     fetchAllData();
@@ -326,21 +340,18 @@ export default function LedgerSection() {
     };
   }, [user, fetchAllData]);
 
-  // Helper map for quick account lookup
   const accountsMap = useMemo(() => {
     const map = new Map<string, AccountItem>();
     accounts.forEach((a) => map.set(a.id, a));
     return map;
   }, [accounts]);
 
-  // Total Portfolio Net Balance across all accounts
   const totalPortfolioBalance = useMemo(() => {
     return accounts.reduce((acc, curr) => acc + curr.balance, 0);
   }, [accounts]);
 
-  // 2. Synthesize Master Chronological Ledger & Compute Precise Running Balances
+  // Master Chronological Ledger & Running Balance Calculation
   const fullUnifiedLedger = useMemo(() => {
-    // A. Map income items to CREDIT ledger entries
     const incomeEntries: LedgerEntry[] = incomes.map((inc) => ({
       id: inc.id,
       sourceType: "income",
@@ -356,7 +367,6 @@ export default function LedgerSection() {
       account: inc.account_id ? accountsMap.get(inc.account_id) || null : null,
     }));
 
-    // B. Map expense items to DEBIT ledger entries
     const expenseEntries: LedgerEntry[] = expenses.map((exp) => ({
       id: exp.id,
       sourceType: "expense",
@@ -371,7 +381,6 @@ export default function LedgerSection() {
       account: exp.account_id ? accountsMap.get(exp.account_id) || null : null,
     }));
 
-    // C. Combine and sort chronologically (oldest to newest) to calculate forward running balance
     const combined = [...incomeEntries, ...expenseEntries];
     combined.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
@@ -382,7 +391,6 @@ export default function LedgerSection() {
       return createdA - createdB;
     });
 
-    // D. Compute Running Balance (Consolidated Master Portfolio)
     const totalCredits = combined
       .filter((e) => e.type === "CREDIT")
       .reduce((sum, e) => sum + e.amount, 0);
@@ -405,12 +413,30 @@ export default function LedgerSection() {
     return combined;
   }, [incomes, expenses, accountsMap, totalPortfolioBalance]);
 
-  // Sort entries newest first for display in the journal table, filtered by selected month or all time
+  // Filtered ledger entries
   const ledgerEntries = useMemo(() => {
     let list = fullUnifiedLedger;
     if (!isAllTime) {
       list = list.filter((e) => e.date.startsWith(selectedMonthYear));
     }
+    if (typeFilter !== "all") {
+      list = list.filter((e) => e.type === typeFilter);
+    }
+    if (accountFilter !== "all") {
+      list = list.filter((e) => (e.account_id || "unallocated") === accountFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q) ||
+          (e.notes && e.notes.toLowerCase().includes(q)) ||
+          (e.account?.name && e.account.name.toLowerCase().includes(q)) ||
+          String(e.amount).includes(q)
+      );
+    }
+
     return [...list].sort((a, b) => {
       const diff = new Date(b.date).getTime() - new Date(a.date).getTime();
       if (diff !== 0) return diff;
@@ -418,16 +444,20 @@ export default function LedgerSection() {
       const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return createdB - createdA;
     });
-  }, [fullUnifiedLedger, isAllTime, selectedMonthYear]);
+  }, [fullUnifiedLedger, isAllTime, selectedMonthYear, typeFilter, accountFilter, searchQuery]);
 
-  // 3. Financial KPI Calculations
+  // Financial KPI Calculations
   const kpiMetrics = useMemo(() => {
     let creditsTotal = 0;
     let creditsCount = 0;
     let debitsTotal = 0;
     let debitsCount = 0;
 
-    ledgerEntries.forEach((entry) => {
+    const sourceEntries = isAllTime
+      ? fullUnifiedLedger
+      : fullUnifiedLedger.filter((e) => e.date.startsWith(selectedMonthYear));
+
+    sourceEntries.forEach((entry) => {
       if (entry.type === "CREDIT") {
         creditsTotal += entry.amount;
         creditsCount += 1;
@@ -448,17 +478,16 @@ export default function LedgerSection() {
       netFlow,
       totalVolume,
     };
-  }, [ledgerEntries]);
+  }, [fullUnifiedLedger, isAllTime, selectedMonthYear]);
 
-  // 4. Prompt Delete Entry
+  // Prompt Delete Entry
   const promptDeleteEntry = (entry: LedgerEntry, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEntryToDelete(entry);
     setIsDeleteModalOpen(true);
   };
 
-  // 6. Atomic Delete & Reverse Transaction
-  // When an entry is deleted from the ledger, its impact on the account balance is ALWAYS reversed atomically
+  // Atomic Delete & Reverse Transaction
   const confirmDeleteAndReverse = async () => {
     if (!entryToDelete || !user) return;
 
@@ -516,84 +545,73 @@ export default function LedgerSection() {
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* SECTION HEADER */}
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8"
-        style={{ borderBottom: "1px solid var(--app-border)" }}
-      >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <BookOpen size={24} className="text-amber-400 flex-shrink-0" />
-            <span>General Ledger</span>
-          </h1>
-          <p className="text-xs opacity-70 mt-1">
-            Double-entry statements, account passbooks, and running balances.
-          </p>
-        </div>
-
-        {/* Top Action Toolbar: Month with Year Stepper */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Month Stepper */}
-          <div
-            className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <button
-              onClick={handlePrevMonth}
-              disabled={!canGoPrev}
-              title={!canGoPrev ? "No earlier ledger records" : "Previous Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoPrev
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
+      <PageHeader
+        title="General Ledger"
+        description="Double-entry statements, passbooks, and chronologically reconciled running balances."
+        badge={
+          <Badge variant="amber" dot>
+            Double-Entry
+          </Badge>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Month Stepper */}
+            <div
+              className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
+              style={{
+                borderColor: "var(--app-border)",
+                backgroundColor: "var(--app-card)",
+              }}
             >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="px-3 font-semibold min-w-[110px] text-center">
-              {monthDisplayTitle}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              disabled={!canGoNext}
-              title={!canGoNext ? "Future months are not yet available" : "Next Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoNext
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronRight size={14} />
-            </button>
-            {!isCurrentMonth && !isAllTime && (
               <button
-                onClick={handleResetToCurrentMonth}
-                className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
-                style={{ borderColor: "var(--app-border-subtle)" }}
+                onClick={handlePrevMonth}
+                disabled={!canGoPrev}
+                title={!canGoPrev ? "No earlier ledger records" : "Previous Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoPrev
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 cursor-pointer"
+                }`}
               >
-                Today
+                <ChevronLeft size={14} />
               </button>
-            )}
-          </div>
+              <span className="px-3 font-semibold min-w-[110px] text-center">
+                {monthDisplayTitle}
+              </span>
+              <button
+                onClick={handleNextMonth}
+                disabled={!canGoNext}
+                title={!canGoNext ? "Future months are not yet available" : "Next Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoNext
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 cursor-pointer"
+                }`}
+              >
+                <ChevronRight size={14} />
+              </button>
+              {!isCurrentMonth && !isAllTime && (
+                <button
+                  onClick={handleResetToCurrentMonth}
+                  className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
+                  style={{ borderColor: "var(--app-border-subtle)" }}
+                >
+                  Today
+                </button>
+              )}
+            </div>
 
-          {/* All Time Toggle */}
-          <button
-            onClick={() => setIsAllTime(!isAllTime)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-all ${
-              isAllTime ? "shadow-sm font-bold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: isAllTime ? "var(--app-fg)" : "var(--app-card)",
-              color: isAllTime ? "var(--app-bg)" : "var(--app-fg)",
-              borderColor: isAllTime ? "var(--app-fg)" : "var(--app-border-subtle)",
-            }}
-          >
-            All Time
-          </button>
-        </div>
-      </div>
+            {/* All Time Toggle */}
+            <Button
+              variant={isAllTime ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setIsAllTime(!isAllTime)}
+            >
+              All Time
+            </Button>
+          </div>
+        }
+      />
 
       {errorMsg && (
         <div
@@ -609,213 +627,151 @@ export default function LedgerSection() {
       )}
 
       {/* KPI OVERVIEW SUMMARY METRICS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Total Credits */}
-        <div
-          className="rounded-2xl p-5 border space-y-2 transition-colors shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60 flex items-center gap-1.5">
-              <TrendingUp size={14} className="text-emerald-400" />
-              <span>Credits (Inflow)</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          title="Credits (Inflow)"
+          value={
+            <span className="text-emerald-400 font-mono font-extrabold">
+              +{formatINR(kpiMetrics.creditsTotal)}
             </span>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              {kpiMetrics.creditsCount} Txns
-            </span>
-          </div>
-          <div className="text-2xl font-extrabold tracking-tight font-mono text-emerald-400">
-            +{formatINR(kpiMetrics.creditsTotal)}
-          </div>
-          <p className="text-[11px] opacity-60">Deposits, salaries, and income</p>
-        </div>
+          }
+          subtitle={`${kpiMetrics.creditsCount} transactions • deposits & salaries`}
+          icon={<TrendingUp size={16} />}
+          iconColor="emerald"
+        />
 
-        {/* Total Debits */}
-        <div
-          className="rounded-2xl p-5 border space-y-2 transition-colors shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60 flex items-center gap-1.5">
-              <TrendingDown size={14} className="text-rose-400" />
-              <span>Debits (Outflow)</span>
+        <StatCard
+          title="Debits (Outflow)"
+          value={
+            <span className="text-rose-400 font-mono font-extrabold">
+              -{formatINR(kpiMetrics.debitsTotal)}
             </span>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              {kpiMetrics.debitsCount} Txns
-            </span>
-          </div>
-          <div className="text-2xl font-extrabold tracking-tight font-mono text-rose-400">
-            -{formatINR(kpiMetrics.debitsTotal)}
-          </div>
-          <p className="text-[11px] opacity-60">Expenses, bills, and withdrawals</p>
-        </div>
+          }
+          subtitle={`${kpiMetrics.debitsCount} transactions • expenses & bills`}
+          icon={<TrendingDown size={16} />}
+          iconColor="rose"
+        />
 
-        {/* Net Cashflow Position */}
-        <div
-          className="rounded-2xl p-5 border space-y-2 transition-colors shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60 flex items-center gap-1.5">
-              <ArrowUpDown size={14} />
-              <span>Net Movement</span>
-            </span>
+        <StatCard
+          title="Net Movement"
+          value={
             <span
-              className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+              className={`font-mono font-extrabold ${
                 kpiMetrics.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"
               }`}
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
             >
-              {kpiMetrics.netFlow >= 0 ? "SURPLUS" : "DEFICIT"}
+              {kpiMetrics.netFlow >= 0 ? "+" : ""}
+              {formatINR(kpiMetrics.netFlow)}
             </span>
-          </div>
-          <div
-            className={`text-2xl font-extrabold tracking-tight font-mono ${
-              kpiMetrics.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"
-            }`}
-          >
-            {kpiMetrics.netFlow >= 0 ? "+" : ""}
-            {formatINR(kpiMetrics.netFlow)}
-          </div>
-          <p className="text-[11px] opacity-60">Inflow minus outflow in period</p>
-        </div>
+          }
+          subtitle={
+            kpiMetrics.netFlow >= 0
+              ? "Surplus net flow for period"
+              : "Deficit net flow for period"
+          }
+          icon={<ArrowUpDown size={16} />}
+          iconColor={kpiMetrics.netFlow >= 0 ? "emerald" : "rose"}
+        />
 
-        {/* Ledger Balance / Turnover */}
-        <div
-          className="rounded-2xl p-5 border space-y-2 transition-colors shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60 flex items-center gap-1.5">
-              <Wallet size={14} />
-              <span>Total Portfolio Net</span>
-            </span>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
-            >
-              INR (₹)
-            </span>
-          </div>
-          <div className="text-2xl font-extrabold tracking-tight font-mono">
-            {formatINR(totalPortfolioBalance)}
-          </div>
-          <p className="text-[11px] opacity-60">
-            Total Turnover: {formatINR(kpiMetrics.totalVolume)}
-          </p>
-        </div>
+        <StatCard
+          title="Total Portfolio Net"
+          value={<span className="font-mono font-extrabold">{formatINR(totalPortfolioBalance)}</span>}
+          subtitle={`Turnover Volume: ${formatINR(kpiMetrics.totalVolume)}`}
+          icon={<Wallet size={16} />}
+          iconColor="sky"
+        />
       </div>
 
-      {/* TABLE HEADER / ENTRY COUNTER */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <h2 className="text-xs font-bold uppercase tracking-wider opacity-60">
-          Journal Transactions
-        </h2>
-        <span
-          className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-medium"
-          style={{
-            borderColor: "var(--app-border-subtle)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
+      {/* FILTER & SEARCH TOOLBAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search Bar */}
+          <div className="w-full sm:w-64">
+            <Input
+              placeholder="Search title, category, notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              leftIcon={<Search size={14} />}
+            />
+          </div>
+
+          {/* Type Segmented Pill */}
+          <SegmentedControl
+            options={[
+              { value: "all", label: "All Types" },
+              { value: "CREDIT", label: "Credits (+)" },
+              { value: "DEBIT", label: "Debits (-)" },
+            ]}
+            value={typeFilter}
+            onChange={(val) => setTypeFilter(val as "all" | "CREDIT" | "DEBIT")}
+            size="sm"
+          />
+
+          {/* Account Filter */}
+          <select
+            value={accountFilter}
+            onChange={(e) => setAccountFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs rounded-xl border font-sans cursor-pointer focus:outline-none"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-card)",
+              color: "var(--app-fg)",
+            }}
+          >
+            <option value="all">All Accounts</option>
+            <option value="unallocated">Unallocated / Cash</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>
+                {acc.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <Badge variant="outline" className="font-mono self-end sm:self-auto">
           {ledgerEntries.length} Entries • {isAllTime ? "All Time" : monthDisplayTitle}
-        </span>
+        </Badge>
       </div>
 
       {/* LEDGER DATA VIEW: JOURNAL TABLE */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 space-y-3">
-          <Loader2 size={24} className="animate-spin opacity-50" />
-          <span className="text-xs opacity-60 font-mono">Synchronizing financial ledger...</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       ) : ledgerEntries.length === 0 ? (
-        <div
-          className="rounded-2xl p-12 text-center border transition-colors shadow-sm space-y-4"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div
-            className="w-12 h-12 mx-auto rounded-full flex items-center justify-center border"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-bg)",
-            }}
-          >
-            <BookOpen size={20} className="opacity-40" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold">No Ledger Entries Found</h3>
-            <p className="text-xs opacity-60 mt-1 max-w-sm mx-auto">
-              Transactions logged under Income and Expenses will appear here automatically.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          icon={<BookOpen size={28} className="text-muted-foreground" />}
+          title="No Ledger Entries Found"
+          description={
+            searchQuery || typeFilter !== "all" || accountFilter !== "all"
+              ? "No transactions match your current search and filter criteria."
+              : `No entries recorded for ${isAllTime ? "all time" : monthDisplayTitle}. Logged income and expenses will appear here automatically.`
+          }
+        />
       ) : (
-        /* JOURNAL TABULAR VIEW (Zerodha Kite Style) */
-        <div
-          className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
+        /* JOURNAL TABULAR VIEW */
+        <Card className="overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr
-                  className="border-b text-[11px] font-bold uppercase tracking-wider select-none"
+                  className="border-b text-[11px] font-bold uppercase tracking-wider select-none font-mono opacity-60"
                   style={{
                     borderColor: "var(--app-border)",
                     backgroundColor: "var(--app-bg)",
                     color: "var(--app-fg)",
                   }}
                 >
-                  <th className="py-3 px-4 font-semibold opacity-70">Date</th>
-                  <th className="py-3 px-4 font-semibold opacity-70">Description & Details</th>
-                  <th className="py-3 px-4 font-semibold opacity-70">Account</th>
-                  <th className="py-3 px-4 font-semibold opacity-70">Category</th>
-                  <th className="py-3 px-4 font-semibold opacity-70 text-right">Debit (-)</th>
-                  <th className="py-3 px-4 font-semibold opacity-70 text-right">Credit (+)</th>
-                  <th className="py-3 px-4 font-semibold opacity-70 text-right">Running Balance</th>
-                  <th className="py-3 px-4 font-semibold opacity-70 text-center">Actions</th>
+                  <th className="py-3 px-4 font-semibold">Date</th>
+                  <th className="py-3 px-4 font-semibold">Description & Details</th>
+                  <th className="py-3 px-4 font-semibold">Account</th>
+                  <th className="py-3 px-4 font-semibold">Category</th>
+                  <th className="py-3 px-4 font-semibold text-right">Debit (-)</th>
+                  <th className="py-3 px-4 font-semibold text-right">Credit (+)</th>
+                  <th className="py-3 px-4 font-semibold text-right">Running Balance</th>
+                  <th className="py-3 px-4 font-semibold text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
@@ -886,15 +842,7 @@ export default function LedgerSection() {
 
                       {/* Category */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className="text-[10px] font-medium px-2 py-0.5 rounded-full border inline-block"
-                          style={{
-                            borderColor: "var(--app-border-subtle)",
-                            backgroundColor: "var(--app-bg)",
-                          }}
-                        >
-                          {entry.category}
-                        </span>
+                        <Badge variant="outline">{entry.category}</Badge>
                       </td>
 
                       {/* Debit */}
@@ -915,13 +863,15 @@ export default function LedgerSection() {
                       {/* Actions: Delete & Reverse */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => promptDeleteEntry(entry, e)}
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             title="Delete and reverse balance"
-                            className="p-1.5 rounded hover:bg-rose-500/20 text-rose-400 transition-colors cursor-pointer"
+                            className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                            onClick={(e) => promptDeleteEntry(entry, e)}
                           >
                             <Trash2 size={13} />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -930,34 +880,19 @@ export default function LedgerSection() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* MODAL 1: TRANSACTION VOUCHER DETAIL MODAL */}
-      {selectedVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-6 space-y-5 shadow-2xl transition-all select-text"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2">
-                <FileText size={18} className="text-amber-400" />
-                <h3 className="font-bold text-base">Transaction Voucher</h3>
-              </div>
-              <button
-                onClick={() => setSelectedVoucher(null)}
-                className="p-1 rounded hover:bg-[var(--app-card-hover)] opacity-70 hover:opacity-100 cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
+      <Modal
+        isOpen={!!selectedVoucher}
+        onClose={() => setSelectedVoucher(null)}
+        title="Transaction Details"
+        description="Double-entry reconciliation voucher"
+        size="md"
+      >
+        {selectedVoucher && (
+          <div className="space-y-4">
             {/* Voucher Amount Badge */}
             <div
               className="p-4 rounded-xl border text-center space-y-1"
@@ -985,19 +920,17 @@ export default function LedgerSection() {
 
             {/* Metadata Fields */}
             <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Date of Transaction</span>
                 <span className="font-mono font-medium">{formatDateDisplay(selectedVoucher.date)}</span>
               </div>
 
-              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Category</span>
-                <span className="font-medium px-2 py-0.5 rounded border" style={{ borderColor: "var(--app-border-subtle)" }}>
-                  {selectedVoucher.category}
-                </span>
+                <Badge variant="outline">{selectedVoucher.category}</Badge>
               </div>
 
-              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Account Linked</span>
                 {selectedVoucher.account ? (
                   <div className="flex items-center gap-2 font-medium">
@@ -1013,14 +946,14 @@ export default function LedgerSection() {
               </div>
 
               {selectedVoucher.frequency && (
-                <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+                <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
                   <span className="opacity-60">Frequency</span>
                   <span className="font-medium">{selectedVoucher.frequency}</span>
                 </div>
               )}
 
               {selectedVoucher.runningBalance !== undefined && (
-                <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+                <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
                   <span className="opacity-60">Balance Post-Transaction</span>
                   <span className="font-mono font-bold">{formatINR(selectedVoucher.runningBalance)}</span>
                 </div>
@@ -1048,55 +981,49 @@ export default function LedgerSection() {
             </div>
 
             {/* Actions: Delete & Close */}
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={() => {
-                  promptDeleteEntry(selectedVoucher);
-                }}
-                className="flex items-center gap-1.5 text-xs text-rose-400 hover:underline cursor-pointer"
+            <div className="flex items-center justify-between pt-3 border-t border-[var(--app-border-subtle)]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                icon={<Trash2 size={13} />}
+                onClick={() => promptDeleteEntry(selectedVoucher)}
               >
-                <Trash2 size={13} />
-                <span>Delete & Reverse Entry</span>
-              </button>
+                Delete & Reverse
+              </Button>
 
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setSelectedVoucher(null)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg border cursor-pointer opacity-80 hover:opacity-100"
-                style={{
-                  borderColor: "var(--app-border)",
-                  backgroundColor: "var(--app-bg)",
-                }}
               >
-                Close Voucher
-              </button>
+                Close
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* MODAL 2: DELETE & AUTOMATIC REVERSAL CONFIRMATION MODAL */}
-      {isDeleteModalOpen && entryToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div
-            className="w-full max-w-md rounded-2xl border p-6 space-y-4 shadow-2xl transition-all"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center gap-2.5 text-rose-400">
-              <AlertCircle size={22} className="flex-shrink-0" />
-              <h3 className="font-bold text-base">Delete & Reverse Transaction</h3>
-            </div>
-
-            <p className="text-xs opacity-75">
+      <Modal
+        isOpen={isDeleteModalOpen && !!entryToDelete}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setEntryToDelete(null);
+        }}
+        title="Delete & Reverse Transaction"
+        description="Permanently delete entry and restore account balance."
+        size="md"
+      >
+        {entryToDelete && (
+          <div className="space-y-4">
+            <p className="text-xs opacity-75 leading-relaxed">
               Are you sure you want to permanently delete{" "}
-              <span className="font-bold" style={{ color: "var(--app-fg)" }}>"{entryToDelete.title}"</span> (
-              {formatINR(entryToDelete.amount)}) from the ledger?
+              <strong>&ldquo;{entryToDelete.title}&rdquo;</strong> (
+              <span className="font-mono font-bold">{formatINR(entryToDelete.amount)}</span>) from the ledger?
             </p>
 
-            {/* Explicit Automatic Reversal Notice */}
+            {/* Reversal Notice */}
             {entryToDelete.account ? (
               <div
                 className="p-3.5 rounded-xl border space-y-1.5 text-xs"
@@ -1135,36 +1062,34 @@ export default function LedgerSection() {
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--app-border-subtle)]">
+              <Button
                 type="button"
+                variant="outline"
+                size="md"
                 disabled={deleting}
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setEntryToDelete(null);
                 }}
-                className="px-4 py-2 text-xs font-semibold rounded-lg border cursor-pointer opacity-70 hover:opacity-100"
-                style={{
-                  borderColor: "var(--app-border)",
-                  backgroundColor: "var(--app-bg)",
-                }}
               >
                 Cancel
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
-                disabled={deleting}
+                variant="danger"
+                size="md"
+                loading={deleting}
+                icon={<Trash2 size={13} />}
                 onClick={confirmDeleteAndReverse}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
-                <Trash2 size={13} />
-                <span>{deleting ? "Reversing..." : "Delete & Reverse Balance"}</span>
-              </button>
+                Delete & Reverse Balance
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </main>
   );
 }

@@ -4,11 +4,9 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Users,
   UserPlus,
-  Plus,
   Trash2,
   Pencil,
   Loader2,
-  X,
   Phone,
   Mail,
   Send,
@@ -16,10 +14,6 @@ import {
   FileText,
   Coins,
   Wallet,
-  Calendar,
-  CheckCircle2,
-  ArrowUpRight,
-  TrendingUp,
   PieChart as PieChartIcon,
   ChevronLeft,
   ChevronRight,
@@ -27,8 +21,8 @@ import {
   LayoutGrid,
   List,
   Search,
-  Filter,
   ShieldCheck,
+  Calendar,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -46,6 +40,17 @@ import {
   computeNextMonth,
   computePrevMonth,
 } from "@/utils/monthUtils";
+import { Button } from "@/components/ui/Button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Badge, BadgeVariant } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
+import { StatCard } from "@/components/ui/StatCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 // ==========================================
 // TypeScript Interfaces
@@ -99,46 +104,21 @@ const RELATIONSHIPS = [
   "Other Dependent",
 ];
 
-function getRelationshipBadge(rel: string) {
+function getRelationshipBadgeVariant(rel: string): { variant: BadgeVariant; label: string } {
   const r = (rel || "").toLowerCase();
   if (r.includes("child") || r.includes("kid") || r.includes("son") || r.includes("daughter")) {
-    return {
-      label: rel,
-      bg: "rgba(16, 185, 129, 0.12)",
-      text: "#34d399",
-      border: "rgba(16, 185, 129, 0.3)",
-    };
+    return { variant: "emerald", label: rel };
   }
   if (r.includes("spouse") || r.includes("wife") || r.includes("husband") || r.includes("partner")) {
-    return {
-      label: rel,
-      bg: "rgba(244, 63, 94, 0.12)",
-      text: "#fb7185",
-      border: "rgba(244, 63, 94, 0.3)",
-    };
+    return { variant: "rose", label: rel };
   }
   if (r.includes("parent") || r.includes("mother") || r.includes("father") || r.includes("dad") || r.includes("mom")) {
-    return {
-      label: rel,
-      bg: "rgba(245, 158, 11, 0.12)",
-      text: "#fbbf24",
-      border: "rgba(245, 158, 11, 0.3)",
-    };
+    return { variant: "amber", label: rel };
   }
   if (r.includes("sibling") || r.includes("brother") || r.includes("sister")) {
-    return {
-      label: rel,
-      bg: "rgba(139, 92, 246, 0.12)",
-      text: "#a78bfa",
-      border: "rgba(139, 92, 246, 0.3)",
-    };
+    return { variant: "violet", label: rel };
   }
-  return {
-    label: rel || "Family",
-    bg: "rgba(56, 189, 248, 0.12)",
-    text: "#38bdf8",
-    border: "rgba(56, 189, 248, 0.3)",
-  };
+  return { variant: "sky", label: rel || "Family" };
 }
 
 const AVATAR_COLORS = [
@@ -148,9 +128,9 @@ const AVATAR_COLORS = [
   "#EC4899", // Pink
   "#F59E0B", // Amber
   "#06B6D4", // Cyan
-  "#F43F5E", // Modern Rose / Red
+  "#F43F5E", // Modern Rose
   "#14B8A6", // Teal
-  "#E11D48", // Rose
+  "#E11D48", // Crimson
 ];
 
 export default function FamilySection() {
@@ -333,7 +313,6 @@ export default function FamilySection() {
   // Calculated Metrics by Selected Month
   // ==========================================
 
-  // Calculate spending for a specific member according to selected month or all-time
   const getMemberSpendingForMonth = useCallback(
     (member: FamilyMember) => {
       const memberName = (member.name || "").trim().toLowerCase();
@@ -353,7 +332,6 @@ export default function FamilySection() {
       );
       const expSum = monthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-      // If viewing current month, ensure it reflects at least member.current_spending counter
       if (isCurrentMonth) {
         return Math.max(expSum, Number(member.current_spending) || 0);
       }
@@ -475,11 +453,7 @@ export default function FamilySection() {
     [members, getMemberSpendingForMonth]
   );
 
-  // ==========================================
-  // Visual Charts Calculations (Pie & Line)
-  // ==========================================
-
-  // 1. Pie / Donut Chart: Member Support Allocation
+  // Charts
   const donutSegments: DonutSegment[] = useMemo(() => {
     if (members.length === 0) return [];
 
@@ -506,7 +480,6 @@ export default function FamilySection() {
     return chartMode === "spending" ? totalCurrentSpending : totalMonthlyAllowance;
   }, [chartMode, totalCurrentSpending, totalMonthlyAllowance]);
 
-  // 2. Line Chart: 6-Month Timeline Trajectory of Family Support
   const lineChartData: LinePoint[] = useMemo(() => {
     const months: { key: string; label: string; fullLabel: string; value: number }[] = [];
     const now = new Date();
@@ -530,7 +503,6 @@ export default function FamilySection() {
       });
     }
 
-    // Ensure current month displays at least current cycle spending
     const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const currentMonthObj = months.find((m) => m.key === currentKey);
     if (currentMonthObj && currentMonthObj.value < totalCurrentSpending && isCurrentMonth) {
@@ -540,9 +512,7 @@ export default function FamilySection() {
     return months;
   }, [familyExpenses, totalCurrentSpending, isCurrentMonth]);
 
-  // ==========================================
   // Member Operations
-  // ==========================================
   const handleSaveMember = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
@@ -628,9 +598,7 @@ export default function FamilySection() {
     }
   };
 
-  // ==========================================
   // Log Money Sent / Transfer Operation
-  // ==========================================
   const handleLogTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !transferMember) return;
@@ -647,7 +615,7 @@ export default function FamilySection() {
       const supabase = createClient();
       const newSpending = Number((Number(transferMember.current_spending || 0) + val).toFixed(2));
 
-      // 1. Update family member's current spending / total sent
+      // 1. Update family member's current spending counter
       const { error: memberError } = await supabase
         .from("family_members")
         .update({ current_spending: newSpending })
@@ -656,7 +624,7 @@ export default function FamilySection() {
 
       if (memberError) throw memberError;
 
-      // 2. Atomically record as a family support transfer (deducts from account, managed in Family)
+      // 2. Atomically record as a family support transfer
       const { error: expError } = await supabase.rpc("fn_record_expense_atomic", {
         p_user_id: user.id,
         p_title: `Money sent to ${transferMember.name}`,
@@ -693,9 +661,7 @@ export default function FamilySection() {
     }
   };
 
-  // ==========================================
   // Reset Spending Cycle to ₹0
-  // ==========================================
   const handleResetSpending = async () => {
     if (!user || !resetMember) return;
     setSubmitting(true);
@@ -722,9 +688,7 @@ export default function FamilySection() {
     }
   };
 
-  // ==========================================
   // Delete / Reverse Transfer Record from History
-  // ==========================================
   const handleDeleteTransfer = async (expenseId: string, itemTitle?: string | null, itemAmount?: number) => {
     if (!confirm(`Are you sure you want to reverse this transfer record${itemAmount ? ` of ${formatINR(itemAmount)}` : ""}? The debited amount will be refunded to your account balance.`)) return;
     if (!user) return;
@@ -732,7 +696,6 @@ export default function FamilySection() {
 
     try {
       const supabase = createClient();
-      // Atomically delete expense and refund balance to account
       const { error } = await supabase.rpc("fn_delete_expense_atomic", {
         p_expense_id: expenseId,
         p_user_id: user.id,
@@ -768,16 +731,21 @@ export default function FamilySection() {
     }
   };
 
-  // Loading state
+  // Loading state with Skeletons
   if (loading) {
     return (
-      <main
-        className="flex-1 h-full p-4 sm:p-8 flex items-center justify-center select-none"
-        style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={24} className="animate-spin text-emerald-400" />
-          <p className="text-xs font-mono opacity-60">Synchronizing family support tracker...</p>
+      <main className="flex-1 h-full p-4 sm:p-6 md:p-8 space-y-6 overflow-y-auto">
+        <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border)]">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48 rounded-lg" />
+            <Skeleton className="h-4 w-72 rounded-md" />
+          </div>
+          <Skeleton className="h-9 w-32 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       </main>
     );
@@ -788,266 +756,140 @@ export default function FamilySection() {
       className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      {/* =========================================================================
-          Top Header Bar with Month Stepper & Action Buttons
-          ========================================================================= */}
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6"
-        style={{ borderBottom: "1px solid var(--app-border)" }}
-      >
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Family Money Tracker</h1>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded-full border uppercase tracking-wider font-semibold"
+      {/* Page Header */}
+      <PageHeader
+        title="Family Money Tracker"
+        description="Track monthly allowances, financial support, and money sent to family members."
+        badge={
+          <Badge variant="emerald" dot>
+            Support & Transfers
+          </Badge>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Month Stepper */}
+            <div
+              className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
               style={{
-                backgroundColor: "var(--app-accent-subtle)",
-                color: "var(--app-accent)",
-                borderColor: "var(--app-border-subtle)",
+                borderColor: "var(--app-border)",
+                backgroundColor: "var(--app-card)",
               }}
             >
-              Support & Transfers
-            </span>
-          </div>
-          <p className="text-xs opacity-70 mt-1">
-            Track monthly allowances, financial support, and money sent to family members.
-          </p>
-        </div>
-
-        {/* Action Buttons & Month Stepper on Top Right */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* Month Stepper */}
-          <div
-            className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <button
-              onClick={handlePrevMonth}
-              disabled={!canGoPrev}
-              title={!canGoPrev ? "No earlier transfer records" : "Previous Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoPrev
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="px-3 font-semibold min-w-[110px] text-center">
-              {monthDisplayTitle}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              disabled={!canGoNext}
-              title={!canGoNext ? "Future months are not yet available" : "Next Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoNext
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronRight size={14} />
-            </button>
-            {!isCurrentMonth && !isAllTime && (
               <button
-                onClick={handleResetToCurrentMonth}
-                className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
-                style={{ borderColor: "var(--app-border-subtle)" }}
+                onClick={handlePrevMonth}
+                disabled={!canGoPrev}
+                title={!canGoPrev ? "No earlier transfer records" : "Previous Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoPrev
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 cursor-pointer"
+                }`}
               >
-                Today
+                <ChevronLeft size={14} />
               </button>
-            )}
+              <span className="px-3 font-semibold min-w-[110px] text-center">
+                {monthDisplayTitle}
+              </span>
+              <button
+                onClick={handleNextMonth}
+                disabled={!canGoNext}
+                title={!canGoNext ? "Future months are not yet available" : "Next Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoNext
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 cursor-pointer"
+                }`}
+              >
+                <ChevronRight size={14} />
+              </button>
+              {!isCurrentMonth && !isAllTime && (
+                <button
+                  onClick={handleResetToCurrentMonth}
+                  className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
+                  style={{ borderColor: "var(--app-border-subtle)" }}
+                >
+                  Today
+                </button>
+              )}
+            </div>
+
+            {/* All Time Toggle */}
+            <Button
+              variant={isAllTime ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setIsAllTime(!isAllTime)}
+            >
+              All Time
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<UserPlus size={14} />}
+              onClick={() => {
+                setEditingMember(null);
+                setMemberModalOpen(true);
+              }}
+            >
+              Add Member
+            </Button>
           </div>
+        }
+      />
 
-          {/* All Time Toggle */}
-          <button
-            onClick={() => setIsAllTime(!isAllTime)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-all ${
-              isAllTime ? "shadow-sm font-bold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: isAllTime ? "var(--app-fg)" : "var(--app-card)",
-              color: isAllTime ? "var(--app-bg)" : "var(--app-fg)",
-              borderColor: isAllTime ? "var(--app-fg)" : "var(--app-border-subtle)",
-            }}
-          >
-            All Time
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingMember(null);
-              setMemberModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-            style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-          >
-            <UserPlus size={14} />
-            Add Member
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          Top 4 KPI Metric Summary Cards
-          ========================================================================= */}
+      {/* 4 KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Card 1: Family Members */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Family Members</span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-accent-subtle)" }}
-            >
-              <Users size={14} style={{ color: "var(--app-accent)" }} />
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono">{members.length} Members</div>
-            <div className="text-xs opacity-60 mt-1 flex items-center gap-1.5 flex-wrap">
-              <span>{members.filter((m) => m.relationship === "Parent").length} Parents</span>
-              <span>•</span>
-              <span>{members.filter((m) => m.relationship === "Spouse").length} Spouse</span>
-              <span>•</span>
-              <span>{members.filter((m) => m.relationship === "Child").length} Children</span>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Family Members"
+          value={`${members.length} Members`}
+          subtitle={`${members.filter((m) => m.relationship === "Parent").length} Parents • ${members.filter((m) => m.relationship === "Spouse").length} Spouse • ${members.filter((m) => m.relationship === "Child").length} Children`}
+          icon={<Users size={16} />}
+          iconColor="emerald"
+        />
 
-        {/* Card 2: Total Money Sent This Cycle / Selected Month */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">
-              {isAllTime ? "All-Time Money Sent" : `Total Money Sent (${monthDisplayTitle})`}
-            </span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-emerald-400"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(16, 185, 129, 0.12)" }}
-            >
-              <Send size={14} />
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
-              {formatINR(totalCurrentSpending)}
-            </div>
-            <div className="text-xs opacity-60 mt-1">
-              {isAllTime
-                ? `Transferred across all recorded months`
-                : `Transferred across ${activeRecipientsCount} of ${members.length} members`}
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title={isAllTime ? "All-Time Sent" : `Total Sent (${monthDisplayTitle})`}
+          value={formatINR(totalCurrentSpending)}
+          subtitle={
+            isAllTime
+              ? `Transferred across all recorded months`
+              : `Transferred across ${activeRecipientsCount} of ${members.length} members`
+          }
+          icon={<Send size={16} />}
+          iconColor="emerald"
+        />
 
-        {/* Card 3: Monthly Support Target / Budget */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
+        <StatCard
+          title="Monthly Support Target"
+          value={formatINR(totalMonthlyAllowance)}
+          subtitle={remainingBudget <= 0 ? "Target Met ✓" : `${formatINR(remainingBudget)} Remaining (${overallPercent}%)`}
+          icon={<Coins size={16} />}
+          iconColor="amber"
+          progress={{
+            value: Math.min(100, overallPercent),
+            color:
+              totalCurrentSpending > totalMonthlyAllowance
+                ? "bg-rose-500"
+                : totalCurrentSpending >= totalMonthlyAllowance * 0.8
+                ? "bg-amber-400"
+                : "bg-emerald-400",
           }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Monthly Support Target</span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-amber-400"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(245, 158, 11, 0.12)" }}
-            >
-              <Coins size={14} />
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono">
-              {formatINR(totalMonthlyAllowance)}
-            </div>
-            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
-              <span>{overallPercent}% fulfilled</span>
-              <span className="font-mono font-medium" style={{ color: remainingBudget <= 0 ? "var(--app-accent)" : "#F59E0B" }}>
-                {remainingBudget <= 0 ? "Target Met ✓" : `${formatINR(remainingBudget)} Remaining`}
-              </span>
-            </div>
-            {/* Progress Bar */}
-            <div
-              className="w-full h-1.5 rounded-full mt-2 overflow-hidden"
-              style={{ backgroundColor: "var(--app-track-bg)" }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${Math.min(100, overallPercent)}%`,
-                  backgroundColor:
-                    totalCurrentSpending > totalMonthlyAllowance
-                      ? "var(--app-loss)"
-                      : totalCurrentSpending >= totalMonthlyAllowance * 0.8
-                      ? "#F59E0B"
-                      : "var(--app-accent)",
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        />
 
-        {/* Card 4: Average Support Per Member */}
-        <div
-          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Avg Support / Member</span>
-            <span
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-sky-400"
-              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(56, 189, 248, 0.12)" }}
-            >
-              <Wallet size={14} />
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight font-mono text-sky-400">
-              {formatINR(avgSpendingPerMember)}
-            </div>
-            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
-              <span>Target: {formatINR(avgTargetPerMember)}/mo</span>
-              <span className="font-mono">
-                {activeRecipientsCount} of {members.length} active
-              </span>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Avg Support / Member"
+          value={formatINR(avgSpendingPerMember)}
+          subtitle={`Target: ${formatINR(avgTargetPerMember)}/mo • ${activeRecipientsCount} active`}
+          icon={<Wallet size={16} />}
+          iconColor="sky"
+        />
       </div>
 
-      {/* =========================================================================
-          ROW 2: VISUAL CHARTS (LINE CHART + PIE / DONUT CHART SIDE BY SIDE)
-          ========================================================================= */}
+      {/* Row 2: Charts (Line Chart + Donut Chart) */}
       {members.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
-          {/* Left Card: 6-Month Support Line Chart */}
-          <div
-            className="lg:col-span-7 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
+          {/* Left: 6-Month Timeline Trajectory */}
+          <Card className="lg:col-span-7 flex flex-col justify-between">
             <InteractiveLineChart
               title="Family Support Trajectory"
               subtitle="6-Month Monthly Outflow & Transfers Trend"
@@ -1058,17 +900,10 @@ export default function FamilySection() {
               type="expense"
               emptyMessage="No family transfers recorded in the last 6 months."
             />
-          </div>
+          </Card>
 
-          {/* Right Card: Member Allocation Pie / Donut Chart */}
-          <div
-            className="lg:col-span-5 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
+          {/* Right: Support Allocation Donut */}
+          <Card className="lg:col-span-5 flex flex-col justify-between">
             <div
               className="flex items-center justify-between pb-3 border-b flex-wrap gap-2"
               style={{ borderColor: "var(--app-border-subtle)" }}
@@ -1079,36 +914,15 @@ export default function FamilySection() {
               </div>
 
               {/* Mode Toggle: Spending vs Allowance */}
-              <div
-                className="flex items-center p-0.5 rounded-lg border text-[11px] font-mono"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setChartMode("spending")}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    chartMode === "spending"
-                      ? "bg-[var(--app-card)] font-bold text-emerald-400 shadow-sm border border-[var(--app-border)]"
-                      : "opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  Sent
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartMode("allowance")}
-                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    chartMode === "allowance"
-                      ? "bg-[var(--app-card)] font-bold text-amber-400 shadow-sm border border-[var(--app-border)]"
-                      : "opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  Target
-                </button>
-              </div>
+              <SegmentedControl
+                options={[
+                  { value: "spending", label: "Sent" },
+                  { value: "allowance", label: "Target" },
+                ]}
+                value={chartMode}
+                onChange={(val) => setChartMode(val as "spending" | "allowance")}
+                size="sm"
+              />
             </div>
 
             <div className="pt-4 flex items-center justify-center">
@@ -1130,150 +944,77 @@ export default function FamilySection() {
                 strokeWidth={14}
               />
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* =========================================================================
-          FAMILY DATA SECTION: TABS (MEMBERS / HISTORY) & CONTROLS
-          ========================================================================= */}
+      {/* Family Data Tabs (Members vs History) */}
       <div className="space-y-4">
-        {/* Navigation Tabs Bar & Right Controls Header */}
         <div
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b"
           style={{ borderColor: "var(--app-border)" }}
         >
-          {/* Left: Tab Switcher (Family Members vs Transfer History) */}
-          <div
-            className="inline-flex items-center p-1 rounded-2xl border gap-1 self-start sm:self-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border-subtle)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveTab("members")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "members"
-                  ? "shadow-sm bg-[var(--app-fg)] text-[var(--app-bg)]"
-                  : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
-              }`}
-            >
-              <Users size={14} />
-              <span>Family Members</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full border ${
-                  activeTab === "members"
-                    ? "bg-[var(--app-bg)] text-[var(--app-fg)] border-transparent"
-                    : "opacity-80"
-                }`}
-                style={{ borderColor: "var(--app-border-subtle)" }}
-              >
-                {members.length}
-              </span>
-            </button>
+          {/* Left: Tab Switcher */}
+          <SegmentedControl
+            options={[
+              {
+                value: "members",
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    <Users size={13} />
+                    <span>Family Members</span>
+                    <Badge variant="neutral" className="ml-1">
+                      {members.length}
+                    </Badge>
+                  </span>
+                ),
+              },
+              {
+                value: "history",
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    <History size={13} />
+                    <span>Transfer History</span>
+                    <Badge variant="neutral" className="ml-1">
+                      {displayedFamilyExpenses.length}
+                    </Badge>
+                  </span>
+                ),
+              },
+            ]}
+            value={activeTab}
+            onChange={(val) => setActiveTab(val as "members" | "history")}
+          />
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("history")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "history"
-                  ? "shadow-sm bg-[var(--app-fg)] text-[var(--app-bg)]"
-                  : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
-              }`}
-            >
-              <History size={14} />
-              <span>Transfer History</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full border ${
-                  activeTab === "history"
-                    ? "bg-[var(--app-bg)] text-[var(--app-fg)] border-transparent"
-                    : "opacity-80"
-                }`}
-                style={{ borderColor: "var(--app-border-subtle)" }}
-              >
-                {displayedFamilyExpenses.length}
-              </span>
-            </button>
-          </div>
-
-          {/* Right Top of Table: Controls & The User's Requested Badge! */}
+          {/* Right Controls Header */}
           <div className="flex items-center gap-2.5 flex-wrap self-end sm:self-auto">
             {activeTab === "members" ? (
               <>
-                {/* Grid / Table View Mode Toggle */}
-                <div
-                  className="flex items-center rounded-xl border p-0.5"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-card)",
-                  }}
-                >
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    title="Grid / Cards View"
-                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                      viewMode === "grid" ? "shadow-sm" : "opacity-40 hover:opacity-100"
-                    }`}
-                    style={{
-                      backgroundColor: viewMode === "grid" ? "var(--app-fg)" : "transparent",
-                      color: viewMode === "grid" ? "var(--app-bg)" : "var(--app-fg)",
-                    }}
-                  >
-                    <LayoutGrid size={13} />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("table")}
-                    title="Table View"
-                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                      viewMode === "table" ? "shadow-sm" : "opacity-40 hover:opacity-100"
-                    }`}
-                    style={{
-                      backgroundColor: viewMode === "table" ? "var(--app-fg)" : "transparent",
-                      color: viewMode === "table" ? "var(--app-bg)" : "var(--app-fg)",
-                    }}
-                  >
-                    <List size={13} />
-                  </button>
-                </div>
+                {/* View Mode Toggle */}
+                <SegmentedControl
+                  options={[
+                    { value: "grid", label: <LayoutGrid size={13} /> },
+                    { value: "table", label: <List size={13} /> },
+                  ]}
+                  value={viewMode}
+                  onChange={(val) => setViewMode(val as "grid" | "table")}
+                  size="sm"
+                />
 
-                {/* RIGHT TOP OF TABLE BADGE */}
-                <span
-                  className="text-xs font-mono px-3 py-1 rounded-xl border font-semibold flex items-center gap-1.5"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-card)",
-                  }}
-                >
+                <Badge variant="outline" className="font-mono">
                   {members.length} Members • {isAllTime ? "All Time" : monthDisplayTitle}
-                </span>
+                </Badge>
               </>
             ) : (
               <>
                 {/* Search in History */}
-                <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
-                  <input
-                    type="text"
+                <div className="w-36 sm:w-48">
+                  <Input
                     placeholder="Search transfers..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    className="pl-7 pr-7 py-1 text-xs rounded-xl border font-sans focus:outline-none w-36 sm:w-48 transition-all"
-                    style={{
-                      borderColor: "var(--app-border-subtle)",
-                      backgroundColor: "var(--app-card)",
-                      color: "var(--app-fg)",
-                    }}
+                    leftIcon={<Search size={13} />}
                   />
-                  {historySearch && (
-                    <button
-                      onClick={() => setHistorySearch("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 cursor-pointer"
-                    >
-                      <X size={11} />
-                    </button>
-                  )}
                 </div>
 
                 {/* Filter by Member Dropdown */}
@@ -1281,9 +1022,9 @@ export default function FamilySection() {
                   <select
                     value={historyMemberFilter}
                     onChange={(e) => setHistoryMemberFilter(e.target.value)}
-                    className="px-2.5 py-1 text-xs rounded-xl border font-sans cursor-pointer focus:outline-none"
+                    className="px-2.5 py-1.5 text-xs rounded-xl border font-sans cursor-pointer focus:outline-none"
                     style={{
-                      borderColor: "var(--app-border-subtle)",
+                      borderColor: "var(--app-border)",
                       backgroundColor: "var(--app-card)",
                       color: "var(--app-fg)",
                     }}
@@ -1297,57 +1038,36 @@ export default function FamilySection() {
                   </select>
                 )}
 
-                {/* RIGHT TOP OF TABLE BADGE FOR HISTORY */}
-                <span
-                  className="text-xs font-mono px-3 py-1 rounded-xl border font-semibold flex items-center gap-1.5"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-card)",
-                  }}
-                >
+                <Badge variant="outline" className="font-mono">
                   {filteredFamilyHistory.length} Transfers • {isAllTime ? "All Time" : monthDisplayTitle}
-                </span>
+                </Badge>
               </>
             )}
           </div>
         </div>
 
-        {/* =========================================================================
-            TAB 1 CONTENT: FAMILY MEMBERS (GRID OR TABLE VIEW)
-            ========================================================================= */}
+        {/* Tab 1: Members (Grid or Table) */}
         {activeTab === "members" && (
           <div className="space-y-4 animate-in fade-in duration-200">
             {members.length === 0 ? (
-              <div
-                className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
-                style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-              >
-                <div
-                  className="w-14 h-14 rounded-2xl border flex items-center justify-center"
-                  style={{ backgroundColor: "var(--app-accent-subtle)", borderColor: "var(--app-border-subtle)" }}
-                >
-                  <Users size={28} style={{ color: "var(--app-accent)" }} />
-                </div>
-                <div className="max-w-md">
-                  <h3 className="text-base font-bold">No Family Members Tracked Yet</h3>
-                  <p className="text-xs opacity-70 mt-1">
-                    Add your parents, spouse, children, or relatives to track regular financial support, allowances, and money sent to them.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center pt-2">
-                  <button
+              <EmptyState
+                icon={<Users size={28} className="text-emerald-400" />}
+                title="No Family Members Tracked Yet"
+                description="Add your parents, spouse, children, or relatives to track regular financial support, allowances, and money sent to them."
+                action={
+                  <Button
+                    variant="primary"
+                    size="md"
+                    icon={<UserPlus size={15} />}
                     onClick={() => {
                       setEditingMember(null);
                       setMemberModalOpen(true);
                     }}
-                    className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
                   >
-                    <UserPlus size={15} />
                     Add First Member
-                  </button>
-                </div>
-              </div>
+                  </Button>
+                }
+              />
             ) : viewMode === "grid" ? (
               /* GRID / CARDS VIEW */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -1363,7 +1083,7 @@ export default function FamilySection() {
                       .toUpperCase() || member.name.slice(0, 2).toUpperCase();
 
                   const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
-                  const relBadge = getRelationshipBadge(member.relationship);
+                  const relBadge = getRelationshipBadgeVariant(member.relationship);
 
                   const allowance = Number(member.monthly_allowance) || 0;
                   const spending = getMemberSpendingForMonth(member);
@@ -1371,13 +1091,10 @@ export default function FamilySection() {
                   const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
 
                   return (
-                    <div
+                    <Card
                       key={member.id}
-                      className="group relative rounded-2xl border p-5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
-                      style={{
-                        backgroundColor: "var(--app-card)",
-                        borderColor: "var(--app-border)",
-                      }}
+                      interactive
+                      className="group relative flex flex-col justify-between overflow-hidden"
                     >
                       <div
                         className="absolute -top-24 -right-24 w-48 h-48 rounded-full pointer-events-none opacity-10 blur-3xl transition-opacity group-hover:opacity-25"
@@ -1402,42 +1119,35 @@ export default function FamilySection() {
                                 {displayName}
                               </h3>
                               <div className="flex items-center gap-1.5 mt-1">
-                                <span
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
-                                  style={{
-                                    backgroundColor: relBadge.bg,
-                                    color: relBadge.text,
-                                    borderColor: relBadge.border,
-                                  }}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
+                                <Badge variant={relBadge.variant} dot>
                                   {relBadge.label}
-                                </span>
+                                </Badge>
                               </div>
                             </div>
                           </div>
 
                           {/* Actions */}
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title="Edit Member"
                               onClick={() => {
                                 setEditingMember(member);
                                 setMemberModalOpen(true);
                               }}
-                              className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-white/5 transition-all cursor-pointer"
-                              style={{ borderColor: "var(--app-border-subtle)" }}
-                              title="Edit Member"
                             >
                               <Pencil size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMember(member.id, member.name)}
-                              className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all cursor-pointer text-rose-400"
-                              style={{ borderColor: "var(--app-border-subtle)" }}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
                               title="Remove Member"
+                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                              onClick={() => handleDeleteMember(member.id, member.name)}
                             >
                               <Trash2 size={13} />
-                            </button>
+                            </Button>
                           </div>
                         </div>
 
@@ -1486,16 +1196,9 @@ export default function FamilySection() {
                           </div>
 
                           <div className="flex items-center justify-between text-xs pt-0.5">
-                            <span
-                              className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
-                              style={{
-                                borderColor: "var(--app-border-subtle)",
-                                backgroundColor: "var(--app-card)",
-                                color: "var(--app-fg)",
-                              }}
-                            >
+                            <Badge variant="neutral">
                               {percentSpent}% fulfilled
-                            </span>
+                            </Badge>
                             <span
                               className="font-mono text-[11px] font-bold"
                               style={{
@@ -1563,12 +1266,16 @@ export default function FamilySection() {
                         )}
                       </div>
 
-                      {/* Card Footer: Send Money & Counter Reset */}
+                      {/* Card Footer: Send Money & Reset */}
                       <div
                         className="relative z-10 pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2"
                         style={{ borderColor: "var(--app-border-subtle)" }}
                       >
-                        <button
+                        <Button
+                          variant="primary"
+                          size="md"
+                          className="flex-1"
+                          icon={<Send size={13} className="text-emerald-400" />}
                           onClick={() => {
                             setTransferMember(member);
                             setTransferAmountInput("");
@@ -1577,28 +1284,23 @@ export default function FamilySection() {
                             setTransferAccountId(accounts[0]?.id || "");
                             setTransferModalOpen(true);
                           }}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md bg-white text-black hover:bg-neutral-100 hover:scale-[1.01] active:scale-[0.98]"
                         >
-                          <Send size={13} className="text-emerald-600" />
-                          <span>Send Money</span>
-                        </button>
+                          Send Money
+                        </Button>
 
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Reset monthly spending counter to ₹0"
                           onClick={() => {
                             setResetMember(member);
                             setResetModalOpen(true);
                           }}
-                          className="w-9 h-9 rounded-xl border flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
-                          style={{
-                            borderColor: "var(--app-border-subtle)",
-                            backgroundColor: "var(--app-bg)",
-                          }}
-                          title="Reset monthly spending counter to ₹0"
                         >
                           <RotateCcw size={13} />
-                        </button>
+                        </Button>
                       </div>
-                    </div>
+                    </Card>
                   );
                 })}
               </div>
@@ -1645,7 +1347,7 @@ export default function FamilySection() {
                             .slice(0, 2)
                             .toUpperCase() || member.name.slice(0, 2).toUpperCase();
                         const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
-                        const relBadge = getRelationshipBadge(member.relationship);
+                        const relBadge = getRelationshipBadgeVariant(member.relationship);
                         const allowance = Number(member.monthly_allowance) || 0;
                         const spending = getMemberSpendingForMonth(member);
                         const remaining = allowance - spending;
@@ -1656,7 +1358,6 @@ export default function FamilySection() {
                             key={member.id}
                             className="group transition-colors hover:bg-[var(--app-card-hover)]"
                           >
-                            {/* Member Name + Avatar */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 <div
@@ -1680,32 +1381,20 @@ export default function FamilySection() {
                               </div>
                             </td>
 
-                            {/* Relationship Badge */}
                             <td className="py-3 px-4">
-                              <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
-                                style={{
-                                  backgroundColor: relBadge.bg,
-                                  color: relBadge.text,
-                                  borderColor: relBadge.border,
-                                }}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
+                              <Badge variant={relBadge.variant} dot>
                                 {relBadge.label}
-                              </span>
+                              </Badge>
                             </td>
 
-                            {/* Monthly Target */}
                             <td className="py-3 px-4 text-right font-mono font-semibold">
                               {allowance > 0 ? formatINR(allowance) : <span className="opacity-40">Flexible</span>}
                             </td>
 
-                            {/* Sent This Month */}
                             <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
                               {formatINR(spending)}
                             </td>
 
-                            {/* Remaining */}
                             <td className="py-3 px-4 text-right font-mono text-[11px]">
                               {allowance === 0 ? (
                                 <span className="opacity-40">—</span>
@@ -1716,7 +1405,6 @@ export default function FamilySection() {
                               )}
                             </td>
 
-                            {/* Progress Bar */}
                             <td className="py-3 px-4">
                               <div className="w-28 space-y-1">
                                 <div className="flex items-center justify-between text-[10px] font-mono opacity-60">
@@ -1739,15 +1427,16 @@ export default function FamilySection() {
                               </div>
                             </td>
 
-                            {/* Notes / Memo */}
                             <td className="py-3 px-4 max-w-[180px] truncate text-xs opacity-70">
                               {member.notes || <span className="opacity-30">—</span>}
                             </td>
 
-                            {/* Actions */}
                             <td className="py-3 px-4 text-center">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
+                                <Button
+                                  variant="primary"
+                                  size="xs"
+                                  icon={<Send size={11} className="text-emerald-400" />}
                                   onClick={() => {
                                     setTransferMember(member);
                                     setTransferAmountInput("");
@@ -1756,42 +1445,40 @@ export default function FamilySection() {
                                     setTransferAccountId(accounts[0]?.id || "");
                                     setTransferModalOpen(true);
                                   }}
-                                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-xs bg-white text-black hover:bg-neutral-100"
-                                  title="Send Money"
                                 >
-                                  <Send size={11} className="text-emerald-600" />
-                                  <span>Send</span>
-                                </button>
-                                <button
+                                  Send
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Edit Member"
                                   onClick={() => {
                                     setEditingMember(member);
                                     setMemberModalOpen(true);
                                   }}
-                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 cursor-pointer"
-                                  style={{ borderColor: "var(--app-border-subtle)" }}
-                                  title="Edit Member"
                                 >
                                   <Pencil size={12} />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Reset spending cycle"
                                   onClick={() => {
                                     setResetMember(member);
                                     setResetModalOpen(true);
                                   }}
-                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 cursor-pointer"
-                                  style={{ borderColor: "var(--app-border-subtle)" }}
-                                  title="Reset spending cycle"
                                 >
                                   <RotateCcw size={12} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteMember(member.id, member.name)}
-                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 text-rose-400 hover:bg-rose-500/10 cursor-pointer"
-                                  style={{ borderColor: "var(--app-border-subtle)" }}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
                                   title="Remove Member"
+                                  className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                  onClick={() => handleDeleteMember(member.id, member.name)}
                                 >
                                   <Trash2 size={12} />
-                                </button>
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -1805,112 +1492,66 @@ export default function FamilySection() {
           </div>
         )}
 
-        {/* =========================================================================
-            TAB 2 CONTENT: TRANSFER HISTORY
-            ========================================================================= */}
+        {/* Tab 2: Transfer History */}
         {activeTab === "history" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            {/* History Mini Metric Summary Bar */}
+            {/* History Mini KPI Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div
-                className="p-3.5 rounded-xl border flex items-center justify-between"
-                style={{
-                  backgroundColor: "var(--app-card)",
-                  borderColor: "var(--app-border)",
-                }}
-              >
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Total Support Outflow</span>
-                  <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
-                    {formatINR(historyStats.totalSent)}
-                  </div>
-                </div>
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-emerald-400"
-                  style={{ backgroundColor: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.2)" }}
-                >
-                  <Send size={14} />
-                </div>
-              </div>
+              <StatCard
+                title="Total Support Outflow"
+                value={formatINR(historyStats.totalSent)}
+                subtitle="Aggregated transfer volume"
+                icon={<Send size={14} />}
+                iconColor="emerald"
+              />
 
-              <div
-                className="p-3.5 rounded-xl border flex items-center justify-between"
-                style={{
-                  backgroundColor: "var(--app-card)",
-                  borderColor: "var(--app-border)",
-                }}
-              >
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Transfers Recorded</span>
-                  <div className="text-lg font-bold font-mono mt-0.5">
-                    {historyStats.count} Transactions
-                  </div>
-                </div>
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center opacity-70"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border-subtle)" }}
-                >
-                  <FileText size={14} />
-                </div>
-              </div>
+              <StatCard
+                title="Transfers Recorded"
+                value={`${historyStats.count} Transactions`}
+                subtitle="Reconciled ledger vouchers"
+                icon={<FileText size={14} />}
+                iconColor="sky"
+              />
 
-              <div
-                className="p-3.5 rounded-xl border flex items-center justify-between"
-                style={{
-                  backgroundColor: "var(--app-card)",
-                  borderColor: "var(--app-border)",
-                }}
-              >
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Average Transfer</span>
-                  <div className="text-lg font-bold font-mono mt-0.5">
-                    {formatINR(historyStats.avg)}
-                  </div>
-                </div>
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-amber-400"
-                  style={{ backgroundColor: "rgba(245, 158, 11, 0.1)", borderColor: "rgba(245, 158, 11, 0.2)" }}
-                >
-                  <Coins size={14} />
-                </div>
-              </div>
+              <StatCard
+                title="Average Transfer"
+                value={formatINR(historyStats.avg)}
+                subtitle="Mean outflow per transaction"
+                icon={<Coins size={14} />}
+                iconColor="amber"
+              />
             </div>
 
             {/* Transfer History Table */}
             {filteredFamilyHistory.length === 0 ? (
-              <div
-                className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-3"
-                style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-              >
-                <div
-                  className="w-12 h-12 rounded-xl border flex items-center justify-center opacity-40"
-                  style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <History size={22} />
-                </div>
-                <h3 className="text-base font-bold">No Transfer History Found</h3>
-                <p className="text-xs opacity-60 max-w-sm mx-auto">
-                  {historySearch || historyMemberFilter !== "all"
+              <EmptyState
+                icon={<History size={24} className="text-muted-foreground" />}
+                title="No Transfer History Found"
+                description={
+                  historySearch || historyMemberFilter !== "all"
                     ? "No transfers match your current filter criteria."
-                    : `No family support transfers recorded for ${isAllTime ? "all time" : monthDisplayTitle}.`}
-                </p>
-                {members.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setTransferMember(members[0]);
-                      setTransferAmountInput("");
-                      setTransferDate(new Date().toISOString().split("T")[0]);
-                      setTransferNotes("");
-                      setTransferAccountId(accounts[0]?.id || "");
-                      setTransferModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs cursor-pointer bg-white text-black hover:bg-neutral-100 mt-2"
-                  >
-                    <Send size={13} className="text-emerald-600" />
-                    <span>Send Money Now</span>
-                  </button>
-                )}
-              </div>
+                    : `No family support transfers recorded for ${isAllTime ? "all time" : monthDisplayTitle}.`
+                }
+                action={
+                  members.length > 0 ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Send size={13} className="text-emerald-400" />}
+                      onClick={() => {
+                        setTransferMember(members[0]);
+                        setTransferAmountInput("");
+                        setTransferDate(new Date().toISOString().split("T")[0]);
+                        setTransferNotes("");
+                        setTransferAccountId(accounts[0]?.id || "");
+                        setTransferModalOpen(true);
+                      }}
+                    >
+                      Send Money Now
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <div
                 className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
@@ -1942,7 +1583,6 @@ export default function FamilySection() {
                     </thead>
                     <tbody className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
                       {filteredFamilyHistory.map((item) => {
-                        // Match to registered member
                         const matchedMember = members.find((m) => {
                           const t = (item.title || "").toLowerCase();
                           const n = (item.notes || "").toLowerCase();
@@ -1969,7 +1609,7 @@ export default function FamilySection() {
                           item.title?.replace(/^Money sent to\s*/i, "") ||
                           "Family Support";
 
-                        const relBadge = matchedMember ? getRelationshipBadge(matchedMember.relationship) : null;
+                        const relBadge = matchedMember ? getRelationshipBadgeVariant(matchedMember.relationship) : null;
                         const account = accounts.find((a) => a.id === item.account_id);
                         const relDateTag = getRelativeDateTag(item.expense_date);
 
@@ -1978,7 +1618,6 @@ export default function FamilySection() {
                             key={item.id}
                             className="group transition-colors hover:bg-[var(--app-card-hover)]"
                           >
-                            {/* Date Column */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="font-mono text-xs font-semibold">
                                 {formatHistoryDate(item.expense_date)}
@@ -1993,7 +1632,6 @@ export default function FamilySection() {
                               )}
                             </td>
 
-                            {/* Recipient Member */}
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-3">
                                 <div
@@ -2010,23 +1648,15 @@ export default function FamilySection() {
                                   </div>
                                   {relBadge && (
                                     <div className="mt-0.5">
-                                      <span
-                                        className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border"
-                                        style={{
-                                          backgroundColor: relBadge.bg,
-                                          color: relBadge.text,
-                                          borderColor: relBadge.border,
-                                        }}
-                                      >
+                                      <Badge variant={relBadge.variant}>
                                         {relBadge.label}
-                                      </span>
+                                      </Badge>
                                     </div>
                                   )}
                                 </div>
                               </div>
                             </td>
 
-                            {/* Payment Source Account */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <BankLogo name={account?.name || "Cash in Hand"} size={20} />
@@ -2041,45 +1671,34 @@ export default function FamilySection() {
                               </div>
                             </td>
 
-                            {/* Purpose / Notes */}
                             <td className="py-3.5 px-4 max-w-[220px]">
                               <p className="text-xs truncate font-sans" title={item.notes || item.title || ""}>
                                 {item.notes || item.title || "Family support transfer"}
                               </p>
                             </td>
 
-                            {/* Category */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
-                              <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border"
-                                style={{
-                                  backgroundColor: "rgba(251, 146, 60, 0.1)",
-                                  color: "#fb923c",
-                                  borderColor: "rgba(251, 146, 60, 0.25)",
-                                }}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                              <Badge variant="warning" dot>
                                 Family & Child Care
-                              </span>
+                              </Badge>
                             </td>
 
-                            {/* Amount Sent */}
                             <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <span className="font-mono font-bold text-sm text-emerald-400">
                                 {formatINR(item.amount)}
                               </span>
                             </td>
 
-                            {/* Actions */}
                             <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Reverse transfer record"
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
                                 onClick={() => handleDeleteTransfer(item.id, item.title, item.amount)}
-                                className="w-7 h-7 rounded-lg border inline-flex items-center justify-center opacity-50 hover:opacity-100 text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all"
-                                style={{ borderColor: "var(--app-border-subtle)" }}
-                                title="Delete transfer record"
                               >
                                 <Trash2 size={12} />
-                              </button>
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -2093,370 +1712,243 @@ export default function FamilySection() {
         )}
       </div>
 
-      {/* =========================================================================
-          POPUP MODAL 1: ADD / EDIT FAMILY MEMBER
-          ========================================================================= */}
-      {memberModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+      {/* MODAL 1: ADD / EDIT FAMILY MEMBER */}
+      <Modal
+        isOpen={memberModalOpen}
+        onClose={() => setMemberModalOpen(false)}
+        title={editingMember ? "Edit Family Member" : "Add Family Member"}
+        description="Set relationship, monthly support target, and contact details."
+        size="lg"
+      >
+        <form onSubmit={handleSaveMember} className="space-y-4">
+          <Input
+            label="Full Name *"
+            name="name"
+            required
+            placeholder="e.g. Amma / Mom, Dad, Priya"
+            defaultValue={editingMember?.name || ""}
+          />
+
+          <Select
+            label="Relationship"
+            name="relationship"
+            defaultValue={editingMember?.relationship || "Parent"}
+            options={RELATIONSHIPS.map((rel) => ({ value: rel, label: rel }))}
+          />
+
+          <Input
+            label="Monthly Support Target / Allowance (₹ INR)"
+            type="number"
+            name="monthly_allowance"
+            step="100"
+            min="0"
+            placeholder="0"
+            defaultValue={editingMember?.monthly_allowance || ""}
+            leftIcon={<span className="font-mono text-xs">₹</span>}
+          />
+
+          <div>
+            <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+              Avatar Color
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {AVATAR_COLORS.map((col) => (
+                <label key={col} className="relative cursor-pointer">
+                  <input
+                    type="radio"
+                    name="avatar_color"
+                    value={col}
+                    defaultChecked={(editingMember?.avatar_color || "#10B981") === col}
+                    className="peer sr-only"
+                  />
+                  <div
+                    className="w-6 h-6 rounded-full border-2 peer-checked:ring-2 peer-checked:ring-white transition-all"
+                    style={{ backgroundColor: col, borderColor: "rgba(255,255,255,0.2)" }}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Phone / UPI Number"
+              type="tel"
+              name="phone"
+              placeholder="+91 98765 43210"
+              defaultValue={editingMember?.phone || ""}
+              leftIcon={<Phone size={13} />}
+            />
+            <Input
+              label="Email (Optional)"
+              type="email"
+              name="email"
+              placeholder="name@example.com"
+              defaultValue={editingMember?.email || ""}
+              leftIcon={<Mail size={13} />}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+              Notes / Bank / Transfer Details
+            </label>
+            <textarea
+              name="notes"
+              rows={2}
+              placeholder="e.g. Monthly medical support, HDFC UPI transfer, or account number"
+              defaultValue={editingMember?.notes || ""}
+              className="w-full rounded-xl px-3.5 py-2 text-xs border focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors resize-none"
+              style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => setMemberModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={submitting}
+            >
+              Save Member
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 2: SEND MONEY / LOG TRANSFER */}
+      <Modal
+        isOpen={transferModalOpen && !!transferMember}
+        onClose={() => setTransferModalOpen(false)}
+        title={`Log Money Sent to ${transferMember?.name || ""}`}
+        description={`Target: ${formatINR(transferMember?.monthly_allowance || 0)} • Sent: ${formatINR(transferMember?.current_spending || 0)}`}
+        size="md"
+      >
+        <form onSubmit={handleLogTransfer} className="space-y-4">
+          <Input
+            label="Amount Sent (₹ INR) *"
+            type="number"
+            step="1"
+            min="1"
+            placeholder="0"
+            value={transferAmountInput}
+            onChange={(e) => setTransferAmountInput(e.target.value)}
+            required
+            autoFocus
+            leftIcon={<span className="font-mono text-xs">₹</span>}
+          />
+
+          <Input
+            label="Transfer Date"
+            type="date"
+            value={transferDate}
+            onChange={(e) => setTransferDate(e.target.value)}
+            leftIcon={<Calendar size={13} />}
+          />
+
+          <Select
+            label="Payment Account"
+            value={transferAccountId}
+            onChange={(e) => setTransferAccountId(e.target.value)}
+            options={[
+              { value: "", label: "Unlinked / Direct Cash" },
+              ...accounts.map((acc) => ({
+                value: acc.id,
+                label: `${acc.name} (${acc.type}) — ${formatINR(acc.balance)}`,
+              })),
+            ]}
+          />
+
+          <Input
+            label="Purpose / Notes"
+            type="text"
+            placeholder="e.g. Monthly maintenance, Medical support, Gift"
+            value={transferNotes}
+            onChange={(e) => setTransferNotes(e.target.value)}
+          />
+
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="p-3.5 rounded-xl border flex items-start gap-2.5 text-xs"
             style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
+              backgroundColor: "rgba(16, 185, 129, 0.08)",
+              borderColor: "rgba(16, 185, 129, 0.2)",
               color: "var(--app-fg)",
             }}
           >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center"
-                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <Users size={16} style={{ color: "var(--app-accent)" }} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight">
-                    {editingMember ? "Edit Family Member" : "Add Family Member"}
-                  </h3>
-                  <p className="text-xs opacity-60">Set relationship, monthly support target, and notes.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setMemberModalOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveMember} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Full Name *</label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  placeholder="e.g. Amma / Mom, Dad, Priya"
-                  defaultValue={editingMember?.name || ""}
-                  className="w-full rounded-lg px-3.5 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Relationship</label>
-                <select
-                  name="relationship"
-                  defaultValue={editingMember?.relationship || "Parent"}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                >
-                  {RELATIONSHIPS.map((rel) => (
-                    <option key={rel} value={rel}>{rel}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Monthly Support Target / Allowance (₹ INR)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-xs font-mono opacity-60">₹</span>
-                  <input
-                    type="number"
-                    name="monthly_allowance"
-                    step="100"
-                    min="0"
-                    placeholder="0"
-                    defaultValue={editingMember?.monthly_allowance || ""}
-                    className="w-full rounded-lg pl-7 pr-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Avatar Color
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {AVATAR_COLORS.map((col) => (
-                    <label key={col} className="relative cursor-pointer">
-                      <input
-                        type="radio"
-                        name="avatar_color"
-                        value={col}
-                        defaultChecked={(editingMember?.avatar_color || "#10B981") === col}
-                        className="peer sr-only"
-                      />
-                      <div
-                        className="w-6 h-6 rounded-full border-2 peer-checked:ring-2 peer-checked:ring-white transition-all"
-                        style={{ backgroundColor: col, borderColor: "rgba(255,255,255,0.2)" }}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Phone / UPI Number</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    placeholder="+91 98765 43210"
-                    defaultValue={editingMember?.phone || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Email (Optional)</label>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="name@example.com"
-                    defaultValue={editingMember?.email || ""}
-                    className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">Notes / Bank / Transfer Details</label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="e.g. Monthly medical support, HDFC UPI transfer, or bank account number"
-                  defaultValue={editingMember?.notes || ""}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors resize-none"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setMemberModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-70 hover:opacity-100"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Save Member
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          POPUP MODAL 2: SEND MONEY / LOG TRANSFER
-          ========================================================================= */}
-      {transferModalOpen && transferMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-6 space-y-5 shadow-2xl relative"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-emerald-400"
-                  style={{ borderColor: "var(--app-border)", backgroundColor: "var(--app-bg)" }}
-                >
-                  <Send size={15} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">
-                    Log Money Sent to {transferMember.name}
-                  </h3>
-                  <p className="text-xs opacity-60">
-                    Target: {formatINR(transferMember.monthly_allowance)} • Sent: {formatINR(transferMember.current_spending)}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setTransferModalOpen(false)}
-                className="p-1 rounded opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleLogTransfer} className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Amount Sent (₹ INR) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-mono opacity-60">₹</span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    placeholder="0"
-                    value={transferAmountInput}
-                    onChange={(e) => setTransferAmountInput(e.target.value)}
-                    required
-                    autoFocus
-                    className="w-full rounded-lg pl-7 pr-3 py-2 text-sm font-mono font-bold border focus:outline-none transition-colors"
-                    style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Transfer Date
-                </label>
-                <input
-                  type="date"
-                  value={transferDate}
-                  onChange={(e) => setTransferDate(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-xs font-mono border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Payment Account
-                </label>
-                <select
-                  value={transferAccountId}
-                  onChange={(e) => setTransferAccountId(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                >
-                  <option value="">Unlinked / Direct Cash</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.type}) — {formatINR(acc.balance)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-                  Purpose / Notes
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Monthly maintenance, Medical support, Gift"
-                  value={transferNotes}
-                  onChange={(e) => setTransferNotes(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-xs border focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
-                />
-              </div>
-
-              <div
-                className="p-3 rounded-xl border flex items-start gap-2.5 text-xs"
-                style={{
-                  backgroundColor: "rgba(16, 185, 129, 0.08)",
-                  borderColor: "rgba(16, 185, 129, 0.2)",
-                  color: "var(--app-fg)",
-                }}
-              >
-                <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-                <div className="space-y-0.5 text-[11px] leading-relaxed">
-                  <span className="font-semibold text-emerald-400 block">Managed Exclusively in Family Support</span>
-                  <span className="opacity-70">
-                    This transfer will deduct from your chosen payment account and be tracked directly under Transfer History, keeping your personal Expenses ledger clean.
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-                <button
-                  type="button"
-                  onClick={() => setTransferModalOpen(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
-                >
-                  {submitting && <Loader2 size={13} className="animate-spin" />}
-                  Record Transfer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          POPUP MODAL 3: RESET SPENDING CYCLE
-          ========================================================================= */}
-      {resetModalOpen && resetMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div
-            className="w-full max-w-sm rounded-2xl border p-6 space-y-4 shadow-2xl relative"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <h3 className="text-sm font-bold tracking-tight">Reset Monthly Cycle</h3>
-              <button
-                onClick={() => setResetModalOpen(false)}
-                className="p-1 rounded opacity-60 hover:opacity-100 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className="text-xs opacity-70 leading-relaxed">
-              Resetting will set <strong>{resetMember.name}&apos;s</strong> current monthly spending counter from{" "}
-              <strong>{formatINR(resetMember.current_spending)}</strong> back to <strong>₹0</strong> for the new billing cycle.
-            </p>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
-              <button
-                type="button"
-                onClick={() => setResetModalOpen(false)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border opacity-70 hover:opacity-100 cursor-pointer"
-                style={{ borderColor: "var(--app-border)" }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleResetSpending}
-                disabled={submitting}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer disabled:opacity-50 text-white bg-rose-600 hover:bg-rose-700"
-              >
-                {submitting && <Loader2 size={13} className="animate-spin" />}
-                Reset to ₹0
-              </button>
+            <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-[11px] leading-relaxed">
+              <span className="font-semibold text-emerald-400 block">Managed Exclusively in Family Support</span>
+              <span className="opacity-70">
+                This transfer will deduct from your chosen payment account and be tracked directly under Transfer History, keeping your personal Expenses ledger clean.
+              </span>
             </div>
           </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => setTransferModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={submitting}
+            >
+              Record Transfer
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 3: RESET SPENDING CYCLE */}
+      <Modal
+        isOpen={resetModalOpen && !!resetMember}
+        onClose={() => setResetModalOpen(false)}
+        title="Reset Monthly Cycle"
+        description="Reset the monthly spending counter back to ₹0."
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-xs opacity-75 leading-relaxed">
+            Resetting will set <strong>{resetMember?.name}&apos;s</strong> current monthly spending counter from{" "}
+            <strong className="text-emerald-400">{formatINR(resetMember?.current_spending || 0)}</strong> back to{" "}
+            <strong>₹0</strong> for the new billing cycle. Historical records will remain intact.
+          </p>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => setResetModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              loading={submitting}
+              onClick={handleResetSpending}
+            >
+              Reset to ₹0
+            </Button>
+          </div>
         </div>
-      )}
+      </Modal>
     </main>
   );
 }

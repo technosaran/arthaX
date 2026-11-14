@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark h-full" data-theme="ultra" suppressHydrationWarning>
+    <html lang="en" className="dark h-full" data-theme="dark" suppressHydrationWarning>
       <head>
         <link
           rel="preconnect"
@@ -57,7 +57,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var t = localStorage.getItem('arthax_theme') || 'ultra';
+                var t = localStorage.getItem('arthax_theme') || 'dark';
+                if (t !== 'light' && t !== 'dark') t = 'dark';
                 document.documentElement.setAttribute('data-theme', t);
                 document.documentElement.style.colorScheme = t === 'light' ? 'light' : 'dark';
                 if (t === 'light') {

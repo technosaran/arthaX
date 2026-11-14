@@ -16,6 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Search,
+  Filter,
+  AlertCircle,
+  TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -34,6 +38,15 @@ import {
   computePrevMonth,
 } from "@/utils/monthUtils";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 interface ExpenseItem {
   id: string;
@@ -157,48 +170,48 @@ export default function ExpensesSection() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Add / Edit Modal States
+  // Month navigation & Filter states
+  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
+  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(currentMonthYear);
+  const [isAllTime, setIsAllTime] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null);
 
-  // Form states
+  // Form Fields
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food & Dining");
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [accountId, setAccountId] = useState<string>("");
-  const [deductFromAccount, setDeductFromAccount] = useState(true);
+  const [deductFromAccount, setDeductFromAccount] = useState<boolean>(true);
   const [notes, setNotes] = useState("");
 
-  // Active month in YYYY-MM format with strict boundary constraints
-  const currentMonthYear = useMemo(() => getCurrentMonthYear(), []);
-  const [selectedMonthYear, setSelectedMonthYear] = useState<string>(() => getCurrentMonthYear());
-  const [isAllTime, setIsAllTime] = useState<boolean>(false);
-
-  // Compute earliest month that actually has expense data
+  // Earliest data month
   const earliestMonthYear = useMemo(() => {
-    return getEarliestDataMonth(
-      expenses.map((e) => e.expense_date),
-      currentMonthYear
-    );
-  }, [expenses, currentMonthYear]);
+    const dates = expenses.map((e) => e.expense_date).filter(Boolean);
+    return getEarliestDataMonth(dates);
+  }, [expenses]);
 
-  // Clamp selectedMonthYear so it cannot be in the future or before earliest data
-  useEffect(() => {
-    if (selectedMonthYear > currentMonthYear) {
-      setSelectedMonthYear(currentMonthYear);
-    } else if (earliestMonthYear && selectedMonthYear < earliestMonthYear) {
-      setSelectedMonthYear(earliestMonthYear);
-    }
-  }, [selectedMonthYear, currentMonthYear, earliestMonthYear]);
+  const canGoPrev = useMemo(() => {
+    if (isAllTime) return false;
+    return selectedMonthYear > earliestMonthYear;
+  }, [selectedMonthYear, earliestMonthYear, isAllTime]);
 
-  const canGoPrev = selectedMonthYear > earliestMonthYear;
-  const canGoNext = selectedMonthYear < currentMonthYear;
+  const canGoNext = useMemo(() => {
+    if (isAllTime) return false;
+    return selectedMonthYear < currentMonthYear;
+  }, [selectedMonthYear, currentMonthYear, isAllTime]);
+
   const isCurrentMonth = selectedMonthYear === currentMonthYear;
 
   const monthDisplayTitle = useMemo(() => {
+    if (isAllTime) return "All Time Cumulative";
     return formatMonthDisplay(selectedMonthYear);
-  }, [selectedMonthYear]);
+  }, [selectedMonthYear, isAllTime]);
 
   const handlePrevMonth = () => {
     if (!canGoPrev) return;
@@ -258,7 +271,7 @@ export default function ExpensesSection() {
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
     if (!user) return;
     if (!skipCache) {
-      const cached = getFromLocalCache<any[]>(redisAccountsKey);
+      const cached = getFromLocalCache<AccountItem[]>(redisAccountsKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
         setAccounts(cached);
       }
@@ -293,7 +306,6 @@ export default function ExpensesSection() {
     if (!user) return;
     setErrorMsg(null);
 
-    // Instant local cache check
     if (!skipCache) {
       const cached = getFromLocalCache<ExpenseItem[]>(redisExpensesKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
@@ -328,8 +340,6 @@ export default function ExpensesSection() {
           .filter((item) => !isFamilyTransfer(item));
 
         setExpenses(mapped);
-
-        // Update Multi-Tier Cache
         saveToCache(redisExpensesKey, mapped, 3600);
       }
     } catch {
@@ -344,7 +354,6 @@ export default function ExpensesSection() {
     fetchExpenses();
     fetchAccounts();
 
-    // Realtime Supabase broadcast subscription scoped to user
     const supabase = createClient();
     const channel = supabase
       .channel(`realtime-expenses-${user.id}`)
@@ -398,7 +407,7 @@ export default function ExpensesSection() {
     setCategory(item.category);
     setExpenseDate(item.expense_date);
     setAccountId(item.account_id || "");
-    setDeductFromAccount(false); // Default false on edit
+    setDeductFromAccount(false);
     setNotes(item.notes || "");
     setIsModalOpen(true);
   };
@@ -418,7 +427,6 @@ export default function ExpensesSection() {
 
     try {
       if (editingExpense) {
-        // Atomic Edit Flow: Updates expense and automatically reconciles balance differences
         const { error } = await supabase.rpc("fn_update_expense_atomic", {
           p_expense_id: editingExpense.id,
           p_user_id: user.id,
@@ -445,7 +453,6 @@ export default function ExpensesSection() {
           await fetchAccounts(true);
         }
       } else {
-        // Atomic Create Flow: Uses row-level locking to deduct balance without race conditions
         const targetAccountId = (accountId && deductFromAccount) ? accountId : null;
         const { error } = await supabase.rpc("fn_record_expense_atomic", {
           p_user_id: user.id,
@@ -459,9 +466,9 @@ export default function ExpensesSection() {
         });
 
         if (error) {
-          showToast("Record Failed", error.message || "Please check inputs.", "error");
+          showToast("Create Failed", error.message || "Failed to log expense.", "error");
         } else {
-          showToast("Expense Logged", `${title.trim()} (${formatINR(parsedAmount)}) recorded with atomic precision.`, "success");
+          showToast("Expense Logged", `${title.trim()} (${formatINR(parsedAmount)}) recorded.`, "success");
           setIsModalOpen(false);
           await invalidateCacheKeys([
             redisExpensesKey,
@@ -473,79 +480,111 @@ export default function ExpensesSection() {
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      const msg = err instanceof Error ? err.message : "Failed to record expense.";
       showToast("Operation Failed", msg, "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteExpense = async (id: string, name: string) => {
+  const handleDeleteExpense = async (id: string, itemTitle: string) => {
     if (!user) return;
     const supabase = createClient();
-    // Atomic Delete Flow: Deletes transaction and automatically refunds deducted balance
-    const { error } = await supabase.rpc("fn_delete_expense_atomic", {
-      p_expense_id: id,
-      p_user_id: user.id,
-    });
 
-    if (error) {
-      showToast("Delete Failed", error.message || "Could not remove expense record.", "error");
-    } else {
-      showToast("Expense Removed", `${name} deleted and balance restored to account.`, "info");
-      await invalidateCacheKeys([
-        redisExpensesKey,
-        redisAccountsKey,
-        redisLedgerKey,
-      ]);
-      await fetchExpenses(true);
-      await fetchAccounts(true);
+    try {
+      const { error } = await supabase.rpc("fn_delete_expense_atomic", {
+        p_expense_id: id,
+        p_user_id: user.id,
+      });
+
+      if (error) {
+        showToast("Delete Failed", error.message || "Could not delete expense.", "error");
+      } else {
+        showToast("Expense Deleted", `${itemTitle} removed and account balance restored.`, "info");
+        await invalidateCacheKeys([
+          redisExpensesKey,
+          redisAccountsKey,
+          redisLedgerKey,
+        ]);
+        await fetchExpenses(true);
+        await fetchAccounts(true);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to remove expense.";
+      showToast("Delete Failed", msg, "error");
     }
   };
 
-  // Filtered expenses based on active month
+  // Filter displayed expenses by month and search/category filters
   const displayedExpenses = useMemo(() => {
-    if (isAllTime) return expenses;
-    return expenses.filter((e) => e.expense_date && e.expense_date.startsWith(selectedMonthYear));
-  }, [expenses, isAllTime, selectedMonthYear]);
+    return expenses.filter((item) => {
+      // 1. Month filter
+      if (!isAllTime) {
+        if (!item.expense_date || !item.expense_date.startsWith(selectedMonthYear)) {
+          return false;
+        }
+      }
 
-  // Telemetry & Aggregations
+      // 2. Category filter
+      if (categoryFilter !== "all" && item.category !== categoryFilter) {
+        return false;
+      }
+
+      // 3. Search query
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchesTitle = item.title.toLowerCase().includes(q);
+        const matchesNote = item.notes?.toLowerCase().includes(q);
+        const matchesCategory = item.category.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesNote && !matchesCategory) return false;
+      }
+
+      return true;
+    });
+  }, [expenses, isAllTime, selectedMonthYear, categoryFilter, searchTerm]);
+
+  // Aggregate Metrics for Displayed Month
   const totalExpenses = useMemo(() => {
     return displayedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
   }, [displayedExpenses]);
 
   const categoryTotals = useMemo(() => {
-    return displayedExpenses.reduce((acc, curr) => {
-      acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
-      return acc;
-    }, {} as Record<string, number>);
+    const acc: Record<string, number> = {};
+    displayedExpenses.forEach((item) => {
+      acc[item.category] = (acc[item.category] || 0) + item.amount;
+    });
+    return acc;
   }, [displayedExpenses]);
 
   const topCategoryEntry = useMemo(() => {
-    return Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+    const entries = Object.entries(categoryTotals);
+    if (entries.length === 0) return null;
+    return entries.sort((a, b) => b[1] - a[1])[0];
   }, [categoryTotals]);
 
-  const averageExpense = displayedExpenses.length > 0 ? totalExpenses / displayedExpenses.length : 0;
-  const maxExpense = displayedExpenses.length > 0 ? Math.max(...displayedExpenses.map((i) => i.amount)) : 0;
+  const averageExpense = useMemo(() => {
+    if (displayedExpenses.length === 0) return 0;
+    return totalExpenses / displayedExpenses.length;
+  }, [displayedExpenses, totalExpenses]);
+
+  const maxExpense = useMemo(() => {
+    if (displayedExpenses.length === 0) return 0;
+    return Math.max(...displayedExpenses.map((e) => e.amount));
+  }, [displayedExpenses]);
 
   const dailyBurnRate = useMemo(() => {
-    if (displayedExpenses.length === 0 || totalExpenses <= 0) return 0;
+    if (displayedExpenses.length === 0) return 0;
+    let elapsedDays = 30;
     if (isAllTime) {
-      const dates = displayedExpenses
-        .map((e) => (e.expense_date ? new Date(e.expense_date).getTime() : NaN))
-        .filter((t) => !isNaN(t));
-      if (dates.length <= 1) return totalExpenses;
-      const days = Math.max(1, Math.round((Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24)) + 1);
-      return totalExpenses / days;
-    }
-    const [yearStr, monthStr] = selectedMonthYear.split("-");
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
-    const totalDaysInMonth = new Date(year, month, 0).getDate();
-    const now = new Date();
-    let elapsedDays = totalDaysInMonth;
-    if (isCurrentMonth) {
-      elapsedDays = Math.max(1, now.getDate());
+      const uniqueDays = new Set(displayedExpenses.map((e) => e.expense_date)).size;
+      elapsedDays = Math.max(1, uniqueDays);
+    } else if (isCurrentMonth) {
+      elapsedDays = Math.max(1, new Date().getDate());
+    } else {
+      const parts = selectedMonthYear.split("-");
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      elapsedDays = new Date(y, m, 0).getDate();
     }
     return totalExpenses / elapsedDays;
   }, [displayedExpenses, totalExpenses, isAllTime, selectedMonthYear, isCurrentMonth]);
@@ -588,212 +627,160 @@ export default function ExpensesSection() {
 
   return (
     <main
-      className="flex-1 h-full p-3.5 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-4 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      {/* Top Header */}
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8"
-        style={{ borderBottom: "1px solid var(--app-border)" }}
-      >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-xs opacity-70 mt-1">
-            Track your daily expenses, bills, and monthly spending.
-          </p>
-        </div>
-
-        {/* Action Buttons & Month Stepper on Top Right */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Month Stepper */}
-          <div
-            className="flex items-center rounded-xl border p-0.5 text-xs font-mono"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <button
-              onClick={handlePrevMonth}
-              disabled={!canGoPrev}
-              title={!canGoPrev ? "No earlier expense records" : "Previous Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoPrev
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
+      {/* Universal Page Header */}
+      <PageHeader
+        title="Expenses & Outflows"
+        description="Daily expenditures, category burn rates, and historical spending trajectory."
+        badge={
+          <Badge variant="danger">
+            {displayedExpenses.length} Records • {isAllTime ? "All Time" : monthDisplayTitle}
+          </Badge>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Month Stepper */}
+            <div
+              className="flex items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0.5 text-xs font-mono shadow-xs"
             >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="px-3 font-semibold min-w-[110px] text-center">
-              {monthDisplayTitle}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              disabled={!canGoNext}
-              title={!canGoNext ? "Future months are not yet available" : "Next Month"}
-              className={`p-1.5 rounded-lg transition-all ${
-                !canGoNext
-                  ? "opacity-25 cursor-not-allowed"
-                  : "opacity-70 hover:opacity-100 cursor-pointer"
-              }`}
-            >
-              <ChevronRight size={14} />
-            </button>
-            {!isCurrentMonth && !isAllTime && (
               <button
-                onClick={handleResetToCurrentMonth}
-                className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
-                style={{ borderColor: "var(--app-border-subtle)" }}
+                type="button"
+                onClick={handlePrevMonth}
+                disabled={!canGoPrev}
+                title={!canGoPrev ? "No earlier expense records" : "Previous Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoPrev
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 hover:bg-[var(--app-card-hover)] cursor-pointer"
+                }`}
               >
-                Today
+                <ChevronLeft size={14} />
               </button>
-            )}
+              <span className="px-3 font-semibold min-w-[110px] text-center text-[var(--app-fg)]">
+                {monthDisplayTitle}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                disabled={!canGoNext}
+                title={!canGoNext ? "Future months are not yet available" : "Next Month"}
+                className={`p-1.5 rounded-lg transition-all ${
+                  !canGoNext
+                    ? "opacity-25 cursor-not-allowed"
+                    : "opacity-70 hover:opacity-100 hover:bg-[var(--app-card-hover)] cursor-pointer"
+                }`}
+              >
+                <ChevronRight size={14} />
+              </button>
+              {!isCurrentMonth && !isAllTime && (
+                <button
+                  type="button"
+                  onClick={handleResetToCurrentMonth}
+                  className="ml-1 px-2 py-0.5 text-[10px] uppercase font-bold rounded-md border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-accent)] hover:bg-[var(--app-card-hover)] cursor-pointer"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+
+            <Button
+              size="sm"
+              variant={isAllTime ? "primary" : "secondary"}
+              onClick={() => setIsAllTime(!isAllTime)}
+            >
+              All Time
+            </Button>
+
+            <Button
+              size="sm"
+              variant="danger"
+              icon={<Plus size={15} />}
+              onClick={openAddModal}
+            >
+              Add Expense
+            </Button>
           </div>
-
-          <button
-            onClick={() => setIsAllTime(!isAllTime)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-all ${
-              isAllTime ? "shadow-sm font-bold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: isAllTime ? "var(--app-fg)" : "var(--app-card)",
-              color: isAllTime ? "var(--app-bg)" : "var(--app-fg)",
-              borderColor: isAllTime ? "var(--app-fg)" : "var(--app-border-subtle)",
-            }}
-          >
-            All Time
-          </button>
-
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm"
-            style={{
-              backgroundColor: "var(--app-fg)",
-              color: "var(--app-bg)",
-              border: "1px solid var(--app-border)",
-            }}
-          >
-            <Plus size={15} />
-            Add Expense
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {errorMsg && (
-        <div
-          className="mb-6 p-4 rounded-xl text-xs border"
-          style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          {errorMsg}
+        <div className="mb-6 p-4 rounded-xl text-xs border border-rose-500/30 bg-rose-500/10 text-rose-400 flex items-center gap-2">
+          <AlertCircle size={15} />
+          <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* ROW 1: 4 SEPARATE KPI CARDS (RESPONSIVE 4-COLUMN GRID) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
-        {/* Card 1: Total Logged Outflow */}
-        <div
-          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
-            <span>Total Logged Outflow</span>
-            <ArrowDownRight size={16} className="text-rose-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-rose-400">
-            {loading ? "..." : formatINR(totalExpenses)}
-          </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
-            Aggregated across {displayedExpenses.length} recorded items
-          </p>
+      {/* ROW 1: 4 SEPARATE KPI METRIC CARDS */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+          {/* Card 1: Total Logged Outflow */}
+          <StatCard
+            title="Total Logged Outflow"
+            value={<span className="text-rose-400">{formatINR(totalExpenses)}</span>}
+            icon={<ArrowDownRight size={16} />}
+            iconColor="rose"
+            subtitle={`Aggregated across ${displayedExpenses.length} entries`}
+          />
 
-        {/* Card 2: Largest Outflow Category */}
-        <div
-          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
-            <span>Largest Outflow Category</span>
-            <TrendingDown size={16} className="text-amber-400" />
-          </div>
-          <div className="text-xl sm:text-2xl font-bold tracking-tight mt-2 truncate">
-            {topCategoryEntry ? topCategoryEntry[0] : "None"}
-          </div>
-          <p className="text-[11px] opacity-60 mt-1 font-mono text-amber-400 truncate">
-            {topCategoryEntry ? formatINR(topCategoryEntry[1]) : "₹0.00"} (
-            {topCategoryEntry && totalExpenses > 0
-              ? `${((topCategoryEntry[1] / totalExpenses) * 100).toFixed(1)}%`
-              : "0%"}
-            )
-          </p>
-        </div>
+          {/* Card 2: Largest Outflow Category */}
+          <StatCard
+            title="Largest Category"
+            value={
+              <span className="truncate block text-lg sm:text-2xl font-bold">
+                {topCategoryEntry ? topCategoryEntry[0] : "None"}
+              </span>
+            }
+            icon={<TrendingDown size={16} />}
+            iconColor="amber"
+            subtitle={
+              topCategoryEntry
+                ? `${formatINR(topCategoryEntry[1])} • ${
+                    totalExpenses > 0
+                      ? ((topCategoryEntry[1] / totalExpenses) * 100).toFixed(1)
+                      : 0
+                  }% of total`
+                : "No categorized spend"
+            }
+          />
 
-        {/* Card 3: Expense Volume & Averages */}
-        <div
-          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
-            <span>Expense Volume</span>
-            <CreditCard size={16} className="opacity-70" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2">
-            {loading ? "..." : `${displayedExpenses.length} Items`}
-          </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
-            Avg: {formatINR(averageExpense)} • Peak: {formatINR(maxExpense)}
-          </p>
-        </div>
+          {/* Card 3: Expense Volume & Averages */}
+          <StatCard
+            title="Expense Volume"
+            value={`${displayedExpenses.length} Items`}
+            icon={<CreditCard size={16} />}
+            iconColor="neutral"
+            subtitle={`Avg: ${formatINR(averageExpense)} • Peak: ${formatINR(maxExpense)}`}
+          />
 
-        {/* Card 4 (NEW): Daily Burn Rate */}
-        <div
-          className="rounded-2xl p-5 sm:p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
-        >
-          <div className="flex items-center justify-between opacity-60 text-xs font-mono uppercase tracking-wider">
-            <span>Daily Burn Rate</span>
-            <Flame size={16} className="text-orange-400" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 text-orange-400">
-            {loading ? "..." : formatINR(dailyBurnRate)}
-            <span className="text-xs font-normal opacity-60"> /day</span>
-          </div>
-          <p className="text-[11px] opacity-50 mt-1 font-mono truncate">
-            {isAllTime ? "All-time average burn pace" : `Paced across active days in ${monthDisplayTitle}`}
-          </p>
+          {/* Card 4: Daily Burn Rate */}
+          <StatCard
+            title="Daily Burn Rate"
+            value={<span className="text-amber-400">{formatINR(dailyBurnRate)}/day</span>}
+            icon={<Flame size={16} />}
+            iconColor="amber"
+            subtitle={
+              isAllTime
+                ? "All-time average burn pace"
+                : `Paced across active days in ${monthDisplayTitle}`
+            }
+          />
         </div>
-      </div>
+      )}
 
       {/* ROW 2: VISUAL CHARTS (LINE CHART + PIE CHART SIDE BY SIDE) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
         {/* Left Card: 6-Month Spending Line Chart */}
         <div
-          className="lg:col-span-7 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
+          className="lg:col-span-7 rounded-2xl p-6 border border-[var(--app-border)] bg-[var(--app-card)] shadow-xs flex flex-col justify-between"
         >
           <InteractiveLineChart
             title="Spending Trajectory"
@@ -809,19 +796,14 @@ export default function ExpensesSection() {
 
         {/* Right Card: Category Allocation Donut / Pie Chart */}
         <div
-          className="lg:col-span-5 rounded-2xl p-6 border transition-colors shadow-sm flex flex-col justify-between"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-            color: "var(--app-fg)",
-          }}
+          className="lg:col-span-5 rounded-2xl p-6 border border-[var(--app-border)] bg-[var(--app-card)] shadow-xs flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border-subtle)]">
             <div className="flex items-center gap-1.5">
               <PieChartIcon size={14} className="text-rose-400" />
-              <h3 className="text-sm font-bold tracking-tight">Category Breakdown</h3>
+              <h3 className="text-sm font-bold tracking-tight text-[var(--app-fg)]">Category Breakdown</h3>
             </div>
-            <span className="text-[10px] font-mono opacity-50">
+            <span className="text-[10px] font-mono text-[var(--app-muted)]">
               {donutSegments.length} Categories
             </span>
           </div>
@@ -829,7 +811,7 @@ export default function ExpensesSection() {
           <div className="pt-4 flex items-center justify-center">
             {loading ? (
               <div className="flex items-center justify-center h-44 w-full">
-                <Loader2 size={24} className="animate-spin opacity-50" />
+                <Skeleton className="w-36 h-36 rounded-full" />
               </div>
             ) : (
               <InteractiveDonutChart
@@ -847,76 +829,77 @@ export default function ExpensesSection() {
         </div>
       </div>
 
-      {/* TABLE HEADER / ENTRY COUNTER */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <h2 className="text-xs font-bold uppercase tracking-wider opacity-60">
-          Expenses Log
-        </h2>
-        <span
-          className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-medium"
-          style={{
-            borderColor: "var(--app-border-subtle)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          {displayedExpenses.length} Records • {isAllTime ? "All Time" : monthDisplayTitle}
-        </span>
+      {/* SEARCH & CATEGORY FILTER TOOLBAR */}
+      <div
+        className="p-3 sm:p-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs"
+      >
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-md">
+          <div className="relative w-full">
+            <Search size={14} className="absolute left-3 top-2.5 text-[var(--app-muted)]" />
+            <input
+              type="text"
+              placeholder="Search expenses by title or notes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-2.5 text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 text-xs rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none cursor-pointer font-medium w-full sm:w-auto"
+          >
+            <option value="all">All Categories</option>
+            {EXPENSE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* FINANCIAL EXPENSES TRANSACTION LIST (NO CARDS) */}
+      {/* FINANCIAL EXPENSES TRANSACTION LIST */}
       {loading ? (
-        <div
-          className="flex items-center justify-center p-20 rounded-2xl border"
-          style={{
-            borderColor: "var(--app-border-subtle)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          <Loader2 size={24} className="animate-spin" />
-        </div>
+        <CardSkeleton rows={8} />
       ) : displayedExpenses.length === 0 ? (
-        <div
-          className="p-16 rounded-2xl border text-center space-y-3"
-          style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          <CreditCard size={36} className="mx-auto opacity-30 text-rose-400" />
-          <h3 className="text-base font-bold">No Expenses Logged</h3>
-          <p className="text-xs opacity-60 max-w-sm mx-auto">
-            {isAllTime
+        <EmptyState
+          icon={<CreditCard size={32} className="text-rose-400" />}
+          title="No Expenses Logged"
+          description={
+            isAllTime
               ? "Start tracking your burn rate by recording your first expense."
-              : `No expenses logged for ${monthDisplayTitle}.`}
-          </p>
-          <button
-            onClick={openAddModal}
-            className="mt-2 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border cursor-pointer"
-            style={{
-              backgroundColor: "var(--app-fg)",
-              color: "var(--app-bg)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <Plus size={14} />
-            Add Expense
-          </button>
-        </div>
+              : `No expenses logged for ${monthDisplayTitle}.`
+          }
+          action={
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={openAddModal}
+            >
+              Add Expense
+            </Button>
+          }
+        />
       ) : (
         <div
-          className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
+          className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] overflow-hidden shadow-xs transition-colors"
         >
           {/* Desktop Column Header */}
           <div
-            className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-mono uppercase tracking-wider opacity-60 border-b select-none font-semibold"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-bg)",
-            }}
+            className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-mono uppercase tracking-wider text-[var(--app-muted)] border-b border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] select-none font-semibold"
           >
             <div className="col-span-4">Merchant / Payee</div>
             <div className="col-span-3">Category</div>
@@ -925,7 +908,7 @@ export default function ExpensesSection() {
           </div>
 
           {/* Transaction Rows */}
-          <div className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
+          <div className="divide-y divide-[var(--app-border-subtle)]">
             {displayedExpenses.map((item) => {
               const catColor = CATEGORY_COLORS[item.category] || "#71717A";
               const account = accounts.find((a) => a.id === item.account_id);
@@ -939,19 +922,17 @@ export default function ExpensesSection() {
                   <div className="hidden md:grid grid-cols-12 items-center gap-4 py-3.5 px-5">
                     {/* Col 1: Logo + Title + Subtitle */}
                     <div className="col-span-4 flex items-center gap-3.5 min-w-0 pr-2">
-                      <EntityLogo name={item.title} category={item.category} size={42} />
+                      <EntityLogo name={item.title} category={item.category} size={40} />
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            onClick={() => openEditModal(item)}
-                            className="font-bold text-sm tracking-tight truncate hover:text-rose-400 transition-colors cursor-pointer"
-                            title={item.title}
-                          >
-                            {item.title}
-                          </span>
-                        </div>
-                        <p className="text-[11px] opacity-50 truncate mt-0.5 font-sans">
-                          {item.notes || (item.category ? `${item.category} Outflow` : "Direct Debit")}
+                        <span
+                          onClick={() => openEditModal(item)}
+                          className="font-bold text-sm tracking-tight truncate hover:text-rose-400 transition-colors cursor-pointer block text-[var(--app-fg)]"
+                          title={item.title}
+                        >
+                          {item.title}
+                        </span>
+                        <p className="text-[11px] text-[var(--app-muted)] truncate mt-0.5">
+                          {item.notes || `${item.category} Outflow`}
                         </p>
                       </div>
                     </div>
@@ -976,23 +957,21 @@ export default function ExpensesSection() {
                       <div className="flex items-center gap-1.5 text-xs font-medium">
                         {account ? (
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px]"
-                            style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
                           >
-                            <BankLogo name={account.name} size={18} />
+                            <BankLogo name={account.name} size={16} />
                             <span className="truncate max-w-[130px]">{account.name}</span>
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] opacity-75"
-                            style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] text-[var(--app-muted)] border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
                           >
-                            <Wallet size={12} className="opacity-60 text-rose-400" />
+                            <Wallet size={12} className="text-rose-400" />
                             <span>Cash / Direct</span>
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-mono opacity-50">
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--app-muted)]">
                         <Calendar size={11} className="opacity-70" />
                         <span>{formatDisplayDate(item.expense_date)}</span>
                       </div>
@@ -1001,28 +980,28 @@ export default function ExpensesSection() {
                     {/* Col 4: Amount + Actions */}
                     <div className="col-span-2 flex items-center justify-end gap-3.5">
                       <div className="text-right">
-                        <div className="text-base font-bold font-mono tracking-tight text-rose-400">
+                        <div className="text-base font-bold font-mono tracking-tight text-rose-400 tabular-nums">
                           -{formatINR(item.amount)}
                         </div>
-                        <span className="text-[10px] uppercase font-mono tracking-wider opacity-40">
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] opacity-60">
                           Debited
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          type="button"
                           onClick={() => openEditModal(item)}
                           title="Edit Expense"
-                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-400 transition-all opacity-70 hover:opacity-100 cursor-pointer"
-                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-400 transition-all cursor-pointer"
                         >
                           <Pencil size={13} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteExpense(item.id, item.title)}
                           title="Delete Record"
-                          className="w-7 h-7 rounded-md flex items-center justify-center border hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400 transition-all opacity-70 hover:opacity-100 cursor-pointer"
-                          style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1038,24 +1017,24 @@ export default function ExpensesSection() {
                         <div className="min-w-0">
                           <h4
                             onClick={() => openEditModal(item)}
-                            className="font-bold text-sm tracking-tight truncate cursor-pointer"
+                            className="font-bold text-sm tracking-tight truncate cursor-pointer text-[var(--app-fg)]"
                           >
                             {item.title}
                           </h4>
-                          <p className="text-[10px] opacity-50 truncate mt-0.5">
-                            {item.notes || (item.category ? `${item.category} Outflow` : "Direct Debit")}
+                          <p className="text-[10px] text-[var(--app-muted)] truncate mt-0.5">
+                            {item.notes || `${item.category} Outflow`}
                           </p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-bold font-mono text-rose-400">
+                        <div className="text-sm font-bold font-mono text-rose-400 tabular-nums">
                           -{formatINR(item.amount)}
                         </div>
-                        <span className="text-[9px] uppercase font-mono opacity-40">Debited</span>
+                        <span className="text-[9px] uppercase font-mono text-[var(--app-muted)]">Debited</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t text-xs" style={{ borderColor: "var(--app-border-subtle)" }}>
+                    <div className="flex items-center justify-between pt-2 border-t border-[var(--app-border-subtle)] text-xs">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className="px-2 py-0.5 rounded-full text-[10px] font-semibold border"
@@ -1067,7 +1046,7 @@ export default function ExpensesSection() {
                         >
                           {item.category}
                         </span>
-                        <span className="text-[10px] font-mono opacity-60 flex items-center gap-1">
+                        <span className="text-[10px] font-mono text-[var(--app-muted)] flex items-center gap-1">
                           <Calendar size={10} />
                           {formatDisplayDate(item.expense_date)}
                         </span>
@@ -1075,16 +1054,16 @@ export default function ExpensesSection() {
 
                       <div className="flex items-center gap-1.5">
                         <button
+                          type="button"
                           onClick={() => openEditModal(item)}
-                          className="p-1 rounded border opacity-70 hover:opacity-100"
-                          style={{ borderColor: "var(--app-border-subtle)" }}
+                          className="p-1 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                         >
                           <Pencil size={12} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteExpense(item.id, item.title)}
-                          className="p-1 rounded border opacity-70 hover:opacity-100 text-rose-400"
-                          style={{ borderColor: "var(--app-border-subtle)" }}
+                          className="p-1 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-rose-400"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1099,218 +1078,106 @@ export default function ExpensesSection() {
       )}
 
       {/* POPUP MODAL: Add / Edit Expense */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-md rounded-2xl border p-4 sm:p-5 shadow-2xl relative max-h-[95vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-              color: "var(--app-fg)",
-            }}
-          >
-            {/* Modal Header */}
-            <div
-              className="flex items-center justify-between pb-3 mb-3 border-b"
-              style={{ borderColor: "var(--app-border-subtle)" }}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-7 h-7 rounded-lg border flex items-center justify-center"
-                  style={{
-                    borderColor: "var(--app-border)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
-                >
-                  <TrendingDown size={15} className="text-rose-400" />
-                </div>
-                <h3 className="text-base font-bold tracking-tight">
-                  {editingExpense ? "Edit Expense" : "Add Expense"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg hover:opacity-75 transition-opacity cursor-pointer opacity-70 hover:opacity-100"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingExpense ? "Edit Expense Entry" : "Record New Expense"}
+        description="Enter expense details. If linked to an account, balance will automatically be debited."
+        size="lg"
+      >
+        <form onSubmit={handleSubmitExpense} className="space-y-4">
+          <Input
+            label="Expense Title or Merchant"
+            placeholder="e.g. Swiggy, DMart, Rent, Electricity Bill"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            leftIcon={<CreditCard size={15} />}
+          />
 
-            <form onSubmit={handleSubmitExpense} className="space-y-3">
-              {/* Row 1: Title */}
-              <div>
-                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                  Expense Title or Payee
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Groceries, Rent, Dinner"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Amount (₹ INR)"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
+            />
 
-              {/* Row 2: Amount & Date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                    Amount (₹ INR)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-xs sm:text-sm font-mono opacity-60">₹</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      required
-                      className="w-full rounded-lg pl-7 pr-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
-                      style={{
-                        backgroundColor: "var(--app-bg)",
-                        borderColor: "var(--app-border)",
-                        color: "var(--app-fg)",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                    Expense Date
-                  </label>
-                  <input
-                    type="date"
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm font-mono border focus:outline-none transition-colors"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border)",
-                      color: "var(--app-fg)",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Category & Paid From Account */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border)",
-                      color: "var(--app-fg)",
-                    }}
-                  >
-                    {EXPENSE_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                    Paid From (Optional)
-                  </label>
-                  <select
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors cursor-pointer"
-                    style={{
-                      backgroundColor: "var(--app-bg)",
-                      borderColor: "var(--app-border)",
-                      color: "var(--app-fg)",
-                    }}
-                  >
-                    <option value="">None / Cash</option>
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} ({formatINR(acc.balance)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Notes / Memo */}
-              <div>
-                <label className="block text-[11px] uppercase font-mono tracking-wider opacity-70 mb-1">
-                  Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Paid via UPI / GPay"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-xs sm:text-sm border focus:outline-none transition-colors"
-                  style={{
-                    backgroundColor: "var(--app-bg)",
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                />
-              </div>
-
-              {/* Checkbox: auto deduct from account */}
-              {!editingExpense && accountId && (
-                <label className="flex items-center gap-2 pt-0.5 text-xs opacity-80 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={deductFromAccount}
-                    onChange={(e) => setDeductFromAccount(e.target.checked)}
-                    className="rounded accent-rose-500 cursor-pointer"
-                  />
-                  <span>Deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
-                </label>
-              )}
-
-              {/* Actions */}
-              <div
-                className="flex items-center justify-end gap-2.5 pt-3 border-t"
-                style={{ borderColor: "var(--app-border-subtle)" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-opacity cursor-pointer opacity-80 hover:opacity-100"
-                  style={{ borderColor: "var(--app-border)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
-                  style={{
-                    backgroundColor: "var(--app-fg)",
-                    color: "var(--app-bg)",
-                  }}
-                >
-                  {submitting && <Loader2 size={12} className="animate-spin" />}
-                  {editingExpense ? "Update" : "Save Expense"}
-                </button>
-              </div>
-            </form>
+            <Input
+              label="Expense Date"
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+              required
+            />
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              options={EXPENSE_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+            />
+
+            <Select
+              label="Paid From (Account / Card)"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              <option value="">None / Physical Cash</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({formatINR(acc.balance)})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <Input
+            label="Notes / Memo (Optional)"
+            placeholder="e.g. Paid via UPI QR / Split with colleagues"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+
+          {!editingExpense && accountId && (
+            <label className="flex items-center gap-2 pt-1 text-xs text-[var(--app-muted)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={deductFromAccount}
+                onChange={(e) => setDeductFromAccount(e.target.checked)}
+                className="rounded accent-emerald-500 cursor-pointer"
+              />
+              <span>Deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
+            </label>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              size="sm"
+              loading={submitting}
+            >
+              {editingExpense ? "Update Expense" : "Save Expense"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </main>
   );
 }

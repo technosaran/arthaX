@@ -2,6 +2,8 @@ import React from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ShieldCheck, Lock, EyeOff, UserCheck, ArrowLeft, Mail } from "lucide-react";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 
 export const metadata = {
   title: "Privacy Policy — arthaX",
@@ -16,12 +18,12 @@ export default function PrivacyPolicyPage() {
     >
       <div className="max-w-4xl mx-auto w-full space-y-8">
         {/* Navigation & Header */}
-        <div className="flex items-center justify-between pb-6 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+        <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
           <div className="flex items-center gap-3">
             <Logo size={36} showText={true} />
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Badge variant="emerald" dot>
               Privacy Policy
-            </span>
+            </Badge>
           </div>
           <Link
             href="/login"
@@ -40,23 +42,17 @@ export default function PrivacyPolicyPage() {
 
         {/* Core Principles */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div
-            className="p-4 rounded-2xl border space-y-2"
-            style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-          >
+          <Card className="p-4 space-y-2">
             <div className="p-2 w-fit rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <ShieldCheck size={20} />
             </div>
-            <h3 className="text-sm font-bold">100% Tenant Isolation</h3>
+            <h3 className="text-sm font-bold">100% Data Privacy</h3>
             <p className="text-xs opacity-70 leading-relaxed">
-              Every financial record is encrypted and bounded by PostgreSQL Row-Level Security (RLS). Only your authenticated account can read or alter your vault.
+              Every financial record is encrypted and bounded by PostgreSQL Row-Level Security (RLS). Only your authenticated account can read or alter your data.
             </p>
-          </div>
+          </Card>
 
-          <div
-            className="p-4 rounded-2xl border space-y-2"
-            style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-          >
+          <Card className="p-4 space-y-2">
             <div className="p-2 w-fit rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
               <EyeOff size={20} />
             </div>
@@ -64,12 +60,9 @@ export default function PrivacyPolicyPage() {
             <p className="text-xs opacity-70 leading-relaxed">
               We never sell, rent, monetize, or trade your personal or financial data to advertising brokers, marketers, or external entities.
             </p>
-          </div>
+          </Card>
 
-          <div
-            className="p-4 rounded-2xl border space-y-2"
-            style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-          >
+          <Card className="p-4 space-y-2">
             <div className="p-2 w-fit rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
               <Lock size={20} />
             </div>
@@ -77,14 +70,11 @@ export default function PrivacyPolicyPage() {
             <p className="text-xs opacity-70 leading-relaxed">
               Data is transmitted via HTTPS/TLS 1.3 and stored in securely encrypted databases with strict access credentials.
             </p>
-          </div>
+          </Card>
         </div>
 
         {/* Detailed Sections */}
-        <div
-          className="p-6 sm:p-8 rounded-3xl border space-y-6 text-sm leading-relaxed"
-          style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
-        >
+        <Card className="p-6 sm:p-8 space-y-6 text-sm leading-relaxed">
           <section className="space-y-2">
             <h2 className="text-base font-bold flex items-center gap-2">
               <UserCheck size={18} className="text-emerald-400" />
@@ -107,7 +97,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1 opacity-80 text-xs sm:text-sm">
               <li>Authenticate your identity securely without requiring a separate password.</li>
-              <li>Personalize your profile display name in the arthaX vault.</li>
+              <li>Personalize your profile display name in arthaX.</li>
               <li>Protect against unauthorized access through Google&apos;s multi-factor authentication infrastructure.</li>
             </ul>
             <p className="opacity-80 text-xs">
@@ -141,7 +131,7 @@ export default function PrivacyPolicyPage() {
               iamsaran.ai@gmail.com
             </p>
           </section>
-        </div>
+        </Card>
 
         {/* Footer */}
         <div className="text-center text-xs opacity-50 pb-6">

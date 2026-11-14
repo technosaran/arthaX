@@ -5,7 +5,7 @@
 create table if not exists public.user_settings (
   id text primary key,
   name text not null default 'User',
-  theme text not null default 'ultra',
+  theme text not null default 'dark',
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -175,7 +175,7 @@ begin
   values (
     new.id::text,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'User'),
-    'ultra'
+    'dark'
   )
   on conflict (id) do nothing;
 

@@ -3,26 +3,23 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   PieChart as PieChartIcon,
-  Loader2,
   Plus,
   ArrowUpRight,
   ArrowDownLeft,
   ArrowLeftRight,
   Target,
-  Award,
   TrendingUp,
   TrendingDown,
-  Wallet,
-  ShieldCheck,
   ChevronRight,
   Landmark,
   ArrowRight,
   PiggyBank,
-  CheckCircle2,
   Clock,
   Sparkles,
-  Banknote,
   Activity,
+  ShieldCheck,
+  CreditCard,
+  Wallet,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -33,6 +30,12 @@ import EntityLogo from "@/components/EntityLogo";
 import BankLogo from "@/components/BankLogo";
 import { getTimeGreeting } from "@/utils/greeting";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 interface AccountItem {
   id: string;
@@ -180,7 +183,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           .limit(25),
       ]);
 
-      // 1. Resolve user display name from existing profile context
+      // 1. Resolve user display name
       const resolvedName =
         profile?.name ||
         name ||
@@ -241,7 +244,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   }, [user, redisPortfolioKey, profile?.name, name]);
 
   useEffect(() => {
-    // Determine dynamic time greeting & matching emoji
     const updateTimeGreeting = () => {
       const info = getTimeGreeting();
       setGreeting(info.text);
@@ -468,8 +470,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     >
       {/* Header Bar */}
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8 border-b"
-        style={{ borderColor: "var(--app-border)" }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 mb-6 sm:mb-8 border-b border-[var(--app-border)]"
       >
         <div className="space-y-1">
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
@@ -494,14 +495,16 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 {greetingEmoji}
               </span>
             </h1>
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live Ledger Sync
-            </span>
           </div>
           <p className="text-xs sm:text-sm text-[var(--app-muted)] font-normal">
-            Your personal net worth, liquidity and cashflow command center.
+            Sovereign ledger overview, net worth telemetry, and real-time cash flow.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant="success" dot={true}>
+            Realtime Telemetry Active
+          </Badge>
         </div>
       </div>
 
@@ -534,66 +537,61 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               {/* Massive Metric Amount */}
               <div className="space-y-1">
                 <div className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight font-mono text-[var(--app-fg)] tabular-nums">
-                  {loading ? "..." : formatCurrency(netWorth)}
+                  {loading ? (
+                    <Skeleton className="h-14 w-64 rounded-xl" />
+                  ) : (
+                    formatCurrency(netWorth)
+                  )}
                 </div>
               </div>
 
               {/* Asset & Liability Quick Badges */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div
-                  className="p-3 rounded-xl border transition-colors"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
+                  className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                  style={{ backgroundColor: "var(--app-card-subtle)" }}
                 >
                   <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
                     Total Assets
                   </div>
                   <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
-                    {formatCurrency(totalAssets)}
+                    {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
                   </div>
                 </div>
 
                 <div
-                  className="p-3 rounded-xl border transition-colors"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
+                  className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                  style={{ backgroundColor: "var(--app-card-subtle)" }}
                 >
                   <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
                     Total Liabilities
                   </div>
                   <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
-                    {formatCurrency(totalLiabilities)}
+                    {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalLiabilities)}
                   </div>
                 </div>
               </div>
 
               {/* Sub-Badges Pill Row */}
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
-                  <span className="w-2 h-2 rounded-xs bg-emerald-400" />
-                  {liquidPct}% Liquid Reserves
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-amber-500/20 bg-amber-500/10 text-amber-400">
-                  <Award size={13} className="text-amber-400" />
-                  <span>Realized Gain:</span>
-                  <span className="font-mono font-bold tracking-tight">+₹2,828.56</span>
-                </span>
+                <Badge variant="success" dot={true}>
+                  {liquidPct}% Liquid Assets
+                </Badge>
+                {totalLiabilities > 0 && totalAssets > 0 && (
+                  <Badge variant="danger">
+                    {Math.round((totalLiabilities / totalAssets) * 100)}% Debt-to-Asset Ratio
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
             <div
-              className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
-              style={{ borderColor: "var(--app-border-subtle)" }}
+              className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8 border-[var(--app-border-subtle)]"
             >
               {loading ? (
                 <div className="flex items-center justify-center h-48 w-full">
-                  <Loader2 size={24} className="animate-spin opacity-50 text-[var(--app-accent)]" />
+                  <Skeleton className="w-40 h-40 rounded-full" />
                 </div>
               ) : (
                 <InteractiveDonutChart
@@ -612,107 +610,75 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         </div>
 
         {/* MONTHLY FINANCIAL PULSE (3 Key High-Impact Metrics) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
-          {/* 1. Monthly Inflow */}
-          <div
-            className="p-5 sm:p-6 rounded-2xl border transition-all shadow-xs hover:border-[var(--app-border-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-[var(--app-muted)]">This Month's Inflow</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                <TrendingUp size={16} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--app-fg)] tabular-nums">
-                {formatCurrency(totalMonthIncome)}
-              </div>
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-emerald-400 font-medium">
-                <ArrowUpRight size={14} />
-                <span>{currentMonthIncomes.length} Income streams recorded</span>
-              </div>
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+            {/* 1. Monthly Inflow */}
+            <StatCard
+              title="This Month's Inflow"
+              value={formatCurrency(totalMonthIncome)}
+              icon={<TrendingUp size={16} />}
+              iconColor="emerald"
+              trend={{
+                direction: "up",
+                value: `${currentMonthIncomes.length} Inflows`,
+                label: "recorded this cycle",
+              }}
+              onClick={() => onNavigate?.("income")}
+            />
 
-          {/* 2. Monthly Outflow */}
-          <div
-            className="p-5 sm:p-6 rounded-2xl border transition-all shadow-xs hover:border-[var(--app-border-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-[var(--app-muted)]">This Month's Spend</span>
-              <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
-                <TrendingDown size={16} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--app-fg)] tabular-nums">
-                {formatCurrency(totalMonthExpense)}
-              </div>
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-[var(--app-muted)] font-medium">
-                <Activity size={13} className="text-rose-400" />
-                <span>Burn rate: ~{formatCurrency(dailyBurnRate)}/day</span>
-              </div>
-            </div>
-          </div>
+            {/* 2. Monthly Outflow */}
+            <StatCard
+              title="This Month's Spend"
+              value={formatCurrency(totalMonthExpense)}
+              icon={<TrendingDown size={16} />}
+              iconColor="rose"
+              trend={{
+                direction: "down",
+                value: `~${formatCurrency(dailyBurnRate)}/day`,
+                label: "daily burn rate",
+              }}
+              onClick={() => onNavigate?.("expenses")}
+            />
 
-          {/* 3. Net Savings Rate */}
-          <div
-            className="p-5 sm:p-6 rounded-2xl border transition-all shadow-xs hover:border-[var(--app-border-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-[var(--app-muted)]">Net Savings & Rate</span>
-              <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
-                <PiggyBank size={16} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div
-                className={`text-2xl sm:text-3xl font-extrabold font-mono tabular-nums ${
-                  netSavings >= 0 ? "text-emerald-400" : "text-rose-400"
-                }`}
-              >
-                {netSavings >= 0 ? "+" : ""}
-                {formatCurrency(netSavings)}
-              </div>
-              <div className="mt-2.5 space-y-1.5">
+            {/* 3. Net Savings Rate */}
+            <StatCard
+              title="Net Savings & Rate"
+              value={
+                <span className={netSavings >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                  {netSavings >= 0 ? "+" : ""}
+                  {formatCurrency(netSavings)}
+                </span>
+              }
+              icon={<PiggyBank size={16} />}
+              iconColor="sky"
+              subtitle={
                 <div className="flex items-center justify-between text-xs font-semibold">
                   <span className="text-[var(--app-muted)]">Savings Rate</span>
                   <span className="font-mono text-emerald-400">{savingsRate}%</span>
                 </div>
-                {/* Progress bar */}
-                <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-400 transition-all duration-500"
-                    style={{ width: `${savingsRate}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+              }
+              progress={{
+                value: savingsRate,
+                color: "#10b981",
+              }}
+              onClick={() => onNavigate?.("budgets")}
+            />
           </div>
-        </div>
+        )}
 
-        {/* QUICK ACTIONS BUTTONS BAR */}
+        {/* QUICK ACTIONS COMMAND BAR */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <button
             type="button"
             onClick={() => onNavigate?.("accounts")}
-            className="rounded-xl border p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <Plus size={15} className="text-[var(--app-accent)]" />
             <span>Add Account</span>
@@ -721,11 +687,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <button
             type="button"
             onClick={() => onNavigate?.("expenses")}
-            className="rounded-xl border p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <ArrowUpRight size={15} className="text-rose-400" />
             <span>Add Expense</span>
@@ -734,11 +697,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <button
             type="button"
             onClick={() => onNavigate?.("income")}
-            className="rounded-xl border p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <ArrowDownLeft size={15} className="text-emerald-400" />
             <span>Add Income</span>
@@ -747,11 +707,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <button
             type="button"
             onClick={() => onNavigate?.("accounts")}
-            className="rounded-xl border p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <ArrowLeftRight size={15} className="text-sky-400" />
             <span>Transfer Funds</span>
@@ -760,11 +717,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <button
             type="button"
             onClick={() => onNavigate?.("budgets")}
-            className="col-span-2 sm:col-span-1 rounded-xl border p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="col-span-2 sm:col-span-1 rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <Target size={15} className="text-amber-400" />
             <span>Category Budgets</span>
@@ -775,11 +729,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           {/* Left Column: Top Spending Categories Breakdown */}
           <div
-            className="lg:col-span-6 rounded-2xl p-5 sm:p-7 border transition-all shadow-xs"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="lg:col-span-6 rounded-2xl p-5 sm:p-7 border border-[var(--app-border)] transition-all shadow-xs"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <div className="flex items-center justify-between mb-5">
               <div>
@@ -800,14 +751,29 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               </button>
             </div>
 
-            {topExpenseCategories.length === 0 ? (
-              <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs text-[var(--app-muted)]">
-                <Target size={28} className="opacity-40 mb-2 text-[var(--app-accent)]" />
-                <p className="font-semibold text-[var(--app-fg)]">No expenses recorded this month</p>
-                <p className="text-[11px] mt-1 opacity-70">
-                  Log your everyday expenses to view dynamic category analytics.
-                </p>
+            {loading ? (
+              <div className="space-y-4 pt-2">
+                <Skeleton className="h-4 w-full rounded-md" />
+                <Skeleton className="h-4 w-5/6 rounded-md" />
+                <Skeleton className="h-4 w-4/6 rounded-md" />
               </div>
+            ) : topExpenseCategories.length === 0 ? (
+              <EmptyState
+                compact={true}
+                icon={<Target size={24} />}
+                title="No expenses recorded this month"
+                description="Log your everyday expenses in the Expenses tab to view dynamic category analytics."
+                action={
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    icon={<Plus size={13} />}
+                    onClick={() => onNavigate?.("expenses")}
+                  >
+                    Log an Expense
+                  </Button>
+                }
+              />
             ) : (
               <div className="space-y-4">
                 {topExpenseCategories.map((item) => (
@@ -847,19 +813,16 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
           {/* Right Column: Connected Accounts & Liquidity Strip */}
           <div
-            className="lg:col-span-6 rounded-2xl p-5 sm:p-7 border transition-all shadow-xs"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
+            className="lg:col-span-6 rounded-2xl p-5 sm:p-7 border border-[var(--app-border)] transition-all shadow-xs"
+            style={{ backgroundColor: "var(--app-card)" }}
           >
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 className="text-sm font-bold tracking-tight text-[var(--app-fg)]">
-                  Connected Accounts & Vaults
+                  Connected Accounts
                 </h3>
                 <p className="text-xs text-[var(--app-muted)] mt-0.5">
-                  {accounts.length} active liquidity holdings
+                  {accounts.length} active {accounts.length === 1 ? "holding" : "holdings"}
                 </p>
               </div>
               <button
@@ -872,25 +835,36 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               </button>
             </div>
 
-            {accounts.length === 0 ? (
-              <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-xs text-[var(--app-muted)]">
-                <Landmark size={28} className="opacity-40 mb-2 text-[var(--app-accent)]" />
-                <p className="font-semibold text-[var(--app-fg)]">No accounts connected yet</p>
-                <p className="text-[11px] mt-1 opacity-70">
-                  Connect your bank accounts or cash holding to get started.
-                </p>
+            {loading ? (
+              <div className="space-y-3 pt-2">
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
               </div>
+            ) : accounts.length === 0 ? (
+              <EmptyState
+                compact={true}
+                icon={<Landmark size={24} />}
+                title="No accounts linked yet"
+                description="Connect your bank accounts, credit cards, or cash holdings to activate portfolio tracking."
+                action={
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    icon={<Plus size={13} />}
+                    onClick={() => onNavigate?.("accounts")}
+                  >
+                    Add First Account
+                  </Button>
+                }
+              />
             ) : (
               <div className="space-y-2.5">
                 {accounts.slice(0, 4).map((acc) => (
                   <div
                     key={acc.id}
                     onClick={() => onNavigate?.("accounts")}
-                    className="flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
-                    style={{
-                      borderColor: "var(--app-border-subtle)",
-                      backgroundColor: "var(--app-bg)",
-                    }}
+                    className="flex items-center justify-between p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] transition-all cursor-pointer hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <BankLogo name={acc.name} size={34} className="flex-shrink-0" />
@@ -937,11 +911,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
         {/* RECENT FINANCIAL ACTIVITY FEED */}
         <div
-          className="rounded-2xl p-5 sm:p-7 border transition-all shadow-xs"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
+          className="rounded-2xl p-5 sm:p-7 border border-[var(--app-border)] transition-all shadow-xs"
+          style={{ backgroundColor: "var(--app-card)" }}
         >
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -949,7 +920,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 Recent Financial Activity
               </h3>
               <p className="text-xs text-[var(--app-muted)] mt-0.5">
-                Latest transactions across your unified ledger
+                Latest transactions across your active holdings
               </p>
             </div>
             <button
@@ -957,21 +928,36 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               onClick={() => onNavigate?.("ledger")}
               className="flex items-center gap-1.5 text-xs font-bold text-[var(--app-accent)] hover:underline cursor-pointer"
             >
-              <span>View Consolidated Ledger</span>
+              <span>View All Transactions</span>
               <ArrowRight size={13} />
             </button>
           </div>
 
-          {recentActivities.length === 0 ? (
-            <div className="h-36 flex flex-col items-center justify-center text-center p-4 text-xs text-[var(--app-muted)]">
-              <Clock size={26} className="opacity-40 mb-2 text-[var(--app-accent)]" />
-              <p className="font-semibold text-[var(--app-fg)]">No recent transactions recorded</p>
-              <p className="text-[11px] mt-1 opacity-70">
-                Transactions you log in Expenses, Income, or Transfers will appear here in real time.
-              </p>
+          {loading ? (
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-10 w-full rounded-xl" />
+              <Skeleton className="h-10 w-full rounded-xl" />
+              <Skeleton className="h-10 w-full rounded-xl" />
             </div>
+          ) : recentActivities.length === 0 ? (
+            <EmptyState
+              compact={true}
+              icon={<Clock size={24} />}
+              title="No recent transactions recorded"
+              description="Transactions you log in Expenses, Income, or Transfers will appear here in real time."
+              action={
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  icon={<Plus size={13} />}
+                  onClick={() => onNavigate?.("expenses")}
+                >
+                  Record a Transaction
+                </Button>
+              }
+            />
           ) : (
-            <div className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
+            <div className="divide-y divide-[var(--app-border-subtle)]">
               {recentActivities.map((act) => {
                 const isIncome = act.type === "income";
                 const isExpense = act.type === "expense";
@@ -1002,7 +988,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         </div>
                         <div className="text-[11px] text-[var(--app-muted)] flex items-center gap-2 mt-0.5">
                           {act.category && (
-                            <span className="px-2 py-0.5 rounded-md border text-[10px] font-mono border-[var(--app-border-subtle)] bg-[var(--app-bg)]">
+                            <span className="px-2 py-0.5 rounded-md border text-[10px] font-mono border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
                               {act.category}
                             </span>
                           )}

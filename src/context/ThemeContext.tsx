@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
-export type ThemeMode = "light" | "dark" | "ultra";
+export type ThemeMode = "light" | "dark";
 
 interface ThemeContextType {
   theme: ThemeMode;
@@ -13,7 +13,7 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: "ultra",
+  theme: "dark",
   setTheme: async () => {},
   loading: true,
 });
@@ -22,12 +22,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("arthax_theme") as ThemeMode | null;
-      if (saved === "light" || saved === "dark" || saved === "ultra") {
+      const saved = localStorage.getItem("arthax_theme");
+      if (saved === "light" || saved === "dark") {
         return saved;
       }
     }
-    return "ultra";
+    return "dark";
   });
   const [loading, setLoading] = useState(true);
 
@@ -65,10 +65,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           .eq("id", user.id)
           .maybeSingle();
 
-        if (data?.theme && (data.theme === "light" || data.theme === "dark" || data.theme === "ultra")) {
+        if (data?.theme && (data.theme === "light" || data.theme === "dark")) {
           setThemeState(data.theme);
           applyThemeToDOM(data.theme);
           localStorage.setItem("arthax_theme", data.theme);
+        } else if (data?.theme === "ultra") {
+          // Normalize legacy ultra theme to dark
+          setThemeState("dark");
+          applyThemeToDOM("dark");
+          localStorage.setItem("arthax_theme", "dark");
+          supabase.from("user_settings").update({ theme: "dark" }).eq("id", user.id).then();
         }
       } catch (err) {
         console.warn("Failed to load user theme from Supabase:", err);
@@ -92,10 +98,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         },
         (payload: any) => {
           const newTheme = payload.new?.theme;
-          if (newTheme && (newTheme === "light" || newTheme === "dark" || newTheme === "ultra")) {
+          if (newTheme && (newTheme === "light" || newTheme === "dark")) {
             setThemeState(newTheme);
             applyThemeToDOM(newTheme);
             localStorage.setItem("arthax_theme", newTheme);
+          } else if (newTheme === "ultra") {
+            setThemeState("dark");
+            applyThemeToDOM("dark");
+            localStorage.setItem("arthax_theme", "dark");
           }
         }
       )

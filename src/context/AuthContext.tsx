@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data) {
         const newProf = {
           name: data.name || defaultName || "User",
-          theme: data.theme || "ultra",
+          theme: data.theme === "light" ? "light" : "dark",
         };
         setProfile(newProf);
         try {
@@ -70,9 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.from("user_settings").upsert({
           id: userId,
           name: nameToSet,
-          theme: "ultra",
+          theme: "dark",
         });
-        const newProf = { name: nameToSet, theme: "ultra" };
+        const newProf = { name: nameToSet, theme: "dark" };
         setProfile(newProf);
         try {
           window.localStorage.setItem("arthax_cached_profile", JSON.stringify(newProf));
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile((prev) => {
               const updated = {
                 name: payload.new.name || prev?.name || "User",
-                theme: payload.new.theme || prev?.theme || "ultra",
+                theme: payload.new.theme === "light" ? "light" : "dark",
               };
               try {
                 window.localStorage.setItem("arthax_cached_profile", JSON.stringify(updated));
@@ -192,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev) => {
       const merged = {
         name: updates.name !== undefined ? updates.name : (prev?.name || "User"),
-        theme: updates.theme !== undefined ? updates.theme : (prev?.theme || "ultra"),
+        theme: updates.theme !== undefined ? updates.theme : (prev?.theme || "dark"),
       };
       try {
         window.localStorage.setItem("arthax_cached_profile", JSON.stringify(merged));

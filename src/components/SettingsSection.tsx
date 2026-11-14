@@ -19,10 +19,8 @@ import {
   RotateCcw,
   LogOut,
   Copy,
-  Sparkles,
   AlertTriangle,
   Trash2,
-  X,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -38,6 +36,13 @@ import {
 } from "@/utils/pdfExport";
 import { invalidateCacheKeys, getFromLocalCache, saveToLocalCache } from "@/utils/cacheClient";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 // Utility function to escape CSV values according to RFC 4180
 function escapeCSV(val: unknown): string {
@@ -81,7 +86,7 @@ export default function SettingsSection() {
   const [greetingName, setGreetingName] = useState(profile?.name || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [cacheSyncing, setCacheSyncing] = useState(false);
-  const [copiedVaultId, setCopiedVaultId] = useState(false);
+  const [copiedAccountId, setCopiedAccountId] = useState(false);
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -223,7 +228,7 @@ export default function SettingsSection() {
       const { error } = await supabase.from("user_settings").upsert({
         id: user.id,
         name: nameToSave,
-        theme: theme || "ultra",
+        theme: theme || "dark",
         updated_at: new Date().toISOString(),
       });
 
@@ -273,12 +278,12 @@ export default function SettingsSection() {
     }
   };
 
-  const handleCopyVaultId = () => {
+  const handleCopyAccountId = () => {
     if (user?.id) {
       navigator.clipboard.writeText(user.id);
-      setCopiedVaultId(true);
-      showToast("Copied", "Vault ID copied to clipboard.", "success");
-      setTimeout(() => setCopiedVaultId(false), 2000);
+      setCopiedAccountId(true);
+      showToast("Copied", "Account ID copied to clipboard.", "success");
+      setTimeout(() => setCopiedAccountId(false), 2000);
     }
   };
 
@@ -337,7 +342,6 @@ export default function SettingsSection() {
       const result = await res.json().catch(() => ({}));
 
       if (!res.ok || !result.success) {
-        // Fallback: direct client-side delete if API call returned non-200
         if (user?.id) {
           await supabase.from("transfers").delete().eq("user_id", user.id);
           await supabase.from("recurring_rules").delete().eq("user_id", user.id);
@@ -373,7 +377,6 @@ export default function SettingsSection() {
         }
       }
 
-      // Purge all multi-tier caches
       const keysToPurge = [
         getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
         getUserCacheKey(userId, CACHE_KEYS.INCOME),
@@ -391,7 +394,6 @@ export default function SettingsSection() {
       ];
       await invalidateCacheKeys(keysToPurge);
 
-      // Clear local storage keys
       try {
         if (typeof window !== "undefined") {
           const keysToRemove: string[] = [];
@@ -405,7 +407,6 @@ export default function SettingsSection() {
         }
       } catch {}
 
-      // Reset local counts state immediately
       setCounts({
         accounts: 1,
         income: 0,
@@ -420,11 +421,9 @@ export default function SettingsSection() {
 
       showToast("Workspace Wiped", "All financial records and accounts have been permanently erased.", "success");
 
-      // Refresh telemetry counts and profile
       await refreshCounts();
       if (refreshProfile) await refreshProfile();
 
-      // Dispatch universal event so all components react
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("arthax:workspace_wiped"));
       }
@@ -470,7 +469,7 @@ export default function SettingsSection() {
     };
   };
 
-  // 1. Export All JSON Backup
+  // Export All JSON Backup
   const handleExportAllJSON = async () => {
     try {
       setExportingTarget("all_json");
@@ -869,7 +868,6 @@ export default function SettingsSection() {
     }
   };
 
-  // Clean datasets matrix specification
   const DATASET_ROWS = [
     {
       id: "ledger",
@@ -909,8 +907,8 @@ export default function SettingsSection() {
     },
     {
       id: "budgets",
-      name: "Category Budgets Matrix",
-      desc: "Configured monthly limits, pace alerts, and allocations",
+      name: "Category Budgets",
+      desc: "Configured monthly limits and spending progress",
       count: counts.budgets,
       icon: Target,
       iconColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
@@ -921,8 +919,8 @@ export default function SettingsSection() {
     },
     {
       id: "accounts",
-      name: "Bank Accounts & Liquid Vault",
-      desc: "Connected holdings, physical cash, and running balances",
+      name: "Bank & Cash Accounts",
+      desc: "Connected accounts, cash balance, and statements",
       count: counts.accounts,
       icon: Landmark,
       iconColor: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
@@ -934,16 +932,11 @@ export default function SettingsSection() {
   ];
 
   const renderDangerZoneCard = () => (
-    <div
-      className="rounded-2xl border p-6 sm:p-7 space-y-5 shadow-sm transition-all"
-      style={{
-        backgroundColor: "var(--app-card)",
-        borderColor: "rgba(244, 63, 94, 0.3)",
-      }}
+    <Card
+      className="p-6 sm:p-7 space-y-5 shadow-sm transition-all border-rose-500/30"
     >
       <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b"
-        style={{ borderColor: "rgba(244, 63, 94, 0.2)" }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-rose-500/20"
       >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
@@ -951,35 +944,29 @@ export default function SettingsSection() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-rose-400">Danger Zone: Master Data Wipe</h2>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400">
-                Irreversible
-              </span>
+              <h2 className="text-sm font-bold tracking-tight text-rose-400">Danger Zone: Delete All Data</h2>
+              <Badge variant="rose">Irreversible</Badge>
             </div>
             <p className="text-xs opacity-60 mt-0.5">
-              Permanently wipe all transactions, accounts, budgets, and family vault data.
+              Permanently delete all transactions, accounts, budgets, and family data.
             </p>
           </div>
         </div>
 
-        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full border border-rose-500/30 text-rose-400 bg-rose-500/10 self-start sm:self-auto">
+        <Badge variant="rose" className="self-start sm:self-auto font-mono">
           {counts.total} Total Records
-        </span>
+        </Badge>
       </div>
 
       <div
-        className="p-4 sm:p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-        style={{
-          backgroundColor: "var(--app-bg)",
-          borderColor: "rgba(244, 63, 94, 0.2)",
-        }}
+        className="p-4 sm:p-5 rounded-xl border border-rose-500/20 bg-[var(--app-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div className="space-y-1.5 max-w-xl">
-          <div className="font-bold text-xs text-rose-300 flex items-center gap-2">
-            <span>Wipe Entire Data & Factory Reset Workspace</span>
+          <div className="font-bold text-xs text-rose-300">
+            Delete All Data & Reset Account
           </div>
           <p className="text-xs opacity-70 leading-relaxed">
-            Deletes all expenses, income streams, transfers, category budgets, family records, and custom accounts. Liquid Cash will reset to ₹0.00. This action is catastrophic and cannot be undone.
+            Deletes all expenses, income records, transfers, category budgets, family records, and custom accounts. Cash balance will reset to ₹0.00. This action cannot be undone.
           </p>
 
           <div className="flex items-center gap-3 pt-1 text-[11px] font-mono opacity-60 flex-wrap">
@@ -989,20 +976,19 @@ export default function SettingsSection() {
           </div>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="danger"
+          size="md"
+          icon={<Trash2 size={14} />}
           onClick={() => {
             setWipeConfirmationInput("");
             setWipeModalOpen(true);
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl border border-rose-500/40 hover:border-rose-500 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-rose-100 transition-all cursor-pointer shadow-sm active:scale-95 flex-shrink-0 self-start sm:self-center"
-          title="Open master delete wipe confirmation"
         >
-          <Trash2 size={14} className="text-rose-400" />
-          <span>Wipe Entire Data</span>
-        </button>
+          Wipe Entire Data
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 
   return (
@@ -1011,144 +997,80 @@ export default function SettingsSection() {
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 pb-16">
-        {/* ============================================================== */}
-        {/* TOP HEADER                                                     */}
-        {/* ============================================================== */}
-        <div
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 sm:pb-6 border-b"
-          style={{ borderColor: "var(--app-border)" }}
-        >
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Settings</h1>
-              <span
-                className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-card)",
-                }}
-              >
-                Workspace & Vault
-              </span>
-            </div>
-            <p className="text-xs opacity-70 mt-1">
-              Personalize your workspace identity, export statements, and manage account security.
-            </p>
-          </div>
-
-          {/* Quick Synchronize Workspace Button */}
-          <button
-            type="button"
-            onClick={handlePurgeCacheAndSync}
-            disabled={cacheSyncing}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer shadow-sm hover:opacity-100 opacity-80 active:scale-95 disabled:opacity-40 self-start sm:self-auto"
-            style={{
-              borderColor: "var(--app-border)",
-              backgroundColor: "var(--app-card)",
-              color: "var(--app-fg)",
-            }}
-            title="Synchronize all account balances and cache"
-          >
-            <RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />
-            <span>{cacheSyncing ? "Syncing..." : "Sync Workspace"}</span>
-          </button>
-        </div>
-
-        {/* ============================================================== */}
-        {/* CLEAN SEGMENTED SUB-NAV TABS                                   */}
-        {/* ============================================================== */}
-        <div
-          className="flex items-center gap-1.5 p-1.5 rounded-2xl border overflow-x-auto shadow-xs"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setActiveTab("profile")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "profile"
-                ? "shadow-sm text-emerald-400"
-                : "opacity-60 hover:opacity-100 hover:text-[var(--app-fg)]"
-            }`}
-            style={{
-              backgroundColor: activeTab === "profile" ? "var(--app-bg)" : "transparent",
-            }}
-          >
-            <User size={14} className={activeTab === "profile" ? "text-emerald-400" : ""} />
-            <span>Profile & Identity</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("statements")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "statements"
-                ? "shadow-sm text-emerald-400"
-                : "opacity-60 hover:opacity-100 hover:text-[var(--app-fg)]"
-            }`}
-            style={{
-              backgroundColor: activeTab === "statements" ? "var(--app-bg)" : "transparent",
-            }}
-          >
-            <FileText size={14} className={activeTab === "statements" ? "text-emerald-400" : ""} />
-            <span>Statements & Data</span>
-            <span
-              className="text-[10px] font-mono px-1.5 py-0.2 rounded-full border opacity-75"
-              style={{ borderColor: "var(--app-border-subtle)" }}
+        {/* TOP HEADER */}
+        <PageHeader
+          title="Settings"
+          description="Personalize your workspace identity, export statements, and manage account security."
+          badge={
+            <Badge variant="violet" dot>
+              Preferences & Vault
+            </Badge>
+          }
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />}
+              loading={cacheSyncing}
+              onClick={handlePurgeCacheAndSync}
             >
-              {counts.total}
-            </span>
-          </button>
+              Sync Workspace
+            </Button>
+          }
+        />
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("security")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "security"
-                ? "shadow-sm text-emerald-400"
-                : "opacity-60 hover:opacity-100 hover:text-[var(--app-fg)]"
-            }`}
-            style={{
-              backgroundColor: activeTab === "security" ? "var(--app-bg)" : "transparent",
-            }}
-          >
-            <ShieldCheck size={14} className={activeTab === "security" ? "text-emerald-400" : ""} />
-            <span>Vault Security</span>
-          </button>
+        {/* SUB-NAV TABS */}
+        <SegmentedControl
+          options={[
+            {
+              value: "profile",
+              label: (
+                <span className="flex items-center gap-2">
+                  <User size={14} />
+                  <span>Profile & Identity</span>
+                </span>
+              ),
+            },
+            {
+              value: "statements",
+              label: (
+                <span className="flex items-center gap-2">
+                  <FileText size={14} />
+                  <span>Statements & Data</span>
+                  <Badge variant="neutral" className="ml-1">
+                    {counts.total}
+                  </Badge>
+                </span>
+              ),
+            },
+            {
+              value: "security",
+              label: (
+                <span className="flex items-center gap-2">
+                  <ShieldCheck size={14} />
+                  <span>Security & Privacy</span>
+                </span>
+              ),
+            },
+            {
+              value: "danger",
+              label: (
+                <span className="flex items-center gap-2 text-rose-400">
+                  <AlertTriangle size={14} />
+                  <span>Danger Zone</span>
+                </span>
+              ),
+            },
+          ]}
+          value={activeTab}
+          onChange={(val) => setActiveTab(val as SettingsTab)}
+        />
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("danger")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "danger"
-                ? "shadow-sm text-rose-400 border border-rose-500/40"
-                : "opacity-60 hover:opacity-100 hover:text-rose-400"
-            }`}
-            style={{
-              backgroundColor: activeTab === "danger" ? "rgba(244, 63, 94, 0.12)" : "transparent",
-            }}
-          >
-            <AlertTriangle size={14} className={activeTab === "danger" ? "text-rose-400" : "text-rose-400/80"} />
-            <span className={activeTab === "danger" ? "text-rose-400 font-bold" : ""}>Danger Zone</span>
-          </button>
-        </div>
-
-        {/* ============================================================== */}
-        {/* TAB 1: PROFILE & IDENTITY                                      */}
-        {/* ============================================================== */}
+        {/* TAB 1: PROFILE & IDENTITY */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Identity Showcase Card */}
-            <div
-              className="rounded-2xl border p-6 sm:p-7 space-y-6 shadow-sm transition-all"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
                     <User size={16} />
@@ -1160,20 +1082,15 @@ export default function SettingsSection() {
                 </div>
 
                 {isGoogleUser && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-mono font-semibold rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-400">
-                    <CheckCircle2 size={12} />
+                  <Badge variant="sky" dot>
                     Google Account
-                  </span>
+                  </Badge>
                 )}
               </div>
 
               {/* Visual Identity Row */}
               <div
-                className="p-4 sm:p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
+                className="p-4 sm:p-5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="flex items-center gap-4">
                   {googleAvatarUrl ? (
@@ -1184,8 +1101,7 @@ export default function SettingsSection() {
                     />
                   ) : (
                     <div
-                      className="w-14 h-14 rounded-2xl border flex items-center justify-center font-extrabold text-lg flex-shrink-0 bg-emerald-500/10 text-emerald-400"
-                      style={{ borderColor: "var(--app-border)" }}
+                      className="w-14 h-14 rounded-2xl border border-[var(--app-border)] flex items-center justify-center font-extrabold text-lg flex-shrink-0 bg-emerald-500/10 text-emerald-400"
                     >
                       {initials}
                     </div>
@@ -1204,22 +1120,22 @@ export default function SettingsSection() {
                   </div>
                 </div>
 
-                {/* Vault ID with Copy Button */}
+                {/* Account ID with Copy Button */}
                 <div className="flex items-center gap-2 self-start sm:self-center">
-                  <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider">Vault ID:</span>
+                  <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider">Account ID:</span>
                   <button
                     type="button"
-                    onClick={handleCopyVaultId}
+                    onClick={handleCopyAccountId}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono rounded-lg border hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-colors cursor-pointer"
                     style={{
                       borderColor: "var(--app-border)",
                       backgroundColor: "var(--app-card)",
                       color: "var(--app-fg)",
                     }}
-                    title="Click to copy Vault ID"
+                    title="Click to copy Account ID"
                   >
-                    <span>{user?.id ? `${user.id.substring(0, 8)}...` : "local_vault"}</span>
-                    {copiedVaultId ? (
+                    <span>{user?.id ? `${user.id.substring(0, 8)}...` : "local_account"}</span>
+                    {copiedAccountId ? (
                       <Check size={11} className="text-emerald-400" />
                     ) : (
                       <Copy size={11} className="opacity-60" />
@@ -1231,7 +1147,7 @@ export default function SettingsSection() {
               {/* Display Name Input Form */}
               <div className="space-y-3 pt-2">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider block opacity-75">
+                  <label className="text-xs font-bold uppercase tracking-wider block opacity-75 font-mono">
                     Greeting Name
                   </label>
                   <p className="text-xs opacity-60 mt-0.5">
@@ -1241,58 +1157,42 @@ export default function SettingsSection() {
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                   <div className="relative flex-1">
-                    <input
+                    <Input
                       type="text"
                       value={greetingName}
                       onChange={handleNameInputChange}
                       onKeyDown={handleNameKeyDown}
                       onBlur={handleNameBlur}
                       placeholder="Enter display name (e.g. Saran)"
-                      className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all font-medium"
-                      style={{
-                        backgroundColor: "var(--app-bg)",
-                        color: "var(--app-fg)",
-                        borderColor: "var(--app-border)",
-                      }}
                     />
                   </div>
 
-                  <button
+                  <Button
                     type="button"
+                    variant="primary"
+                    size="md"
+                    loading={saveStatus === "saving"}
+                    disabled={!greetingName.trim()}
                     onClick={() => handleSaveName()}
-                    disabled={saveStatus === "saving" || !greetingName.trim()}
-                    className="px-5 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 min-w-[120px]"
-                    style={{
-                      backgroundColor: "var(--app-fg)",
-                      color: "var(--app-bg)",
-                    }}
+                    className="min-w-[120px]"
                   >
-                    {saveStatus === "saving" ? (
+                    {saveStatus === "saved" ? (
                       <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : saveStatus === "saved" ? (
-                      <>
-                        <Check size={13} className="text-emerald-500" />
+                        <Check size={13} className="text-emerald-400" />
                         <span>Saved</span>
                       </>
                     ) : (
                       <span>Save Name</span>
                     )}
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Live Greeting Preview Banner */}
                 <div
-                  className="p-3 rounded-xl border flex items-center justify-between gap-3 text-xs"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
+                  className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
                     <span className="opacity-60 text-[10px] font-mono uppercase tracking-wider">Dashboard Greeting Preview:</span>
                     <span className="font-semibold truncate text-xs text-emerald-400">
                       {timeGreeting}{greetingName.trim() ? `, ${greetingName.trim()}` : ""}
@@ -1301,24 +1201,15 @@ export default function SettingsSection() {
                   <span className="text-[10px] font-mono opacity-50 hidden sm:inline">Active</span>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* TAB 2: STATEMENTS & DATA REPORTS                               */}
-        {/* ============================================================== */}
+        {/* TAB 2: STATEMENTS & DATA REPORTS */}
         {activeTab === "statements" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Master Bulk Actions Bar */}
-            <div
-              className="rounded-2xl border p-6 sm:p-7 space-y-5 shadow-sm transition-all"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b" style={{ borderColor: "var(--app-border-subtle)" }}>
+            <Card className="p-6 sm:p-7 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--app-border-subtle)]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
                     <FileText size={16} />
@@ -1329,76 +1220,49 @@ export default function SettingsSection() {
                   </div>
                 </div>
 
-                <span
-                  className="text-[10px] font-mono px-2.5 py-1 rounded-full border self-start sm:self-auto"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
-                >
+                <Badge variant="outline" className="font-mono self-start sm:self-auto">
                   {loadingCounts ? "Loading..." : `${counts.total} items recorded`}
-                </span>
+                </Badge>
               </div>
 
               {/* 1-Click Master Export Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                  icon={exportingTarget === "master_pdf" ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                  disabled={exportingTarget !== null}
                   onClick={handleExportMasterPDF}
-                  disabled={exportingTarget !== null}
-                  className="flex items-center justify-center gap-2 p-3 text-xs font-bold rounded-xl border border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-40"
-                  title="Download complete portfolio financial report in PDF"
                 >
-                  {exportingTarget === "master_pdf" ? (
-                    <Loader2 size={14} className="animate-spin text-rose-400" />
-                  ) : (
-                    <FileText size={14} />
-                  )}
-                  <span>Master Portfolio PDF</span>
-                </button>
+                  Master Portfolio PDF
+                </Button>
 
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={exportingTarget === "all_json" ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  disabled={exportingTarget !== null}
                   onClick={handleExportAllJSON}
-                  disabled={exportingTarget !== null}
-                  className="flex items-center justify-center gap-2 p-3 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:opacity-90 active:scale-98 disabled:opacity-40"
-                  style={{
-                    backgroundColor: "var(--app-fg)",
-                    color: "var(--app-bg)",
-                  }}
-                  title="Download full portfolio backup in JSON format"
                 >
-                  {exportingTarget === "all_json" ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Download size={14} />
-                  )}
-                  <span>Backup All JSON</span>
-                </button>
+                  Backup All JSON
+                </Button>
 
-                <button
-                  type="button"
-                  onClick={handleExportAllCSVs}
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                  icon={exportingTarget === "all_csv" ? <Loader2 size={14} className="animate-spin" /> : <FolderDown size={14} />}
                   disabled={exportingTarget !== null}
-                  className="flex items-center justify-center gap-2 p-3 text-xs font-bold rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-40"
-                  title="Download all datasets as individual CSV spreadsheets"
+                  onClick={handleExportAllCSVs}
                 >
-                  {exportingTarget === "all_csv" ? (
-                    <Loader2 size={14} className="animate-spin text-emerald-400" />
-                  ) : (
-                    <FolderDown size={14} />
-                  )}
-                  <span>All CSV Spreadsheets</span>
-                </button>
+                  All CSV Spreadsheets
+                </Button>
               </div>
 
               {/* Metrics Summary Strip */}
               <div
-                className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl border text-xs"
-                style={{
-                  backgroundColor: "var(--app-bg)",
-                  borderColor: "var(--app-border-subtle)",
-                }}
+                className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] text-xs"
               >
                 <div className="flex items-center gap-2 p-1.5">
                   <Landmark size={14} className="opacity-60 flex-shrink-0" />
@@ -1448,11 +1312,7 @@ export default function SettingsSection() {
                 </div>
 
                 <div
-                  className="divide-y rounded-2xl border overflow-hidden shadow-xs"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
+                  className="divide-y rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] overflow-hidden shadow-xs"
                 >
                   {DATASET_ROWS.map((ds) => {
                     const Icon = ds.icon;
@@ -1468,9 +1328,9 @@ export default function SettingsSection() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-xs tracking-tight truncate">{ds.name}</span>
-                              <span className="text-[10px] font-mono opacity-50 px-1.5 py-0.2 rounded-full border border-[var(--app-border-subtle)]">
+                              <Badge variant="neutral">
                                 {ds.count} {ds.count === 1 ? "row" : "rows"}
-                              </span>
+                              </Badge>
                             </div>
                             <p className="text-[11px] opacity-60 truncate mt-0.5">{ds.desc}</p>
                           </div>
@@ -1478,90 +1338,62 @@ export default function SettingsSection() {
 
                         {/* Dual Action Buttons */}
                         <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-                          <button
-                            type="button"
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                            icon={exportingTarget === ds.pdfTarget ? <Loader2 size={12} className="animate-spin text-rose-400" /> : <FileText size={12} />}
+                            disabled={exportingTarget !== null}
                             onClick={ds.pdfFn}
-                            disabled={exportingTarget !== null}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-40"
-                            title={`Download ${ds.name} PDF statement`}
                           >
-                            {exportingTarget === ds.pdfTarget ? (
-                              <Loader2 size={12} className="animate-spin text-rose-400" />
-                            ) : (
-                              <FileText size={12} />
-                            )}
-                            <span>PDF</span>
-                          </button>
+                            PDF
+                          </Button>
 
-                          <button
-                            type="button"
-                            onClick={ds.csvFn}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                            icon={exportingTarget === ds.csvTarget ? <Loader2 size={12} className="animate-spin text-emerald-400" /> : <FileSpreadsheet size={12} />}
                             disabled={exportingTarget !== null}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-40"
-                            title={`Export ${ds.name} to CSV`}
+                            onClick={ds.csvFn}
                           >
-                            {exportingTarget === ds.csvTarget ? (
-                              <Loader2 size={12} className="animate-spin text-emerald-400" />
-                            ) : (
-                              <FileSpreadsheet size={12} />
-                            )}
-                            <span>CSV</span>
-                          </button>
+                            CSV
+                          </Button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-            </div>
+            </Card>
 
             {/* Danger Zone Wipe within Statements & Data */}
             {renderDangerZoneCard()}
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* TAB 3: VAULT SECURITY & CACHE SYNC                             */}
-        {/* ============================================================== */}
+        {/* TAB 3: VAULT SECURITY & CACHE SYNC */}
         {activeTab === "security" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div
-              className="rounded-2xl border p-6 sm:p-7 space-y-6 shadow-sm transition-all"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div
-                className="flex items-center justify-between pb-4 border-b"
-                style={{ borderColor: "var(--app-border-subtle)" }}
-              >
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
                     <ShieldCheck size={16} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold tracking-tight">Security & Vault Session</h2>
-                    <p className="text-xs opacity-60">Multi-tenant encrypted personal finance vault</p>
+                    <h2 className="text-sm font-bold tracking-tight">Account & Security</h2>
+                    <p className="text-xs opacity-60">Manage your account security and session</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2.5 py-1 rounded-full border text-emerald-400 border-emerald-500/30 bg-emerald-500/10 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Protected & Active
-                </span>
               </div>
 
               {/* Status Rows */}
               <div
-                className="p-4 rounded-xl border space-y-3 text-xs"
-                style={{
-                  backgroundColor: "var(--app-bg)",
-                  borderColor: "var(--app-border-subtle)",
-                }}
+                className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-3 text-xs"
               >
                 <div
-                  className="flex items-center justify-between py-1.5 border-b"
-                  style={{ borderColor: "var(--app-border-subtle)" }}
+                  className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]"
                 >
                   <span className="opacity-60 text-xs">Primary Email</span>
                   <div className="flex items-center gap-1.5 font-medium">
@@ -1571,71 +1403,55 @@ export default function SettingsSection() {
                 </div>
 
                 <div
-                  className="flex items-center justify-between py-1.5 border-b"
-                  style={{ borderColor: "var(--app-border-subtle)" }}
+                  className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]"
                 >
-                  <span className="opacity-60 text-xs">Data Encryption</span>
-                  <span className="font-mono text-[11px] opacity-80">Client-Side Vault Isolation • Multi-Tenant</span>
+                  <span className="opacity-60 text-xs">Data Protection</span>
+                  <span className="text-[11px] opacity-80 font-mono">Encrypted Database (Row-Level Security)</span>
                 </div>
 
                 <div className="flex items-center justify-between py-1.5">
                   <span className="opacity-60 text-xs">Session Status</span>
-                  <span className="text-emerald-400 font-semibold text-xs flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    Active Secure Session
-                  </span>
+                  <Badge variant="emerald" dot>
+                    Active Session
+                  </Badge>
                 </div>
               </div>
 
               {/* Action Buttons: Refresh & Sign Out */}
               <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="md"
+                  icon={<RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />}
+                  loading={cacheSyncing}
                   onClick={handlePurgeCacheAndSync}
-                  disabled={cacheSyncing}
-                  className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl border hover:bg-[var(--app-bg)] transition-all cursor-pointer opacity-80 hover:opacity-100 disabled:opacity-40 shadow-xs active:scale-95"
-                  style={{
-                    borderColor: "var(--app-border)",
-                    color: "var(--app-fg)",
-                  }}
-                  title="Refresh all account balances and transaction data"
                 >
-                  <RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />
-                  <span>{cacheSyncing ? "Refreshing Data..." : "Synchronize Workspace Cache"}</span>
-                </button>
+                  Refresh Account Data
+                </Button>
 
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
+                  size="md"
+                  icon={<LogOut size={13} />}
                   onClick={signOut}
-                  className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl border border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer shadow-xs active:scale-95"
-                  title="Securely sign out of your arthaX account"
                 >
-                  <LogOut size={13} />
-                  <span>Sign Out of arthaX</span>
-                </button>
+                  Sign Out of arthaX
+                </Button>
               </div>
-            </div>
+            </Card>
 
             {/* Danger Zone Wipe within Vault Security */}
             {renderDangerZoneCard()}
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* TAB 4: DANGER ZONE (MASTER DATA WIPE)                          */}
-        {/* ============================================================== */}
+        {/* TAB 4: DANGER ZONE (MASTER DATA WIPE) */}
         {activeTab === "danger" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             {renderDangerZoneCard()}
 
-            {/* Explanatory Safety & Backup Recommendations Card */}
-            <div
-              className="rounded-2xl border p-6 space-y-4 shadow-sm text-xs"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border-subtle)",
-              }}
-            >
+            {/* Safeguard & Export Options Card */}
+            <Card className="p-6 space-y-4 text-xs">
               <div className="flex items-center gap-2.5 font-bold text-sm">
                 <ShieldCheck size={16} className="text-emerald-400" />
                 <span>Safeguards & Export Options Prior to Deletion</span>
@@ -1644,163 +1460,122 @@ export default function SettingsSection() {
                 Before initiating a master wipe, we strongly encourage generating an offline JSON backup or downloading your consolidated CSV statements. Once the wipe is processed, all data will be permanently expunged from the PostgreSQL database and Redis caching layer.
               </p>
               <div className="flex items-center gap-3 pt-1 flex-wrap">
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                  icon={<Download size={13} />}
+                  disabled={exportingTarget !== null}
                   onClick={handleExportAllJSON}
-                  disabled={exportingTarget !== null}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer shadow-xs active:scale-95"
                 >
-                  <Download size={13} />
-                  <span>Download Complete JSON Backup</span>
-                </button>
-                <button
-                  type="button"
+                  Download Complete JSON Backup
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                  icon={<FileText size={13} />}
+                  disabled={exportingTarget !== null}
                   onClick={handleExportMasterPDF}
-                  disabled={exportingTarget !== null}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer shadow-xs active:scale-95"
                 >
-                  <FileText size={13} />
-                  <span>Download Master Portfolio PDF</span>
-                </button>
+                  Download Master Portfolio PDF
+                </Button>
               </div>
-            </div>
+            </Card>
           </div>
         )}
       </div>
 
-      {/* ============================================================== */}
-      {/* POPUP CONFIRMATION MODAL: MASTER DATA WIPE SAFEGUARD           */}
-      {/* ============================================================== */}
-      {wipeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+      {/* POPUP CONFIRMATION MODAL: MASTER DATA WIPE */}
+      <Modal
+        isOpen={wipeModalOpen}
+        onClose={() => !isWiping && setWipeModalOpen(false)}
+        title="Delete All Data"
+        description="This action is permanent and cannot be undone."
+        size="lg"
+      >
+        <div className="space-y-5">
+          {/* Warning Details Callout */}
+          <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2 text-xs">
+            <div className="font-bold text-rose-300 flex items-center gap-1.5">
+              <span>Are you absolutely certain?</span>
+            </div>
+            <p className="opacity-80 leading-relaxed">
+              You are about to delete all data from your account. The following records will be permanently removed:
+            </p>
+            <ul className="list-disc list-inside space-y-1 opacity-90 pl-1 font-mono text-[11px] text-rose-200">
+              <li>All Expenses & Receipts ({counts.expenses} items)</li>
+              <li>All Income Records ({counts.income} items)</li>
+              <li>All Account Transfers & Recurring Rules</li>
+              <li>All Category Budgets ({counts.budgets} items)</li>
+              <li>All Family Members & Transfer Records</li>
+              <li>All Linked Accounts & Balances</li>
+              <li>All Transaction History</li>
+            </ul>
+          </div>
+
+          {/* Offline Snapshot Backup Suggestion */}
           <div
-            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative animate-in zoom-in-95 duration-200 border-rose-500/40"
-            style={{
-              backgroundColor: "var(--app-card)",
-              color: "var(--app-fg)",
-            }}
+            className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex items-center justify-between gap-3 text-xs"
           >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-4 pb-3 border-b border-[var(--app-border-subtle)]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center justify-center flex-shrink-0 animate-pulse">
-                  <AlertTriangle size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight text-rose-400">Master Wipe: Erase All Data</h3>
-                  <p className="text-xs opacity-70">This action is permanent and cannot be undone.</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => !isWiping && setWipeModalOpen(false)}
-                disabled={isWiping}
-                className="p-1 rounded-lg border border-[var(--app-border-subtle)] opacity-60 hover:opacity-100 transition-opacity disabled:opacity-30 cursor-pointer"
-              >
-                <X size={16} />
-              </button>
+            <div className="min-w-0">
+              <div className="font-semibold text-xs">Recommended: Download Backup</div>
+              <div className="text-[11px] opacity-60 truncate">Save a complete JSON snapshot prior to wiping.</div>
             </div>
-
-            {/* Warning Details Callout */}
-            <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2 text-xs">
-              <div className="font-bold text-rose-300 flex items-center gap-1.5">
-                <span>Are you absolutely certain?</span>
-              </div>
-              <p className="opacity-80 leading-relaxed">
-                You are about to execute a master wipe on your personal finance vault. The following records will be permanently deleted:
-              </p>
-              <ul className="list-disc list-inside space-y-1 opacity-90 pl-1 font-mono text-[11px] text-rose-200">
-                <li>All Expenses, Receipts & Outflows ({counts.expenses} items)</li>
-                <li>All Income Streams & Inflows ({counts.income} items)</li>
-                <li>All Account Transfers & Recurring Automation Rules</li>
-                <li>All Category Budgets & Pace Targets ({counts.budgets} items)</li>
-                <li>All Family Members, Goals & Emergency Vault Records</li>
-                <li>All Linked Accounts (Liquid Cash will reset to ₹0.00)</li>
-                <li>Complete Financial Audit History</li>
-              </ul>
-            </div>
-
-            {/* Offline Snapshot Backup Suggestion */}
-            <div
-              className="p-3 rounded-xl border flex items-center justify-between gap-3 text-xs"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-bg)",
-              }}
+            <Button
+              variant="outline"
+              size="xs"
+              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              icon={exportingTarget === "all_json" ? <Loader2 size={12} className="animate-spin text-emerald-400" /> : <Download size={12} />}
+              disabled={exportingTarget !== null || isWiping}
+              onClick={handleExportAllJSON}
             >
-              <div className="min-w-0">
-                <div className="font-semibold text-xs">Recommended: Download Backup</div>
-                <div className="text-[11px] opacity-60 truncate">Save a complete JSON snapshot prior to wiping.</div>
-              </div>
-              <button
-                type="button"
-                onClick={handleExportAllJSON}
-                disabled={exportingTarget !== null || isWiping}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95 disabled:opacity-40"
-              >
-                {exportingTarget === "all_json" ? (
-                  <Loader2 size={12} className="animate-spin text-emerald-400" />
-                ) : (
-                  <Download size={12} />
-                )}
-                <span>Download JSON</span>
-              </button>
-            </div>
+              Download JSON
+            </Button>
+          </div>
 
-            {/* Type Confirmation Safeguard */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider block opacity-75">
-                To confirm, type <span className="font-mono text-rose-400 font-extrabold select-all">DELETE</span> in the box below:
-              </label>
-              <input
-                type="text"
-                value={wipeConfirmationInput}
-                onChange={(e) => setWipeConfirmationInput(e.target.value)}
-                disabled={isWiping}
-                placeholder='Type "DELETE"'
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-rose-500/40 border-rose-500/30 transition-all uppercase"
-                style={{
-                  backgroundColor: "var(--app-bg)",
-                  color: "var(--app-fg)",
-                }}
-                autoFocus
-              />
-            </div>
+          {/* Type Confirmation Safeguard */}
+          <div className="space-y-2">
+            <Input
+              label={
+                <span>
+                  To confirm, type <span className="font-mono text-rose-400 font-extrabold select-all">DELETE</span> in the box below:
+                </span>
+              }
+              value={wipeConfirmationInput}
+              onChange={(e) => setWipeConfirmationInput(e.target.value)}
+              disabled={isWiping}
+              placeholder='Type "DELETE"'
+              autoFocus
+            />
+          </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setWipeModalOpen(false)}
-                disabled={isWiping}
-                className="px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--app-border)] hover:bg-[var(--app-bg)] transition-all cursor-pointer opacity-80 hover:opacity-100 disabled:opacity-40"
-              >
-                Cancel
-              </button>
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              disabled={isWiping}
+              onClick={() => setWipeModalOpen(false)}
+            >
+              Cancel
+            </Button>
 
-              <button
-                type="button"
-                onClick={handleMasterWipe}
-                disabled={wipeConfirmationInput.trim().toUpperCase() !== "DELETE" || isWiping}
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl border border-rose-500/50 bg-rose-600 hover:bg-rose-700 text-white transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                {isWiping ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin text-white" />
-                    <span>Wiping Workspace Data...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={14} className="text-white" />
-                    <span>Permanently Wipe Everything</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              loading={isWiping}
+              disabled={wipeConfirmationInput.trim().toUpperCase() !== "DELETE" || isWiping}
+              icon={<Trash2 size={14} />}
+              onClick={handleMasterWipe}
+            >
+              Permanently Wipe Everything
+            </Button>
           </div>
         </div>
-      )}
+      </Modal>
     </main>
   );
 }
