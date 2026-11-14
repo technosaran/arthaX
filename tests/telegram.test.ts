@@ -145,7 +145,7 @@ describe("Telegram Integration Suite", () => {
     });
 
     it("formats comprehensive command help guide", () => {
-      const help = formatHelpMessage("ArthaXBot");
+      const help = formatHelpMessage("Artha_X_bot");
       expect(help).toContain("arthaX Telegram Bot Guide");
       expect(help).toContain("Dinner 650 HDFC");
       expect(help).toContain("Bank Debit SMS Forwarding");

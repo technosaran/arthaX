@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         .eq("id", userId);
     }
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "ArthaXBot";
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
 
     return NextResponse.json({
       success: true,
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       .update({ telegram_link_token: newToken })
       .eq("id", userId);
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "ArthaXBot";
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
 
     return NextResponse.json({
       success: true,

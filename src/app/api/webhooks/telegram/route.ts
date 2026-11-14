@@ -53,7 +53,7 @@ interface TelegramUpdate {
  */
 export async function GET() {
   const isConfigured = Boolean(process.env.TELEGRAM_BOT_TOKEN);
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || "ArthaXBot";
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
 
   if (!isConfigured) {
     return NextResponse.json({
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     const chatIdStr = String(chatId);
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "ArthaXBot";
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
 
     // -------------------------------------------------------------
     // 2. Resolve User ID from Database

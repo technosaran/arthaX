@@ -109,7 +109,7 @@ export default function SettingsSection() {
     telegram_username: profile?.telegram_username || null,
     telegram_chat_id: profile?.telegram_chat_id || null,
     link_token: profile?.telegram_link_token || null,
-    bot_username: "ArthaXBot",
+    bot_username: "Artha_X_bot",
     loading: false,
   });
   const [copiedLinkToken, setCopiedLinkToken] = useState(false);
@@ -247,7 +247,7 @@ export default function SettingsSection() {
             telegram_username: data.telegram_username,
             telegram_chat_id: data.telegram_chat_id,
             link_token: data.link_token,
-            bot_username: data.bot_username || "ArthaXBot",
+            bot_username: data.bot_username || "Artha_X_bot",
             loading: false,
           });
         }
@@ -1604,7 +1604,7 @@ export default function SettingsSection() {
                               navigator.clipboard.writeText(`/link ${telegramData.link_token || user?.id}`);
                               setCopiedLinkToken(true);
                               setTimeout(() => setCopiedLinkToken(false), 2000);
-                              showToast("Copied to clipboard", "Paste this command into @ArthaXBot on Telegram", "success");
+                              showToast("Copied to clipboard", "Paste this command into @Artha_X_bot on Telegram", "success");
                             }}
                           >
                             {copiedLinkToken ? "Copied" : "Copy"}
