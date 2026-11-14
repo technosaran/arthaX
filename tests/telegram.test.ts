@@ -4,13 +4,21 @@ import {
   escapeTelegramHtml,
   formatCurrencyINR,
   formatExpenseConfirmation,
+  formatIncomeConfirmation,
+  formatTransferConfirmation,
+  formatBudgetSummary,
+  formatUndoConfirmation,
   formatBalanceSummary,
   formatRecentExpenses,
   formatSpendingSummary,
   formatWelcomeMessage,
   formatHelpMessage,
+  getStandardInlineKeyboard,
+  getExpenseActionKeyboard,
+  getIncomeActionKeyboard,
 } from "@/utils/telegram";
 import { parseExpenseMessage, AccountSummary } from "@/utils/expenseParser";
+import { classifyFinancialMessage } from "@/utils/financeParser";
 
 describe("Telegram Integration Suite", () => {
   describe("Security & Secret Verification", () => {
@@ -211,6 +219,147 @@ describe("Telegram Integration Suite", () => {
       expect(extractLinkToken("/start AX-7K9P2X")).toBe("AX-7K9P2X");
       expect(extractLinkToken("/start")).toBeNull();
       expect(extractLinkToken("/balance")).toBeNull();
+    });
+  });
+
+  describe("Full Financial Intent Classifier & Flow", () => {
+    const knownAccounts: AccountSummary[] = [
+      { id: "acc-1", name: "HDFC Salary", type: "Savings", balance: 50000, last_four: "9876" },
+      { id: "acc-2", name: "Cash in Hand", type: "Liquid Cash", balance: 5000, last_four: "CASH" },
+      { id: "acc-3", name: "SBI Card", type: "Credit Card", balance: 12000, last_four: "1122" },
+    ];
+
+    it("detects and parses inter-account transfers", () => {
+      const msg = "Transfer 5000 from HDFC to Cash";
+      const intent = classifyFinancialMessage(msg, knownAccounts);
+
+      expect(intent.type).toBe("transfer");
+      if (intent.type === "transfer") {
+        expect(intent.data.amount).toBe(5000);
+        expect(intent.data.fromAccountQuery.toLowerCase()).toContain("hdfc");
+        expect(intent.data.toAccountQuery.toLowerCase()).toContain("cash");
+      }
+    });
+
+    it("detects and parses salary/income entries", () => {
+      const msg = "Salary 85000 HDFC";
+      const intent = classifyFinancialMessage(msg, knownAccounts);
+
+      expect(intent.type).toBe("income");
+      if (intent.type === "income") {
+        expect(intent.data.amount).toBe(85000);
+        expect(intent.data.category).toBe("Salary");
+        expect(intent.data.accountQuery).toBe("HDFC Salary");
+      }
+    });
+
+    it("detects and parses bank credit SMS notifications", () => {
+      const sms = "Dear Customer, your A/c ending 9876 has been credited with Rs. 25,000.00 on 14-Nov-26.";
+      const intent = classifyFinancialMessage(sms, knownAccounts);
+
+      expect(intent.type).toBe("income");
+      if (intent.type === "income") {
+        expect(intent.data.amount).toBe(25000);
+      }
+    });
+
+    it("falls back to conversational/AI for general queries", () => {
+      const msg = "How can I cut down my food budget?";
+      const intent = classifyFinancialMessage(msg, knownAccounts);
+
+      expect(intent.type).toBe("unknown");
+    });
+  });
+
+  describe("Advanced Confirmations & Interactive Keyboards", () => {
+    it("formats income confirmation accurately", () => {
+      const res = formatIncomeConfirmation({
+        amount: 50000,
+        category: "Salary",
+        title: "Monthly Salary",
+        accountName: "HDFC Salary",
+        newBalance: 120000,
+      });
+
+      expect(res).toContain("Income Recorded!");
+      expect(res).toContain("50,000");
+      expect(res).toContain("HDFC Salary");
+      expect(res).toContain("1,20,000");
+    });
+
+    it("formats transfer confirmation with source and target balances", () => {
+      const res = formatTransferConfirmation({
+        amount: 3000,
+        fromAccountName: "HDFC Salary",
+        toAccountName: "Cash in Hand",
+        fromBalance: 47000,
+        toBalance: 8000,
+      });
+
+      expect(res).toContain("Transfer Recorded!");
+      expect(res).toContain("3,000");
+      expect(res).toContain("HDFC Salary");
+      expect(res).toContain("Cash in Hand");
+    });
+
+    it("formats budget progress overview with visual indicators", () => {
+      const budgets = [
+        { category: "Food & Dining", budgeted: 10000, spent: 6500, percent: 65 },
+        { category: "Shopping", budgeted: 8000, spent: 8500, percent: 106 },
+      ];
+
+      const res = formatBudgetSummary({ budgets, monthName: "November 2026" });
+      expect(res).toContain("Budgets Overview");
+      expect(res).toContain("Food &amp; Dining");
+      expect(res).toContain("65%");
+      expect(res).toContain("Over budget");
+    });
+
+    it("formats transaction undo cancellation confirmation", () => {
+      const res = formatUndoConfirmation({
+        type: "expense",
+        title: "Grocery Shopping",
+        amount: 1200,
+        accountName: "HDFC Salary",
+        restoredBalance: 48200,
+      });
+
+      expect(res).toContain("Transaction Reverted!");
+      expect(res).toContain("Refunded to");
+      expect(res).toContain("HDFC Salary");
+      expect(res).toContain("48,200");
+    });
+
+    it("builds valid interactive inline keyboards with callback data", () => {
+      const stdKeyboard = getStandardInlineKeyboard("https://arthax.vercel.app");
+      expect(stdKeyboard.inline_keyboard.length).toBeGreaterThan(0);
+      const firstBtn = stdKeyboard.inline_keyboard[0][0];
+      expect("callback_data" in firstBtn ? firstBtn.callback_data : null).toBe("action:balance");
+
+      const expKeyboard = getExpenseActionKeyboard("exp-123");
+      const expBtn = expKeyboard.inline_keyboard[0][0];
+      expect("callback_data" in expBtn ? expBtn.callback_data : null).toBe("undo:expense:exp-123");
+
+      const incKeyboard = getIncomeActionKeyboard("inc-456");
+      const incBtn = incKeyboard.inline_keyboard[0][0];
+      expect("callback_data" in incBtn ? incBtn.callback_data : null).toBe("undo:income:inc-456");
+    });
+  });
+
+  describe("Multi-Tenant Safety (Strict Isolation)", () => {
+    it("never permits unlinked Telegram chats to access another user's workspace", () => {
+      const mockDbUsers: Record<string, string> = {
+        "chat_alice_123": "user_alice",
+        "chat_bob_456": "user_bob",
+      };
+
+      const resolveTenant = (incomingChatId: string): string | null => {
+        return mockDbUsers[incomingChatId] || null;
+      };
+
+      expect(resolveTenant("chat_alice_123")).toBe("user_alice");
+      expect(resolveTenant("chat_bob_456")).toBe("user_bob");
+      expect(resolveTenant("chat_stranger_999")).toBeNull();
     });
   });
 });

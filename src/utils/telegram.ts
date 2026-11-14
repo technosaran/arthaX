@@ -209,6 +209,34 @@ export async function deleteTelegramWebhook(): Promise<{ success: boolean; descr
 }
 
 /**
+ * Acknowledges a Telegram callback query (from inline button clicks) to remove the loading state on the button.
+ */
+export async function answerTelegramCallbackQuery(
+  callbackQueryId: string,
+  text?: string
+): Promise<{ success: boolean; error?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return { success: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
+  }
+
+  try {
+    const payload: Record<string, unknown> = { callback_query_id: callbackQueryId };
+    if (text) payload.text = text;
+
+    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error contacting Telegram API";
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Validates the X-Telegram-Bot-Api-Secret-Token header using timing-safe comparison.
  */
 export function verifyTelegramSecret(
@@ -400,22 +428,218 @@ export function formatHelpMessage(botUsername?: string): string {
   return (
     `🤖 <b>arthaX Telegram Bot Guide ${botTag}</b>\n\n` +
     `<b>Natural Expense Logging:</b>\n` +
-    `Simply type what you spent and where:\n` +
     `• <code>Dinner 650 HDFC</code>\n` +
     `• <code>Petrol 1200 Cash</code>\n` +
-    `• <code>Blinkit 380 SBI</code>\n` +
-    `• <code>Coffee 150</code>\n` +
-    `• <code>Shopping 2.5k HDFC</code>\n\n` +
+    `• <code>Uber 320</code>\n\n` +
     `<b>Bank Debit SMS Forwarding:</b>\n` +
-    `Forward or paste any official bank SMS alert. The bot automatically detects the amount, merchant, and bank account!\n\n` +
+    `• Forward or paste any debit SMS from HDFC, SBI, ICICI, Axis, etc.\n\n` +
+    `<b>Record Income:</b>\n` +
+    `• <code>Salary 85000 HDFC</code>\n` +
+    `• <code>Freelance 15000 SBI</code>\n` +
+    `• <code>Dividend 450 Cash</code>\n\n` +
+    `<b>Account Transfers:</b>\n` +
+    `• <code>Transfer 5000 from HDFC to Cash</code>\n` +
+    `• <code>Moved 2000 SBI to ICICI</code>\n\n` +
     `<b>Commands:</b>\n` +
-    `• /balance - List all accounts and current balances\n` +
-    `• /recent - View your last 5 recorded expenses\n` +
-    `• /summary - Spending totals for today & this month\n` +
-    `• /ai &lt;query&gt; - Ask Google Gemini financial advice & insights\n` +
-    `• /link &lt;token&gt; - Link your Telegram account\n` +
-    `• /unlink - Disconnect Telegram from arthaX\n` +
-    `• /help - Display this command guide\n\n` +
-    `<i>Security: Each user's data is strictly partitioned using PostgreSQL Row-Level Security and atomic transactions.</i>`
+    `• /balance - View accounts & liquid portfolio\n` +
+    `• /budget - Category budgets & progress bars\n` +
+    `• /summary - Today & monthly income/spending\n` +
+    `• /recent - Last 5 recorded transactions\n` +
+    `• /undo - Cancel your last recorded transaction\n` +
+    `• /ai &lt;query&gt; - Financial advice via Gemini AI\n` +
+    `• /link &lt;token&gt; - Pair your Telegram account\n` +
+    `• /unlink - Disconnect this chat\n\n` +
+    `<i>Each user's data is strictly partitioned by their unique Telegram Chat ID and protected with PostgreSQL Row-Level Security.</i>`
   );
+}
+
+export function formatIncomeConfirmation({
+  amount,
+  category,
+  title,
+  accountName,
+  newBalance,
+}: {
+  amount: number;
+  category: string;
+  title: string;
+  accountName: string;
+  newBalance?: number;
+}): string {
+  const formattedAmount = formatCurrencyINR(amount);
+  const formattedBalance = newBalance !== undefined ? formatCurrencyINR(newBalance) : null;
+
+  return (
+    `💰 <b>Income Recorded!</b>\n\n` +
+    `📈 <b>Amount:</b> +${escapeTelegramHtml(formattedAmount)}\n` +
+    `🏷️ <b>Category:</b> ${escapeTelegramHtml(category)}\n` +
+    `📝 <b>Source:</b> ${escapeTelegramHtml(title)}\n` +
+    `🏦 <b>Deposited To:</b> ${escapeTelegramHtml(accountName)}\n` +
+    (formattedBalance ? `💳 <b>New Balance:</b> ${escapeTelegramHtml(formattedBalance)}\n\n` : `\n`) +
+    `<i>⚡ Logged automatically in arthaX</i>`
+  );
+}
+
+export function formatTransferConfirmation({
+  amount,
+  fromAccountName,
+  toAccountName,
+  fromBalance,
+  toBalance,
+}: {
+  amount: number;
+  fromAccountName: string;
+  toAccountName: string;
+  fromBalance?: number;
+  toBalance?: number;
+}): string {
+  const formattedAmount = formatCurrencyINR(amount);
+  const fromBalStr = fromBalance !== undefined ? ` (Bal: ${formatCurrencyINR(fromBalance)})` : "";
+  const toBalStr = toBalance !== undefined ? ` (Bal: ${formatCurrencyINR(toBalance)})` : "";
+
+  return (
+    `🔄 <b>Transfer Recorded!</b>\n\n` +
+    `💸 <b>Amount:</b> ${escapeTelegramHtml(formattedAmount)}\n` +
+    `📤 <b>From:</b> ${escapeTelegramHtml(fromAccountName)}${fromBalStr}\n` +
+    `📥 <b>To:</b> ${escapeTelegramHtml(toAccountName)}${toBalStr}\n\n` +
+    `<i>⚡ Balances updated atomically across accounts</i>`
+  );
+}
+
+export function formatBudgetSummary({
+  budgets,
+  monthName,
+}: {
+  budgets: Array<{
+    category: string;
+    budgeted: number;
+    spent: number;
+    percent: number;
+  }>;
+  monthName: string;
+}): string {
+  if (!budgets || budgets.length === 0) {
+    return (
+      `🎯 <b>Budgets (${escapeTelegramHtml(monthName)}):</b>\n\n` +
+      `<i>No active budgets found for this month.</i>\n\n` +
+      `Set up monthly category limits in arthaX &gt; Budgets!`
+    );
+  }
+
+  let totalBudgeted = 0;
+  let totalSpent = 0;
+
+  const lines = budgets.map((b) => {
+    totalBudgeted += b.budgeted;
+    totalSpent += b.spent;
+
+    const remaining = b.budgeted - b.spent;
+    const isOver = remaining < 0;
+
+    // Build 10-segment visual progress bar: e.g. [██████░░░░]
+    const filledCount = Math.min(10, Math.max(0, Math.round(b.percent / 10)));
+    const emptyCount = 10 - filledCount;
+    const bar = "█".repeat(filledCount) + "░".repeat(emptyCount);
+
+    const statusNote = isOver
+      ? `⚠️ <i>Over budget by ${formatCurrencyINR(Math.abs(remaining))}!</i>`
+      : `Remaining: ${formatCurrencyINR(remaining)}`;
+
+    return (
+      `• <b>${escapeTelegramHtml(b.category)}</b>\n` +
+      `  ${formatCurrencyINR(b.spent)} / ${formatCurrencyINR(b.budgeted)} [${bar}] ${b.percent}%\n` +
+      `  ${statusNote}`
+    );
+  });
+
+  const overallPercent = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
+
+  return (
+    `🎯 <b>Budgets Overview (${escapeTelegramHtml(monthName)}):</b>\n\n` +
+    lines.join("\n\n") +
+    `\n\n` +
+    `📊 <b>Total:</b> ${formatCurrencyINR(totalSpent)} / ${formatCurrencyINR(totalBudgeted)} (${overallPercent}%)\n` +
+    `<i>⚡ Monitored real-time against current expenses</i>`
+  );
+}
+
+export function formatUndoConfirmation({
+  type,
+  title,
+  amount,
+  accountName,
+  restoredBalance,
+}: {
+  type: "expense" | "income";
+  title: string;
+  amount: number;
+  accountName: string;
+  restoredBalance?: number;
+}): string {
+  const formattedAmount = formatCurrencyINR(amount);
+  const balStr = restoredBalance !== undefined ? `\n💳 <b>Adjusted Balance:</b> ${formatCurrencyINR(restoredBalance)}` : "";
+  const verb = type === "expense" ? "Refunded to" : "Deducted from";
+
+  return (
+    `↩️ <b>Transaction Reverted!</b>\n\n` +
+    `🗑️ <b>Cancelled:</b> ${escapeTelegramHtml(title)} (${escapeTelegramHtml(formattedAmount)})\n` +
+    `🏦 <b>${verb}:</b> ${escapeTelegramHtml(accountName)}${balStr}\n\n` +
+    `<i>⚡ Your ledger and account balance have been restored</i>`
+  );
+}
+
+// -------------------------------------------------------------
+// Interactive Inline Keyboards
+// -------------------------------------------------------------
+
+export function getStandardInlineKeyboard(webUrl: string = "https://arthax.vercel.app") {
+  return {
+    inline_keyboard: [
+      [
+        { text: "💳 Balances", callback_data: "action:balance" },
+        { text: "🎯 Budgets", callback_data: "action:budget" },
+      ],
+      [
+        { text: "📊 Summary", callback_data: "action:summary" },
+        { text: "📜 Recent", callback_data: "action:recent" },
+      ],
+      [
+        { text: "🌐 Open arthaX Web", url: webUrl },
+      ],
+    ],
+  };
+}
+
+export function getExpenseActionKeyboard(expenseId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "↩️ Undo", callback_data: `undo:expense:${expenseId}` },
+        { text: "💳 Balances", callback_data: "action:balance" },
+        { text: "🎯 Budgets", callback_data: "action:budget" },
+      ],
+    ],
+  };
+}
+
+export function getIncomeActionKeyboard(incomeId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "↩️ Undo", callback_data: `undo:income:${incomeId}` },
+        { text: "💳 Balances", callback_data: "action:balance" },
+        { text: "📊 Summary", callback_data: "action:summary" },
+      ],
+    ],
+  };
+}
+
+export function getUnlinkedInlineKeyboard(webUrl: string = "https://arthax.vercel.app") {
+  return {
+    inline_keyboard: [
+      [
+        { text: "🔗 Open arthaX to Connect", url: `${webUrl}/#settings` },
+      ],
+    ],
+  };
 }
