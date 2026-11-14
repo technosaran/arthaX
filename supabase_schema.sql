@@ -6,8 +6,15 @@ create table if not exists public.user_settings (
   id text primary key,
   name text not null default 'User',
   theme text not null default 'dark',
+  telegram_chat_id text,
+  telegram_username text,
+  telegram_link_token text,
+  telegram_linked_at timestamptz,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+create index if not exists idx_user_settings_telegram_chat_id on public.user_settings(telegram_chat_id);
+create index if not exists idx_user_settings_telegram_link_token on public.user_settings(telegram_link_token);
 
 alter table public.user_settings enable row level security;
 
@@ -291,11 +298,14 @@ create table if not exists public.family_members (
   role text not null default 'member',
   email text,
   phone text,
+  telegram_chat_id text,
+  telegram_username text,
   notes text,
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 create index if not exists idx_family_members_user_id on public.family_members(user_id);
 create index if not exists idx_family_members_user_created on public.family_members(user_id, created_at desc);
+create index if not exists idx_family_members_telegram_chat_id on public.family_members(telegram_chat_id);
 alter table public.family_members enable row level security;
 
 -- Family Goals

@@ -21,6 +21,14 @@ import {
   Copy,
   AlertTriangle,
   Trash2,
+  Send,
+  Bot,
+  ExternalLink,
+  Sparkles,
+  RefreshCw,
+  Smartphone,
+  Mic,
+  MessageSquare,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -75,7 +83,7 @@ interface DataCounts {
   total: number;
 }
 
-type SettingsTab = "profile" | "statements" | "security" | "danger";
+type SettingsTab = "profile" | "statements" | "integrations" | "security" | "danger";
 
 export default function SettingsSection() {
   const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
@@ -87,6 +95,25 @@ export default function SettingsSection() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [cacheSyncing, setCacheSyncing] = useState(false);
   const [copiedAccountId, setCopiedAccountId] = useState(false);
+
+  // Telegram Integration State
+  const [telegramData, setTelegramData] = useState<{
+    is_linked: boolean;
+    telegram_username: string | null;
+    telegram_chat_id: string | null;
+    link_token: string | null;
+    bot_username: string;
+    loading: boolean;
+  }>({
+    is_linked: Boolean(profile?.telegram_chat_id),
+    telegram_username: profile?.telegram_username || null,
+    telegram_chat_id: profile?.telegram_chat_id || null,
+    link_token: profile?.telegram_link_token || null,
+    bot_username: "ArthaXBot",
+    loading: false,
+  });
+  const [copiedLinkToken, setCopiedLinkToken] = useState(false);
+  const [refreshingTelegram, setRefreshingTelegram] = useState(false);
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -207,6 +234,75 @@ export default function SettingsSection() {
       supabase.removeChannel(channel);
     };
   }, [userId, user, refreshCounts, updateProfileLocally]);
+
+  // Fetch Telegram Integration Status
+  const fetchTelegramStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/integrations/telegram/link");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTelegramData({
+            is_linked: data.is_linked,
+            telegram_username: data.telegram_username,
+            telegram_chat_id: data.telegram_chat_id,
+            link_token: data.link_token,
+            bot_username: data.bot_username || "ArthaXBot",
+            loading: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Telegram link status:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "integrations") {
+      fetchTelegramStatus();
+    }
+  }, [activeTab, fetchTelegramStatus]);
+
+  const handleRegenerateToken = async () => {
+    setRefreshingTelegram(true);
+    try {
+      const res = await fetch("/api/v1/integrations/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate_token" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.link_token) {
+          setTelegramData((prev) => ({ ...prev, link_token: data.link_token }));
+          showToast("New Code Generated", "Use this code with /link in Telegram", "success");
+        }
+      }
+    } catch {
+      showToast("Error", "Failed to generate new Telegram code", "error");
+    } finally {
+      setRefreshingTelegram(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    setRefreshingTelegram(true);
+    try {
+      const res = await fetch("/api/v1/integrations/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unlink" }),
+      });
+      if (res.ok) {
+        await fetchTelegramStatus();
+        showToast("Telegram Disconnected", "Your Telegram chat is no longer linked to arthaX.", "success");
+      }
+    } catch {
+      showToast("Error", "Failed to disconnect Telegram", "error");
+    } finally {
+      setRefreshingTelegram(false);
+    }
+  };
 
   // Save Greeting Name
   const handleSaveName = async (customName?: string) => {
@@ -1044,6 +1140,15 @@ export default function SettingsSection() {
               ),
             },
             {
+              value: "integrations",
+              label: (
+                <span className="flex items-center gap-2">
+                  <Bot size={14} />
+                  <span>Integrations & Bots</span>
+                </span>
+              ),
+            },
+            {
               value: "security",
               label: (
                 <span className="flex items-center gap-2">
@@ -1372,7 +1477,268 @@ export default function SettingsSection() {
           </div>
         )}
 
-        {/* TAB 3: VAULT SECURITY & CACHE SYNC */}
+        {/* TAB 3: INTEGRATIONS & BOTS */}
+        {activeTab === "integrations" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* TELEGRAM BOT CARD */}
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#229ED9]/10 text-[#229ED9] border border-[#229ED9]/25 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <Send size={18} className="translate-x-[-1px] translate-y-[-1px]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold tracking-tight">Telegram Bot Integration</h2>
+                      <Badge variant="sky" className="text-[10px]">
+                        Official Bot
+                      </Badge>
+                    </div>
+                    <p className="text-xs opacity-60">Log expenses, check balances, and parse bank SMS alerts right from Telegram</p>
+                  </div>
+                </div>
+
+                <div>
+                  {telegramData.is_linked ? (
+                    <Badge variant="emerald" dot>
+                      Connected: @{telegramData.telegram_username || "Direct Chat"}
+                    </Badge>
+                  ) : (
+                    <Badge variant="neutral">Not Linked</Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Status & Connection Actions */}
+              {telegramData.is_linked ? (
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 size={14} />
+                        <span>Telegram Chat Active</span>
+                      </div>
+                      <p className="opacity-70 text-[11px]">
+                        Chat ID: <span className="font-mono text-xs">{telegramData.telegram_chat_id}</span>
+                        {telegramData.telegram_username && (
+                          <span> • Username: <span className="font-mono">@{telegramData.telegram_username}</span></span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`https://t.me/${telegramData.bot_username}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-medium transition-all shadow-sm"
+                      >
+                        <Send size={12} />
+                        <span>Open Telegram Bot</span>
+                        <ExternalLink size={10} className="opacity-70" />
+                      </a>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                        loading={refreshingTelegram}
+                        onClick={handleUnlinkTelegram}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-4">
+                  <div className="text-xs space-y-1">
+                    <h3 className="font-semibold">Connect Your Telegram Account</h3>
+                    <p className="opacity-60">
+                      Link your Telegram chat to automatically record expenses from text messages and forwarded bank debit alerts.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {/* Option 1: 1-Click Deep Link */}
+                    <div className="p-3.5 rounded-lg border border-[#229ED9]/20 bg-[#229ED9]/5 space-y-2.5 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#229ED9]">Method 1 • Quick Connect</span>
+                        <p className="text-xs opacity-80 mt-1">
+                          Click below to launch the bot on Telegram. It will automatically authorize with your unique start token.
+                        </p>
+                      </div>
+
+                      <a
+                        href={`https://t.me/${telegramData.bot_username}?start=${telegramData.link_token || user?.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-semibold transition-all shadow-sm"
+                      >
+                        <Send size={13} />
+                        <span>Launch @{telegramData.bot_username}</span>
+                        <ExternalLink size={12} className="opacity-70" />
+                      </a>
+                    </div>
+
+                    {/* Option 2: Copy Command */}
+                    <div className="p-3.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-bg)] space-y-2.5 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Method 2 • Manual Command</span>
+                        <p className="text-xs opacity-80 mt-1">
+                          Open <b>@{telegramData.bot_username}</b> in Telegram and paste this link command:
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)]">
+                        <code className="text-xs font-mono text-emerald-400 select-all font-semibold">
+                          /link {telegramData.link_token || user?.id}
+                        </code>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon={copiedLinkToken ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                            onClick={() => {
+                              navigator.clipboard.writeText(`/link ${telegramData.link_token || user?.id}`);
+                              setCopiedLinkToken(true);
+                              setTimeout(() => setCopiedLinkToken(false), 2000);
+                              showToast("Copied to clipboard", "Paste this command into @ArthaXBot on Telegram", "success");
+                            }}
+                          >
+                            {copiedLinkToken ? "Copied" : "Copy"}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon={<RefreshCw size={11} className={refreshingTelegram ? "animate-spin text-cyan-400" : ""} />}
+                            disabled={refreshingTelegram}
+                            onClick={handleRegenerateToken}
+                            title="Generate fresh link code"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bot Capabilities Reference Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 text-xs">
+                {/* Column 1: Natural Messages */}
+                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-2.5">
+                  <div className="flex items-center gap-2 font-bold text-emerald-400">
+                    <Sparkles size={14} />
+                    <span>Natural Expense & SMS Logging</span>
+                  </div>
+                  <p className="opacity-70 text-[11px] leading-relaxed">
+                    Type naturally or paste bank debit notifications. The bot automatically identifies amounts, categories, and matches bank accounts:
+                  </p>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
+                      <span className="text-emerald-400">Dinner 500 HDFC</span>
+                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Logs ₹500 in Food & Dining, debits HDFC</p>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
+                      <span className="text-emerald-400">Petrol 1200 Cash</span>
+                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Logs ₹1,200 in Transport, debits Cash</p>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
+                      <span className="text-emerald-400">Swiggy 340</span>
+                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Auto-categorized into Food & Dining</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Commands */}
+                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-2.5">
+                  <div className="flex items-center gap-2 font-bold text-cyan-400">
+                    <Bot size={14} />
+                    <span>Bot Slash Commands</span>
+                  </div>
+                  <p className="opacity-70 text-[11px] leading-relaxed">
+                    Control and query your personal financial telemetry with instant inline commands:
+                  </p>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
+                      <code className="text-cyan-400 font-mono font-bold">/balance</code>
+                      <span className="opacity-70 text-[10px]">Real-time accounts & balances</span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
+                      <code className="text-cyan-400 font-mono font-bold">/recent</code>
+                      <span className="opacity-70 text-[10px]">Last 5 recorded expenses</span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
+                      <code className="text-cyan-400 font-mono font-bold">/summary</code>
+                      <span className="opacity-70 text-[10px]">Today & monthly totals</span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
+                      <code className="text-cyan-400 font-mono font-bold">/help</code>
+                      <span className="opacity-70 text-[10px]">Full syntax & examples</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* WHATSAPP & SIRI COMPANION CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* WhatsApp Card */}
+              <Card className="p-5 space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 font-bold">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                      <MessageSquare size={15} />
+                    </div>
+                    <div>
+                      <div className="font-bold">WhatsApp Cloud API</div>
+                      <div className="text-[10px] opacity-60">Meta Graph Webhook</div>
+                    </div>
+                  </div>
+                  <Badge variant="emerald">Live Webhook</Badge>
+                </div>
+
+                <p className="opacity-70 leading-relaxed text-[11px]">
+                  Send bank SMS alerts or text expenses via WhatsApp. Connects directly to the Meta WhatsApp Cloud API free tier.
+                </p>
+
+                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1 font-mono text-[10px]">
+                  <div className="opacity-50 uppercase tracking-wider text-[9px]">Webhook Route:</div>
+                  <div className="text-emerald-400">/api/webhooks/whatsapp</div>
+                </div>
+              </Card>
+
+              {/* Apple Siri Card */}
+              <Card className="p-5 space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 font-bold">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                      <Mic size={15} />
+                    </div>
+                    <div>
+                      <div className="font-bold">Apple Siri Voice Shortcuts</div>
+                      <div className="text-[10px] opacity-60">iOS & macOS Automation</div>
+                    </div>
+                  </div>
+                  <Badge variant="violet">Siri Enabled</Badge>
+                </div>
+
+                <p className="opacity-70 leading-relaxed text-[11px]">
+                  Say <span className="text-indigo-400 font-semibold">&ldquo;Hey Siri, Log Expense&rdquo;</span> to automatically parse and record expenses with your voice.
+                </p>
+
+                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1 font-mono text-[10px]">
+                  <div className="opacity-50 uppercase tracking-wider text-[9px]">Shortcut Route:</div>
+                  <div className="text-indigo-400">/api/shortcuts/expense</div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: VAULT SECURITY & CACHE SYNC */}
         {activeTab === "security" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <Card className="p-6 sm:p-7 space-y-6">

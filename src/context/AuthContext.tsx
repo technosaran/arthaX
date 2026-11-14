@@ -8,6 +8,9 @@ import { useRouter } from "next/navigation";
 interface UserProfile {
   name: string;
   theme: string;
+  telegram_chat_id?: string | null;
+  telegram_username?: string | null;
+  telegram_link_token?: string | null;
 }
 
 interface AuthContextType {
@@ -51,14 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("user_settings")
-        .select("name, theme")
+        .select("name, theme, telegram_chat_id, telegram_username, telegram_link_token")
         .eq("id", userId)
         .maybeSingle();
 
       if (data) {
-        const newProf = {
+        const newProf: UserProfile = {
           name: data.name || defaultName || "User",
           theme: data.theme === "light" ? "light" : "dark",
+          telegram_chat_id: data.telegram_chat_id || null,
+          telegram_username: data.telegram_username || null,
+          telegram_link_token: data.telegram_link_token || null,
         };
         setProfile(newProf);
         try {
