@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setTelegramWebhook, getTelegramWebhookInfo, deleteTelegramWebhook } from "@/utils/telegram";
+import { setTelegramWebhook, getTelegramWebhookInfo, deleteTelegramWebhook, setTelegramBotCommands } from "@/utils/telegram";
 
 /**
  * Telegram Webhook Setup & Inspection Endpoint
  * GET: Retrieves current webhook registration info from Telegram API
- * POST: Automatically registers or updates the webhook URL
+ * POST: Automatically registers or updates the webhook URL and syncs bot slash commands
  * DELETE: Unregisters the webhook
  */
 
@@ -35,9 +35,13 @@ export async function POST(req: NextRequest) {
       secretToken,
     });
 
+    // Also register native slash commands menu on Telegram
+    const commandsRes = await setTelegramBotCommands();
+
     return NextResponse.json({
       target_url: webhookUrl,
       result: res,
+      commands: commandsRes,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error configuring Telegram webhook";

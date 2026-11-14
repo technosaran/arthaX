@@ -209,6 +209,45 @@ export async function deleteTelegramWebhook(): Promise<{ success: boolean; descr
 }
 
 /**
+ * Registers native slash command autocomplete menu with Telegram Bot API
+ */
+export async function setTelegramBotCommands(): Promise<{ success: boolean; description?: string; error?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return { success: false, error: "TELEGRAM_BOT_TOKEN is not configured." };
+  }
+
+  const commands = [
+    { command: "balance", description: "View accounts & liquid balances" },
+    { command: "summary", description: "Today & monthly spending summary" },
+    { command: "recent", description: "Last 5 recorded expenses" },
+    { command: "budget", description: "Category budgets & progress bars" },
+    { command: "undo", description: "Cancel last recorded transaction" },
+    { command: "status", description: "Check connection & workspace status" },
+    { command: "ai", description: "Ask financial advice via Gemini AI" },
+    { command: "help", description: "Full bot guide & examples" },
+    { command: "unlink", description: "Disconnect this Telegram chat" },
+  ];
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commands }),
+    });
+
+    const data = (await res.json()) as TelegramApiResponse;
+    if (!res.ok || !data.ok) {
+      return { success: false, error: data.description || "Failed to set bot commands" };
+    }
+    return { success: true, description: "Commands registered successfully" };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error contacting Telegram API";
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Acknowledges a Telegram callback query (from inline button clicks) to remove the loading state on the button.
  */
 export async function answerTelegramCallbackQuery(
@@ -264,6 +303,82 @@ export function verifyTelegramSecret(
   } catch {
     return false;
   }
+}
+
+// -------------------------------------------------------------
+// Telegram Deep Linking & Token Resolution Helpers
+// -------------------------------------------------------------
+
+/**
+ * Parses and extracts a potential account linking token or identifier from user input.
+ * Supports:
+ * - /start <token>, /start@Bot <token>, /start=<token>
+ * - /link <token>, /link@Bot <token>, /link:<token>
+ * - /connect <token>, link <token>, connect <token>
+ * - Standalone "AX-7K9P2X", "AX_7K9P2X", "AX7K9P2X"
+ * - Standalone 6-character hex/alphanumeric code "7K9P2X" or "365CA9"
+ * - Standalone Email address
+ * - Standalone UUID
+ */
+export function extractTelegramLinkCandidate(text: string): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+
+  // 1. Slash commands: /start, /link, /connect (with optional @bot and token)
+  const cmdMatch = trimmed.match(/^\/(?:start|link|connect)(?:@[a-zA-Z0-9_]+)?(?:[\s=:]+([^\s]+))?$/i);
+  if (cmdMatch) {
+    return cmdMatch[1]?.trim() || null;
+  }
+
+  // 2. Natural commands: "link 365CA9", "connect AX-365CA9", "pair AX-365CA9"
+  const naturalMatch = trimmed.match(/^(?:link|connect|pair)[\s=:]+([^\s]+)$/i);
+  if (naturalMatch) {
+    return naturalMatch[1]?.trim() || null;
+  }
+
+  // 3. Standalone AX token format: "AX-7K9P2X", "AX_7K9P2X", "AX7K9P2X"
+  const axMatch = trimmed.match(/^AX[-_]?([a-zA-Z0-9]{6})$/i);
+  if (axMatch) {
+    return `AX-${axMatch[1].toUpperCase()}`;
+  }
+
+  // 4. Standalone 6-character alphanumeric code: "365CA9" or "7K9P2X"
+  if (/^[a-zA-Z0-9]{6}$/.test(trimmed)) {
+    return `AX-${trimmed.toUpperCase()}`;
+  }
+
+  // 5. Standalone Email
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  // 6. Standalone UUID
+  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+/**
+ * Generates all normalized search variations of a link token candidate
+ * to guarantee robust database matching regardless of casing, hyphens, or prefixes.
+ */
+export function normalizeLinkTokenCandidates(candidate: string): string[] {
+  if (!candidate) return [];
+  const raw = candidate.trim();
+  const upper = raw.toUpperCase();
+  const normalized = upper.replace(/_/g, "-");
+
+  const results = new Set<string>([raw, upper, normalized]);
+
+  if (normalized.startsWith("AX-")) {
+    results.add(normalized.slice(3));
+  } else if (/^[A-Z0-9]{6}$/.test(normalized)) {
+    results.add(`AX-${normalized}`);
+  }
+
+  return Array.from(results);
 }
 
 // -------------------------------------------------------------
@@ -588,6 +703,36 @@ export function formatUndoConfirmation({
   );
 }
 
+export function formatStatusMessage({
+  userName,
+  accountCount,
+  totalPortfolio,
+  botUsername,
+  linkedAt,
+}: {
+  userName: string;
+  accountCount: number;
+  totalPortfolio: number;
+  botUsername?: string;
+  linkedAt?: string | null;
+}): string {
+  const botDisplay = botUsername ? ` (@${botUsername})` : "";
+  const linkedStr = linkedAt
+    ? new Date(linkedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "Active";
+
+  return (
+    `⚡ <b>arthaX Connection Status</b>\n\n` +
+    `🟢 <b>Status:</b> Connected &amp; Synchronized\n` +
+    `👤 <b>Workspace:</b> ${escapeTelegramHtml(userName)}\n` +
+    `💳 <b>Linked Accounts:</b> ${accountCount}\n` +
+    `💰 <b>Liquid Portfolio:</b> ${formatCurrencyINR(totalPortfolio)}\n` +
+    `📅 <b>Connected Since:</b> ${escapeTelegramHtml(linkedStr)}\n` +
+    `🤖 <b>Bot Engine:</b> arthaX Core v2.0${botDisplay}\n\n` +
+    `<i>⚡ All natural messages and forwarded bank SMS are processed in real-time.</i>`
+  );
+}
+
 // -------------------------------------------------------------
 // Interactive Inline Keyboards
 // -------------------------------------------------------------
@@ -604,7 +749,8 @@ export function getStandardInlineKeyboard(webUrl: string = "https://arthax.verce
         { text: "📜 Recent", callback_data: "action:recent" },
       ],
       [
-        { text: "🌐 Open arthaX Web", url: webUrl },
+        { text: "⚡ Status", callback_data: "action:status" },
+        { text: "🌐 Open arthaX", url: webUrl },
       ],
     ],
   };

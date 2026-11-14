@@ -13,6 +13,9 @@ import {
   formatSpendingSummary,
   formatWelcomeMessage,
   formatHelpMessage,
+  formatStatusMessage,
+  extractTelegramLinkCandidate,
+  normalizeLinkTokenCandidates,
   getStandardInlineKeyboard,
   getExpenseActionKeyboard,
   getIncomeActionKeyboard,
@@ -206,35 +209,66 @@ describe("Telegram Integration Suite", () => {
       expect(extractPrompt("/ai")).toBe("");
     });
 
-    it("extracts link code from /link and /start deep links", () => {
-      const extractLinkToken = (text: string) => {
-        const parts = text.trim().split(/\s+/);
-        if (parts[0] === "/link" || parts[0] === "/start") {
-          return parts[1] || null;
-        }
-        return null;
-      };
+    it("extracts link code from /link, /start, and natural/standalone variants", () => {
+      // Slash command formats
+      expect(extractTelegramLinkCandidate("/link AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("/start AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("/start@Artha_X_bot AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("/connect AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("/link:AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("/start=AX-7K9P2X")).toBe("AX-7K9P2X");
 
-      expect(extractLinkToken("/link AX-7K9P2X")).toBe("AX-7K9P2X");
-      expect(extractLinkToken("/start AX-7K9P2X")).toBe("AX-7K9P2X");
-      expect(extractLinkToken("/start")).toBeNull();
-      expect(extractLinkToken("/balance")).toBeNull();
+      // Natural prefix commands
+      expect(extractTelegramLinkCandidate("link AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("connect AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("pair 7K9P2X")).toBe("7K9P2X");
+
+      // Standalone code formats (critical for loose copy-pasting)
+      expect(extractTelegramLinkCandidate("AX-7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("ax-7k9p2x")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("AX_7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("AX7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("7K9P2X")).toBe("AX-7K9P2X");
+      expect(extractTelegramLinkCandidate("365CA9")).toBe("AX-365CA9");
+
+      // Email & UUID formats
+      expect(extractTelegramLinkCandidate("user@example.com")).toBe("user@example.com");
+      expect(extractTelegramLinkCandidate("640cb47d-abe8-4182-85d5-347f5ccd4aa2")).toBe("640cb47d-abe8-4182-85d5-347f5ccd4aa2");
+
+      // Non-linking messages should return null
+      expect(extractTelegramLinkCandidate("/start")).toBeNull();
+      expect(extractTelegramLinkCandidate("/balance")).toBeNull();
+      expect(extractTelegramLinkCandidate("Dinner 500 HDFC")).toBeNull();
     });
 
     it("handles token normalization for case-insensitivity, hyphens, and missing prefix", () => {
-      const normalizeCandidate = (raw: string) => {
-        const clean = raw.trim().toUpperCase().replace(/_/g, "-");
-        return Array.from(
-          new Set([
-            clean,
-            clean.startsWith("AX-") ? clean.slice(3) : `AX-${clean}`,
-          ])
-        );
-      };
+      const c1 = normalizeLinkTokenCandidates("ax-7k9p2x");
+      expect(c1).toContain("AX-7K9P2X");
+      expect(c1).toContain("7K9P2X");
 
-      expect(normalizeCandidate("ax-7k9p2x")).toContain("AX-7K9P2X");
-      expect(normalizeCandidate("ax_7k9p2x")).toContain("AX-7K9P2X");
-      expect(normalizeCandidate("7k9p2x")).toContain("AX-7K9P2X");
+      const c2 = normalizeLinkTokenCandidates("ax_7k9p2x");
+      expect(c2).toContain("AX-7K9P2X");
+
+      const c3 = normalizeLinkTokenCandidates("7k9p2x");
+      expect(c3).toContain("AX-7K9P2X");
+      expect(c3).toContain("7K9P2X");
+    });
+
+    it("formats rich status overview message", () => {
+      const statusMsg = formatStatusMessage({
+        userName: "Saran",
+        accountCount: 3,
+        totalPortfolio: 75000,
+        botUsername: "Artha_X_bot",
+        linkedAt: "2026-11-14T10:00:00Z",
+      });
+
+      expect(statusMsg).toContain("arthaX Connection Status");
+      expect(statusMsg).toContain("Connected &amp; Synchronized");
+      expect(statusMsg).toContain("Saran");
+      expect(statusMsg).toContain("3");
+      expect(statusMsg).toContain("75,000");
+      expect(statusMsg).toContain("@Artha_X_bot");
     });
   });
 

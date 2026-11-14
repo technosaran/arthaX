@@ -235,10 +235,17 @@ export default function SettingsSection() {
     };
   }, [userId, user, refreshCounts, updateProfileLocally]);
 
-  // Fetch Telegram Integration Status
+  // Fetch Telegram Integration Status with Bearer token authentication
   const fetchTelegramStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/integrations/telegram/link");
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/telegram/link", { headers });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -282,9 +289,16 @@ export default function SettingsSection() {
   const handleRegenerateToken = async () => {
     setRefreshingTelegram(true);
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch("/api/v1/integrations/telegram/link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ action: "generate_token" }),
       });
       if (res.ok) {
@@ -304,9 +318,16 @@ export default function SettingsSection() {
   const handleUnlinkTelegram = async () => {
     setRefreshingTelegram(true);
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch("/api/v1/integrations/telegram/link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ action: "unlink" }),
       });
       if (res.ok) {
@@ -1586,7 +1607,13 @@ export default function SettingsSection() {
                       </div>
 
                       <a
-                        href={`https://t.me/${telegramData.bot_username}?start=${telegramData.link_token || user?.id}`}
+                        href={
+                          telegramData.link_token
+                            ? `https://t.me/${telegramData.bot_username}?start=${encodeURIComponent(telegramData.link_token)}`
+                            : user?.id
+                            ? `https://t.me/${telegramData.bot_username}?start=${encodeURIComponent(user.id)}`
+                            : `https://t.me/${telegramData.bot_username}`
+                        }
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-semibold transition-all shadow-sm"
@@ -1608,7 +1635,7 @@ export default function SettingsSection() {
 
                       <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)]">
                         <code className="text-xs font-mono text-emerald-400 select-all font-semibold">
-                          /link {telegramData.link_token || user?.id}
+                          /link {telegramData.link_token || (user?.id ? user.id : "AX-CONNECT")}
                         </code>
 
                         <div className="flex items-center gap-1">
@@ -1617,10 +1644,15 @@ export default function SettingsSection() {
                             size="xs"
                             icon={copiedLinkToken ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                             onClick={() => {
-                              navigator.clipboard.writeText(`/link ${telegramData.link_token || user?.id}`);
+                              const codeToCopy = telegramData.link_token
+                                ? `/link ${telegramData.link_token}`
+                                : user?.id
+                                ? `/link ${user.id}`
+                                : "/start";
+                              navigator.clipboard.writeText(codeToCopy);
                               setCopiedLinkToken(true);
                               setTimeout(() => setCopiedLinkToken(false), 2000);
-                              showToast("Copied to clipboard", "Paste this command into @Artha_X_bot on Telegram", "success");
+                              showToast("Copied to clipboard", `Paste "${codeToCopy}" into @${telegramData.bot_username} on Telegram`, "success");
                             }}
                           >
                             {copiedLinkToken ? "Copied" : "Copy"}

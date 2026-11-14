@@ -17,15 +17,21 @@ import {
   formatUndoConfirmation,
   formatWelcomeMessage,
   formatHelpMessage,
+  formatStatusMessage,
   getStandardInlineKeyboard,
   getExpenseActionKeyboard,
   getIncomeActionKeyboard,
   getUnlinkedInlineKeyboard,
   getTelegramWebhookInfo,
+  extractTelegramLinkCandidate,
+  normalizeLinkTokenCandidates,
+  formatCurrencyINR,
 } from "@/utils/telegram";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString, getCurrentMonthYear, formatMonthDisplay } from "@/utils/monthUtils";
 import { generateFinancialAnswer } from "@/utils/gemini";
+import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { logger } from "@/utils/logger";
 
 interface TelegramUpdate {
   update_id: number;
@@ -87,7 +93,7 @@ export async function GET() {
 
 /**
  * High-Performance Multi-Tenant Telegram Bot Webhook (POST)
- * Supports all financial actions: Expenses, Income, Transfers, Budgets, Balances, Undo, and Gemini AI.
+ * Supports all financial actions: Expenses, Income, Transfers, Budgets, Balances, Undo, Status, and Gemini AI.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------
     const secretHeader = req.headers.get("x-telegram-bot-api-secret-token");
     if (!verifyTelegramSecret(secretHeader)) {
-      console.warn("[Telegram Webhook] Invalid secret token detected.");
+      logger.warn("[Telegram Webhook] Invalid secret token detected.");
       return NextResponse.json({ error: "Unauthorized: Invalid secret token" }, { status: 401 });
     }
 
@@ -123,6 +129,24 @@ export async function POST(req: NextRequest) {
     const chatIdStr = String(chatId);
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
     const webAppUrl = process.env.NEXT_PUBLIC_APP_URL || "https://arthax.vercel.app";
+
+    // Deduplicate updates to prevent double processing
+    if (update.update_id) {
+      const isFresh = await checkAndSetIdempotency(`tg_update:${update.update_id}`, 600);
+      if (!isFresh) {
+        return NextResponse.json({ status: "duplicate_update_ignored" });
+      }
+    }
+
+    // Rate limiting per chat: 45 messages per minute
+    const rl = await rateLimit(`tg_chat:${chatIdStr}`, 45, 60);
+    if (!rl.success) {
+      await sendTelegramMessage({
+        chatId,
+        text: "⚠️ <i>You are sending messages too quickly. Please pause for a moment.</i>",
+      });
+      return NextResponse.json({ status: "rate_limited" }, { status: 429 });
+    }
 
     if (isCallback && callbackId) {
       await answerTelegramCallbackQuery(callbackId);
@@ -163,29 +187,16 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 3. Pairing & Linking Commands (/link <token_or_email> or /start <token>)
+    // 3. Pairing & Linking Commands (/link, /start, loose tokens, email, or TELEGRAM_AUTHORIZED_USER_ID)
     // -------------------------------------------------------------
-    if (rawText.startsWith("/start") || rawText.startsWith("/link")) {
-      const parts = rawText.split(/\s+/);
-      const linkCandidate = parts[1]?.trim();
+    const linkCandidate = extractTelegramLinkCandidate(rawText);
+
+    if (linkCandidate || (!userId && (rawText.startsWith("/start") || rawText === "start"))) {
+      let matchedUserId: string | null = null;
+      let matchedUserName: string = "User";
 
       if (linkCandidate) {
-        let matchedUserId: string | null = null;
-        let matchedUserName: string = "User";
-
-        const rawCandidate = linkCandidate.trim();
-        const upperCandidate = rawCandidate.toUpperCase();
-        const normalizedToken = upperCandidate.replace(/_/g, "-");
-
-        // Build list of possible token representations
-        const tokenCandidates = Array.from(
-          new Set([
-            rawCandidate,
-            upperCandidate,
-            normalizedToken,
-            normalizedToken.startsWith("AX-") ? normalizedToken.slice(3) : `AX-${normalizedToken}`,
-          ])
-        );
+        const tokenCandidates = normalizeLinkTokenCandidates(linkCandidate);
 
         // A. Match by Link Token in user_settings
         const { data: targetUser } = await supabaseAdmin
@@ -200,12 +211,12 @@ export async function POST(req: NextRequest) {
           matchedUserName = targetUser.name || "User";
         }
 
-        // B. Match by User ID directly (UUID or text id)
-        if (!matchedUserId) {
+        // B. Match by User ID directly (UUID)
+        if (!matchedUserId && /^[0-9a-fA-F-]{36}$/.test(linkCandidate)) {
           const { data: userById } = await supabaseAdmin
             .from("user_settings")
             .select("id, name")
-            .eq("id", rawCandidate)
+            .eq("id", linkCandidate)
             .limit(1)
             .maybeSingle();
           if (userById?.id) {
@@ -214,7 +225,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // C. If email provided (e.g. /link user@example.com)
+        // C. Match by Email (e.g. user@example.com or /link user@example.com)
         if (!matchedUserId && linkCandidate.includes("@")) {
           const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
           const foundAuth = (usersList?.users || []).find(
@@ -231,12 +242,12 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // D. Check family_members by email or phone
+        // D. Match family_members by email or phone
         if (!matchedUserId) {
           const { data: fm } = await supabaseAdmin
             .from("family_members")
             .select("id, user_id, name")
-            .or(`email.ilike.${rawCandidate},phone.eq.${rawCandidate}`)
+            .or(`email.ilike.${linkCandidate},phone.eq.${linkCandidate}`)
             .limit(1)
             .maybeSingle();
 
@@ -260,56 +271,75 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, linked_family_member: fm.id });
           }
         }
+      }
 
-        if (matchedUserId) {
-          // Bind Telegram Chat ID to the matching user
-          await supabaseAdmin
+      // E. Single-User / Owner Fallback via TELEGRAM_AUTHORIZED_USER_ID on /start
+      if (!matchedUserId && !userId && (rawText === "/start" || rawText === "start")) {
+        const authUserId = process.env.TELEGRAM_AUTHORIZED_USER_ID;
+        if (authUserId) {
+          const { data: authUser } = await supabaseAdmin
             .from("user_settings")
-            .upsert(
-              {
-                id: matchedUserId,
-                telegram_chat_id: chatIdStr,
-                telegram_username: senderUsername || null,
-                telegram_linked_at: new Date().toISOString(),
-                telegram_link_token: null, // Consume one-time token
-              },
-              { onConflict: "id" }
-            );
+            .select("id, name")
+            .eq("id", authUserId)
+            .limit(1)
+            .maybeSingle();
 
-          try {
-            await invalidateCachedData([
-              getUserCacheKey(matchedUserId, CACHE_KEYS.PORTFOLIO),
-              getUserCacheKey(matchedUserId, CACHE_KEYS.ACCOUNTS),
-            ]);
-          } catch {}
-
-          await sendTelegramMessage({
-            chatId,
-            text:
-              `🎉 <b>arthaX Workspace Successfully Connected!</b>\n\n` +
-              `Welcome <b>${escapeTelegramHtml(matchedUserName)}</b>. Your Telegram chat is now paired.\n\n` +
-              `<b>You can now perform everything directly here:</b>\n` +
-              `• <b>Log Expense:</b> <code>Dinner 500 HDFC</code>\n` +
-              `• <b>Log Income:</b> <code>Salary 85000 HDFC</code>\n` +
-              `• <b>Transfer:</b> <code>Transfer 5000 HDFC to Cash</code>\n` +
-              `• <b>Forward SMS:</b> Paste any bank debit or credit notification!\n` +
-              `• <b>Ask AI:</b> <code>/ai How to save on grocery bills?</code>\n\n` +
-              `Use the quick actions below to manage your finances on the go:`,
-            replyMarkup: getStandardInlineKeyboard(webAppUrl),
-          });
-
-          return NextResponse.json({ success: true, linked: true, user_id: matchedUserId });
-        } else {
-          await sendTelegramMessage({
-            chatId,
-            text:
-              `❌ <b>Invalid Link Code</b>\n\n` +
-              `We couldn't find an arthaX account matching <code>${escapeTelegramHtml(linkCandidate)}</code>.\n\n` +
-              `Open <b>arthaX &gt; Settings &gt; Integrations &gt; Telegram</b> to view your 6-character code or click the one-click connect button.`,
-            replyMarkup: getUnlinkedInlineKeyboard(webAppUrl),
-          });
-          return NextResponse.json({ success: false, error: "Invalid link code" });
+          if (authUser?.id) {
+            matchedUserId = authUser.id;
+            matchedUserName = authUser.name || "Owner";
+          }
         }
+      }
+
+      if (matchedUserId) {
+        // Bind Telegram Chat ID to the matching user
+        await supabaseAdmin
+          .from("user_settings")
+          .update({
+            telegram_chat_id: chatIdStr,
+            telegram_username: senderUsername || null,
+            telegram_linked_at: new Date().toISOString(),
+            telegram_link_token: null, // Consume one-time token
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", matchedUserId);
+
+        try {
+          await invalidateCachedData([
+            getUserCacheKey(matchedUserId, CACHE_KEYS.PORTFOLIO),
+            getUserCacheKey(matchedUserId, CACHE_KEYS.ACCOUNTS),
+            getUserCacheKey(matchedUserId, CACHE_KEYS.SETTINGS),
+          ]);
+        } catch {}
+
+        logger.info(`Telegram chat ${chatIdStr} linked to user ${matchedUserId}`, "TelegramBot");
+
+        await sendTelegramMessage({
+          chatId,
+          text:
+            `🎉 <b>arthaX Workspace Successfully Connected!</b>\n\n` +
+            `Welcome <b>${escapeTelegramHtml(matchedUserName)}</b>. Your Telegram chat is now paired.\n\n` +
+            `<b>You can now perform everything directly here:</b>\n` +
+            `• <b>Log Expense:</b> <code>Dinner 500 HDFC</code>\n` +
+            `• <b>Log Income:</b> <code>Salary 85000 HDFC</code>\n` +
+            `• <b>Transfer:</b> <code>Transfer 5000 HDFC to Cash</code>\n` +
+            `• <b>Forward SMS:</b> Paste any bank debit or credit notification!\n` +
+            `• <b>Ask AI:</b> <code>/ai How to save on grocery bills?</code>\n\n` +
+            `Use the quick actions below to manage your finances on the go:`,
+          replyMarkup: getStandardInlineKeyboard(webAppUrl),
+        });
+
+        return NextResponse.json({ success: true, linked: true, user_id: matchedUserId });
+      } else if (linkCandidate) {
+        await sendTelegramMessage({
+          chatId,
+          text:
+            `❌ <b>Invalid Link Code</b>\n\n` +
+            `We couldn't find an arthaX account matching <code>${escapeTelegramHtml(linkCandidate)}</code>.\n\n` +
+            `Open <b>arthaX &gt; Settings &gt; Integrations &gt; Telegram</b> to view your 6-character code or click the one-click connect button.`,
+          replyMarkup: getUnlinkedInlineKeyboard(webAppUrl),
+        });
+        return NextResponse.json({ success: false, error: "Invalid link code" });
       }
     }
 
@@ -477,6 +507,37 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ status: "unlinked_successfully" });
+    }
+
+    // /status or action:status
+    if (rawText === "/status" || rawText === "status" || rawText === "action:status") {
+      const { data: accounts } = await supabaseAdmin
+        .from("accounts")
+        .select("id, name, balance")
+        .eq("user_id", userId);
+
+      const totalAccounts = accounts?.length || 0;
+      const totalPortfolio = (accounts || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+
+      const { data: userSet } = await supabaseAdmin
+        .from("user_settings")
+        .select("telegram_linked_at")
+        .eq("id", userId)
+        .maybeSingle();
+
+      await sendTelegramMessage({
+        chatId,
+        text: formatStatusMessage({
+          userName,
+          accountCount: totalAccounts,
+          totalPortfolio,
+          botUsername,
+          linkedAt: userSet?.telegram_linked_at || null,
+        }),
+        replyMarkup: getStandardInlineKeyboard(webAppUrl),
+      });
+
+      return NextResponse.json({ status: "status_sent" });
     }
 
     // /balance or action:balance

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { apiSuccess, apiError, apiUnauthorized, apiValidationError, extractRequestId } from "@/utils/apiResponse";
+import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { logger } from "@/utils/logger";
 import { z } from "zod";
 
 const TransactionSchema = z.object({
@@ -17,14 +20,24 @@ const TransactionSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
   if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
+    return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  // Rate limit queries
+  const rl = await rateLimit(`txn_get:${userId}`, 120, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") || "all"; // 'all' | 'expense' | 'income'
-  const month = searchParams.get("month");       // 'YYYY-MM'
+  const month = searchParams.get("month"); // 'YYYY-MM'
   const accountId = searchParams.get("account_id");
   const category = searchParams.get("category");
   const search = searchParams.get("search");
@@ -72,8 +85,8 @@ export async function GET(req: NextRequest) {
 
     const [expRes, incRes] = await Promise.all([expensesPromise, incomePromise]);
 
-    if (expRes.error) return NextResponse.json({ success: false, error: expRes.error.message }, { status: 500 });
-    if (incRes.error) return NextResponse.json({ success: false, error: incRes.error.message }, { status: 500 });
+    if (expRes.error) return apiError(expRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    if (incRes.error) return apiError(incRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
 
     const unifiedList = [
       ...(expRes.data || []).map((e) => ({
@@ -90,25 +103,49 @@ export async function GET(req: NextRequest) {
 
     unifiedList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return NextResponse.json({
-      success: true,
-      data: unifiedList.slice(0, limit),
-      meta: {
+    return apiSuccess(
+      unifiedList.slice(0, limit),
+      {
         page,
         limit,
         total: (expRes.count || 0) + (incRes.count || 0),
       },
-    });
+      200,
+      req
+    );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to fetch transactions";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    logger.error("Transaction fetch error", "TransactionsAPI", err, { userId, requestId });
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
   if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
+    return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  // Idempotency support
+  const idempotencyKey = req.headers.get("idempotency-key");
+  if (idempotencyKey) {
+    const isFirstTime = await checkAndSetIdempotency(`txn:${userId}:${idempotencyKey}`, 86400);
+    if (!isFirstTime) {
+      return NextResponse.json(
+        { success: false, error: "Duplicate transaction rejected (Idempotency conflict)", requestId },
+        { status: 409, headers: { "X-Request-Id": requestId } }
+      );
+    }
+  }
+
+  // Rate limit creation
+  const rl = await rateLimit(`txn_post:${userId}`, 60, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Rate limit exceeded. Please wait a moment before logging again.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   try {
@@ -116,10 +153,7 @@ export async function POST(req: NextRequest) {
     const parseResult = TransactionSchema.safeParse(rawBody);
 
     if (!parseResult.success) {
-      return NextResponse.json(
-        { success: false, error: "Validation failed", details: parseResult.error.format() },
-        { status: 422 }
-      );
+      return apiValidationError(parseResult.error.format(), "Validation failed", req);
     }
 
     const data = parseResult.data;
@@ -136,7 +170,7 @@ export async function POST(req: NextRequest) {
         p_notes: data.notes || null,
         p_tags: data.tags || [],
       });
-      if (rpcErr) return NextResponse.json({ success: false, error: rpcErr.message }, { status: 500 });
+      if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       rpcResponse = result;
     } else {
       const { data: result, error: rpcErr } = await supabaseAdmin.rpc("fn_record_income_atomic", {
@@ -150,11 +184,13 @@ export async function POST(req: NextRequest) {
         p_notes: data.notes || null,
         p_tags: data.tags || [],
       });
-      if (rpcErr) return NextResponse.json({ success: false, error: rpcErr.message }, { status: 500 });
+      if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       rpcResponse = result;
     }
 
+    // Invalidate affected caches including analytics
     try {
+      const monthPrefix = data.date.slice(0, 7);
       await invalidateCachedData([
         getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
         getUserCacheKey(userId, CACHE_KEYS.INCOME),
@@ -162,20 +198,23 @@ export async function POST(req: NextRequest) {
         getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
         getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+        getUserCacheKey(userId, `analytics:${monthPrefix}`),
       ]);
     } catch {}
 
-    return NextResponse.json({ success: true, data: rpcResponse }, { status: 201 });
+    return apiSuccess(rpcResponse, undefined, 201, req);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to record transaction";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    logger.error("Failed to record transaction", "TransactionsAPI", err, { userId, requestId });
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
   if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
+    return apiUnauthorized(authError || "Unauthorized", req);
   }
 
   const { searchParams } = new URL(req.url);
@@ -183,7 +222,10 @@ export async function DELETE(req: NextRequest) {
   const type = searchParams.get("type"); // 'expense' | 'income'
 
   if (!id || !/^[0-9a-fA-F-]{36}$/.test(id) || !type || !["expense", "income"].includes(type)) {
-    return NextResponse.json({ success: false, error: "Missing or invalid id / type parameters" }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: "Missing or invalid id / type parameters", requestId },
+      { status: 400, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   try {
@@ -193,14 +235,14 @@ export async function DELETE(req: NextRequest) {
         p_expense_id: id,
         p_user_id: userId,
       });
-      if (rpcErr) return NextResponse.json({ success: false, error: rpcErr.message }, { status: 500 });
+      if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       result = rpcResult;
     } else {
       const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_delete_income_atomic", {
         p_income_id: id,
         p_user_id: userId,
       });
-      if (rpcErr) return NextResponse.json({ success: false, error: rpcErr.message }, { status: 500 });
+      if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       result = rpcResult;
     }
 
@@ -215,9 +257,10 @@ export async function DELETE(req: NextRequest) {
       ]);
     } catch {}
 
-    return NextResponse.json({ success: true, data: result });
+    return apiSuccess(result, undefined, 200, req);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to delete transaction";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    logger.error("Failed to delete transaction", "TransactionsAPI", err, { userId, requestId });
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }

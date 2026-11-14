@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { apiSuccess, apiError, apiUnauthorized, apiValidationError, extractRequestId } from "@/utils/apiResponse";
+import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { logger } from "@/utils/logger";
 import { z } from "zod";
 
 const CreateTransferSchema = z.object({
@@ -13,9 +16,18 @@ const CreateTransferSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
   if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
+    return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  const rl = await rateLimit(`transfers_get:${userId}`, 100, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   const { searchParams } = new URL(req.url);
@@ -39,28 +51,51 @@ export async function GET(req: NextRequest) {
     const { data, count, error } = await query;
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return apiError(error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: data || [],
-      meta: {
+    return apiSuccess(
+      data || [],
+      {
         page,
         limit,
         total: count || 0,
       },
-    });
+      200,
+      req
+    );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to fetch transfers";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    logger.error("Failed to fetch transfers", "TransfersAPI", err, { userId, requestId });
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
   if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
+    return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  // Idempotency support
+  const idempotencyKey = req.headers.get("idempotency-key");
+  if (idempotencyKey) {
+    const isFirst = await checkAndSetIdempotency(`transfer:${userId}:${idempotencyKey}`, 86400);
+    if (!isFirst) {
+      return NextResponse.json(
+        { success: false, error: "Duplicate transfer request rejected", requestId },
+        { status: 409, headers: { "X-Request-Id": requestId } }
+      );
+    }
+  }
+
+  const rl = await rateLimit(`transfers_post:${userId}`, 30, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Rate limit exceeded. Please wait a moment before transferring.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   try {
@@ -68,18 +103,15 @@ export async function POST(req: NextRequest) {
     const parseResult = CreateTransferSchema.safeParse(rawBody);
 
     if (!parseResult.success) {
-      return NextResponse.json(
-        { success: false, error: "Validation failed", details: parseResult.error.format() },
-        { status: 422 }
-      );
+      return apiValidationError(parseResult.error.format(), "Validation failed", req);
     }
 
     const { from_account_id, to_account_id, amount, transfer_date, notes } = parseResult.data;
 
     if (from_account_id === to_account_id) {
       return NextResponse.json(
-        { success: false, error: "Source and destination accounts must be distinct." },
-        { status: 400 }
+        { success: false, error: "Source and destination accounts must be distinct.", requestId },
+        { status: 400, headers: { "X-Request-Id": requestId } }
       );
     }
 
@@ -94,65 +126,26 @@ export async function POST(req: NextRequest) {
     });
 
     if (rpcError) {
-      return NextResponse.json({ success: false, error: rpcError.message }, { status: 500 });
+      return apiError(rpcError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
     // Invalidate affected caches
     try {
       await invalidateCachedData([
         getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
         getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
-        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
+        getUserCacheKey(userId, `analytics:${transfer_date.slice(0, 7)}`),
       ]);
-    } catch {
-      // Non-blocking cache warning
-    }
+    } catch {}
 
-    return NextResponse.json({ success: true, data: result }, { status: 201 });
+    logger.info(`Transfer recorded: ${amount} from ${from_account_id} to ${to_account_id}`, "TransfersAPI", { userId });
+
+    return apiSuccess(result, undefined, 201, req);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to execute transfer";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-  if (!user || !userId) {
-    return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const transferId = searchParams.get("id");
-
-  if (!transferId || !/^[0-9a-fA-F-]{36}$/.test(transferId)) {
-    return NextResponse.json({ success: false, error: "Missing or invalid transfer ID" }, { status: 400 });
-  }
-
-  try {
-    const { data: result, error: rpcError } = await supabaseAdmin.rpc("fn_delete_transfer_atomic", {
-      p_transfer_id: transferId,
-      p_user_id: userId,
-    });
-
-    if (rpcError) {
-      return NextResponse.json({ success: false, error: rpcError.message }, { status: 500 });
-    }
-
-    try {
-      await invalidateCachedData([
-        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
-        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
-        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
-      ]);
-    } catch {
-      // Non-blocking
-    }
-
-    return NextResponse.json({ success: true, data: result });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to reverse transfer";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Failed to record transfer";
+    logger.error("Failed to record transfer", "TransfersAPI", err, { userId, requestId });
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
