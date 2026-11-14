@@ -260,8 +260,24 @@ export default function SettingsSection() {
   useEffect(() => {
     if (activeTab === "integrations") {
       fetchTelegramStatus();
+
+      const onFocus = () => {
+        fetchTelegramStatus();
+      };
+      window.addEventListener("focus", onFocus);
+
+      const interval = setInterval(() => {
+        if (!telegramData.is_linked) {
+          fetchTelegramStatus();
+        }
+      }, 3500);
+
+      return () => {
+        window.removeEventListener("focus", onFocus);
+        clearInterval(interval);
+      };
     }
-  }, [activeTab, fetchTelegramStatus]);
+  }, [activeTab, fetchTelegramStatus, telegramData.is_linked]);
 
   const handleRegenerateToken = async () => {
     setRefreshingTelegram(true);

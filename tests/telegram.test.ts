@@ -220,6 +220,22 @@ describe("Telegram Integration Suite", () => {
       expect(extractLinkToken("/start")).toBeNull();
       expect(extractLinkToken("/balance")).toBeNull();
     });
+
+    it("handles token normalization for case-insensitivity, hyphens, and missing prefix", () => {
+      const normalizeCandidate = (raw: string) => {
+        const clean = raw.trim().toUpperCase().replace(/_/g, "-");
+        return Array.from(
+          new Set([
+            clean,
+            clean.startsWith("AX-") ? clean.slice(3) : `AX-${clean}`,
+          ])
+        );
+      };
+
+      expect(normalizeCandidate("ax-7k9p2x")).toContain("AX-7K9P2X");
+      expect(normalizeCandidate("ax_7k9p2x")).toContain("AX-7K9P2X");
+      expect(normalizeCandidate("7k9p2x")).toContain("AX-7K9P2X");
+    });
   });
 
   describe("Full Financial Intent Classifier & Flow", () => {

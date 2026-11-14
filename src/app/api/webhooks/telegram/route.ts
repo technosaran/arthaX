@@ -173,11 +173,25 @@ export async function POST(req: NextRequest) {
         let matchedUserId: string | null = null;
         let matchedUserName: string = "User";
 
-        // A. Match by Link Token or User UUID
+        const rawCandidate = linkCandidate.trim();
+        const upperCandidate = rawCandidate.toUpperCase();
+        const normalizedToken = upperCandidate.replace(/_/g, "-");
+
+        // Build list of possible token representations
+        const tokenCandidates = Array.from(
+          new Set([
+            rawCandidate,
+            upperCandidate,
+            normalizedToken,
+            normalizedToken.startsWith("AX-") ? normalizedToken.slice(3) : `AX-${normalizedToken}`,
+          ])
+        );
+
+        // A. Match by Link Token in user_settings
         const { data: targetUser } = await supabaseAdmin
           .from("user_settings")
           .select("id, name, telegram_link_token")
-          .or(`telegram_link_token.eq.${linkCandidate},id.eq.${linkCandidate}`)
+          .in("telegram_link_token", tokenCandidates)
           .limit(1)
           .maybeSingle();
 
@@ -186,7 +200,21 @@ export async function POST(req: NextRequest) {
           matchedUserName = targetUser.name || "User";
         }
 
-        // B. If email provided (e.g. /link user@example.com)
+        // B. Match by User ID directly (UUID or text id)
+        if (!matchedUserId) {
+          const { data: userById } = await supabaseAdmin
+            .from("user_settings")
+            .select("id, name")
+            .eq("id", rawCandidate)
+            .limit(1)
+            .maybeSingle();
+          if (userById?.id) {
+            matchedUserId = userById.id;
+            matchedUserName = userById.name || "User";
+          }
+        }
+
+        // C. If email provided (e.g. /link user@example.com)
         if (!matchedUserId && linkCandidate.includes("@")) {
           const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
           const foundAuth = (usersList?.users || []).find(
@@ -203,20 +231,56 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // D. Check family_members by email or phone
+        if (!matchedUserId) {
+          const { data: fm } = await supabaseAdmin
+            .from("family_members")
+            .select("id, user_id, name")
+            .or(`email.ilike.${rawCandidate},phone.eq.${rawCandidate}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (fm?.user_id) {
+            await supabaseAdmin
+              .from("family_members")
+              .update({
+                telegram_chat_id: chatIdStr,
+                telegram_username: senderUsername || null,
+              })
+              .eq("id", fm.id);
+
+            await sendTelegramMessage({
+              chatId,
+              text:
+                `🎉 <b>Family Member Connected!</b>\n\n` +
+                `Welcome <b>${escapeTelegramHtml(fm.name)}</b>. Your Telegram chat is now linked to record shared household expenses.\n\n` +
+                `<b>Try:</b> <code>Dinner 450 HDFC</code> or forward any bank debit SMS!`,
+              replyMarkup: getStandardInlineKeyboard(webAppUrl),
+            });
+            return NextResponse.json({ success: true, linked_family_member: fm.id });
+          }
+        }
+
         if (matchedUserId) {
           // Bind Telegram Chat ID to the matching user
           await supabaseAdmin
             .from("user_settings")
-            .update({
-              telegram_chat_id: chatIdStr,
-              telegram_username: senderUsername || null,
-              telegram_linked_at: new Date().toISOString(),
-              telegram_link_token: null, // Consume one-time token
-            })
-            .eq("id", matchedUserId);
+            .upsert(
+              {
+                id: matchedUserId,
+                telegram_chat_id: chatIdStr,
+                telegram_username: senderUsername || null,
+                telegram_linked_at: new Date().toISOString(),
+                telegram_link_token: null, // Consume one-time token
+              },
+              { onConflict: "id" }
+            );
 
           try {
-            await invalidateCachedData([getUserCacheKey(matchedUserId, CACHE_KEYS.PORTFOLIO)]);
+            await invalidateCachedData([
+              getUserCacheKey(matchedUserId, CACHE_KEYS.PORTFOLIO),
+              getUserCacheKey(matchedUserId, CACHE_KEYS.ACCOUNTS),
+            ]);
           } catch {}
 
           await sendTelegramMessage({
@@ -253,7 +317,7 @@ export async function POST(req: NextRequest) {
     // 4. Handle Unlinked Users (Strict Protection)
     // -------------------------------------------------------------
     if (!userId) {
-      if (rawText === "/help") {
+      if (rawText === "/help" || rawText === "help") {
         await sendTelegramMessage({
           chatId,
           text: formatHelpMessage(botUsername),
@@ -276,6 +340,20 @@ export async function POST(req: NextRequest) {
         status: "unlinked_instructions_sent",
         chat_id: chatIdStr,
       });
+    }
+
+    // Handle /start or /help for already linked users
+    if (rawText === "/start" || rawText === "start" || rawText === "/help" || rawText === "help") {
+      await sendTelegramMessage({
+        chatId,
+        text: formatWelcomeMessage({
+          botUsername,
+          isLinked: true,
+          userName,
+        }),
+        replyMarkup: getStandardInlineKeyboard(webAppUrl),
+      });
+      return NextResponse.json({ status: "welcome_sent_linked" });
     }
 
     // -------------------------------------------------------------

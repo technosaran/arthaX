@@ -29,8 +29,14 @@ export async function GET(req: NextRequest) {
       linkToken = generateCode();
       await supabaseAdmin
         .from("user_settings")
-        .update({ telegram_link_token: linkToken })
-        .eq("id", userId);
+        .upsert(
+          {
+            id: userId,
+            telegram_link_token: linkToken,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
     }
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
@@ -71,6 +77,11 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", userId);
 
+      await supabaseAdmin
+        .from("family_members")
+        .update({ telegram_chat_id: null, telegram_username: null })
+        .eq("user_id", userId);
+
       return NextResponse.json({
         success: true,
         is_linked: false,
@@ -82,8 +93,14 @@ export async function POST(req: NextRequest) {
     const newToken = generateCode();
     await supabaseAdmin
       .from("user_settings")
-      .update({ telegram_link_token: newToken })
-      .eq("id", userId);
+      .upsert(
+        {
+          id: userId,
+          telegram_link_token: newToken,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
 
