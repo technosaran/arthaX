@@ -165,13 +165,9 @@ export default function TopNav({
           >
             <TabIcon size={14} className="text-[var(--app-accent)]" />
           </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-bold tracking-tight text-[var(--app-fg)]">arthaX</span>
-            <span className="text-[var(--app-muted)] text-xs select-none">/</span>
-            <span className="text-[var(--app-muted)] font-medium truncate">
-              {activeMeta.label}
-            </span>
-          </div>
+          <span className="font-semibold tracking-tight text-[var(--app-fg)] truncate">
+            {activeMeta.label}
+          </span>
         </div>
       </div>
 

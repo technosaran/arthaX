@@ -58,9 +58,10 @@ export async function GET(req: NextRequest) {
     }
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
-    const deepLink = linkToken
-      ? `https://t.me/${botUsername}?start=${encodeURIComponent(linkToken)}`
-      : `https://t.me/${botUsername}?start=${encodeURIComponent(userId)}`;
+    const targetToken = linkToken || userId;
+    const deepLink = `https://telegram.me/${botUsername}?start=${encodeURIComponent(targetToken)}`;
+    const appUri = `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(targetToken)}`;
+    const webTelegramUrl = `https://web.telegram.org/a/#?tgaddr=${encodeURIComponent(`tg://resolve?domain=${botUsername}&start=${targetToken}`)}`;
 
     return NextResponse.json(
       {
@@ -72,6 +73,8 @@ export async function GET(req: NextRequest) {
         link_token: linkToken || null,
         bot_username: botUsername,
         deep_link: deepLink,
+        app_uri: appUri,
+        web_telegram_url: webTelegramUrl,
         requestId,
       },
       { headers: { "X-Request-Id": requestId } }
@@ -157,7 +160,9 @@ export async function POST(req: NextRequest) {
         { onConflict: "id" }
       );
 
-    const deepLink = `https://t.me/${botUsername}?start=${encodeURIComponent(newToken)}`;
+    const deepLink = `https://telegram.me/${botUsername}?start=${encodeURIComponent(newToken)}`;
+    const appUri = `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(newToken)}`;
+    const webTelegramUrl = `https://web.telegram.org/a/#?tgaddr=${encodeURIComponent(`tg://resolve?domain=${botUsername}&start=${newToken}`)}`;
 
     logger.info(`User ${userId} generated new link token: ${newToken}`, "TelegramLinkAPI", { userId });
 
@@ -167,6 +172,8 @@ export async function POST(req: NextRequest) {
         link_token: newToken,
         bot_username: botUsername,
         deep_link: deepLink,
+        app_uri: appUri,
+        web_telegram_url: webTelegramUrl,
         requestId,
       },
       { headers: { "X-Request-Id": requestId } }

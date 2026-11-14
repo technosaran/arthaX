@@ -829,11 +829,13 @@ export default function LedgerSection() {
                           <div className="flex items-center gap-2.5">
                             <BankLogo name={entry.account.name} size={24} />
                             <span className="font-medium text-xs">{entry.account.name}</span>
-                            {entry.account.last_four && (
-                              <span className="text-[10px] opacity-60 font-mono">
-                                ••{entry.account.last_four.slice(-4)}
-                              </span>
-                            )}
+                            {entry.account.last_four &&
+                              entry.account.last_four.toUpperCase() !== "CASH" &&
+                              /^\d+$/.test(entry.account.last_four.trim()) && (
+                                <span className="text-[10px] opacity-60 font-mono">
+                                  ••{entry.account.last_four.slice(-4)}
+                                </span>
+                              )}
                           </div>
                         ) : (
                           <span className="text-xs opacity-50 italic">Unallocated</span>
@@ -890,55 +892,78 @@ export default function LedgerSection() {
         title="Transaction Details"
         description="Double-entry reconciliation voucher"
         size="md"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+              icon={<Trash2 size={13} />}
+              onClick={() => selectedVoucher && promptDeleteEntry(selectedVoucher)}
+            >
+              Delete & Reverse
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedVoucher(null)}
+            >
+              Close
+            </Button>
+          </div>
+        }
       >
         {selectedVoucher && (
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             {/* Voucher Amount Badge */}
             <div
-              className="p-4 rounded-xl border text-center space-y-1"
+              className="p-3.5 rounded-xl border text-center space-y-1"
               style={{
                 borderColor: "var(--app-border-subtle)",
                 backgroundColor: "var(--app-bg)",
               }}
             >
-              <div className="text-[11px] font-bold uppercase tracking-wider opacity-60">
+              <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">
                 {selectedVoucher.type === "CREDIT" ? "Credit Inflow" : "Debit Outflow"}
               </div>
               <div
-                className={`text-3xl font-extrabold font-mono tabular-nums ${
+                className={`text-2xl sm:text-3xl font-extrabold font-mono tabular-nums ${
                   selectedVoucher.type === "CREDIT" ? "text-emerald-400" : "text-rose-400"
                 }`}
               >
                 {selectedVoucher.type === "CREDIT" ? "+" : "-"}
                 {formatINR(selectedVoucher.amount)}
               </div>
-              <div className="flex items-center justify-center gap-2 pt-1">
-                <EntityLogo name={selectedVoucher.title} category={selectedVoucher.category} size={24} />
+              <div className="flex items-center justify-center gap-2 pt-0.5">
+                <EntityLogo name={selectedVoucher.title} category={selectedVoucher.category} size={22} />
                 <span className="text-xs opacity-80 font-semibold">{selectedVoucher.title}</span>
               </div>
             </div>
 
             {/* Metadata Fields */}
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Date of Transaction</span>
                 <span className="font-mono font-medium">{formatDateDisplay(selectedVoucher.date)}</span>
               </div>
 
-              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
+              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Category</span>
                 <Badge variant="outline">{selectedVoucher.category}</Badge>
               </div>
 
-              <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
+              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
                 <span className="opacity-60">Account Linked</span>
                 {selectedVoucher.account ? (
                   <div className="flex items-center gap-2 font-medium">
-                    <BankLogo name={selectedVoucher.account.name} size={22} />
+                    <BankLogo name={selectedVoucher.account.name} size={20} />
                     <span>{selectedVoucher.account.name}</span>
-                    {selectedVoucher.account.last_four && (
-                      <span className="font-mono opacity-60">•••{selectedVoucher.account.last_four}</span>
-                    )}
+                    {selectedVoucher.account.last_four &&
+                      selectedVoucher.account.last_four.toUpperCase() !== "CASH" &&
+                      /^\d+$/.test(selectedVoucher.account.last_four.trim()) && (
+                        <span className="font-mono opacity-60">•••{selectedVoucher.account.last_four}</span>
+                      )}
                   </div>
                 ) : (
                   <span className="opacity-50 italic">None / Unallocated</span>
@@ -946,24 +971,24 @@ export default function LedgerSection() {
               </div>
 
               {selectedVoucher.frequency && (
-                <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
+                <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
                   <span className="opacity-60">Frequency</span>
                   <span className="font-medium">{selectedVoucher.frequency}</span>
                 </div>
               )}
 
               {selectedVoucher.runningBalance !== undefined && (
-                <div className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]">
+                <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
                   <span className="opacity-60">Balance Post-Transaction</span>
                   <span className="font-mono font-bold">{formatINR(selectedVoucher.runningBalance)}</span>
                 </div>
               )}
 
               {selectedVoucher.notes && (
-                <div className="py-2 space-y-1">
-                  <span className="opacity-60 block">Notes & Narration:</span>
+                <div className="py-1 space-y-1">
+                  <span className="opacity-60 block text-[11px]">Notes & Narration:</span>
                   <div
-                    className="p-3 rounded-lg border font-mono text-[11px] whitespace-pre-wrap"
+                    className="p-2.5 rounded-lg border font-mono text-[11px] whitespace-pre-wrap max-h-24 overflow-y-auto leading-relaxed"
                     style={{
                       borderColor: "var(--app-border-subtle)",
                       backgroundColor: "var(--app-bg)",
@@ -974,31 +999,14 @@ export default function LedgerSection() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between py-1 opacity-50 text-[10px] font-mono">
-                <span>Voucher ID: {selectedVoucher.id}</span>
-                <span>Source: {selectedVoucher.sourceType.toUpperCase()}</span>
+              <div className="flex items-center justify-between py-1 opacity-50 text-[10px] font-mono gap-2">
+                <span className="truncate" title={`Voucher ID: ${selectedVoucher.id}`}>
+                  Voucher ID: {selectedVoucher.id.length > 16 ? `${selectedVoucher.id.slice(0, 8)}...${selectedVoucher.id.slice(-4)}` : selectedVoucher.id}
+                </span>
+                <span className="flex-shrink-0 font-semibold tracking-wider">
+                  Source: {selectedVoucher.sourceType.toUpperCase()}
+                </span>
               </div>
-            </div>
-
-            {/* Actions: Delete & Close */}
-            <div className="flex items-center justify-between pt-3 border-t border-[var(--app-border-subtle)]">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                icon={<Trash2 size={13} />}
-                onClick={() => promptDeleteEntry(selectedVoucher)}
-              >
-                Delete & Reverse
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedVoucher(null)}
-              >
-                Close
-              </Button>
             </div>
           </div>
         )}
@@ -1014,6 +1022,33 @@ export default function LedgerSection() {
         title="Delete & Reverse Transaction"
         description="Permanently delete entry and restore account balance."
         size="md"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              disabled={deleting}
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setEntryToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              loading={deleting}
+              icon={<Trash2 size={13} />}
+              onClick={confirmDeleteAndReverse}
+            >
+              Delete & Reverse Balance
+            </Button>
+          </div>
+        }
       >
         {entryToDelete && (
           <div className="space-y-4">
@@ -1061,32 +1096,6 @@ export default function LedgerSection() {
                 This entry has no linked account. It will be removed from the ledger without affecting account balances.
               </div>
             )}
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--app-border-subtle)]">
-              <Button
-                type="button"
-                variant="outline"
-                size="md"
-                disabled={deleting}
-                onClick={() => {
-                  setIsDeleteModalOpen(false);
-                  setEntryToDelete(null);
-                }}
-              >
-                Cancel
-              </Button>
-
-              <Button
-                type="button"
-                variant="danger"
-                size="md"
-                loading={deleting}
-                icon={<Trash2 size={13} />}
-                onClick={confirmDeleteAndReverse}
-              >
-                Delete & Reverse Balance
-              </Button>
-            </div>
           </div>
         )}
       </Modal>

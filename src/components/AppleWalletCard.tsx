@@ -44,6 +44,21 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
   const clean = (name || "").trim().toLowerCase();
   const cleanType = (type || "").trim().toLowerCase();
 
+  // Check if network is explicitly indicated in name or type
+  let overrideNetwork: CardNetworkType | null = null;
+  if (clean.includes("rupay") || cleanType.includes("rupay")) overrideNetwork = "rupay";
+  else if (clean.includes("mastercard") || clean.includes("master") || cleanType.includes("mastercard")) overrideNetwork = "mastercard";
+  else if (clean.includes("visa") || cleanType.includes("visa")) overrideNetwork = "visa";
+  else if (clean.includes("amex") || clean.includes("american express") || cleanType.includes("amex")) overrideNetwork = "amex";
+
+  // Helper to attach network override
+  const withNetwork = (theme: AppleWalletCardTheme): AppleWalletCardTheme => {
+    if (overrideNetwork && theme.network !== "cash") {
+      return { ...theme, network: overrideNetwork };
+    }
+    return theme;
+  };
+
   // 1. Cash in Hand / Liquid Cash
   if (
     clean.includes("cash") ||
@@ -66,7 +81,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
 
   // 2. SBI (State Bank of India)
   if (clean.includes("sbi") || clean.includes("state bank")) {
-    return {
+    return withNetwork({
       id: "sbi-sapphire",
       name: "SBI Midnight Sapphire",
       bgGradient: "linear-gradient(145deg, #07172e 0%, #0d2953 48%, #051325 100%)",
@@ -77,12 +92,12 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#3b82f6",
       badgeText: "DEBIT CARD",
       subLabel: "SAVINGS ACCOUNT",
-    };
+    });
   }
 
   // 3. HDFC Bank
   if (clean.includes("hdfc")) {
-    return {
+    return withNetwork({
       id: "hdfc-cobalt",
       name: "HDFC Royal Cobalt",
       bgGradient: "linear-gradient(145deg, #081734 0%, #102d60 48%, #061127 100%)",
@@ -93,12 +108,12 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#4f46e5",
       badgeText: "DEBIT CARD",
       subLabel: "PREFERRED SAVINGS",
-    };
+    });
   }
 
   // 4. ICICI Bank
   if (clean.includes("icici")) {
-    return {
+    return withNetwork({
       id: "icici-ruby",
       name: "ICICI Crimson Ruby",
       bgGradient: "linear-gradient(145deg, #240c16 0%, #3d1424 48%, #1a070f 100%)",
@@ -109,12 +124,12 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#f43f5e",
       badgeText: "DEBIT CARD",
       subLabel: "SAVINGS ACCOUNT",
-    };
+    });
   }
 
   // 5. Axis Bank
   if (clean.includes("axis")) {
-    return {
+    return withNetwork({
       id: "axis-plum",
       name: "Axis Plum Obsidian",
       bgGradient: "linear-gradient(145deg, #24091b 0%, #3b0e2c 48%, #170411 100%)",
@@ -125,12 +140,12 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#ec4899",
       badgeText: "DEBIT CARD",
       subLabel: "BURGUNDY SAVINGS",
-    };
+    });
   }
 
   // 6. Kotak Mahindra Bank
   if (clean.includes("kotak")) {
-    return {
+    return withNetwork({
       id: "kotak-ruby",
       name: "Kotak Crimson",
       bgGradient: "linear-gradient(145deg, #260c12 0%, #3e141d 48%, #1a060b 100%)",
@@ -141,7 +156,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#ef4444",
       badgeText: "DEBIT CARD",
       subLabel: "811 SAVINGS",
-    };
+    });
   }
 
   // 7. Trading & Demat (Zerodha, Groww, Angel One, Upstox)
@@ -154,7 +169,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
     cleanType.includes("trading") ||
     cleanType.includes("demat")
   ) {
-    return {
+    return withNetwork({
       id: "demat-cyan",
       name: "Brokerage Obsidian",
       bgGradient: "linear-gradient(145deg, #091724 0%, #11253a 48%, #060f18 100%)",
@@ -165,7 +180,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#06b6d4",
       badgeText: "TRADING & DEMAT",
       subLabel: "PORTFOLIO ASSETS",
-    };
+    });
   }
 
   // 8. Amex / American Express
@@ -186,7 +201,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
 
   // 9. Credit Card (Generic)
   if (cleanType.includes("credit")) {
-    return {
+    return withNetwork({
       id: "credit-matte",
       name: "Matte Black Credit",
       bgGradient: "linear-gradient(145deg, #121316 0%, #1e2026 48%, #0a0b0d 100%)",
@@ -197,11 +212,11 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
       accentColor: "#f59e0b",
       badgeText: "CREDIT CARD",
       subLabel: "PLATINUM REWARDS",
-    };
+    });
   }
 
   // 10. Default Slate Titanium Space Card
-  return {
+  return withNetwork({
     id: "titanium-slate",
     name: "Slate Titanium Card",
     bgGradient: "linear-gradient(145deg, #141518 0%, #20232a 48%, #0e0f11 100%)",
@@ -212,7 +227,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
     accentColor: "#ffffff",
     badgeText: `DEBIT • ${cleanType ? cleanType.toUpperCase() : "ACCOUNT"}`,
     subLabel: type || "SAVINGS ACCOUNT",
-  };
+  });
 }
 
 /**
@@ -340,12 +355,14 @@ function ContactlessWave({ className = "" }: { className?: string }) {
 function RuPayLogo() {
   return (
     <div className="flex items-center gap-1 select-none">
-      <span className="font-sans font-extrabold tracking-tight text-xs text-white drop-shadow-sm">
+      <span className="font-sans font-black tracking-tight text-xs sm:text-[13px] text-white drop-shadow-sm">
         RuPay
       </span>
-      <div className="flex -space-x-1">
-        <span className="w-1.5 h-2.5 bg-[#00A551] transform skew-x-[-22deg] rounded-sm" />
-        <span className="w-1.5 h-2.5 bg-[#F37021] transform skew-x-[-22deg] rounded-sm" />
+      <div className="flex -space-x-0.5 items-center">
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 drop-shadow-sm" fill="none">
+          <path d="M4 2L9 8L4 14H7L12 8L7 2H4Z" fill="#00A551" />
+          <path d="M8 2L13 8L8 14H11L16 8L11 2H8Z" fill="#F37021" />
+        </svg>
       </div>
     </div>
   );
@@ -353,7 +370,7 @@ function RuPayLogo() {
 
 function VisaLogo() {
   return (
-    <span className="font-sans font-black italic tracking-tighter text-sm text-white select-none drop-shadow-sm">
+    <span className="font-sans font-black italic tracking-tighter text-sm sm:text-base text-white select-none drop-shadow-sm">
       VISA
     </span>
   );
@@ -362,17 +379,19 @@ function VisaLogo() {
 function MastercardLogo() {
   return (
     <div className="flex items-center -space-x-2 select-none drop-shadow-sm">
-      <div className="w-4 h-4 rounded-full bg-[#EB001B]/90 shadow-sm" />
-      <div className="w-4 h-4 rounded-full bg-[#F79E1B]/90 shadow-sm mix-blend-screen" />
+      <div className="w-4 h-4 rounded-full bg-[#EB001B] shadow-sm" />
+      <div className="w-4 h-4 rounded-full bg-[#F79E1B]/95 shadow-sm mix-blend-screen" />
     </div>
   );
 }
 
 function AmexLogo() {
   return (
-    <span className="font-sans font-extrabold tracking-widest text-[10px] text-amber-200 border border-amber-300/40 px-1 py-0.5 rounded select-none">
-      AMEX
-    </span>
+    <div className="px-1.5 py-0.5 rounded bg-[#002663] border border-white/20 select-none shadow-sm">
+      <span className="font-sans font-black tracking-wider text-[9px] text-white">
+        AMEX
+      </span>
+    </div>
   );
 }
 
@@ -428,14 +447,37 @@ export default function AppleWalletCard({
     }).format(val);
   };
 
-  // Capitalize bank name nicely for Apple Wallet feel
+  // Capitalize bank name nicely for Apple Wallet feel with proper acronym preservation
+  const acronyms = new Set([
+    "sbi",
+    "hdfc",
+    "icici",
+    "axis",
+    "kotak",
+    "pnb",
+    "bob",
+    "boi",
+    "rbl",
+    "idbi",
+    "idfc",
+    "hsbc",
+    "dbs",
+    "amex",
+    "sc",
+    "au",
+  ]);
+
   const displayName = account.name
     .split(" ")
-    .map((word) =>
-      word.length <= 4 && !word.toLowerCase().includes("bank")
+    .map((word) => {
+      const lower = word.toLowerCase();
+      if (acronyms.has(lower)) {
+        return lower === "kotak" ? "Kotak" : lower === "axis" ? "Axis" : lower.toUpperCase();
+      }
+      return word.length <= 4 && !lower.includes("bank")
         ? word.toUpperCase()
-        : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    )
+        : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
     .join(" ");
 
   return (
@@ -514,11 +556,11 @@ export default function AppleWalletCard({
         <div className="flex items-center gap-3">
           {isCash ? (
             <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md ring-1 ring-emerald-500/30 flex-shrink-0 flex items-center justify-center bg-[#064E3B]">
-              <BankLogo name="cash" size={40} />
+              <BankLogo name="cash" size={32} />
             </div>
           ) : (
             <div className="w-10 h-10 rounded-xl bg-white shadow-md flex items-center justify-center flex-shrink-0 overflow-hidden ring-1 ring-white/20 p-1">
-              <BankLogo name={account.name} size={30} />
+              <BankLogo name={account.name} size={32} />
             </div>
           )}
 

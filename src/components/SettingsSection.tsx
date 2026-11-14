@@ -24,11 +24,11 @@ import {
   Send,
   Bot,
   ExternalLink,
-  Sparkles,
   RefreshCw,
   Smartphone,
   Mic,
   MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -114,6 +114,12 @@ export default function SettingsSection() {
   });
   const [copiedLinkToken, setCopiedLinkToken] = useState(false);
   const [refreshingTelegram, setRefreshingTelegram] = useState(false);
+
+  // Apple Siri & Shortcuts State
+  const [siriModalOpen, setSiriModalOpen] = useState(false);
+  const [copiedSiriUrl, setCopiedSiriUrl] = useState(false);
+  const [siriTesting, setSiriTesting] = useState(false);
+  const [siriGuideTab, setSiriGuideTab] = useState<"voice" | "sms">("voice");
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -1509,8 +1515,6 @@ export default function SettingsSection() {
               </div>
             </Card>
 
-            {/* Danger Zone Wipe within Statements & Data */}
-            {renderDangerZoneCard()}
           </div>
         )}
 
@@ -1565,13 +1569,20 @@ export default function SettingsSection() {
 
                     <div className="flex items-center gap-2">
                       <a
-                        href={`https://t.me/${telegramData.bot_username}`}
-                        target="_blank"
-                        rel="noreferrer"
+                        href={`tg://resolve?domain=${telegramData.bot_username}`}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-medium transition-all shadow-sm"
                       >
                         <Send size={12} />
-                        <span>Open Telegram Bot</span>
+                        <span>Open in App</span>
+                      </a>
+
+                      <a
+                        href={`https://telegram.me/${telegramData.bot_username}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#229ED9]/30 hover:bg-[#229ED9]/10 text-xs font-medium transition-all shadow-sm"
+                      >
+                        <span>Browser</span>
                         <ExternalLink size={10} className="opacity-70" />
                       </a>
 
@@ -1600,37 +1611,48 @@ export default function SettingsSection() {
                     {/* Option 1: 1-Click Deep Link */}
                     <div className="p-3.5 rounded-lg border border-[#229ED9]/20 bg-[#229ED9]/5 space-y-2.5 flex flex-col justify-between">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#229ED9]">Method 1 • Quick Connect</span>
-                        <p className="text-xs opacity-80 mt-1">
-                          Click below to launch the bot on Telegram. It will automatically authorize with your unique start token.
-                        </p>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#229ED9]">Quick Connect</span>
                       </div>
 
-                      <a
-                        href={
-                          telegramData.link_token
-                            ? `https://t.me/${telegramData.bot_username}?start=${encodeURIComponent(telegramData.link_token)}`
-                            : user?.id
-                            ? `https://t.me/${telegramData.bot_username}?start=${encodeURIComponent(user.id)}`
-                            : `https://t.me/${telegramData.bot_username}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-semibold transition-all shadow-sm"
-                      >
-                        <Send size={13} />
-                        <span>Launch @{telegramData.bot_username}</span>
-                        <ExternalLink size={12} className="opacity-70" />
-                      </a>
+                      <div className="space-y-2 pt-1">
+                        {/* Direct App Link (bypasses browser and DNS) */}
+                        <a
+                          href={
+                            telegramData.link_token
+                              ? `tg://resolve?domain=${telegramData.bot_username}&start=${encodeURIComponent(telegramData.link_token)}`
+                              : user?.id
+                              ? `tg://resolve?domain=${telegramData.bot_username}&start=${encodeURIComponent(user.id)}`
+                              : `tg://resolve?domain=${telegramData.bot_username}`
+                          }
+                          className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-semibold transition-all shadow-sm"
+                        >
+                          <Send size={13} />
+                          <span>Open in Telegram App</span>
+                        </a>
+
+                        {/* Browser fallback via telegram.me */}
+                        <a
+                          href={
+                            telegramData.link_token
+                              ? `https://telegram.me/${telegramData.bot_username}?start=${encodeURIComponent(telegramData.link_token)}`
+                              : user?.id
+                              ? `https://telegram.me/${telegramData.bot_username}?start=${encodeURIComponent(user.id)}`
+                              : `https://telegram.me/${telegramData.bot_username}`
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-2 w-full py-1.5 px-3 rounded-lg border border-[#229ED9]/30 hover:bg-[#229ED9]/10 text-xs font-medium transition-all"
+                        >
+                          <span>Open in Browser (telegram.me)</span>
+                          <ExternalLink size={11} className="opacity-70" />
+                        </a>
+                      </div>
                     </div>
 
                     {/* Option 2: Copy Command */}
                     <div className="p-3.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-bg)] space-y-2.5 flex flex-col justify-between">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Method 2 • Manual Command</span>
-                        <p className="text-xs opacity-80 mt-1">
-                          Open <b>@{telegramData.bot_username}</b> in Telegram and paste this link command:
-                        </p>
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Link Token</span>
                       </div>
 
                       <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)]">
@@ -1652,7 +1674,7 @@ export default function SettingsSection() {
                               navigator.clipboard.writeText(codeToCopy);
                               setCopiedLinkToken(true);
                               setTimeout(() => setCopiedLinkToken(false), 2000);
-                              showToast("Copied to clipboard", `Paste "${codeToCopy}" into @${telegramData.bot_username} on Telegram`, "success");
+                              showToast("Copied to clipboard", codeToCopy, "success");
                             }}
                           >
                             {copiedLinkToken ? "Copied" : "Copy"}
@@ -1672,67 +1694,6 @@ export default function SettingsSection() {
                   </div>
                 </div>
               )}
-
-              {/* Bot Capabilities Reference Card */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 text-xs">
-                {/* Column 1: Natural Messages */}
-                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-2.5">
-                  <div className="flex items-center gap-2 font-bold text-emerald-400">
-                    <Sparkles size={14} />
-                    <span>Natural Expense & SMS Logging</span>
-                  </div>
-                  <p className="opacity-70 text-[11px] leading-relaxed">
-                    Type naturally or paste bank debit notifications. The bot automatically identifies amounts, categories, and matches bank accounts:
-                  </p>
-                  <div className="space-y-1.5 font-mono text-[11px]">
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
-                      <span className="text-emerald-400">Dinner 500 HDFC</span>
-                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Logs ₹500 in Food & Dining, debits HDFC</p>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
-                      <span className="text-emerald-400">Petrol 1200 Cash</span>
-                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Logs ₹1,200 in Transport, debits Cash</p>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)]">
-                      <span className="text-emerald-400">Swiggy 340</span>
-                      <p className="text-[10px] opacity-60 font-sans mt-0.5">Auto-categorized into Food & Dining</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Commands */}
-                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-2.5">
-                  <div className="flex items-center gap-2 font-bold text-cyan-400">
-                    <Bot size={14} />
-                    <span>Bot Slash Commands</span>
-                  </div>
-                  <p className="opacity-70 text-[11px] leading-relaxed">
-                    Control and query your personal financial telemetry with instant inline commands:
-                  </p>
-                  <div className="space-y-1.5 text-[11px]">
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
-                      <code className="text-cyan-400 font-mono font-bold">/balance</code>
-                      <span className="opacity-70 text-[10px]">Real-time accounts & balances</span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
-                      <code className="text-cyan-400 font-mono font-bold">/recent</code>
-                      <span className="opacity-70 text-[10px]">Last 5 recorded expenses</span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
-                      <code className="text-cyan-400 font-mono font-bold">/summary</code>
-                      <span className="opacity-70 text-[10px]">Today & monthly totals</span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
-                      <code className="text-cyan-400 font-mono font-bold">/ai &lt;query&gt;</code>
-                      <span className="opacity-70 text-[10px]">Google Gemini financial AI</span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
-                      <code className="text-cyan-400 font-mono font-bold">/help</code>
-                      <span className="opacity-70 text-[10px]">Full syntax & examples</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </Card>
 
             {/* WHATSAPP & SIRI COMPANION CARDS */}
@@ -1752,10 +1713,6 @@ export default function SettingsSection() {
                   <Badge variant="emerald">Live Webhook</Badge>
                 </div>
 
-                <p className="opacity-70 leading-relaxed text-[11px]">
-                  Send bank SMS alerts or text expenses via WhatsApp. Connects directly to the Meta WhatsApp Cloud API free tier.
-                </p>
-
                 <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1 font-mono text-[10px]">
                   <div className="opacity-50 uppercase tracking-wider text-[9px]">Webhook Route:</div>
                   <div className="text-emerald-400">/api/webhooks/whatsapp</div>
@@ -1770,20 +1727,84 @@ export default function SettingsSection() {
                       <Mic size={15} />
                     </div>
                     <div>
-                      <div className="font-bold">Apple Siri Voice Shortcuts</div>
-                      <div className="text-[10px] opacity-60">iOS & macOS Automation</div>
+                      <div className="font-bold">Apple Siri Voice & iOS Automation</div>
+                      <div className="text-[10px] opacity-60">Siri Voice & Native Bank SMS Forwarding</div>
                     </div>
                   </div>
-                  <Badge variant="violet">Siri Enabled</Badge>
+                  <Badge variant="violet">Siri Ready</Badge>
                 </div>
 
-                <p className="opacity-70 leading-relaxed text-[11px]">
-                  Say <span className="text-indigo-400 font-semibold">&ldquo;Hey Siri, Log Expense&rdquo;</span> to automatically parse and record expenses with your voice.
+                <p className="text-[11px] opacity-70 leading-relaxed">
+                  Log expenses hands-free with <strong>&quot;Hey Siri, Log Expense&quot;</strong> or silently auto-forward your bank debit SMS directly on your iPhone.
                 </p>
 
-                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1 font-mono text-[10px]">
-                  <div className="opacity-50 uppercase tracking-wider text-[9px]">Shortcut Route:</div>
-                  <div className="text-indigo-400">/api/shortcuts/expense</div>
+                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1.5 font-mono text-[10px]">
+                  <div className="flex items-center justify-between">
+                    <span className="opacity-50 uppercase tracking-wider text-[9px]">Siri Webhook URL:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = typeof window !== "undefined"
+                          ? `${window.location.origin}/api/shortcuts/expense?key=arthax_siri_key_2026`
+                          : "https://arthax.vercel.app/api/shortcuts/expense?key=arthax_siri_key_2026";
+                        navigator.clipboard.writeText(url);
+                        setCopiedSiriUrl(true);
+                        showToast("URL Copied", "Siri Webhook URL copied to clipboard.", "success");
+                        setTimeout(() => setCopiedSiriUrl(false), 2000);
+                      }}
+                      className="text-indigo-400 hover:text-indigo-300 font-sans text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {copiedSiriUrl ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                      {copiedSiriUrl ? "Copied" : "Copy URL"}
+                    </button>
+                  </div>
+                  <div className="text-indigo-400 truncate select-all">
+                    {typeof window !== "undefined" ? window.location.origin : "https://arthax.vercel.app"}/api/shortcuts/expense?key=arthax_siri_key_2026
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setSiriModalOpen(true)}
+                    className="flex-1 text-xs"
+                  >
+                    <Smartphone size={13} className="mr-1.5" />
+                    Setup Guide (Voice & SMS)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={siriTesting}
+                    onClick={async () => {
+                      setSiriTesting(true);
+                      try {
+                        const res = await fetch("/api/shortcuts/expense", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "x-api-key": "arthax_siri_key_2026",
+                          },
+                          body: JSON.stringify({ text: "20 test coffee on cash" }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          showToast("Siri Connected", data.speech || "Test expense logged successfully!", "success");
+                        } else {
+                          showToast("Siri Test Notice", data.speech || data.display || "Failed to process test", "error");
+                        }
+                      } catch (err: unknown) {
+                        showToast("Error", err instanceof Error ? err.message : "Network error", "error");
+                      } finally {
+                        setSiriTesting(false);
+                      }
+                    }}
+                    className="text-xs"
+                  >
+                    {siriTesting ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <Sparkles size={13} className="mr-1.5 text-indigo-400" />}
+                    Test Siri Route
+                  </Button>
                 </div>
               </Card>
             </div>
@@ -1858,8 +1879,6 @@ export default function SettingsSection() {
               </div>
             </Card>
 
-            {/* Danger Zone Wipe within Vault Security */}
-            {renderDangerZoneCard()}
           </div>
         )}
 
@@ -1990,6 +2009,194 @@ export default function SettingsSection() {
               onClick={handleMasterWipe}
             >
               Permanently Wipe Everything
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* APPLE SIRI & IOS SHORTCUTS MODAL */}
+      <Modal
+        isOpen={siriModalOpen}
+        onClose={() => setSiriModalOpen(false)}
+        title="Apple Siri & iOS Automation Guide"
+      >
+        <div className="space-y-5 text-xs">
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-[var(--app-border-subtle)] pb-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSiriGuideTab("voice")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                siriGuideTab === "voice"
+                  ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/30"
+                  : "opacity-60 hover:opacity-100"
+              }`}
+            >
+              🗣️ Siri Voice Logging
+            </button>
+            <button
+              type="button"
+              onClick={() => setSiriGuideTab("sms")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                siriGuideTab === "sms"
+                  ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/30"
+                  : "opacity-60 hover:opacity-100"
+              }`}
+            >
+              📩 Automatic Bank SMS
+            </button>
+          </div>
+
+          {/* Webhook Configuration Box */}
+          <div className="p-3 rounded-xl bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-[var(--app-fg)]">Your Personal Webhook URL:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = typeof window !== "undefined"
+                    ? `${window.location.origin}/api/shortcuts/expense?key=arthax_siri_key_2026`
+                    : "https://arthax.vercel.app/api/shortcuts/expense?key=arthax_siri_key_2026";
+                  navigator.clipboard.writeText(url);
+                  setCopiedSiriUrl(true);
+                  showToast("Copied", "Webhook URL copied to clipboard.", "success");
+                  setTimeout(() => setCopiedSiriUrl(false), 2000);
+                }}
+                className="text-indigo-400 hover:text-indigo-300 font-sans text-[11px] flex items-center gap-1 cursor-pointer"
+              >
+                {copiedSiriUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copiedSiriUrl ? "Copied" : "Copy URL"}
+              </button>
+            </div>
+            <div className="font-mono text-[10px] text-indigo-400 p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] select-all break-all">
+              {typeof window !== "undefined" ? window.location.origin : "https://arthax.vercel.app"}/api/shortcuts/expense?key=arthax_siri_key_2026
+            </div>
+            <div className="text-[10px] opacity-60">
+              Method: <strong>POST</strong> | Headers: <code>Content-Type: application/json</code>
+            </div>
+          </div>
+
+          {/* VOICE TAB INSTRUCTIONS */}
+          {siriGuideTab === "voice" && (
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm text-[var(--app-fg)] flex items-center gap-2">
+                <span>Setup: &quot;Hey Siri, Log Expense&quot;</span>
+                <Badge variant="violet">2 Minutes</Badge>
+              </h4>
+              <ol className="space-y-2.5 list-decimal list-inside opacity-90 leading-relaxed text-[11px]">
+                <li>
+                  Open the <strong>Shortcuts</strong> app on your iPhone and tap <strong>+</strong> to create a new shortcut.
+                </li>
+                <li>
+                  Rename the shortcut to: <strong>Log Expense</strong> (or <strong>ArthaX</strong>).
+                </li>
+                <li>
+                  Add Action: <strong>Ask for Input</strong> ➡️ Prompt: <code>&quot;What did you spend?&quot;</code> (Type: Text).
+                </li>
+                <li>
+                  Add Action: <strong>Get Contents of URL</strong>:
+                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80 font-mono">
+                    <li>URL: (Paste your Webhook URL above)</li>
+                    <li>Method: POST</li>
+                    <li>Request Body: JSON ➡️ Key: <code>text</code>, Value: (Select <strong>Provided Input</strong>)</li>
+                  </ul>
+                </li>
+                <li>
+                  Add Action: <strong>Get Dictionary Value</strong> ➡️ Key: <code>speech</code> in <strong>Contents of URL</strong>.
+                </li>
+                <li>
+                  Add Action: <strong>Speak Text</strong> ➡️ Choose the Dictionary Value from above.
+                </li>
+              </ol>
+
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] space-y-1">
+                <div className="font-bold">🗣️ How to use:</div>
+                <div>Say: <em>&quot;Hey Siri, Log Expense&quot;</em> ➡️ Siri will ask <em>&quot;What did you spend?&quot;</em> ➡️ Say: <em>&quot;250 lunch on HDFC&quot;</em>. Siri logs it and speaks back your new balance!</div>
+              </div>
+            </div>
+          )}
+
+          {/* SMS TAB INSTRUCTIONS */}
+          {siriGuideTab === "sms" && (
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm text-[var(--app-fg)] flex items-center gap-2">
+                <span>Automatic Bank SMS Logging on iPhone</span>
+                <Badge variant="emerald">100% Background</Badge>
+              </h4>
+              <ol className="space-y-2.5 list-decimal list-inside opacity-90 leading-relaxed text-[11px]">
+                <li>
+                  Open the <strong>Shortcuts</strong> app on your iPhone and tap the <strong>Automation</strong> tab at the bottom.
+                </li>
+                <li>
+                  Tap <strong>New Automation</strong> (or <strong>+</strong>) ➡️ Choose <strong>Message</strong>.
+                </li>
+                <li>
+                  Configure the Trigger:
+                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80">
+                    <li><strong>Message Contains:</strong> <code>debited</code> (or <code>spent</code>)</li>
+                    <li><strong>Sender:</strong> Leave empty (or select bank senders like HDFCBK, SBIN)</li>
+                    <li>Select: <strong>Run Immediately</strong> (Turn OFF &quot;Ask Before Running&quot;)</li>
+                  </ul>
+                </li>
+                <li>
+                  In the Action screen, add <strong>Get Contents of URL</strong>:
+                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80 font-mono">
+                    <li>URL: (Paste your Webhook URL above)</li>
+                    <li>Method: POST</li>
+                    <li>Request Body: JSON ➡️ Key: <code>text</code>, Value: (Select <strong>Shortcut Input</strong>)</li>
+                  </ul>
+                </li>
+              </ol>
+
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] space-y-1">
+                <div className="font-bold">⚡ How it works:</div>
+                <div>Whenever your bank sends a debit SMS, your iPhone silently runs this in the background and updates ArthaX without you touching a button!</div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer Action */}
+          <div className="flex items-center justify-between pt-3 border-t border-[var(--app-border-subtle)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={siriTesting}
+              onClick={async () => {
+                setSiriTesting(true);
+                try {
+                  const res = await fetch("/api/shortcuts/expense", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-api-key": "arthax_siri_key_2026",
+                    },
+                    body: JSON.stringify({ text: "15 test tea on cash" }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    showToast("Test Passed", data.speech, "success");
+                  } else {
+                    showToast("Test Failed", data.speech || "Error", "error");
+                  }
+                } catch {
+                  showToast("Error", "Network error", "error");
+                } finally {
+                  setSiriTesting(false);
+                }
+              }}
+            >
+              {siriTesting ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <Sparkles size={13} className="mr-1.5 text-indigo-400" />}
+              Send Test Voice Ping
+            </Button>
+
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => setSiriModalOpen(false)}
+            >
+              Done
             </Button>
           </div>
         </div>

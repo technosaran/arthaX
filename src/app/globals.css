@@ -203,6 +203,11 @@ pre {
 }
 
 /* Custom Sleek Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border) transparent;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

@@ -500,12 +500,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             Sovereign ledger overview, net worth telemetry, and real-time cash flow.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="success" dot={true}>
-            Realtime Telemetry Active
-          </Badge>
-        </div>
       </div>
 
       <div className="max-w-7xl space-y-6 sm:space-y-8">
@@ -874,12 +868,14 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         </div>
                         <div className="text-[11px] text-[var(--app-muted)] flex items-center gap-1.5">
                           <span>{acc.type}</span>
-                          {acc.last_four && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono">•••• {acc.last_four}</span>
-                            </>
-                          )}
+                          {acc.last_four &&
+                            acc.last_four.toUpperCase() !== "CASH" &&
+                            /^\d+$/.test(acc.last_four.trim()) && (
+                              <>
+                                <span>•</span>
+                                <span className="font-mono">•••• {acc.last_four}</span>
+                              </>
+                            )}
                         </div>
                       </div>
                     </div>

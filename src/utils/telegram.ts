@@ -431,7 +431,8 @@ export function formatBalanceSummary(
   let totalBalance = 0;
   const lines = accounts.map((acc) => {
     totalBalance += Number(acc.balance) || 0;
-    const four = acc.last_four ? ` (••${acc.last_four})` : "";
+    const isValidLastFour = acc.last_four && acc.last_four.toUpperCase() !== "CASH" && /^\d+$/.test(acc.last_four.trim());
+    const four = isValidLastFour ? ` (••${acc.last_four})` : "";
     return `• <b>${escapeTelegramHtml(acc.name)}${escapeTelegramHtml(four)}</b>: ${formatCurrencyINR(Number(acc.balance) || 0)} <span class="tg-spoiler"><i>[${escapeTelegramHtml(acc.type)}]</i></span>`;
   });
 

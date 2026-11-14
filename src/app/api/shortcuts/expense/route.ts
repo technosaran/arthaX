@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expenseParser";
+import { classifyFinancialMessage } from "@/utils/financeParser";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
-import { getLocalDateString } from "@/utils/monthUtils";
+import { getLocalDateString, getCurrentMonthYear } from "@/utils/monthUtils";
 
 interface ShortcutRequestBody {
   text?: string;
@@ -71,7 +72,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!userId && configuredApiKey && apiKeyHeader === configuredApiKey) {
-      userId = body.user_id || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
+      userId =
+        body.user_id ||
+        process.env.SHORTCUTS_AUTHORIZED_USER_ID ||
+        process.env.WHATSAPP_AUTHORIZED_USER_ID ||
+        process.env.TELEGRAM_AUTHORIZED_USER_ID ||
+        null;
     }
 
     if (!userId) {
@@ -133,26 +139,182 @@ export async function POST(req: NextRequest) {
     }));
 
     // -------------------------------------------------------------
-    // 3. Parse Natural Language Input
+    // 3. Detect Action Type: Balance, Summary, Transfer, Income, or Expense
     // -------------------------------------------------------------
+    const cleanLower = rawText.trim().toLowerCase();
+
+    // 3A. Balance Inquiry (e.g., "What is my balance?", "Balance", "How much in SBI?")
+    const isBalanceQuery = /^(?:what is my balance|check balance|my balance|balance|accounts|how much in|net worth)/i.test(cleanLower);
+    if (isBalanceQuery) {
+      // Check if querying a specific account (e.g., "how much in SBI", "balance HDFC")
+      const specificAccount = userAccounts.find((a) => cleanLower.includes(a.name.toLowerCase()));
+      if (specificAccount) {
+        return NextResponse.json({
+          success: true,
+          speech: `You have ${Math.round(specificAccount.balance)} rupees in ${specificAccount.name}.`,
+          display: `${specificAccount.name}: ₹${specificAccount.balance.toLocaleString("en-IN")}`,
+          data: { account: specificAccount.name, balance: specificAccount.balance },
+        });
+      }
+
+      const totalBalance = userAccounts.reduce((sum, a) => sum + a.balance, 0);
+      const topAccountsStr = userAccounts
+        .slice(0, 3)
+        .map((a) => `${a.name}: ${Math.round(a.balance)} rupees`)
+        .join(", ");
+
+      const speech = userAccounts.length > 0
+        ? `Your total balance is ${Math.round(totalBalance)} rupees across ${userAccounts.length} accounts. ${topAccountsStr}.`
+        : `Your total balance is 0 rupees.`;
+
+      return NextResponse.json({
+        success: true,
+        speech,
+        display: `Total Balance: ₹${totalBalance.toLocaleString("en-IN")}`,
+        data: { total: totalBalance, accounts: userAccounts },
+      });
+    }
+
+    // 3B. Monthly Spending Summary (e.g., "How much did I spend this month?", "Summary")
+    const isSummaryQuery = /^(?:how much did i spend|monthly spend|total spent|summary|my spend|spending)/i.test(cleanLower);
+    if (isSummaryQuery) {
+      const currentMonth = getCurrentMonthYear();
+      const monthStart = `${currentMonth}-01`;
+      const today = getLocalDateString(new Date(), "Asia/Kolkata");
+
+      const { data: monthExpenses } = await supabaseAdmin
+        .from("expenses")
+        .select("amount")
+        .eq("user_id", userId)
+        .gte("expense_date", monthStart)
+        .lte("expense_date", today);
+
+      const totalSpent = (monthExpenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+      return NextResponse.json({
+        success: true,
+        speech: `You have spent ${Math.round(totalSpent)} rupees this month.`,
+        display: `This Month's Spending: ₹${totalSpent.toLocaleString("en-IN")}`,
+        data: { totalSpent },
+      });
+    }
+
+    // 3C. Classify Financial Intent (Transfer vs Income vs Expense)
+    const intent = classifyFinancialMessage(rawText, userAccounts);
+
+    // Intent: Inter-Account Transfer (e.g., "Transfer 5000 from HDFC to Cash")
+    if (intent.type === "transfer") {
+      const fromAcc = matchAccount(intent.data.fromAccountQuery, userAccounts);
+      const toAcc = matchAccount(intent.data.toAccountQuery, userAccounts);
+
+      if (!fromAcc || !toAcc) {
+        return NextResponse.json({
+          success: false,
+          speech: `I couldn't identify both accounts for the transfer in "${rawText}". Try saying: Transfer 5000 from HDFC to Cash.`,
+          display: `Could not identify transfer accounts in: "${rawText}"`,
+        });
+      }
+
+      const todayDate = getLocalDateString(new Date(), "Asia/Kolkata");
+      const { data: tResult, error: tErr } = await supabaseAdmin.rpc("fn_record_transfer_atomic", {
+        p_user_id: userId,
+        p_from_account_id: fromAcc.id,
+        p_to_account_id: toAcc.id,
+        p_amount: intent.data.amount,
+        p_transfer_date: todayDate,
+        p_notes: `Logged via Siri Voice: "${rawText}"`,
+      });
+
+      if (tErr) {
+        return NextResponse.json({
+          success: false,
+          speech: `Transfer failed: ${tErr.message}`,
+          display: `Error: ${tErr.message}`,
+        }, { status: 500 });
+      }
+
+      await invalidateCachedData([
+        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
+        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        speech: `Transferred ${intent.data.amount} rupees from ${fromAcc.name} to ${toAcc.name}. New ${fromAcc.name} balance is ${Math.round(tResult?.from_new_balance ?? 0)} rupees.`,
+        display: `Transferred ₹${intent.data.amount}: ${fromAcc.name} ➡️ ${toAcc.name}`,
+        data: {
+          transfer_id: tResult?.transfer_id,
+          from: fromAcc.name,
+          to: toAcc.name,
+          amount: intent.data.amount,
+        },
+      });
+    }
+
+    // Intent: Income Credit (e.g., "Salary 60000 credited to HDFC")
+    if (intent.type === "income") {
+      const targetAccount = matchAccount(intent.data.accountQuery, userAccounts);
+      const todayDate = getLocalDateString(new Date(), "Asia/Kolkata");
+
+      const { data: incResult, error: incErr } = await supabaseAdmin.rpc("fn_record_income_atomic", {
+        p_user_id: userId,
+        p_title: intent.data.title,
+        p_amount: intent.data.amount,
+        p_category: intent.data.category,
+        p_frequency: "one-time",
+        p_account_id: targetAccount?.id || null,
+        p_received_date: todayDate,
+        p_notes: `Logged via Siri Voice: "${rawText}"`,
+        p_tags: ["siri", "voice", "income"],
+      });
+
+      if (incErr) {
+        return NextResponse.json({
+          success: false,
+          speech: `Income logging failed: ${incErr.message}`,
+          display: `Error: ${incErr.message}`,
+        }, { status: 500 });
+      }
+
+      await invalidateCachedData([
+        getUserCacheKey(userId, CACHE_KEYS.INCOME),
+        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+      ]);
+
+      const updatedBal = incResult?.new_balance ?? 0;
+      const accountName = incResult?.account_name || (targetAccount ? targetAccount.name : "Unassigned");
+
+      return NextResponse.json({
+        success: true,
+        speech: targetAccount
+          ? `Logged income of ${intent.data.amount} rupees for ${intent.data.title} into ${accountName}. New balance is ${Math.round(updatedBal)} rupees.`
+          : `Logged income of ${intent.data.amount} rupees for ${intent.data.title}.`,
+        display: `Income: ₹${intent.data.amount} (${intent.data.title}) into ${accountName}`,
+        data: {
+          income_id: incResult?.income_id,
+          account: accountName,
+          amount: intent.data.amount,
+          new_balance: updatedBal,
+        },
+      });
+    }
+
+    // Intent: Expense (Default natural language & debit SMS)
     const parsed = parseExpenseMessage(rawText, userAccounts);
 
     if (!parsed.amount || parsed.amount <= 0) {
       return NextResponse.json({
         success: false,
-        speech: `I couldn't find an amount in "${rawText}". Try saying: Spent 250 on lunch with SBI.`,
-        display: `Could not parse amount from: "${rawText}"`,
+        speech: `I couldn't understand "${rawText}". Try saying: Spent 250 on lunch with SBI, or: What is my balance?`,
+        display: `Could not parse financial intent from: "${rawText}"`,
       });
     }
 
-    // -------------------------------------------------------------
-    // 4. Match Account
-    // -------------------------------------------------------------
     const targetAccount = matchAccount(parsed.accountQuery, userAccounts);
-
-    // -------------------------------------------------------------
-    // 5. Record Expense via ATOMIC RPC (Row-locked balance deduction & audit log)
-    // -------------------------------------------------------------
     const expenseDate = getLocalDateString(new Date(), "Asia/Kolkata");
 
     const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
@@ -181,9 +343,6 @@ export async function POST(req: NextRequest) {
     const updatedBalance = rpcResult?.new_balance ?? 0;
     const accountName = rpcResult?.account_name || (targetAccount ? targetAccount.name : "Unassigned");
 
-    // -------------------------------------------------------------
-    // 6. Invalidate Multi-Tier Cache Keys
-    // -------------------------------------------------------------
     try {
       await invalidateCachedData([
         getUserCacheKey(userId, CACHE_KEYS.EXPENSES),

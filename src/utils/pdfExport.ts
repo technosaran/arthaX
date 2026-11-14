@@ -531,12 +531,15 @@ export async function exportAccountsPDF(accounts: any[]) {
     accounts.length
   );
 
-  const tableData = accounts.map((acc) => [
-    acc.name,
-    acc.type || "Savings",
-    acc.account_number || (acc.last_four ? `••${acc.last_four}` : "Primary"),
-    `INR ${formatCurrency(Number(acc.balance) || 0)}`,
-  ]);
+  const tableData = accounts.map((acc) => {
+    const isValidFour = acc.last_four && acc.last_four.toUpperCase() !== "CASH" && /^\d+$/.test(acc.last_four.trim());
+    return [
+      acc.name,
+      acc.type || "Savings",
+      acc.account_number || (isValidFour ? `••${acc.last_four}` : (acc.type === "CASH" || acc.name.toLowerCase().includes("cash") ? "Liquid Tender" : "Primary")),
+      `INR ${formatCurrency(Number(acc.balance) || 0)}`,
+    ];
+  });
 
   autoTable(doc, {
     startY: 48,
@@ -669,12 +672,15 @@ export async function exportMasterPortfolioPDF(
   doc.setTextColor(15, 23, 42);
   doc.text("1. Connected Bank & Liquid Accounts", 14, 66);
 
-  const accountsTable = accounts.map((a) => [
-    a.name,
-    a.type || "Savings",
-    a.account_number || (a.last_four ? `••${a.last_four}` : "Primary"),
-    `INR ${formatCurrency(Number(a.balance) || 0)}`,
-  ]);
+  const accountsTable = accounts.map((a) => {
+    const isValidFour = a.last_four && a.last_four.toUpperCase() !== "CASH" && /^\d+$/.test(a.last_four.trim());
+    return [
+      a.name,
+      a.type || "Savings",
+      a.account_number || (isValidFour ? `••${a.last_four}` : (a.type === "CASH" || a.name.toLowerCase().includes("cash") ? "Liquid Tender" : "Primary")),
+      `INR ${formatCurrency(Number(a.balance) || 0)}`,
+    ];
+  });
 
   autoTable(doc, {
     startY: 70,

@@ -791,7 +791,7 @@ export default function AccountsSection() {
 
         {viewMode === "holdings" && (
           <div className="flex items-center gap-2">
-            {selectedAccountId ? (
+            {selectedAccountId && (
               <Button
                 size="xs"
                 variant="subtle"
@@ -800,10 +800,6 @@ export default function AccountsSection() {
               >
                 Clear Filter ({accounts.find((a) => a.id === selectedAccountId)?.name})
               </Button>
-            ) : (
-              <span className="text-xs text-[var(--app-muted)]">
-                Click any card to inspect or filter transactions
-              </span>
             )}
           </div>
         )}

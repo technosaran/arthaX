@@ -193,8 +193,6 @@ const COMMON_ENTITIES: Record<string, string> = {
   bpcl: "bharatpetroleum.in",
   iocl: "iocl.com",
   "indian oil": "iocl.com",
-  petrol: "iocl.com",
-  fuel: "iocl.com",
 
   // --- Health & Fitness ---
   apollo: "apollopharmacy.in",
@@ -208,9 +206,26 @@ const COMMON_ENTITIES: Record<string, string> = {
   // --- Banks & Cards (also common for salary/deposits) ---
   hdfc: "hdfcbank.com",
   sbi: "sbi.co.in",
+  "state bank": "sbi.co.in",
+  "state bank of india": "sbi.co.in",
   icici: "icicibank.com",
   axis: "axisbank.com",
-  kotak: "kotakbank.com",
+  kotak: "kotak.com",
+  baroda: "bankofbaroda.in",
+  "bank of baroda": "bankofbaroda.in",
+  bob: "bankofbaroda.in",
+  pnb: "pnbindia.in",
+  "punjab national bank": "pnbindia.in",
+  canara: "canarabank.com",
+  "canara bank": "canarabank.com",
+  union: "unionbankofindia.co.in",
+  "union bank": "unionbankofindia.co.in",
+  idfc: "idfcfirstbank.com",
+  "idfc first": "idfcfirstbank.com",
+  indusind: "indusind.com",
+  "yes bank": "yesbank.in",
+  rbl: "rblbank.com",
+  "federal bank": "federalbank.co.in",
 };
 
 // Sort entries by key length descending so longer matching phrases take precedence
@@ -223,110 +238,21 @@ export function getEntityDomain(inputName: string): string | null {
   const clean = inputName.trim().toLowerCase();
 
   // If input already contains a domain (e.g. google.com or tcs.com)
-  if (clean.includes(".") && !clean.includes(" ")) {
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(clean)) {
     return clean.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   }
 
-  // Check direct and substring dictionary match
+  // Check direct and word boundary dictionary match (prevents false matches like "credit card" -> "cred")
   for (const [key, domain] of SORTED_ENTITIES) {
-    if (key.length <= 3) {
-      // Word boundary check for short acronyms like tcs, hcl, jio, ey, ge
-      const regex = new RegExp(`(^|\\s|[^a-z0-9])${key}($|\\s|[^a-z0-9])`, "i");
-      if (clean === key || regex.test(clean)) {
-        return domain;
-      }
-    } else {
-      if (clean.includes(key)) {
-        return domain;
-      }
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(^|\\s|[^a-z0-9])${escapedKey}($|\\s|[^a-z0-9])`, "i");
+    if (clean === key || regex.test(clean)) {
+      return domain;
     }
   }
 
-  // Fallback: if user typed a clean single brand name like "Stripe", "Figma", "Slack"
-  const tokens = clean.split(/[\s/\\-]+/).filter(Boolean);
-  const ignoredWords = [
-    "salary",
-    "stipend",
-    "bonus",
-    "dividend",
-    "interest",
-    "payout",
-    "monthly",
-    "weekly",
-    "expense",
-    "payment",
-    "dining",
-    "groceries",
-    "food",
-    "rent",
-    "bill",
-    "bills",
-    "charges",
-    "subscription",
-    "recharge",
-    "tea",
-    "chai",
-    "coffee",
-    "cafe",
-    "snack",
-    "snacks",
-    "lunch",
-    "dinner",
-    "breakfast",
-    "meal",
-    "milk",
-    "fruits",
-    "vegetables",
-    "veggies",
-    "petrol",
-    "diesel",
-    "fuel",
-    "cab",
-    "taxi",
-    "auto",
-    "bus",
-    "metro",
-    "train",
-    "flight",
-    "movie",
-    "movies",
-    "cinema",
-    "doctor",
-    "medicine",
-    "meds",
-    "gym",
-    "water",
-    "power",
-    "electricity",
-    "wifi",
-    "maid",
-    "cash",
-    "deposit",
-    "withdrawal",
-    "transfer",
-    "fee",
-    "fees",
-    "donation",
-    "gift",
-    "shopping",
-    "maintenance",
-    "society",
-    "flat",
-    "sip",
-    "savings",
-    "allowance",
-    "card",
-    "debit",
-    "credit",
-  ];
-
-  for (const token of tokens) {
-    const stripped = token.replace(/[^a-z0-9]/g, "");
-    if (stripped.length >= 3 && !ignoredWords.includes(stripped)) {
-      return `${stripped}.com`;
-    }
-  }
-
+  // Strictly DO NOT guess random .com domains from title tokens!
+  // Returning null allows getEntityVisual to show the accurate category icon (Utensils, Car, Fuel, etc.)
   return null;
 }
 

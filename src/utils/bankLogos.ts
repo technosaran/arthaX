@@ -110,36 +110,43 @@ export function getBankDomain(inputName: string): string | null {
   const clean = inputName.trim().toLowerCase();
 
   // Exclude physical cash or generic terms
-  if (clean.includes("cash") || clean === "vault") return null;
-  const genericTerms = ["bank", "account", "card", "savings", "current", "checking", "deposit", "holding"];
+  if (clean.includes("cash") || clean === "vault" || clean.includes("in hand") || clean.includes("liquid")) return null;
+  const genericTerms = [
+    "bank",
+    "account",
+    "card",
+    "savings",
+    "current",
+    "checking",
+    "deposit",
+    "holding",
+    "wallet",
+    "fund",
+    "emergency",
+    "primary",
+    "personal",
+    "salary",
+    "office",
+    "family",
+    "stash",
+  ];
   if (genericTerms.includes(clean)) return null;
 
-  // If input is already a domain (e.g., hdfcbank.com)
-  if (clean.includes(".") && !clean.includes(" ")) {
+  // If input is already an explicit domain (e.g., hdfcbank.com, chase.com)
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(clean)) {
     return clean.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   }
 
-  // Look for match in known bank dictionary (longest match first)
+  // Look for match in known bank dictionary (longest match first) with word boundary safety
   for (const [key, domain] of SORTED_BANKS) {
-    if (key.length <= 3) {
-      // For short acronyms (bob, boi, pnb, sbi, rbl), require word boundaries
-      const regex = new RegExp(`(^|\\s|[^a-z0-9])${key}($|\\s|[^a-z0-9])`, "i");
-      if (clean === key || regex.test(clean)) {
-        return domain;
-      }
-    } else {
-      if (clean.includes(key)) {
-        return domain;
-      }
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(^|\\s|[^a-z0-9])${escapedKey}($|\\s|[^a-z0-9])`, "i");
+    if (clean === key || regex.test(clean)) {
+      return domain;
     }
   }
 
-  // Fallback: guess domain based on name if length is reasonable
-  const stripped = clean.replace(/[^a-z0-9]/g, "");
-  if (stripped.length >= 3 && !genericTerms.includes(stripped)) {
-    return `${stripped}.com`;
-  }
-
+  // Strictly do NOT guess random .com domains to prevent wrong logos!
   return null;
 }
 
