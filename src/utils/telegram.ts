@@ -412,6 +412,7 @@ export function formatHelpMessage(botUsername?: string): string {
     `• /balance - List all accounts and current balances\n` +
     `• /recent - View your last 5 recorded expenses\n` +
     `• /summary - Spending totals for today & this month\n` +
+    `• /ai &lt;query&gt; - Ask Google Gemini financial advice & insights\n` +
     `• /link &lt;token&gt; - Link your Telegram account\n` +
     `• /unlink - Disconnect Telegram from arthaX\n` +
     `• /help - Display this command guide\n\n` +

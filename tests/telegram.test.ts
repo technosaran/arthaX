@@ -186,7 +186,16 @@ describe("Telegram Integration Suite", () => {
       expect(isCmd("/recent")).toBe(true);
       expect(isCmd("/summary")).toBe(true);
       expect(isCmd("/link AX-992144")).toBe(true);
+      expect(isCmd("/ai How can I invest 5000?")).toBe(true);
+      expect(isCmd("/ask How to save money?")).toBe(true);
       expect(isCmd("Dinner 500 HDFC")).toBe(false);
+    });
+
+    it("extracts AI prompt query correctly from /ai and /ask commands", () => {
+      const extractPrompt = (text: string) => text.replace(/^\/(?:ai|ask)\s*/i, "").trim();
+      expect(extractPrompt("/ai How can I invest?")).toBe("How can I invest?");
+      expect(extractPrompt("/ask How to build an emergency fund?")).toBe("How to build an emergency fund?");
+      expect(extractPrompt("/ai")).toBe("");
     });
 
     it("extracts link code from /link and /start deep links", () => {

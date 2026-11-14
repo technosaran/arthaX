@@ -14,6 +14,7 @@ import {
 } from "@/utils/telegram";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString, getCurrentMonthYear } from "@/utils/monthUtils";
+import { generateFinancialAnswer } from "@/utils/gemini";
 
 interface TelegramUpdate {
   update_id: number;
@@ -387,6 +388,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "summary_sent" });
     }
 
+    // /ai <query> or /ask <query>
+    if (text.startsWith("/ai") || text.startsWith("/ask")) {
+      const queryPrompt = text.replace(/^\/(?:ai|ask)\s*/i, "").trim();
+      if (!queryPrompt) {
+        await sendTelegramMessage({
+          chatId,
+          text: `🤖 <b>arthaX AI Assistant</b>\n\nAsk me anything about your finances or money management:\n• <code>/ai How can I save 20% on groceries?</code>\n• <code>/ai Explain debt avalanche vs snowball</code>\n• <code>/ai How to start an emergency fund?</code>`,
+        });
+        return NextResponse.json({ status: "ai_help_prompted" });
+      }
+
+      const { data: accounts } = await supabaseAdmin
+        .from("accounts")
+        .select("name, balance, type")
+        .eq("user_id", userId);
+
+      const geminiRes = await generateFinancialAnswer({
+        prompt: queryPrompt,
+        userName,
+        accountsSummary: (accounts || []).map((a) => ({
+          name: a.name,
+          balance: Number(a.balance) || 0,
+          type: a.type,
+        })),
+      });
+
+      if (geminiRes.success && geminiRes.text) {
+        await sendTelegramMessage({
+          chatId,
+          text: `💡 <b>arthaX AI</b>\n\n${geminiRes.text}`,
+        });
+        return NextResponse.json({ success: true, status: "ai_answered", response: geminiRes.text });
+      } else {
+        await sendTelegramMessage({
+          chatId,
+          text: `⚠️ <i>AI service temporarily unavailable. Please try again shortly.</i>`,
+        });
+        return NextResponse.json({ success: false, error: geminiRes.error });
+      }
+    }
+
     // -------------------------------------------------------------
     // 6. Natural Language Expense & Bank SMS Debit Parsing
     // -------------------------------------------------------------
@@ -433,6 +475,32 @@ export async function POST(req: NextRequest) {
     const parsed = parseExpenseMessage(text, userAccounts);
 
     if (!parsed.amount || parsed.amount <= 0) {
+      // If Gemini AI is configured, generate an intelligent conversational/financial answer
+      if (process.env.GEMINI_API_KEY) {
+        const geminiRes = await generateFinancialAnswer({
+          prompt: text,
+          userName,
+          accountsSummary: userAccounts.map((a) => ({
+            name: a.name,
+            balance: a.balance,
+            type: a.type,
+          })),
+        });
+
+        if (geminiRes.success && geminiRes.text) {
+          await sendTelegramMessage({
+            chatId,
+            text: `💡 <b>arthaX AI</b>\n\n${geminiRes.text}`,
+          });
+
+          return NextResponse.json({
+            success: true,
+            status: "ai_answered",
+            response: geminiRes.text,
+          });
+        }
+      }
+
       await sendTelegramMessage({
         chatId,
         text:

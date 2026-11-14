@@ -1675,6 +1675,10 @@ export default function SettingsSection() {
                       <span className="opacity-70 text-[10px]">Today & monthly totals</span>
                     </div>
                     <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
+                      <code className="text-cyan-400 font-mono font-bold">/ai &lt;query&gt;</code>
+                      <span className="opacity-70 text-[10px]">Google Gemini financial AI</span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] flex items-center justify-between">
                       <code className="text-cyan-400 font-mono font-bold">/help</code>
                       <span className="opacity-70 text-[10px]">Full syntax & examples</span>
                     </div>
