@@ -55,6 +55,7 @@ import {
   computeNextMonth,
   computePrevMonth,
 } from "@/utils/monthUtils";
+import { isFamilyTransfer } from "@/utils/expenseFilter";
 
 export interface BudgetItem {
   id: string;
@@ -74,6 +75,8 @@ interface ExpenseItem {
   amount: number;
   category: string;
   expense_date: string;
+  notes?: string | null;
+  tags?: string[];
 }
 
 export interface CategoryMeta {
@@ -275,18 +278,22 @@ export default function BudgetsSection() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("expenses")
-        .select("id, title, amount, category, expense_date")
+        .select("id, title, amount, category, expense_date, notes, tags")
         .eq("user_id", user.id);
 
       if (!error && data) {
         setExpenses(
-          data.map((e) => ({
-            id: e.id,
-            title: e.title,
-            amount: Number(e.amount) || 0,
-            category: e.category,
-            expense_date: e.expense_date,
-          }))
+          data
+            .map((e) => ({
+              id: e.id,
+              title: e.title,
+              amount: Number(e.amount) || 0,
+              category: e.category,
+              expense_date: e.expense_date,
+              notes: e.notes,
+              tags: e.tags || [],
+            }))
+            .filter((e) => !isFamilyTransfer(e))
         );
       }
     } catch {
@@ -932,175 +939,7 @@ export default function BudgetsSection() {
         </div>
       </div>
 
-      {/* 3. INTERACTIVE CATEGORY CARDS TOOLBAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
-        {/* Card Filter Modes: All Cards / Active Limits / Available to Set */}
-        <div
-          className="flex items-center rounded-xl border p-1 text-xs font-medium max-w-full overflow-x-auto"
-          style={{
-            borderColor: "var(--app-border-subtle)",
-            backgroundColor: "var(--app-card)",
-          }}
-        >
-          <button
-            onClick={() => setFilterMode("ALL")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              filterMode === "ALL" ? "shadow-sm font-semibold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: filterMode === "ALL" ? "var(--app-fg)" : "transparent",
-              color: filterMode === "ALL" ? "var(--app-bg)" : "var(--app-fg)",
-            }}
-          >
-            <span>All Cards</span>
-            <span className="text-[10px] font-mono opacity-70">
-              ({allCategoryCards.length})
-            </span>
-          </button>
-
-          <button
-            onClick={() => setFilterMode("ACTIVE")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              filterMode === "ACTIVE" ? "shadow-sm font-semibold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: filterMode === "ACTIVE" ? "var(--app-fg)" : "transparent",
-              color: filterMode === "ACTIVE" ? "var(--app-bg)" : "var(--app-fg)",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Active Limits</span>
-            <span className="text-[10px] font-mono opacity-70">
-              ({activeBudgetsCount})
-            </span>
-          </button>
-
-          <button
-            onClick={() => setFilterMode("UNSET")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              filterMode === "UNSET" ? "shadow-sm font-semibold" : "opacity-60 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: filterMode === "UNSET" ? "var(--app-fg)" : "transparent",
-              color: filterMode === "UNSET" ? "var(--app-bg)" : "var(--app-fg)",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
-            <span>Available to Set</span>
-            <span className="text-[10px] font-mono opacity-70">
-              ({unbudgetedCount})
-            </span>
-          </button>
-        </div>
-
-        {/* Search, Status & View Mode */}
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-          {/* Search Box */}
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 py-1.5 text-xs rounded-xl border focus:outline-none transition-colors w-36 sm:w-48"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border-subtle)",
-                color: "var(--app-fg)",
-              }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* Status Filter (Only relevant for active budgets) */}
-          {filterMode !== "UNSET" && (
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="px-2.5 py-1.5 text-xs rounded-xl border font-mono appearance-none pr-7 cursor-pointer focus:outline-none"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-card)",
-                  color: "var(--app-fg)",
-                }}
-              >
-                <option value="ALL">Status: All</option>
-                <option value="ON_TRACK">On Track</option>
-                <option value="WARNING">Near Limit</option>
-                <option value="OVER">Over Limit</option>
-              </select>
-              <SlidersHorizontal size={11} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
-            </div>
-          )}
-
-          {/* Sort Dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-2.5 py-1.5 text-xs rounded-xl border font-mono appearance-none pr-7 cursor-pointer focus:outline-none"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-                color: "var(--app-fg)",
-              }}
-            >
-              <option value="highest_budget">Highest Cap</option>
-              <option value="highest_spent">Highest Outflow</option>
-              <option value="highest_ratio">Burn Ratio %</option>
-              <option value="category">Category A-Z</option>
-            </select>
-            <SlidersHorizontal size={11} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
-          </div>
-
-          {/* View Mode Toggle */}
-          <div
-            className="flex items-center rounded-xl border p-0.5"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-            }}
-          >
-            <button
-              onClick={() => setViewMode("grid")}
-              title="Grid View"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "grid" ? "shadow-sm" : "opacity-40 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: viewMode === "grid" ? "var(--app-fg)" : "transparent",
-                color: viewMode === "grid" ? "var(--app-bg)" : "var(--app-fg)",
-              }}
-            >
-              <LayoutGrid size={13} />
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              title="Table View"
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "table" ? "shadow-sm" : "opacity-40 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: viewMode === "table" ? "var(--app-fg)" : "transparent",
-                color: viewMode === "table" ? "var(--app-bg)" : "var(--app-fg)",
-              }}
-            >
-              <List size={13} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. CARDS GRID & INTERACTIVE SELECTION */}
+      {/* 3. CARDS GRID & INTERACTIVE SELECTION */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 opacity-50 gap-2">
           <Loader2 size={24} className="animate-spin" />
@@ -1118,24 +957,20 @@ export default function BudgetsSection() {
             <Target size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-bold">No Categories Match Filters</h3>
+            <h3 className="text-sm font-bold">No Budget Categories Found</h3>
             <p className="text-xs opacity-50 mt-1 max-w-sm mx-auto">
-              Try adjusting your search query or reset the filter mode to view all available category cards.
+              Get started by setting a category budget limit.
             </p>
           </div>
           <button
-            onClick={() => {
-              setFilterMode("ALL");
-              setSearchQuery("");
-              setStatusFilter("ALL");
-            }}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl border opacity-80 hover:opacity-100"
+            onClick={() => handleOpenAddModal()}
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl border opacity-80 hover:opacity-100 cursor-pointer"
             style={{ borderColor: "var(--app-border-subtle)" }}
           >
-            Reset Filters
+            Add Category
           </button>
         </div>
-      ) : viewMode === "grid" ? (
+      ) : (
         /* GRID OF CHOOSEABLE CATEGORY CARDS */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {displayedCards.map((item) => {
@@ -1340,174 +1175,6 @@ export default function BudgetsSection() {
               </div>
             );
           })}
-        </div>
-      ) : (
-        /* TABLE / LEDGER VIEW */
-        <div
-          className="rounded-2xl border overflow-hidden shadow-sm"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border-subtle)",
-          }}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr
-                  className="border-b font-mono uppercase tracking-wider text-[11px] opacity-50"
-                  style={{
-                    borderColor: "var(--app-border-subtle)",
-                    backgroundColor: "var(--app-bg)",
-                  }}
-                >
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4 text-right">Budget Limit</th>
-                  <th className="py-3 px-4 text-right">Actual Spent</th>
-                  <th className="py-3 px-4 text-right">Safe Remaining</th>
-                  <th className="py-3 px-4">Burn Progress</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
-                {displayedCards.map((item) => {
-                  const progress = Math.min(100, item.percentUsed);
-                  const statusColor = item.isOverBudget
-                    ? "#f43f5e"
-                    : item.isWarning
-                    ? "#F59E0B"
-                    : "#10b981";
-
-                  const Icon = item.IconComponent;
-
-                  return (
-                    <tr
-                      key={item.category}
-                      className="hover:opacity-90 transition-colors"
-                      style={{ borderColor: "var(--app-border-subtle)" }}
-                    >
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{
-                              backgroundColor: `${item.color}15`,
-                              color: item.color,
-                            }}
-                          >
-                            <Icon size={13} />
-                          </div>
-                          <span className="font-semibold">{item.category}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-right">
-                        {item.isBudgeted ? formatINR(item.budgetAmount) : (
-                          <span className="opacity-40 text-[11px] font-normal">Unset</span>
-                        )}
-                      </td>
-                      <td
-                        className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#f43f5e" : "var(--app-fg)" }}
-                      >
-                        {formatINR(item.spentAmount)}
-                      </td>
-                      <td
-                        className="py-3 px-4 font-mono font-bold text-right"
-                        style={{ color: item.isOverBudget ? "#f43f5e" : "#10b981" }}
-                      >
-                        {item.isBudgeted ? (
-                          item.isOverBudget
-                            ? `-${formatINR(Math.abs(item.remainingAmount))}`
-                            : formatINR(item.remainingAmount)
-                        ) : (
-                          <span className="opacity-30">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 w-40">
-                        {item.isBudgeted ? (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="flex-1 h-1.5 rounded-full overflow-hidden"
-                              style={{ backgroundColor: "var(--app-track-bg)" }}
-                            >
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${progress}%`,
-                                  backgroundColor: statusColor,
-                                }}
-                              />
-                            </div>
-                            <span className="text-[10px] font-mono opacity-50 w-8 text-right">
-                              {item.percentUsed.toFixed(0)}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] font-mono opacity-30">No limit set</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {item.isBudgeted ? (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border"
-                            style={{
-                              borderColor: `${statusColor}40`,
-                              color: statusColor,
-                              backgroundColor: `${statusColor}08`,
-                            }}
-                          >
-                            {item.isOverBudget
-                              ? "Over Limit"
-                              : item.isWarning
-                              ? "Near Limit"
-                              : "On Track"}
-                          </span>
-                        ) : (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-mono border opacity-50"
-                            style={{ borderColor: "var(--app-border-subtle)" }}
-                          >
-                            Unset
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {item.isBudgeted && item.budgetItem ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleOpenEditModal(item.budgetItem!)}
-                              title="Edit"
-                              className="p-1 rounded opacity-60 hover:opacity-100 hover:text-amber-400 cursor-pointer"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirmationId(item.budgetItem!.id)}
-                              title="Delete"
-                              className="p-1 rounded opacity-60 hover:opacity-100 hover:text-rose-400 cursor-pointer"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenAddModal(item.category, item.meta.defaultAmount)}
-                            className="px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all hover:scale-105"
-                            style={{
-                              backgroundColor: "var(--app-fg)",
-                              color: "var(--app-bg)",
-                            }}
-                          >
-                            + Set
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 

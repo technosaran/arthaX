@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   arthaX Modern FinTech Design System — Minimalist, Clean & Luminous
+   arthaX Sovereign FinTech Design System — Minimalist, Clean & Luminous
    ========================================================================== */
 
 @theme {
@@ -13,13 +13,14 @@
   /* Obsidian Pro (Ultra-clean OLED Dark Minimalist - Pitch Black) */
   color-scheme: dark;
   --app-bg: #000000;
-  --app-card: #0a0b0e;
-  --app-card-hover: #12141a;
-  --app-card-elevated: #161822;
+  --app-card: #090a0f;
+  --app-card-hover: #10121a;
+  --app-card-elevated: #141724;
   --app-fg: #ffffff;
   --app-border: rgba(255, 255, 255, 0.08);
   --app-border-subtle: rgba(255, 255, 255, 0.04);
-  --app-muted: #8e8e93;
+  --app-border-hover: rgba(255, 255, 255, 0.16);
+  --app-muted: #94a3b8;
   --app-accent: #10b981;
   --app-accent-hover: #34d399;
   --app-accent-subtle: rgba(16, 185, 129, 0.12);
@@ -35,14 +36,15 @@
 [data-theme="dark"] {
   /* Midnight Titanium (Deep Stealth Black) */
   color-scheme: dark;
-  --app-bg: #050608;
-  --app-card: #0c0d12;
-  --app-card-hover: #14161f;
-  --app-card-elevated: #191c26;
+  --app-bg: #07080c;
+  --app-card: #0d0f16;
+  --app-card-hover: #141722;
+  --app-card-elevated: #1a1e2c;
   --app-fg: #ffffff;
   --app-border: rgba(255, 255, 255, 0.09);
   --app-border-subtle: rgba(255, 255, 255, 0.05);
-  --app-muted: #8e8e93;
+  --app-border-hover: rgba(255, 255, 255, 0.18);
+  --app-muted: #94a3b8;
   --app-accent: #10b981;
   --app-accent-hover: #34d399;
   --app-accent-subtle: rgba(16, 185, 129, 0.14);
@@ -65,6 +67,7 @@
   --app-fg: #0f172a;
   --app-border: #e2e8f0;
   --app-border-subtle: #f1f5f9;
+  --app-border-hover: #cbd5e1;
   --app-muted: #64748b;
   --app-accent: #059669;
   --app-accent-hover: #047857;
@@ -120,12 +123,13 @@ pre {
   background-color: var(--app-card);
   border: 1px solid var(--app-border);
   box-shadow: var(--app-shadow);
+  border-radius: 1rem;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fintech-card:hover {
   background-color: var(--app-card-hover);
-  border-color: var(--app-border);
+  border-color: var(--app-border-hover);
 }
 
 /* Frosted Glass Panels */
@@ -152,10 +156,40 @@ pre {
   background: radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.15) 0%, transparent 60%);
 }
 
+.ambient-glow-cyan {
+  background: radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.15) 0%, transparent 60%);
+}
+
+.ambient-glow-amber {
+  background: radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.15) 0%, transparent 60%);
+}
+
+/* ==========================================================================
+   Privacy Mask Mode
+   Blurs sensitive balances, metrics & transaction figures when toggled.
+   Hovering over any individual figure momentarily unblurs it for quick view.
+   ========================================================================== */
+.privacy-masked .font-mono,
+.privacy-masked [data-numeric="true"],
+.privacy-masked .tabular-nums,
+.privacy-masked [data-private="true"] {
+  filter: blur(8px) !important;
+  user-select: none !important;
+  cursor: pointer;
+  transition: filter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.privacy-masked .font-mono:hover,
+.privacy-masked [data-numeric="true"]:hover,
+.privacy-masked .tabular-nums:hover,
+.privacy-masked [data-private="true"]:hover {
+  filter: blur(0px) !important;
+}
+
 /* Custom Sleek Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -187,4 +221,34 @@ option {
 ::selection {
   background-color: var(--app-accent-subtle);
   color: var(--app-fg);
+}
+
+/* ==========================================================================
+   Privacy Mask Mode (Incognito Financial Figures & Sensitive Data Masking)
+   ========================================================================== */
+
+.privacy-masked .privacy-mask,
+.privacy-masked [data-privacy="true"],
+.privacy-masked .font-mono:not(button):not(input):not(select):not(.uppercase):not([class*="uppercase"]):not([class*="tracking-widest"]):not([class*="tracking-wider"]):not(label):not(th) {
+  filter: blur(8px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Hover-peek: Temporarily reveal a blurred value on hover */
+.privacy-masked .privacy-mask:hover,
+.privacy-masked [data-privacy="true"]:hover,
+.privacy-masked .font-mono:not(button):not(input):not(select):not(.uppercase):not([class*="uppercase"]):not([class*="tracking-widest"]):not([class*="tracking-wider"]):not(label):not(th):hover {
+  filter: blur(0px) !important;
+}
+
+
+/* Micro-interaction Keyframes */
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 3s ease-in-out infinite;
 }

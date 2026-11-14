@@ -15,11 +15,15 @@ import {
   Users,
   ShieldCheck,
   Check,
-  RotateCw,
   Eye,
-  LayoutGrid,
+  EyeOff,
+  Sun,
+  Moon,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme, ThemeMode } from "@/context/ThemeContext";
+import { useToast } from "@/context/ToastContext";
 
 interface TopNavProps {
   activeTab: string;
@@ -29,7 +33,7 @@ interface TopNavProps {
 }
 
 const TAB_META: Record<string, { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  dashboard: { label: "Dashboard", icon: LayoutDashboard },
+  dashboard: { label: "Financial Overview", icon: LayoutDashboard },
   accounts: { label: "Accounts & Vault", icon: Landmark },
   income: { label: "Income Streams", icon: TrendingUp },
   expenses: { label: "Expenses & Outflows", icon: TrendingDown },
@@ -45,8 +49,22 @@ export default function TopNav({
   setCollapsed,
 }: TopNavProps) {
   const { user, profile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { showToast } = useToast();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPrivacyMasked, setIsPrivacyMasked] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize privacy mode from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("arthax_privacy_mode") === "true";
+      if (saved) {
+        setIsPrivacyMasked(true);
+        document.documentElement.classList.add("privacy-masked");
+      }
+    }
+  }, []);
 
   // Close profile dropdown on click outside
   useEffect(() => {
@@ -76,9 +94,28 @@ export default function TopNav({
   const activeMeta = TAB_META[activeTab] || { label: "Dashboard", icon: LayoutDashboard };
   const TabIcon = activeMeta.icon;
 
+  const togglePrivacyMask = () => {
+    const root = document.documentElement;
+    const isMasked = root.classList.toggle("privacy-masked");
+    setIsPrivacyMasked(isMasked);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("arthax_privacy_mode", isMasked ? "true" : "false");
+    }
+    if (isMasked) {
+      showToast("Privacy Mode Enabled", "Sensitive financial figures and balances are now hidden.", "info");
+    } else {
+      showToast("Privacy Mode Disabled", "Financial figures and balances are now visible.", "info");
+    }
+  };
+
+  const cycleTheme = () => {
+    const nextTheme: ThemeMode = theme === "ultra" ? "dark" : theme === "dark" ? "light" : "ultra";
+    setTheme(nextTheme);
+  };
+
   return (
     <header
-      className="h-14 sm:h-16 px-3.5 sm:px-8 border-b flex items-center justify-between flex-shrink-0 select-none z-30 transition-colors backdrop-blur-xl"
+      className="h-14 sm:h-16 px-3.5 sm:px-6 md:px-8 border-b flex items-center justify-between flex-shrink-0 select-none z-30 transition-colors backdrop-blur-xl sticky top-0"
       style={{
         backgroundColor: "var(--app-bg)",
         borderColor: "var(--app-border)",
@@ -86,13 +123,13 @@ export default function TopNav({
       }}
     >
       {/* Left: Mobile Toggle & Reference-Grade Breadcrumbs */}
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+      <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 pr-2">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
           className="p-2 rounded-xl border transition-all cursor-pointer opacity-75 hover:opacity-100 hover:scale-105 active:scale-95 md:hidden flex-shrink-0"
           style={{
-            borderColor: "var(--app-border-subtle)",
+            borderColor: "var(--app-border)",
             backgroundColor: "var(--app-card)",
             color: "var(--app-fg)",
           }}
@@ -102,61 +139,79 @@ export default function TopNav({
         </button>
 
         <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0 font-medium">
-          <span className="font-bold text-white tracking-tight flex items-center">
-            <span>artha</span>
-            <span className="text-amber-400 font-extrabold ml-0.5">X</span>
-          </span>
-          <span className="text-zinc-600 font-light text-xs select-none">&gt;</span>
-          <span className="text-zinc-400 truncate">
-            {activeMeta.label}
-          </span>
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-card)",
+            }}
+          >
+            <TabIcon size={14} className="text-[var(--app-accent)]" />
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-bold tracking-tight text-[var(--app-fg)]">arthaX</span>
+            <span className="text-[var(--app-muted)] text-xs select-none">/</span>
+            <span className="text-[var(--app-muted)] font-medium truncate">
+              {activeMeta.label}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Right: Action Pills (Refresh, Eye, Grid) & Circular Profile Avatar */}
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        {/* Refresh Action */}
+      {/* Right: Action Pills (Theme Switcher, Privacy Mask) & Circular Profile Avatar */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Quick Theme Toggle Button */}
         <button
           type="button"
-          onClick={() => window.location.reload()}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          title="Refresh Workspace"
-          aria-label="Refresh Workspace"
+          onClick={cycleTheme}
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+          style={{
+            borderColor: "var(--app-border)",
+            backgroundColor: "var(--app-card)",
+            color: "var(--app-fg)",
+          }}
+          title={`Theme: ${theme === "ultra" ? "Obsidian Pro (OLED)" : theme === "dark" ? "Midnight Titanium" : "Studio Light"} — Click to switch`}
+          aria-label="Switch visual theme"
         >
-          <RotateCw size={14} />
+          {theme === "ultra" ? (
+            <Sparkles size={14} className="text-emerald-400" />
+          ) : theme === "dark" ? (
+            <Moon size={14} className="text-sky-400" />
+          ) : (
+            <Sun size={14} className="text-amber-500" />
+          )}
         </button>
 
         {/* Privacy Mask Toggle */}
         <button
           type="button"
-          onClick={() => {
-            const root = document.documentElement;
-            root.classList.toggle("privacy-masked");
-          }}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          title="Toggle Privacy Mode"
+          onClick={togglePrivacyMask}
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+            isPrivacyMasked
+              ? "ring-2 ring-emerald-500/40 bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+              : "opacity-80 hover:opacity-100"
+          }`}
+          style={
+            !isPrivacyMasked
+              ? {
+                  borderColor: "var(--app-border)",
+                  backgroundColor: "var(--app-card)",
+                  color: "var(--app-fg)",
+                }
+              : undefined
+          }
+          title={isPrivacyMasked ? "Privacy Mode Active (Balances Masked) — Click to reveal" : "Toggle Privacy Mode (Hide Balances)"}
           aria-label="Toggle Privacy Mode"
         >
-          <Eye size={14} />
-        </button>
-
-        {/* Overview Layout Grid */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("dashboard")}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          title="Overview Grid"
-          aria-label="Overview Grid"
-        >
-          <LayoutGrid size={14} />
+          {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
 
         {/* Profile Logo in Small Circle */}
-        <div className="relative" ref={profileMenuRef}>
+        <div className="relative ml-1" ref={profileMenuRef}>
           <button
             type="button"
             onClick={() => setIsProfileOpen((prev) => !prev)}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center overflow-hidden transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 relative ring-2 ring-transparent hover:ring-[var(--app-accent)]"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border flex items-center justify-center overflow-hidden transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 relative ring-2 ring-transparent hover:ring-[var(--app-accent)]"
             style={{
               borderColor: "var(--app-border)",
               backgroundColor: "var(--app-card)",
@@ -175,7 +230,7 @@ export default function TopNav({
               <div
                 className="w-full h-full flex items-center justify-center font-bold text-xs font-mono uppercase bg-emerald-500/15 text-emerald-400"
               >
-                {initials || <User size={15} className="opacity-70" />}
+                {initials || <User size={14} className="opacity-70" />}
               </div>
             )}
             {/* Online Status Dot */}
@@ -185,11 +240,12 @@ export default function TopNav({
           {/* Profile Dropdown Popover */}
           {isProfileOpen && (
             <div
-              className="absolute right-0 mt-2.5 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3 backdrop-blur-2xl"
+              className="absolute right-0 mt-2.5 w-76 max-w-[calc(100vw-2rem)] rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3.5 backdrop-blur-2xl"
               style={{
                 backgroundColor: "var(--app-card)",
                 borderColor: "var(--app-border)",
                 color: "var(--app-fg)",
+                boxShadow: "var(--app-shadow)",
               }}
             >
               {/* Identity Header */}
@@ -216,8 +272,8 @@ export default function TopNav({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs truncate">{displayName || "arthaX User"}</div>
-                  <div className="text-[11px] opacity-60 truncate">{user?.email || "Local Vault"}</div>
+                  <div className="font-bold text-xs truncate text-[var(--app-fg)]">{displayName || "arthaX User"}</div>
+                  <div className="text-[11px] text-[var(--app-muted)] truncate">{user?.email || "Personal Vault"}</div>
                   <div className="mt-1">
                     <span
                       className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-full border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
@@ -229,18 +285,63 @@ export default function TopNav({
                 </div>
               </div>
 
-              {/* Quick Actions */}
-              <div className="space-y-1">
+              {/* Theme Selector Strip */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-semibold">
+                  Appearance
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl border" style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("ultra")}
+                    className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                      theme === "ultra"
+                        ? "bg-white/[0.1] text-white shadow-xs font-bold"
+                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                    }`}
+                  >
+                    <Sparkles size={12} className="mb-0.5 text-emerald-400" />
+                    <span>Obsidian</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                      theme === "dark"
+                        ? "bg-white/[0.1] text-white shadow-xs font-bold"
+                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                    }`}
+                  >
+                    <Moon size={12} className="mb-0.5 text-sky-400" />
+                    <span>Midnight</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                      theme === "light"
+                        ? "bg-black/[0.08] text-slate-900 shadow-xs font-bold"
+                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                    }`}
+                  >
+                    <Sun size={12} className="mb-0.5 text-amber-500" />
+                    <span>Studio</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Navigation Actions */}
+              <div className="space-y-1 pt-1 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>
                 <button
                   type="button"
                   onClick={() => {
                     setIsProfileOpen(false);
                     setActiveTab("settings");
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-bg)] transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-card-hover)] transition-colors cursor-pointer text-left text-[var(--app-fg)]"
                 >
                   <Settings size={14} className="opacity-70 text-[var(--app-accent)]" />
-                  <span>Preferences & Settings</span>
+                  <span>Preferences & Vault</span>
                 </button>
 
                 <button

@@ -17,6 +17,7 @@ import {
   Wallet,
   Calendar,
   Filter,
+  ChevronLeft,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -79,6 +80,7 @@ export default function AccountsSection() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"holdings" | "history" | "all">("holdings");
 
   // History and Activity State
   const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
@@ -737,165 +739,323 @@ export default function AccountsSection() {
         </div>
       )}
 
-      {/* COMBINED UNIFIED CARD: Total Portfolio Value + Asset Allocation Chart */}
-      <div
-        className="rounded-2xl p-4 sm:p-6 md:p-8 border mb-8 sm:mb-10 transition-colors shadow-sm"
-        style={{
-          backgroundColor: "var(--app-card)",
-          borderColor: "var(--app-border)",
-          color: "var(--app-fg)",
-        }}
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
-          {/* Left Column: Total Portfolio Summary with Assets & Liabilities */}
-          <div className="lg:col-span-5 space-y-4">
-            <div>
-              <span className="text-[11px] uppercase tracking-wider font-semibold opacity-60">
-                Net Portfolio Value (Assets - Liabilities)
-              </span>
-              <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight mt-1 break-all sm:break-normal">
-                {loading ? "..." : formatINR(netWorth)}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div
-                className="p-3 rounded-xl border"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                <div className="text-[10px] uppercase font-mono tracking-wider opacity-60">
-                  Total Assets
-                </div>
-                <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5">
-                  {formatINR(totalAssets)}
-                </div>
-              </div>
-              <div
-                className="p-3 rounded-xl border"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                <div className="text-[10px] uppercase font-mono tracking-wider opacity-60">
-                  Total Liabilities
-                </div>
-                <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5">
-                  {formatINR(totalLiabilities)}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span
-                className="px-3 py-1 rounded-md border text-[11px] font-mono font-bold"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                  color: "var(--app-fg)",
-                }}
-              >
-                INR (₹) Standard
-              </span>
-              <span
-                className="px-3 py-1 rounded-md border text-[11px] font-mono opacity-80"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                {accounts.length} {accounts.length === 1 ? "Holding" : "Holdings"}
-              </span>
-            </div>
-          </div>
-
-          {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
-          <div
-            className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
-            style={{ borderColor: "var(--app-border-subtle)" }}
+      {/* VIEW MODE SLIDE TOGGLE BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
+        {/* Segmented Pill Slide Toggle */}
+        <div
+          className="inline-flex items-center p-1 rounded-xl border select-none shadow-xs"
+          style={{
+            borderColor: "var(--app-border)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode("holdings")}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewMode === "holdings"
+                ? "bg-[var(--app-fg)] text-[var(--app-bg)] shadow-sm font-bold"
+                : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
+            }`}
           >
-            {loading ? (
-              <div className="flex items-center justify-center h-44 w-full">
-                <Loader2 size={24} className="animate-spin opacity-50" />
-              </div>
-            ) : (
-              <InteractiveDonutChart
-                title="Asset Allocation"
-                totalLabel="Total Assets"
-                totalValue={totalBalance}
-                segments={donutSegments}
-                formatter={formatINR}
-                emptyMessage="No allocation data available."
-                emptySubMessage="Update Cash in Hand or link an account to view your breakdown."
-                icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Holdings & Connected Debit Cards Section */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider">
-              Holdings & Accounts ({accounts.length})
-            </h2>
-            <p className="text-xs opacity-60 mt-0.5">
-              Click any card to filter history to that account.
-            </p>
-          </div>
-          {selectedAccountId && (
-            <button
-              onClick={() => setSelectedAccountId(null)}
-              className="self-start sm:self-auto text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-all cursor-pointer font-medium"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
+            <Wallet size={13} />
+            <span>Holdings & Cards</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                viewMode === "holdings"
+                  ? "bg-[var(--app-bg)]/20 text-[var(--app-bg)] font-bold"
+                  : "bg-white/10 opacity-70"
+              }`}
             >
-              <X size={12} />
-              <span>Clear Filter ({accounts.find((a) => a.id === selectedAccountId)?.name})</span>
-            </button>
-          )}
+              {accounts.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("history")}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewMode === "history"
+                ? "bg-sky-500 text-white shadow-sm font-bold"
+                : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
+            }`}
+          >
+            <History size={13} />
+            <span>Account History</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                viewMode === "history"
+                  ? "bg-black/30 text-white font-bold"
+                  : "bg-sky-500/20 text-sky-400 font-semibold"
+              }`}
+            >
+              {filteredHistory.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("all")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewMode === "all"
+                ? "bg-[var(--app-fg)] text-[var(--app-bg)] shadow-sm font-bold"
+                : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
+            }`}
+            title="Show both Holdings and History together"
+          >
+            <span>All</span>
+          </button>
         </div>
 
-        {loading ? (
+        {/* Quick status pill with interactive slide toggle switch */}
+        <div className="flex items-center gap-3 self-start sm:self-auto text-xs">
           <div
-            className="flex items-center justify-center p-16 rounded-xl border"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border opacity-90 font-mono text-[11px]"
             style={{
               borderColor: "var(--app-border-subtle)",
               backgroundColor: "var(--app-card)",
             }}
           >
-            <Loader2 size={24} className="animate-spin" />
-          </div>
-        ) : (
-          /* Responsive Apple Wallet Grid View */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {accounts.map((acc) => (
-              <AppleWalletCard
-                key={acc.id}
-                account={acc}
-                isCash={isCashAccount(acc)}
-                onEditCash={handleOpenEditCash}
-                onDelete={handleDeleteAccount}
-                formatCurrency={formatINR}
-                isSelected={selectedAccountId === acc.id}
-                onSelect={(card) => {
-                  setSelectedAccountId((prev) => (prev === card.id ? null : card.id));
-                }}
+            <span className="opacity-60">History Section:</span>
+            <span className={viewMode === "history" || viewMode === "all" ? "text-sky-400 font-bold" : "opacity-60"}>
+              {viewMode === "history" || viewMode === "all" ? "Visible" : "Hidden"}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={viewMode === "history" || viewMode === "all"}
+              onClick={() => setViewMode((prev) => (prev === "history" || prev === "all" ? "holdings" : "history"))}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                viewMode === "history" || viewMode === "all" ? "bg-sky-500" : "bg-neutral-700"
+              }`}
+              title="Slide toggle to see Account History section"
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  viewMode === "history" || viewMode === "all" ? "translate-x-4" : "translate-x-0"
+                }`}
               />
-            ))}
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
+      {/* HOLDINGS & PORTFOLIO BREAKDOWN VIEW */}
+      {(viewMode === "holdings" || viewMode === "all") && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* COMBINED UNIFIED CARD: Total Portfolio Value + Asset Allocation Chart */}
+          <div
+            className="rounded-2xl p-4 sm:p-6 md:p-8 border transition-colors shadow-sm"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-fg)",
+            }}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
+              {/* Left Column: Total Portfolio Summary */}
+              <div className="lg:col-span-5 space-y-4">
+                <div>
+                  <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[var(--app-muted)]">
+                    Net Portfolio Value (Assets − Liabilities)
+                  </span>
+                  <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-mono tracking-tight mt-1.5 break-all sm:break-normal">
+                    {loading ? "..." : formatINR(netWorth)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
+              <div
+                className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8"
+                style={{ borderColor: "var(--app-border-subtle)" }}
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center h-44 w-full">
+                    <Loader2 size={24} className="animate-spin opacity-50" />
+                  </div>
+                ) : (
+                  <InteractiveDonutChart
+                    title="Asset Allocation"
+                    totalLabel="Total Assets"
+                    totalValue={totalBalance}
+                    segments={donutSegments}
+                    formatter={formatINR}
+                    emptyMessage="No allocation data available."
+                    emptySubMessage="Update Cash in Hand or link an account to view your breakdown."
+                    icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Holdings & Connected Debit Cards Section */}
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider">
+                  Holdings & Accounts ({accounts.length})
+                </h2>
+                <p className="text-xs opacity-60 mt-0.5">
+                  Click any card to filter history to that account.
+                </p>
+              </div>
+              {selectedAccountId && (
+                <button
+                  onClick={() => setSelectedAccountId(null)}
+                  className="self-start sm:self-auto text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-all cursor-pointer font-medium"
+                  style={{
+                    borderColor: "var(--app-border-subtle)",
+                    backgroundColor: "var(--app-card)",
+                  }}
+                >
+                  <X size={12} />
+                  <span>Clear Filter ({accounts.find((a) => a.id === selectedAccountId)?.name})</span>
+                </button>
+              )}
+            </div>
+
+            {loading ? (
+              <div
+                className="flex items-center justify-center p-16 rounded-xl border"
+                style={{
+                  borderColor: "var(--app-border-subtle)",
+                  backgroundColor: "var(--app-card)",
+                }}
+              >
+                <Loader2 size={24} className="animate-spin" />
+              </div>
+            ) : (
+              /* Responsive Apple Wallet Grid View */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {accounts.map((acc) => (
+                  <AppleWalletCard
+                    key={acc.id}
+                    account={acc}
+                    isCash={isCashAccount(acc)}
+                    onEditCash={handleOpenEditCash}
+                    onDelete={handleDeleteAccount}
+                    formatCurrency={formatINR}
+                    isSelected={selectedAccountId === acc.id}
+                    onSelect={(card) => {
+                      setSelectedAccountId((prev) => (prev === card.id ? null : card.id));
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Selected Account Indicator Banner */}
+            {selectedAccountId && (
+              <div
+                className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-150"
+                style={{
+                  borderColor: "rgba(56, 189, 248, 0.3)",
+                  backgroundColor: "rgba(56, 189, 248, 0.05)",
+                }}
+              >
+                <div className="flex items-center gap-2 text-sky-400 font-medium">
+                  <Filter size={14} />
+                  <span>
+                    Selected <strong>{accounts.find((a) => a.id === selectedAccountId)?.name}</strong> — {filteredHistory.length} activity records found.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    onClick={() => setSelectedAccountId(null)}
+                    className="px-2.5 py-1 rounded-lg border text-[11px] opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+                    style={{ borderColor: "var(--app-border)" }}
+                  >
+                    Clear Filter
+                  </button>
+                  <button
+                    onClick={() => setViewMode("history")}
+                    className="px-3 py-1 rounded-lg bg-sky-500 text-white font-bold text-[11px] flex items-center gap-1.5 hover:bg-sky-400 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
+                  >
+                    <span>View Activity History</span>
+                    <ArrowUpRight size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Slide Toggle Banner to reveal Account History section when in Holdings view */}
+            {viewMode === "holdings" && (
+              <div
+                className="rounded-2xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                }}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0"
+                    style={{
+                      borderColor: "var(--app-border-subtle)",
+                      backgroundColor: "var(--app-bg)",
+                    }}
+                  >
+                    <History size={18} className="text-sky-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold tracking-tight">Account History & Activity</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                        {filteredHistory.length} Entries
+                      </span>
+                    </div>
+                    <p className="text-xs opacity-60 mt-0.5">
+                      Slide toggle to view chronological transfers, card debits, and credited deposits.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <span className="text-xs font-semibold text-sky-400">
+                    Slide toggle to see section
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={false}
+                    onClick={() => setViewMode("history")}
+                    className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-neutral-700 hover:bg-neutral-600 focus:outline-none shadow-sm"
+                    title="Slide toggle to see Account History section"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out translate-x-0"
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ACCOUNT HISTORY & RECENT ACTIVITY SECTION */}
-      <div className="mt-10 sm:mt-12 space-y-4">
+      {(viewMode === "history" || viewMode === "all") && (
+        <div className={`space-y-4 animate-in fade-in duration-200 ${viewMode === "all" ? "mt-10 sm:mt-12" : ""}`}>
+          {/* Back navigation pill when exclusively viewing History */}
+          {viewMode === "history" && (
+            <div className="flex items-center justify-between pb-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("holdings")}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold opacity-80 hover:opacity-100 transition-opacity cursor-pointer text-sky-400 hover:underline"
+              >
+                <ChevronLeft size={14} />
+                <span>Back to Holdings & Cards</span>
+              </button>
+              <div className="flex items-center gap-2 text-xs opacity-70 font-mono text-[11px]">
+                <span>Showing Account History View</span>
+              </div>
+            </div>
+          )}
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b" style={{ borderColor: "var(--app-border)" }}>
           <div>
@@ -1236,6 +1396,7 @@ export default function AccountsSection() {
           </div>
         )}
       </div>
+      )}
 
       {/* POPUP MODAL: Add New Account */}
       {isModalOpen && (

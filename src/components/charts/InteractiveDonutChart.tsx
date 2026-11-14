@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { PieChart as PieChartIcon, Sparkles } from "lucide-react";
+import { PieChart as PieChartIcon } from "lucide-react";
 
 export interface DonutSegment {
   label: string;
@@ -69,23 +69,24 @@ export default function InteractiveDonutChart({
 
   // Compute strokeDasharray and strokeDashoffset for each segment with clean gaps
   const renderedSegments = useMemo(() => {
-    let accumulatedOffset = 0;
     const gapAngle = validSegments.length > 1 ? 2.5 : 0; // 2.5px micro-gap between slices
     const gapPerSegment = (gapAngle / 360) * circumference;
 
-    return validSegments.map((seg, idx) => {
+    let offset = 0;
+    const result = [];
+    for (let idx = 0; idx < validSegments.length; idx++) {
+      const seg = validSegments[idx];
       const rawDash = (seg.percentage / 100) * circumference;
       const strokeDash = Math.max(1, rawDash - gapPerSegment);
-      const offset = accumulatedOffset;
-      accumulatedOffset += rawDash;
-
-      return {
+      result.push({
         ...seg,
         strokeDasharray: `${strokeDash} ${circumference}`,
         strokeDashoffset: -offset,
         index: idx,
-      };
-    });
+      });
+      offset += rawDash;
+    }
+    return result;
   }, [validSegments, circumference]);
 
   // Active highlighted segment (if hovered)

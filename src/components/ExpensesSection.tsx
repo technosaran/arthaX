@@ -15,7 +15,6 @@ import {
   PieChart as PieChartIcon,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   Flame,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -34,6 +33,7 @@ import {
   computeNextMonth,
   computePrevMonth,
 } from "@/utils/monthUtils";
+import { isFamilyTransfer } from "@/utils/expenseFilter";
 
 interface ExpenseItem {
   id: string;
@@ -43,6 +43,7 @@ interface ExpenseItem {
   account_id?: string | null;
   expense_date: string;
   notes?: string | null;
+  tags?: string[];
   created_at?: string;
 }
 
@@ -142,7 +143,8 @@ export default function ExpensesSection() {
 
   // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
   const initialExpenses = useMemo(() => {
-    return getFromLocalCache<ExpenseItem[]>(redisExpensesKey) || [];
+    const raw = getFromLocalCache<ExpenseItem[]>(redisExpensesKey) || [];
+    return raw.filter((item) => !isFamilyTransfer(item));
   }, [redisExpensesKey]);
 
   const initialAccounts = useMemo(() => {
@@ -311,16 +313,19 @@ export default function ExpensesSection() {
       if (error) {
         setErrorMsg("Unable to retrieve expense records. Please try again.");
       } else if (data) {
-        const mapped: ExpenseItem[] = data.map((item) => ({
-          id: item.id,
-          title: item.title,
-          amount: Number(item.amount) || 0,
-          category: item.category,
-          account_id: item.account_id,
-          expense_date: item.expense_date,
-          notes: item.notes,
-          created_at: item.created_at,
-        }));
+        const mapped: ExpenseItem[] = data
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            amount: Number(item.amount) || 0,
+            category: item.category,
+            account_id: item.account_id,
+            expense_date: item.expense_date,
+            notes: item.notes,
+            tags: item.tags || [],
+            created_at: item.created_at,
+          }))
+          .filter((item) => !isFamilyTransfer(item));
 
         setExpenses(mapped);
 
@@ -592,18 +597,7 @@ export default function ExpensesSection() {
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              {displayedExpenses.length} Records • {isAllTime ? "All Time" : monthDisplayTitle}
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-xs opacity-70 mt-1">
             Track your daily expenses, bills, and monthly spending.
           </p>
@@ -853,23 +847,20 @@ export default function ExpensesSection() {
         </div>
       </div>
 
-      {/* EXPENSES LOG HEADER */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-sm font-bold uppercase tracking-wider">
-            Expenses Log
-          </h2>
-          <span
-            className="px-2 py-0.5 rounded-full text-xs font-mono font-bold border"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-              color: "#f43f5e",
-            }}
-          >
-            {displayedExpenses.length}
-          </span>
-        </div>
+      {/* TABLE HEADER / ENTRY COUNTER */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider opacity-60">
+          Expenses Log
+        </h2>
+        <span
+          className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-medium"
+          style={{
+            borderColor: "var(--app-border-subtle)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          {displayedExpenses.length} Records • {isAllTime ? "All Time" : monthDisplayTitle}
+        </span>
       </div>
 
       {/* FINANCIAL EXPENSES TRANSACTION LIST (NO CARDS) */}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { parseExpenseMessage, AccountSummary } from "@/utils/expenseParser";
 import { getUserCacheKey } from "@/utils/redis";
+import { isFamilyTransfer } from "@/utils/expenseFilter";
 
 // Reusable Schemas
 const TransactionSchema = z.object({
@@ -166,6 +167,44 @@ describe("ArthaX Validation & Security Test Suite", () => {
       const res = parseExpenseMessage("Shopping 2.5k Cash", knownAccounts);
       expect(res.amount).toBe(2500);
       expect(res.category).toBe("Shopping & Lifestyle");
+    });
+  });
+
+  describe("Family Support vs General Expense Segregation", () => {
+    it("identifies transactions with family tags as family transfers", () => {
+      const item = {
+        title: "Money sent to Aarav",
+        tags: ["family", "transfer"],
+        notes: "Family support transfer to Aarav",
+        category: "Family & Child Care",
+      };
+      expect(isFamilyTransfer(item)).toBe(true);
+    });
+
+    it("identifies transactions with 'Money sent to' title prefix as family transfers", () => {
+      const item = {
+        title: "Money sent to Aarav (Child)",
+        notes: "Monthly allowance",
+      };
+      expect(isFamilyTransfer(item)).toBe(true);
+    });
+
+    it("identifies transactions with 'family support transfer' notes as family transfers", () => {
+      const item = {
+        title: "Direct Debit",
+        notes: "Family support transfer to Aarav (Child)",
+      };
+      expect(isFamilyTransfer(item)).toBe(true);
+    });
+
+    it("does not classify genuine personal expenses as family transfers", () => {
+      const item = {
+        title: "Swiggy food order",
+        category: "Food & Dining",
+        notes: "Dinner delivery",
+        tags: ["food"],
+      };
+      expect(isFamilyTransfer(item)).toBe(false);
     });
   });
 });

@@ -533,18 +533,7 @@ export default function IncomeSection() {
         style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Income</h1>
-            <span
-              className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              {displayedIncomes.length} Streams • {isAllTime ? "All Time" : monthDisplayTitle}
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Income</h1>
           <p className="text-xs opacity-70 mt-1">
             Track your salaries, investments, dividends, and recurring inflows.
           </p>
@@ -793,23 +782,20 @@ export default function IncomeSection() {
         </div>
       </div>
 
-      {/* INCOME STREAMS HEADER */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-sm font-bold uppercase tracking-wider">
-            Income Streams
-          </h2>
-          <span
-            className="px-2 py-0.5 rounded-full text-xs font-mono font-bold border"
-            style={{
-              borderColor: "var(--app-border-subtle)",
-              backgroundColor: "var(--app-card)",
-              color: "#10B981",
-            }}
-          >
-            {displayedIncomes.length}
-          </span>
-        </div>
+      {/* TABLE HEADER / ENTRY COUNTER */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider opacity-60">
+          Income Streams
+        </h2>
+        <span
+          className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-medium"
+          style={{
+            borderColor: "var(--app-border-subtle)",
+            backgroundColor: "var(--app-card)",
+          }}
+        >
+          {displayedIncomes.length} Streams • {isAllTime ? "All Time" : monthDisplayTitle}
+        </span>
       </div>
 
       {/* FINANCIAL INCOME STREAMS TRANSACTION LIST (NO CARDS) */}

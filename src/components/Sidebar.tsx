@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Sparkles,
   X,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -50,7 +49,7 @@ export default function Sidebar({
       {/* Mobile Backdrop Overlay */}
       {!collapsed && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
           onClick={() => setCollapsed(true)}
           aria-hidden="true"
         />
@@ -60,7 +59,7 @@ export default function Sidebar({
         className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col h-screen transition-all duration-300 ease-in-out select-none border-r ${
           collapsed
             ? "-translate-x-full md:translate-x-0 md:w-16"
-            : "translate-x-0 w-64 md:w-60 shadow-2xl md:shadow-none"
+            : "translate-x-0 w-56 md:w-52 shadow-2xl md:shadow-none"
         }`}
         style={{
           backgroundColor: "var(--app-bg)",
@@ -70,14 +69,14 @@ export default function Sidebar({
       >
         {/* Brand Header */}
         <div
-          className="flex items-center h-16 px-3.5 sm:px-4 border-b flex-shrink-0"
+          className="flex items-center h-16 px-3.5 border-b flex-shrink-0"
           style={{ borderColor: "var(--app-border)" }}
         >
           {collapsed ? (
             <div className="w-full flex items-center justify-center">
               <button
                 onClick={() => setCollapsed(false)}
-                className="cursor-pointer transition-transform hover:scale-105"
+                className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
                 title="Expand sidebar"
               >
                 <Logo size={32} showText={false} />
@@ -105,12 +104,12 @@ export default function Sidebar({
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-2.5 py-3 space-y-4 overflow-y-auto">
+        <nav className="flex-1 px-2.5 py-3.5 space-y-4 overflow-y-auto">
           {/* Group 1: MONEY */}
           <div>
             {!collapsed && (
-              <div className="px-2.5 pb-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-semibold">
-                Money
+              <div className="px-2.5 pb-2 text-[10px] font-mono uppercase tracking-widest text-[var(--app-muted)] font-semibold opacity-80">
+                Finance
               </div>
             )}
             <div className="space-y-1">
@@ -130,16 +129,25 @@ export default function Sidebar({
                     title={collapsed ? item.label : undefined}
                     className={`group relative flex items-center w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border ${
                       isSelected
-                        ? "bg-white/[0.08] border-white/[0.14] text-white shadow-sm"
-                        : "border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                        ? "shadow-xs"
+                        : "border-transparent text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
                     } ${collapsed ? "justify-center" : "gap-3"}`}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: "var(--app-card-elevated)",
+                            borderColor: "var(--app-border)",
+                            color: "var(--app-fg)",
+                          }
+                        : undefined
+                    }
                   >
                     <Icon
                       size={16}
                       className={`flex-shrink-0 transition-transform duration-150 ${
                         isSelected
-                          ? "text-white"
-                          : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
+                          ? "text-[var(--app-accent)]"
+                          : "opacity-75 group-hover:opacity-100 group-hover:scale-105"
                       }`}
                     />
 
@@ -149,7 +157,7 @@ export default function Sidebar({
                           {item.label}
                         </span>
                         {isSelected && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)] flex-shrink-0 shadow-[0_0_8px_var(--app-accent)]" />
                         )}
                       </>
                     )}
@@ -162,7 +170,7 @@ export default function Sidebar({
           {/* Group 2: SYSTEM */}
           <div>
             {!collapsed && (
-              <div className="px-2.5 pb-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-semibold">
+              <div className="px-2.5 pb-2 text-[10px] font-mono uppercase tracking-widest text-[var(--app-muted)] font-semibold opacity-80">
                 System
               </div>
             )}
@@ -183,16 +191,25 @@ export default function Sidebar({
                     title={collapsed ? item.label : undefined}
                     className={`group relative flex items-center w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border ${
                       isSelected
-                        ? "bg-white/[0.08] border-white/[0.14] text-white shadow-sm"
-                        : "border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                        ? "shadow-xs"
+                        : "border-transparent text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
                     } ${collapsed ? "justify-center" : "gap-3"}`}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: "var(--app-card-elevated)",
+                            borderColor: "var(--app-border)",
+                            color: "var(--app-fg)",
+                          }
+                        : undefined
+                    }
                   >
                     <Icon
                       size={16}
                       className={`flex-shrink-0 transition-transform duration-150 ${
                         isSelected
-                          ? "text-white"
-                          : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
+                          ? "text-[var(--app-accent)]"
+                          : "opacity-75 group-hover:opacity-100 group-hover:scale-105"
                       }`}
                     />
 
@@ -202,7 +219,7 @@ export default function Sidebar({
                           {item.label}
                         </span>
                         {isSelected && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)] flex-shrink-0 shadow-[0_0_8px_var(--app-accent)]" />
                         )}
                       </>
                     )}

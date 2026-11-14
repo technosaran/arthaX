@@ -12,7 +12,6 @@ import {
   Phone,
   Mail,
   Send,
-  RefreshCw,
   RotateCcw,
   FileText,
   Coins,
@@ -24,12 +23,19 @@ import {
   PieChart as PieChartIcon,
   ChevronLeft,
   ChevronRight,
+  History,
+  LayoutGrid,
+  List,
+  Search,
+  Filter,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { getFromLocalCache, saveToLocalCache } from "@/utils/cacheClient";
+import { getFromLocalCache, saveToLocalCache, invalidateCacheKeys } from "@/utils/cacheClient";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import { isFamilyTransfer } from "@/utils/expenseFilter";
 import BankLogo from "@/components/BankLogo";
 import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
@@ -74,6 +80,8 @@ interface FamilyExpenseItem {
   title?: string | null;
   notes?: string | null;
   account_id?: string | null;
+  tags?: string[];
+  created_at?: string;
 }
 
 // ==========================================
@@ -162,6 +170,10 @@ export default function FamilySection() {
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [familyExpenses, setFamilyExpenses] = useState<FamilyExpenseItem[]>([]);
   const [chartMode, setChartMode] = useState<"spending" | "allowance">("spending");
+  const [activeTab, setActiveTab] = useState<"members" | "history">("members");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [historySearch, setHistorySearch] = useState<string>("");
+  const [historyMemberFilter, setHistoryMemberFilter] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(() => members.length === 0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -176,7 +188,6 @@ export default function FamilySection() {
   const [transferDate, setTransferDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [transferAccountId, setTransferAccountId] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
-  const [recordInExpenses, setRecordInExpenses] = useState(true);
 
   // Reset Spending Cycle Modal
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -204,10 +215,10 @@ export default function FamilySection() {
         supabase.from("accounts").select("id, name, type, balance").eq("user_id", user.id).order("name", { ascending: true }),
         supabase
           .from("expenses")
-          .select("id, amount, expense_date, title, notes, account_id")
+          .select("id, amount, expense_date, title, notes, account_id, tags, created_at")
           .eq("user_id", user.id)
           .or("category.eq.Family & Child Care,title.ilike.%Money sent to%")
-          .order("expense_date", { ascending: true }),
+          .order("expense_date", { ascending: false }),
       ]);
 
       if (mRes.data) {
@@ -233,14 +244,18 @@ export default function FamilySection() {
 
       if (expRes.data) {
         setFamilyExpenses(
-          expRes.data.map((e: any) => ({
-            id: e.id,
-            amount: Number(e.amount) || 0,
-            expense_date: e.expense_date,
-            title: e.title,
-            notes: e.notes,
-            account_id: e.account_id,
-          }))
+          expRes.data
+            .filter((e: any) => isFamilyTransfer(e) || e.category === "Family & Child Care")
+            .map((e: any) => ({
+              id: e.id,
+              amount: Number(e.amount) || 0,
+              expense_date: e.expense_date,
+              title: e.title,
+              notes: e.notes,
+              account_id: e.account_id,
+              tags: e.tags || [],
+              created_at: e.created_at,
+            }))
         );
       }
     } catch (err) {
@@ -353,6 +368,74 @@ export default function FamilySection() {
     return familyExpenses.filter((e) => e.expense_date && e.expense_date.startsWith(selectedMonthYear));
   }, [familyExpenses, isAllTime, selectedMonthYear]);
 
+  const filteredFamilyHistory = useMemo(() => {
+    let list = displayedFamilyExpenses;
+
+    if (historyMemberFilter !== "all") {
+      const q = historyMemberFilter.toLowerCase();
+      list = list.filter((item) => {
+        const t = (item.title || "").toLowerCase();
+        const n = (item.notes || "").toLowerCase();
+        return t.includes(q) || n.includes(q);
+      });
+    }
+
+    if (historySearch.trim()) {
+      const q = historySearch.toLowerCase();
+      list = list.filter((item) => {
+        const t = (item.title || "").toLowerCase();
+        const n = (item.notes || "").toLowerCase();
+        const acc = accounts.find((a) => a.id === item.account_id);
+        const accName = (acc?.name || "").toLowerCase();
+        return t.includes(q) || n.includes(q) || accName.includes(q) || String(item.amount).includes(q);
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      const dateA = a.expense_date ? new Date(a.expense_date).getTime() : 0;
+      const dateB = b.expense_date ? new Date(b.expense_date).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [displayedFamilyExpenses, historyMemberFilter, historySearch, accounts]);
+
+  const historyStats = useMemo(() => {
+    const totalSent = filteredFamilyHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const count = filteredFamilyHistory.length;
+    const avg = count > 0 ? Math.round(totalSent / count) : 0;
+    return { totalSent, count, avg };
+  }, [filteredFamilyHistory]);
+
+  const formatHistoryDate = useCallback((dateStr: string) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  }, []);
+
+  const getRelativeDateTag = useCallback((dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      const target = new Date(dateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      target.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays > 1 && diffDays <= 7) return `${diffDays}d ago`;
+      return "";
+    } catch {
+      return "";
+    }
+  }, []);
+
   const totalCurrentSpending = useMemo(() => {
     if (members.length > 0) {
       const membersSum = members.reduce((sum, m) => sum + getMemberSpendingForMonth(m), 0);
@@ -375,6 +458,21 @@ export default function FamilySection() {
   const remainingBudget = useMemo(
     () => totalMonthlyAllowance - totalCurrentSpending,
     [totalMonthlyAllowance, totalCurrentSpending]
+  );
+
+  const avgSpendingPerMember = useMemo(
+    () => (members.length > 0 ? Math.round(totalCurrentSpending / members.length) : 0),
+    [members.length, totalCurrentSpending]
+  );
+
+  const avgTargetPerMember = useMemo(
+    () => (members.length > 0 ? Math.round(totalMonthlyAllowance / members.length) : 0),
+    [members.length, totalMonthlyAllowance]
+  );
+
+  const activeRecipientsCount = useMemo(
+    () => members.filter((m) => getMemberSpendingForMonth(m) > 0).length,
+    [members, getMemberSpendingForMonth]
   );
 
   // ==========================================
@@ -558,21 +656,19 @@ export default function FamilySection() {
 
       if (memberError) throw memberError;
 
-      // 2. Atomically record as an expense in user's ledger and deduct from account
-      if (recordInExpenses) {
-        const { error: expError } = await supabase.rpc("fn_record_expense_atomic", {
-          p_user_id: user.id,
-          p_title: `Money sent to ${transferMember.name}`,
-          p_amount: val,
-          p_category: "Family & Child Care",
-          p_account_id: transferAccountId || null,
-          p_expense_date: transferDate || new Date().toISOString().split("T")[0],
-          p_notes: transferNotes || `Family support transfer to ${transferMember.name} (${transferMember.relationship})`,
-          p_tags: ["family", "transfer"],
-        });
+      // 2. Atomically record as a family support transfer (deducts from account, managed in Family)
+      const { error: expError } = await supabase.rpc("fn_record_expense_atomic", {
+        p_user_id: user.id,
+        p_title: `Money sent to ${transferMember.name}`,
+        p_amount: val,
+        p_category: "Family & Child Care",
+        p_account_id: transferAccountId || null,
+        p_expense_date: transferDate || new Date().toISOString().split("T")[0],
+        p_notes: transferNotes || `Family support transfer to ${transferMember.name} (${transferMember.relationship})`,
+        p_tags: ["family", "transfer"],
+      });
 
-        if (expError) throw expError;
-      }
+      if (expError) throw expError;
 
       showToast(`Recorded ${formatINR(val)} sent to ${transferMember.name}`, "success");
 
@@ -581,6 +677,13 @@ export default function FamilySection() {
       setTransferAmountInput("");
       setTransferNotes("");
       setTransferAccountId("");
+
+      await invalidateCacheKeys([
+        membersKey,
+        getUserCacheKey(user.id, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(user.id, CACHE_KEYS.EXPENSES),
+        getUserCacheKey(user.id, CACHE_KEYS.LEDGER),
+      ]);
       await fetchAllData();
     } catch (err) {
       console.error(err);
@@ -614,6 +717,52 @@ export default function FamilySection() {
     } catch (err) {
       console.error(err);
       showToast("Failed to reset spending cycle", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ==========================================
+  // Delete / Reverse Transfer Record from History
+  // ==========================================
+  const handleDeleteTransfer = async (expenseId: string, itemTitle?: string | null, itemAmount?: number) => {
+    if (!confirm(`Are you sure you want to reverse this transfer record${itemAmount ? ` of ${formatINR(itemAmount)}` : ""}? The debited amount will be refunded to your account balance.`)) return;
+    if (!user) return;
+    setSubmitting(true);
+
+    try {
+      const supabase = createClient();
+      // Atomically delete expense and refund balance to account
+      const { error } = await supabase.rpc("fn_delete_expense_atomic", {
+        p_expense_id: expenseId,
+        p_user_id: user.id,
+      });
+      if (error) throw error;
+
+      if (itemTitle && itemAmount) {
+        const titleLower = itemTitle.toLowerCase();
+        const matchedMember = members.find((m) => titleLower.includes(m.name.toLowerCase()));
+        if (matchedMember) {
+          const updatedSpending = Math.max(0, Number(matchedMember.current_spending || 0) - itemAmount);
+          await supabase
+            .from("family_members")
+            .update({ current_spending: updatedSpending })
+            .eq("id", matchedMember.id)
+            .eq("user_id", user.id);
+        }
+      }
+
+      showToast("Transfer Reversed", `${formatINR(itemAmount || 0)} refunded to your account.`, "success");
+      await invalidateCacheKeys([
+        membersKey,
+        getUserCacheKey(user.id, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(user.id, CACHE_KEYS.EXPENSES),
+        getUserCacheKey(user.id, CACHE_KEYS.LEDGER),
+      ]);
+      await fetchAllData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to delete transfer record", "error");
     } finally {
       setSubmitting(false);
     }
@@ -658,15 +807,6 @@ export default function FamilySection() {
               }}
             >
               Support & Transfers
-            </span>
-            <span
-              className="hidden sm:inline-flex text-[11px] font-mono px-2 py-0.5 rounded-md border opacity-80"
-              style={{
-                borderColor: "var(--app-border-subtle)",
-                backgroundColor: "var(--app-card)",
-              }}
-            >
-              {members.length} Members • {isAllTime ? "All Time" : monthDisplayTitle}
             </span>
           </div>
           <p className="text-xs opacity-70 mt-1">
@@ -752,9 +892,9 @@ export default function FamilySection() {
       </div>
 
       {/* =========================================================================
-          Top 3 KPI Metric Summary Cards
+          Top 4 KPI Metric Summary Cards
           ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Card 1: Family Members */}
         <div
           className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
@@ -810,7 +950,7 @@ export default function FamilySection() {
             <div className="text-xs opacity-60 mt-1">
               {isAllTime
                 ? `Transferred across all recorded months`
-                : `Transferred across ${members.filter((m) => getMemberSpendingForMonth(m) > 0).length} of ${members.length} members`}
+                : `Transferred across ${activeRecipientsCount} of ${members.length} members`}
             </div>
           </div>
         </div>
@@ -859,6 +999,36 @@ export default function FamilySection() {
                       : "var(--app-accent)",
                 }}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Average Support Per Member */}
+        <div
+          className="rounded-2xl border p-4.5 transition-all relative overflow-hidden"
+          style={{
+            backgroundColor: "var(--app-card)",
+            borderColor: "var(--app-border)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-wider opacity-60">Avg Support / Member</span>
+            <span
+              className="w-7 h-7 rounded-lg border flex items-center justify-center text-sky-400"
+              style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "rgba(56, 189, 248, 0.12)" }}
+            >
+              <Wallet size={14} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold tracking-tight font-mono text-sky-400">
+              {formatINR(avgSpendingPerMember)}
+            </div>
+            <div className="flex items-center justify-between text-xs opacity-60 mt-1">
+              <span>Target: {formatINR(avgTargetPerMember)}/mo</span>
+              <span className="font-mono">
+                {activeRecipientsCount} of {members.length} active
+              </span>
             </div>
           </div>
         </div>
@@ -965,315 +1135,960 @@ export default function FamilySection() {
       )}
 
       {/* =========================================================================
-          FAMILY MEMBERS LIST / MONEY TRACKING CARDS
+          FAMILY DATA SECTION: TABS (MEMBERS / HISTORY) & CONTROLS
           ========================================================================= */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold uppercase tracking-wider">Family Members ({members.length})</h2>
-          </div>
-          <button
-            onClick={() => fetchAllData()}
-            className="flex items-center gap-1.5 text-xs opacity-60 hover:opacity-100 transition-opacity cursor-pointer font-mono"
-            title="Refresh family data"
-          >
-            <RefreshCw size={12} />
-            <span>Refresh</span>
-          </button>
-        </div>
-
-        {members.length === 0 ? (
+        {/* Navigation Tabs Bar & Right Controls Header */}
+        <div
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b"
+          style={{ borderColor: "var(--app-border)" }}
+        >
+          {/* Left: Tab Switcher (Family Members vs Transfer History) */}
           <div
-            className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
-            style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
+            className="inline-flex items-center p-1 rounded-2xl border gap-1 self-start sm:self-auto"
+            style={{
+              backgroundColor: "var(--app-card)",
+              borderColor: "var(--app-border-subtle)",
+            }}
           >
-            <div
-              className="w-14 h-14 rounded-2xl border flex items-center justify-center"
-              style={{ backgroundColor: "var(--app-accent-subtle)", borderColor: "var(--app-border-subtle)" }}
+            <button
+              type="button"
+              onClick={() => setActiveTab("members")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "members"
+                  ? "shadow-sm bg-[var(--app-fg)] text-[var(--app-bg)]"
+                  : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
+              }`}
             >
-              <Users size={28} style={{ color: "var(--app-accent)" }} />
-            </div>
-            <div className="max-w-md">
-              <h3 className="text-base font-bold">No Family Members Tracked Yet</h3>
-              <p className="text-xs opacity-70 mt-1">
-                Add your parents, spouse, children, or relatives to track regular financial support, allowances, and money sent to them.
-              </p>
-            </div>
-            <div className="flex items-center justify-center pt-2">
-              <button
-                onClick={() => {
-                  setEditingMember(null);
-                  setMemberModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
+              <Users size={14} />
+              <span>Family Members</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full border ${
+                  activeTab === "members"
+                    ? "bg-[var(--app-bg)] text-[var(--app-fg)] border-transparent"
+                    : "opacity-80"
+                }`}
+                style={{ borderColor: "var(--app-border-subtle)" }}
               >
-                <UserPlus size={15} />
-                Add First Member
-              </button>
-            </div>
+                {members.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "history"
+                  ? "shadow-sm bg-[var(--app-fg)] text-[var(--app-bg)]"
+                  : "opacity-60 hover:opacity-100 text-[var(--app-fg)]"
+              }`}
+            >
+              <History size={14} />
+              <span>Transfer History</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full border ${
+                  activeTab === "history"
+                    ? "bg-[var(--app-bg)] text-[var(--app-fg)] border-transparent"
+                    : "opacity-80"
+                }`}
+                style={{ borderColor: "var(--app-border-subtle)" }}
+              >
+                {displayedFamilyExpenses.length}
+              </span>
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {members.map((member) => {
-              // Clean name of brackets or symbols for robust initials & title display
-              const cleanName = member.name.replace(/[\(\)\[\]\{\}\.,_-]/g, " ").trim();
-              const initials =
-                cleanName
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .map((p) => p[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase() || member.name.slice(0, 2).toUpperCase();
 
-              // Clean display name so "(Child)" is not repeated if badge already says Child
-              const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
-              const relBadge = getRelationshipBadge(member.relationship);
-
-              const allowance = Number(member.monthly_allowance) || 0;
-              const spending = getMemberSpendingForMonth(member);
-              const remaining = allowance - spending;
-              const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
-
-              return (
+          {/* Right Top of Table: Controls & The User's Requested Badge! */}
+          <div className="flex items-center gap-2.5 flex-wrap self-end sm:self-auto">
+            {activeTab === "members" ? (
+              <>
+                {/* Grid / Table View Mode Toggle */}
                 <div
-                  key={member.id}
-                  className="group relative rounded-2xl border p-5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
+                  className="flex items-center rounded-xl border p-0.5"
                   style={{
+                    borderColor: "var(--app-border-subtle)",
                     backgroundColor: "var(--app-card)",
-                    borderColor: "var(--app-border)",
                   }}
                 >
-                  {/* Ambient accent background glow on hover */}
-                  <div
-                    className="absolute -top-24 -right-24 w-48 h-48 rounded-full pointer-events-none opacity-10 blur-3xl transition-opacity group-hover:opacity-25"
-                    style={{ backgroundColor: member.avatar_color || "#10B981" }}
-                  />
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    title="Grid / Cards View"
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                      viewMode === "grid" ? "shadow-sm" : "opacity-40 hover:opacity-100"
+                    }`}
+                    style={{
+                      backgroundColor: viewMode === "grid" ? "var(--app-fg)" : "transparent",
+                      color: viewMode === "grid" ? "var(--app-bg)" : "var(--app-fg)",
+                    }}
+                  >
+                    <LayoutGrid size={13} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("table")}
+                    title="Table View"
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                      viewMode === "table" ? "shadow-sm" : "opacity-40 hover:opacity-100"
+                    }`}
+                    style={{
+                      backgroundColor: viewMode === "table" ? "var(--app-fg)" : "transparent",
+                      color: viewMode === "table" ? "var(--app-bg)" : "var(--app-fg)",
+                    }}
+                  >
+                    <List size={13} />
+                  </button>
+                </div>
 
-                  <div className="relative z-10">
-                    {/* Member Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Premium Avatar with gradient and micro-ring */}
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md flex-shrink-0 ring-1 ring-white/20 transition-transform group-hover:scale-105"
-                          style={{
-                            background: `linear-gradient(135deg, ${member.avatar_color || "#10B981"}ee, ${member.avatar_color || "#10B981"}88)`,
-                            boxShadow: `0 4px 14px -2px ${(member.avatar_color || "#10B981")}40`,
-                          }}
-                        >
-                          {initials}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-base font-extrabold tracking-tight truncate capitalize" title={member.name}>
-                            {displayName}
-                          </h3>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
+                {/* RIGHT TOP OF TABLE BADGE */}
+                <span
+                  className="text-xs font-mono px-3 py-1 rounded-xl border font-semibold flex items-center gap-1.5"
+                  style={{
+                    borderColor: "var(--app-border-subtle)",
+                    backgroundColor: "var(--app-card)",
+                  }}
+                >
+                  {members.length} Members • {isAllTime ? "All Time" : monthDisplayTitle}
+                </span>
+              </>
+            ) : (
+              <>
+                {/* Search in History */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search transfers..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="pl-7 pr-7 py-1 text-xs rounded-xl border font-sans focus:outline-none w-36 sm:w-48 transition-all"
+                    style={{
+                      borderColor: "var(--app-border-subtle)",
+                      backgroundColor: "var(--app-card)",
+                      color: "var(--app-fg)",
+                    }}
+                  />
+                  {historySearch && (
+                    <button
+                      onClick={() => setHistorySearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 cursor-pointer"
+                    >
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter by Member Dropdown */}
+                {members.length > 0 && (
+                  <select
+                    value={historyMemberFilter}
+                    onChange={(e) => setHistoryMemberFilter(e.target.value)}
+                    className="px-2.5 py-1 text-xs rounded-xl border font-sans cursor-pointer focus:outline-none"
+                    style={{
+                      borderColor: "var(--app-border-subtle)",
+                      backgroundColor: "var(--app-card)",
+                      color: "var(--app-fg)",
+                    }}
+                  >
+                    <option value="all">All Members ({members.length})</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* RIGHT TOP OF TABLE BADGE FOR HISTORY */}
+                <span
+                  className="text-xs font-mono px-3 py-1 rounded-xl border font-semibold flex items-center gap-1.5"
+                  style={{
+                    borderColor: "var(--app-border-subtle)",
+                    backgroundColor: "var(--app-card)",
+                  }}
+                >
+                  {filteredFamilyHistory.length} Transfers • {isAllTime ? "All Time" : monthDisplayTitle}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* =========================================================================
+            TAB 1 CONTENT: FAMILY MEMBERS (GRID OR TABLE VIEW)
+            ========================================================================= */}
+        {activeTab === "members" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {members.length === 0 ? (
+              <div
+                className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-4"
+                style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl border flex items-center justify-center"
+                  style={{ backgroundColor: "var(--app-accent-subtle)", borderColor: "var(--app-border-subtle)" }}
+                >
+                  <Users size={28} style={{ color: "var(--app-accent)" }} />
+                </div>
+                <div className="max-w-md">
+                  <h3 className="text-base font-bold">No Family Members Tracked Yet</h3>
+                  <p className="text-xs opacity-70 mt-1">
+                    Add your parents, spouse, children, or relatives to track regular financial support, allowances, and money sent to them.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center pt-2">
+                  <button
+                    onClick={() => {
+                      setEditingMember(null);
+                      setMemberModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: "var(--app-fg)", color: "var(--app-bg)" }}
+                  >
+                    <UserPlus size={15} />
+                    Add First Member
+                  </button>
+                </div>
+              </div>
+            ) : viewMode === "grid" ? (
+              /* GRID / CARDS VIEW */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {members.map((member) => {
+                  const cleanName = member.name.replace(/[\(\)\[\]\{\}\.,_-]/g, " ").trim();
+                  const initials =
+                    cleanName
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .map((p) => p[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase() || member.name.slice(0, 2).toUpperCase();
+
+                  const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
+                  const relBadge = getRelationshipBadge(member.relationship);
+
+                  const allowance = Number(member.monthly_allowance) || 0;
+                  const spending = getMemberSpendingForMonth(member);
+                  const remaining = allowance - spending;
+                  const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="group relative rounded-2xl border p-5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
+                      style={{
+                        backgroundColor: "var(--app-card)",
+                        borderColor: "var(--app-border)",
+                      }}
+                    >
+                      <div
+                        className="absolute -top-24 -right-24 w-48 h-48 rounded-full pointer-events-none opacity-10 blur-3xl transition-opacity group-hover:opacity-25"
+                        style={{ backgroundColor: member.avatar_color || "#10B981" }}
+                      />
+
+                      <div className="relative z-10">
+                        {/* Member Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md flex-shrink-0 ring-1 ring-white/20 transition-transform group-hover:scale-105"
                               style={{
-                                backgroundColor: relBadge.bg,
-                                color: relBadge.text,
-                                borderColor: relBadge.border,
+                                background: `linear-gradient(135deg, ${member.avatar_color || "#10B981"}ee, ${member.avatar_color || "#10B981"}88)`,
+                                boxShadow: `0 4px 14px -2px ${(member.avatar_color || "#10B981")}40`,
                               }}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
-                              {relBadge.label}
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-base font-extrabold tracking-tight truncate capitalize" title={member.name}>
+                                {displayName}
+                              </h3>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
+                                  style={{
+                                    backgroundColor: relBadge.bg,
+                                    color: relBadge.text,
+                                    borderColor: relBadge.border,
+                                  }}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
+                                  {relBadge.label}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => {
+                                setEditingMember(member);
+                                setMemberModalOpen(true);
+                              }}
+                              className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-white/5 transition-all cursor-pointer"
+                              style={{ borderColor: "var(--app-border-subtle)" }}
+                              title="Edit Member"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMember(member.id, member.name)}
+                              className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all cursor-pointer text-rose-400"
+                              style={{ borderColor: "var(--app-border-subtle)" }}
+                              title="Remove Member"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Financial Box */}
+                        <div
+                          className="mt-4 p-4 rounded-xl border space-y-3 shadow-xs"
+                          style={{
+                            backgroundColor: "var(--app-bg)",
+                            borderColor: "var(--app-border-subtle)",
+                          }}
+                        >
+                          <div className="flex items-end justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                {isAllTime ? "Total Sent" : `Sent in ${monthDisplayTitle}`}
+                              </span>
+                              <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400 mt-0.5">
+                                {formatINR(spending)}
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 block">
+                                Target Support
+                              </span>
+                              <div className="text-sm sm:text-base font-extrabold font-mono tracking-tight opacity-90 mt-0.5">
+                                {allowance > 0 ? formatINR(allowance) : "None"}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.min(100, percentSpent)}%`,
+                                background:
+                                  spending > allowance && allowance > 0
+                                    ? "linear-gradient(90deg, #f43f5e, #e11d48)"
+                                    : percentSpent >= 80
+                                    ? "linear-gradient(90deg, #10b981, #059669)"
+                                    : `linear-gradient(90deg, ${member.avatar_color || "#3b82f6"}, #10b981)`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-0.5">
+                            <span
+                              className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
+                              style={{
+                                borderColor: "var(--app-border-subtle)",
+                                backgroundColor: "var(--app-card)",
+                                color: "var(--app-fg)",
+                              }}
+                            >
+                              {percentSpent}% fulfilled
+                            </span>
+                            <span
+                              className="font-mono text-[11px] font-bold"
+                              style={{
+                                color:
+                                  allowance === 0
+                                    ? "inherit"
+                                    : remaining <= 0
+                                    ? "#10b981"
+                                    : "#f59e0b",
+                              }}
+                            >
+                              {allowance === 0
+                                ? "Flexible Support"
+                                : remaining <= 0
+                                ? "Target Met ✓"
+                                : `${formatINR(remaining)} Left`}
                             </span>
                           </div>
                         </div>
+
+                        {/* Notes */}
+                        {member.notes && (
+                          <div
+                            className="mt-3 px-3 py-2 rounded-xl border flex items-start gap-2 text-xs"
+                            style={{
+                              borderColor: "var(--app-border-subtle)",
+                              backgroundColor: "var(--app-bg)",
+                            }}
+                          >
+                            <FileText size={13} className="text-sky-400 flex-shrink-0 mt-0.5 opacity-80" />
+                            <span className="opacity-80 line-clamp-2 leading-relaxed italic text-[11px]">
+                              &ldquo;{member.notes}&rdquo;
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Contact Chips */}
+                        {(member.phone || member.email) && (
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            {member.phone && (
+                              <div
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                                style={{
+                                  borderColor: "var(--app-border-subtle)",
+                                  backgroundColor: "var(--app-bg)",
+                                }}
+                              >
+                                <Phone size={10} className="text-emerald-400" />
+                                <span>{member.phone}</span>
+                              </div>
+                            )}
+                            {member.email && (
+                              <div
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                                style={{
+                                  borderColor: "var(--app-border-subtle)",
+                                  backgroundColor: "var(--app-bg)",
+                                }}
+                              >
+                                <Mail size={10} className="text-sky-400" />
+                                <span>{member.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Header Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Card Footer: Send Money & Counter Reset */}
+                      <div
+                        className="relative z-10 pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2"
+                        style={{ borderColor: "var(--app-border-subtle)" }}
+                      >
                         <button
                           onClick={() => {
-                            setEditingMember(member);
-                            setMemberModalOpen(true);
+                            setTransferMember(member);
+                            setTransferAmountInput("");
+                            setTransferDate(new Date().toISOString().split("T")[0]);
+                            setTransferNotes("");
+                            setTransferAccountId(accounts[0]?.id || "");
+                            setTransferModalOpen(true);
                           }}
-                          className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-white/5 transition-all cursor-pointer"
-                          style={{ borderColor: "var(--app-border-subtle)" }}
-                          title="Edit Member"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md bg-white text-black hover:bg-neutral-100 hover:scale-[1.01] active:scale-[0.98]"
                         >
-                          <Pencil size={13} />
+                          <Send size={13} className="text-emerald-600" />
+                          <span>Send Money</span>
                         </button>
+
                         <button
-                          onClick={() => handleDeleteMember(member.id, member.name)}
-                          className="w-8 h-8 rounded-xl border flex items-center justify-center opacity-60 hover:opacity-100 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all cursor-pointer text-rose-400"
-                          style={{ borderColor: "var(--app-border-subtle)" }}
-                          title="Remove Member"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Financial Support Health Box */}
-                    <div
-                      className="mt-4 p-4 rounded-xl border space-y-3 shadow-xs"
-                      style={{
-                        backgroundColor: "var(--app-bg)",
-                        borderColor: "var(--app-border-subtle)",
-                      }}
-                    >
-                      {/* Metric Split */}
-                      <div className="flex items-end justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            {isAllTime ? "Total Sent" : `Sent in ${monthDisplayTitle}`}
-                          </span>
-                          <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400 mt-0.5">
-                            {formatINR(spending)}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 block">
-                            Target Support
-                          </span>
-                          <div className="text-sm sm:text-base font-extrabold font-mono tracking-tight opacity-90 mt-0.5">
-                            {allowance > 0 ? formatINR(allowance) : "None"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar with Dynamic Multi-Stop Gradient Fill */}
-                      <div
-                        className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10"
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min(100, percentSpent)}%`,
-                            background:
-                              spending > allowance && allowance > 0
-                                ? "linear-gradient(90deg, #f43f5e, #e11d48)"
-                                : percentSpent >= 80
-                                ? "linear-gradient(90deg, #10b981, #059669)"
-                                : `linear-gradient(90deg, ${member.avatar_color || "#3b82f6"}, #10b981)`,
+                          onClick={() => {
+                            setResetMember(member);
+                            setResetModalOpen(true);
                           }}
-                        />
-                      </div>
-
-                      {/* Status Row */}
-                      <div className="flex items-center justify-between text-xs pt-0.5">
-                        <span
-                          className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
+                          className="w-9 h-9 rounded-xl border flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
                           style={{
                             borderColor: "var(--app-border-subtle)",
-                            backgroundColor: "var(--app-card)",
-                            color: "var(--app-fg)",
+                            backgroundColor: "var(--app-bg)",
                           }}
+                          title="Reset monthly spending counter to ₹0"
                         >
-                          {percentSpent}% fulfilled
-                        </span>
-                        <span
-                          className="font-mono text-[11px] font-bold"
-                          style={{
-                            color:
-                              allowance === 0
-                                ? "inherit"
-                                : remaining <= 0
-                                ? "#10b981"
-                                : "#f59e0b",
-                          }}
-                        >
-                          {allowance === 0
-                            ? "Flexible Support"
-                            : remaining <= 0
-                            ? "Target Met ✓"
-                            : `${formatINR(remaining)} Left`}
-                        </span>
+                          <RotateCcw size={13} />
+                        </button>
                       </div>
                     </div>
-
-                    {/* Member Notes / Memo */}
-                    {member.notes && (
-                      <div
-                        className="mt-3 px-3 py-2 rounded-xl border flex items-start gap-2 text-xs"
+                  );
+                })}
+              </div>
+            ) : (
+              /* TABULAR VIEW FOR FAMILY MEMBERS */
+              <div
+                className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                  color: "var(--app-fg)",
+                }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr
+                        className="border-b text-[11px] font-bold uppercase tracking-wider select-none font-mono opacity-60"
                         style={{
-                          borderColor: "var(--app-border-subtle)",
+                          borderColor: "var(--app-border)",
                           backgroundColor: "var(--app-bg)",
+                          color: "var(--app-fg)",
                         }}
                       >
-                        <FileText size={13} className="text-sky-400 flex-shrink-0 mt-0.5 opacity-80" />
-                        <span className="opacity-80 line-clamp-2 leading-relaxed italic text-[11px]">
-                          "{member.notes}"
-                        </span>
-                      </div>
-                    )}
+                        <th className="py-3.5 px-4 font-semibold">Member</th>
+                        <th className="py-3.5 px-4 font-semibold">Relationship</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Target Support</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Sent This Month</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Remaining</th>
+                        <th className="py-3.5 px-4 font-semibold">Progress</th>
+                        <th className="py-3.5 px-4 font-semibold">Details / Notes</th>
+                        <th className="py-3.5 px-4 font-semibold text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
+                      {members.map((member) => {
+                        const cleanName = member.name.replace(/[\(\)\[\]\{\}\.,_-]/g, " ").trim();
+                        const initials =
+                          cleanName
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .map((p) => p[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase() || member.name.slice(0, 2).toUpperCase();
+                        const displayName = member.name.replace(/\s*\([^)]*\)/g, "").trim() || member.name;
+                        const relBadge = getRelationshipBadge(member.relationship);
+                        const allowance = Number(member.monthly_allowance) || 0;
+                        const spending = getMemberSpendingForMonth(member);
+                        const remaining = allowance - spending;
+                        const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
 
-                    {/* Contact Badges */}
-                    {(member.phone || member.email) && (
-                      <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                        {member.phone && (
-                          <div
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
-                            style={{
-                              borderColor: "var(--app-border-subtle)",
-                              backgroundColor: "var(--app-bg)",
-                            }}
+                        return (
+                          <tr
+                            key={member.id}
+                            className="group transition-colors hover:bg-[var(--app-card-hover)]"
                           >
-                            <Phone size={10} className="text-emerald-400" />
-                            <span>{member.phone}</span>
-                          </div>
-                        )}
-                        {member.email && (
-                          <div
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
-                            style={{
-                              borderColor: "var(--app-border-subtle)",
-                              backgroundColor: "var(--app-bg)",
-                            }}
-                          >
-                            <Mail size={10} className="text-sky-400" />
-                            <span>{member.email}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                            {/* Member Name + Avatar */}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-xs flex-shrink-0"
+                                  style={{
+                                    backgroundColor: member.avatar_color || "#10B981",
+                                  }}
+                                >
+                                  {initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-sm tracking-tight truncate capitalize">
+                                    {displayName}
+                                  </div>
+                                  {(member.phone || member.email) && (
+                                    <div className="text-[11px] font-mono opacity-50 truncate">
+                                      {member.phone || member.email}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
 
-                  {/* Card Footer: Send Money & Counter Reset */}
-                  <div
-                    className="relative z-10 pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2"
-                    style={{ borderColor: "var(--app-border-subtle)" }}
-                  >
-                    <button
-                      onClick={() => {
-                        setTransferMember(member);
-                        setTransferAmountInput("");
-                        setTransferDate(new Date().toISOString().split("T")[0]);
-                        setTransferNotes("");
-                        setTransferAccountId(accounts[0]?.id || "");
-                        setTransferModalOpen(true);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md bg-white text-black hover:bg-neutral-100 hover:scale-[1.01] active:scale-[0.98]"
-                    >
-                      <Send size={13} className="text-emerald-600" />
-                      <span>Send Money</span>
-                    </button>
+                            {/* Relationship Badge */}
+                            <td className="py-3 px-4">
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border"
+                                style={{
+                                  backgroundColor: relBadge.bg,
+                                  color: relBadge.text,
+                                  borderColor: relBadge.border,
+                                }}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: relBadge.text }} />
+                                {relBadge.label}
+                              </span>
+                            </td>
 
-                    <button
-                      onClick={() => {
-                        setResetMember(member);
-                        setResetModalOpen(true);
-                      }}
-                      className="w-9 h-9 rounded-xl border flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
-                      style={{
-                        borderColor: "var(--app-border-subtle)",
-                        backgroundColor: "var(--app-bg)",
-                      }}
-                      title="Reset monthly spending counter to ₹0"
-                    >
-                      <RotateCcw size={13} />
-                    </button>
+                            {/* Monthly Target */}
+                            <td className="py-3 px-4 text-right font-mono font-semibold">
+                              {allowance > 0 ? formatINR(allowance) : <span className="opacity-40">Flexible</span>}
+                            </td>
+
+                            {/* Sent This Month */}
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
+                              {formatINR(spending)}
+                            </td>
+
+                            {/* Remaining */}
+                            <td className="py-3 px-4 text-right font-mono text-[11px]">
+                              {allowance === 0 ? (
+                                <span className="opacity-40">—</span>
+                              ) : remaining <= 0 ? (
+                                <span className="font-bold text-emerald-400">Target Met ✓</span>
+                              ) : (
+                                <span className="font-bold text-amber-400">{formatINR(remaining)}</span>
+                              )}
+                            </td>
+
+                            {/* Progress Bar */}
+                            <td className="py-3 px-4">
+                              <div className="w-28 space-y-1">
+                                <div className="flex items-center justify-between text-[10px] font-mono opacity-60">
+                                  <span>{percentSpent}%</span>
+                                </div>
+                                <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/5">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${Math.min(100, percentSpent)}%`,
+                                      backgroundColor:
+                                        spending > allowance && allowance > 0
+                                          ? "var(--app-loss)"
+                                          : percentSpent >= 80
+                                          ? "#10B981"
+                                          : member.avatar_color || "#3B82F6",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Notes / Memo */}
+                            <td className="py-3 px-4 max-w-[180px] truncate text-xs opacity-70">
+                              {member.notes || <span className="opacity-30">—</span>}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setTransferMember(member);
+                                    setTransferAmountInput("");
+                                    setTransferDate(new Date().toISOString().split("T")[0]);
+                                    setTransferNotes("");
+                                    setTransferAccountId(accounts[0]?.id || "");
+                                    setTransferModalOpen(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-xs bg-white text-black hover:bg-neutral-100"
+                                  title="Send Money"
+                                >
+                                  <Send size={11} className="text-emerald-600" />
+                                  <span>Send</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingMember(member);
+                                    setMemberModalOpen(true);
+                                  }}
+                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 cursor-pointer"
+                                  style={{ borderColor: "var(--app-border-subtle)" }}
+                                  title="Edit Member"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setResetMember(member);
+                                    setResetModalOpen(true);
+                                  }}
+                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 cursor-pointer"
+                                  style={{ borderColor: "var(--app-border-subtle)" }}
+                                  title="Reset spending cycle"
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMember(member.id, member.name)}
+                                  className="w-7 h-7 rounded-lg border flex items-center justify-center opacity-60 hover:opacity-100 text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                                  style={{ borderColor: "var(--app-border-subtle)" }}
+                                  title="Remove Member"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            TAB 2 CONTENT: TRANSFER HISTORY
+            ========================================================================= */}
+        {activeTab === "history" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* History Mini Metric Summary Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div
+                className="p-3.5 rounded-xl border flex items-center justify-between"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                }}
+              >
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Total Support Outflow</span>
+                  <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
+                    {formatINR(historyStats.totalSent)}
                   </div>
                 </div>
-              );
-            })}
+                <div
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-emerald-400"
+                  style={{ backgroundColor: "rgba(16, 185, 129, 0.1)", borderColor: "rgba(16, 185, 129, 0.2)" }}
+                >
+                  <Send size={14} />
+                </div>
+              </div>
+
+              <div
+                className="p-3.5 rounded-xl border flex items-center justify-between"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                }}
+              >
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Transfers Recorded</span>
+                  <div className="text-lg font-bold font-mono mt-0.5">
+                    {historyStats.count} Transactions
+                  </div>
+                </div>
+                <div
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center opacity-70"
+                  style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border-subtle)" }}
+                >
+                  <FileText size={14} />
+                </div>
+              </div>
+
+              <div
+                className="p-3.5 rounded-xl border flex items-center justify-between"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                }}
+              >
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">Average Transfer</span>
+                  <div className="text-lg font-bold font-mono mt-0.5">
+                    {formatINR(historyStats.avg)}
+                  </div>
+                </div>
+                <div
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center text-amber-400"
+                  style={{ backgroundColor: "rgba(245, 158, 11, 0.1)", borderColor: "rgba(245, 158, 11, 0.2)" }}
+                >
+                  <Coins size={14} />
+                </div>
+              </div>
+            </div>
+
+            {/* Transfer History Table */}
+            {filteredFamilyHistory.length === 0 ? (
+              <div
+                className="rounded-2xl border p-12 text-center flex flex-col items-center justify-center space-y-3"
+                style={{ backgroundColor: "var(--app-card)", borderColor: "var(--app-border)" }}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl border flex items-center justify-center opacity-40"
+                  style={{ borderColor: "var(--app-border-subtle)", backgroundColor: "var(--app-bg)" }}
+                >
+                  <History size={22} />
+                </div>
+                <h3 className="text-base font-bold">No Transfer History Found</h3>
+                <p className="text-xs opacity-60 max-w-sm mx-auto">
+                  {historySearch || historyMemberFilter !== "all"
+                    ? "No transfers match your current filter criteria."
+                    : `No family support transfers recorded for ${isAllTime ? "all time" : monthDisplayTitle}.`}
+                </p>
+                {members.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setTransferMember(members[0]);
+                      setTransferAmountInput("");
+                      setTransferDate(new Date().toISOString().split("T")[0]);
+                      setTransferNotes("");
+                      setTransferAccountId(accounts[0]?.id || "");
+                      setTransferModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs cursor-pointer bg-white text-black hover:bg-neutral-100 mt-2"
+                  >
+                    <Send size={13} className="text-emerald-600" />
+                    <span>Send Money Now</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div
+                className="rounded-2xl border overflow-hidden shadow-sm transition-colors"
+                style={{
+                  backgroundColor: "var(--app-card)",
+                  borderColor: "var(--app-border)",
+                  color: "var(--app-fg)",
+                }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr
+                        className="border-b text-[11px] font-bold uppercase tracking-wider select-none font-mono opacity-60"
+                        style={{
+                          borderColor: "var(--app-border)",
+                          backgroundColor: "var(--app-bg)",
+                          color: "var(--app-fg)",
+                        }}
+                      >
+                        <th className="py-3.5 px-4 font-semibold">Date</th>
+                        <th className="py-3.5 px-4 font-semibold">Recipient Member</th>
+                        <th className="py-3.5 px-4 font-semibold">Payment Source</th>
+                        <th className="py-3.5 px-4 font-semibold">Purpose / Memo</th>
+                        <th className="py-3.5 px-4 font-semibold">Category</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Amount Sent</th>
+                        <th className="py-3.5 px-4 font-semibold text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: "var(--app-border-subtle)" }}>
+                      {filteredFamilyHistory.map((item) => {
+                        // Match to registered member
+                        const matchedMember = members.find((m) => {
+                          const t = (item.title || "").toLowerCase();
+                          const n = (item.notes || "").toLowerCase();
+                          const mName = m.name.toLowerCase();
+                          return t.includes(mName) || n.includes(mName);
+                        });
+
+                        const cleanName = (matchedMember?.name || item.title || "Family Member")
+                          .replace(/^Money sent to\s*/i, "")
+                          .replace(/[\(\)\[\]\{\}\.,_-]/g, " ")
+                          .trim();
+
+                        const initials =
+                          cleanName
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .map((p) => p[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase() || "FM";
+
+                        const recipientName =
+                          matchedMember?.name ||
+                          item.title?.replace(/^Money sent to\s*/i, "") ||
+                          "Family Support";
+
+                        const relBadge = matchedMember ? getRelationshipBadge(matchedMember.relationship) : null;
+                        const account = accounts.find((a) => a.id === item.account_id);
+                        const relDateTag = getRelativeDateTag(item.expense_date);
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className="group transition-colors hover:bg-[var(--app-card-hover)]"
+                          >
+                            {/* Date Column */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-mono text-xs font-semibold">
+                                {formatHistoryDate(item.expense_date)}
+                              </div>
+                              {relDateTag && (
+                                <span
+                                  className="inline-block mt-0.5 text-[9px] font-mono px-1.5 py-0.2 rounded border opacity-60"
+                                  style={{ borderColor: "var(--app-border-subtle)" }}
+                                >
+                                  {relDateTag}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Recipient Member */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-xs flex-shrink-0"
+                                  style={{
+                                    backgroundColor: matchedMember?.avatar_color || "#10B981",
+                                  }}
+                                >
+                                  {initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-sm tracking-tight truncate capitalize">
+                                    {recipientName}
+                                  </div>
+                                  {relBadge && (
+                                    <div className="mt-0.5">
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border"
+                                        style={{
+                                          backgroundColor: relBadge.bg,
+                                          color: relBadge.text,
+                                          borderColor: relBadge.border,
+                                        }}
+                                      >
+                                        {relBadge.label}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Payment Source Account */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <BankLogo name={account?.name || "Cash in Hand"} size={20} />
+                                <div>
+                                  <div className="font-semibold text-xs truncate max-w-[150px]">
+                                    {account?.name || "Direct / Cash"}
+                                  </div>
+                                  <div className="text-[10px] font-mono opacity-50 uppercase">
+                                    {account?.type || "Cash"}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Purpose / Notes */}
+                            <td className="py-3.5 px-4 max-w-[220px]">
+                              <p className="text-xs truncate font-sans" title={item.notes || item.title || ""}>
+                                {item.notes || item.title || "Family support transfer"}
+                              </p>
+                            </td>
+
+                            {/* Category */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border"
+                                style={{
+                                  backgroundColor: "rgba(251, 146, 60, 0.1)",
+                                  color: "#fb923c",
+                                  borderColor: "rgba(251, 146, 60, 0.25)",
+                                }}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                                Family & Child Care
+                              </span>
+                            </td>
+
+                            {/* Amount Sent */}
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <span className="font-mono font-bold text-sm text-emerald-400">
+                                {formatINR(item.amount)}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <button
+                                onClick={() => handleDeleteTransfer(item.id, item.title, item.amount)}
+                                className="w-7 h-7 rounded-lg border inline-flex items-center justify-center opacity-50 hover:opacity-100 text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all"
+                                style={{ borderColor: "var(--app-border-subtle)" }}
+                                title="Delete transfer record"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1551,17 +2366,21 @@ export default function FamilySection() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="recordInExpensesCheck"
-                  checked={recordInExpenses}
-                  onChange={(e) => setRecordInExpenses(e.target.checked)}
-                  className="rounded border-zinc-700 text-emerald-500 focus:ring-0 cursor-pointer"
-                />
-                <label htmlFor="recordInExpensesCheck" className="text-xs opacity-80 cursor-pointer select-none">
-                  Record in Expenses ledger as <strong>Family & Child Care</strong>
-                </label>
+              <div
+                className="p-3 rounded-xl border flex items-start gap-2.5 text-xs"
+                style={{
+                  backgroundColor: "rgba(16, 185, 129, 0.08)",
+                  borderColor: "rgba(16, 185, 129, 0.2)",
+                  color: "var(--app-fg)",
+                }}
+              >
+                <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-[11px] leading-relaxed">
+                  <span className="font-semibold text-emerald-400 block">Managed Exclusively in Family Support</span>
+                  <span className="opacity-70">
+                    This transfer will deduct from your chosen payment account and be tracked directly under Transfer History, keeping your personal Expenses ledger clean.
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t" style={{ borderColor: "var(--app-border-subtle)" }}>

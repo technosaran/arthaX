@@ -24,6 +24,9 @@ import {
   Zap,
   Copy,
   Sparkles,
+  AlertTriangle,
+  Trash2,
+  X,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -71,7 +74,7 @@ interface DataCounts {
   total: number;
 }
 
-type SettingsTab = "profile" | "appearance" | "statements" | "security";
+type SettingsTab = "profile" | "appearance" | "statements" | "security" | "danger";
 
 export default function SettingsSection() {
   const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
@@ -83,6 +86,11 @@ export default function SettingsSection() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [cacheSyncing, setCacheSyncing] = useState(false);
   const [copiedVaultId, setCopiedVaultId] = useState(false);
+
+  // Master Data Wipe State
+  const [wipeModalOpen, setWipeModalOpen] = useState(false);
+  const [wipeConfirmationInput, setWipeConfirmationInput] = useState("");
+  const [isWiping, setIsWiping] = useState(false);
 
   const [counts, setCounts] = useState<DataCounts>({
     accounts: 0,
@@ -315,6 +323,135 @@ export default function SettingsSection() {
       showToast("Error", "Could not refresh data.", "error");
     } finally {
       setCacheSyncing(false);
+    }
+  };
+
+  // Master Wipe Entire Workspace Data Handler
+  const handleMasterWipe = async () => {
+    if (wipeConfirmationInput.trim().toUpperCase() !== "DELETE") {
+      showToast("Confirmation Required", 'Please type "DELETE" to confirm data wipe.', "error");
+      return;
+    }
+
+    setIsWiping(true);
+    try {
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch("/api/v1/workspace/wipe", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ confirmation: "DELETE" }),
+      });
+
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok || !result.success) {
+        // Fallback: direct client-side delete if API call returned non-200
+        if (user?.id) {
+          await supabase.from("transfers").delete().eq("user_id", user.id);
+          await supabase.from("recurring_rules").delete().eq("user_id", user.id);
+          await supabase.from("expenses").delete().eq("user_id", user.id);
+          await supabase.from("income").delete().eq("user_id", user.id);
+          await supabase.from("budgets").delete().eq("user_id", user.id);
+          await supabase.from("family_responsibilities").delete().eq("user_id", user.id);
+          await supabase.from("family_goals").delete().eq("user_id", user.id);
+          await supabase.from("family_emergency_vault").delete().eq("user_id", user.id);
+          await supabase.from("family_members").delete().eq("user_id", user.id);
+
+          const { data: accs } = await supabase.from("accounts").select("id, name, last_four").eq("user_id", user.id);
+          const cashAcc = accs?.find((a) => a.last_four === "CASH" || a.name.toLowerCase() === "cash in hand");
+          if (accs && accs.length > 0) {
+            const others = accs.filter((a) => a.id !== cashAcc?.id);
+            if (others.length > 0) {
+              await supabase.from("accounts").delete().in("id", others.map((a) => a.id));
+            }
+          }
+          if (cashAcc) {
+            await supabase.from("accounts").update({ balance: 0.0 }).eq("id", cashAcc.id);
+          } else {
+            await supabase.from("accounts").insert({
+              user_id: user.id,
+              name: "Cash in Hand",
+              type: "Liquid Cash",
+              balance: 0.0,
+              last_four: "CASH",
+            });
+          }
+        } else {
+          throw new Error(result.error || "Failed to wipe workspace data");
+        }
+      }
+
+      // Purge all multi-tier caches
+      const keysToPurge = [
+        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.INCOME),
+        getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
+        getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
+        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+        getUserCacheKey(userId, CACHE_KEYS.FAMILY_MEMBERS),
+        getUserCacheKey(userId, CACHE_KEYS.FAMILY_RESPONSIBILITIES),
+        getUserCacheKey(userId, CACHE_KEYS.SETTINGS),
+        "arthax:cache:accounts",
+        "arthax:cache:ledger",
+        "arthax:cache:portfolio",
+      ];
+      await invalidateCacheKeys(keysToPurge);
+
+      // Clear local storage keys
+      try {
+        if (typeof window !== "undefined") {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && (k.startsWith("arthax_c_") || k === "arthax_cached_profile")) {
+              keysToRemove.push(k);
+            }
+          }
+          keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+        }
+      } catch {}
+
+      // Reset local counts state immediately
+      setCounts({
+        accounts: 1,
+        income: 0,
+        expenses: 0,
+        budgets: 0,
+        ledger: 0,
+        total: 1,
+      });
+
+      setWipeModalOpen(false);
+      setWipeConfirmationInput("");
+
+      showToast("Workspace Wiped", "All financial records and accounts have been permanently erased.", "success");
+
+      // Refresh telemetry counts and profile
+      await refreshCounts();
+      if (refreshProfile) await refreshProfile();
+
+      // Dispatch universal event so all components react
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("arthax:workspace_wiped"));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not complete master wipe.";
+      console.error("Master wipe failed:", err);
+      showToast("Wipe Failed", msg, "error");
+    } finally {
+      setIsWiping(false);
     }
   };
 
@@ -814,6 +951,78 @@ export default function SettingsSection() {
     },
   ];
 
+  const renderDangerZoneCard = () => (
+    <div
+      className="rounded-2xl border p-6 sm:p-7 space-y-5 shadow-sm transition-all"
+      style={{
+        backgroundColor: "var(--app-card)",
+        borderColor: "rgba(244, 63, 94, 0.3)",
+      }}
+    >
+      <div
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b"
+        style={{ borderColor: "rgba(244, 63, 94, 0.2)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle size={16} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold tracking-tight text-rose-400">Danger Zone: Master Data Wipe</h2>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400">
+                Irreversible
+              </span>
+            </div>
+            <p className="text-xs opacity-60 mt-0.5">
+              Permanently wipe all transactions, accounts, budgets, and family vault data.
+            </p>
+          </div>
+        </div>
+
+        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full border border-rose-500/30 text-rose-400 bg-rose-500/10 self-start sm:self-auto">
+          {counts.total} Total Records
+        </span>
+      </div>
+
+      <div
+        className="p-4 sm:p-5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        style={{
+          backgroundColor: "var(--app-bg)",
+          borderColor: "rgba(244, 63, 94, 0.2)",
+        }}
+      >
+        <div className="space-y-1.5 max-w-xl">
+          <div className="font-bold text-xs text-rose-300 flex items-center gap-2">
+            <span>Wipe Entire Data & Factory Reset Workspace</span>
+          </div>
+          <p className="text-xs opacity-70 leading-relaxed">
+            Deletes all expenses, income streams, transfers, category budgets, family records, and custom accounts. Liquid Cash will reset to ₹0.00. This action is catastrophic and cannot be undone.
+          </p>
+
+          <div className="flex items-center gap-3 pt-1 text-[11px] font-mono opacity-60 flex-wrap">
+            <span>• {counts.ledger} Transactions</span>
+            <span>• {counts.accounts} Accounts</span>
+            <span>• {counts.budgets} Budgets</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setWipeConfirmationInput("");
+            setWipeModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl border border-rose-500/40 hover:border-rose-500 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-rose-100 transition-all cursor-pointer shadow-sm active:scale-95 flex-shrink-0 self-start sm:self-center"
+          title="Open master delete wipe confirmation"
+        >
+          <Trash2 size={14} className="text-rose-400" />
+          <span>Wipe Entire Data</span>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <main
       className="flex-1 h-full px-3.5 sm:px-6 md:px-8 py-5 sm:py-8 overflow-y-auto transition-colors select-none"
@@ -941,6 +1150,22 @@ export default function SettingsSection() {
           >
             <ShieldCheck size={14} className={activeTab === "security" ? "text-emerald-400" : ""} />
             <span>Vault Security</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("danger")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "danger"
+                ? "shadow-sm text-rose-400 border border-rose-500/40"
+                : "opacity-60 hover:opacity-100 hover:text-rose-400"
+            }`}
+            style={{
+              backgroundColor: activeTab === "danger" ? "rgba(244, 63, 94, 0.12)" : "transparent",
+            }}
+          >
+            <AlertTriangle size={14} className={activeTab === "danger" ? "text-rose-400" : "text-rose-400/80"} />
+            <span className={activeTab === "danger" ? "text-rose-400 font-bold" : ""}>Danger Zone</span>
           </button>
         </div>
 
@@ -1575,6 +1800,9 @@ export default function SettingsSection() {
                 </div>
               </div>
             </div>
+
+            {/* Danger Zone Wipe within Statements & Data */}
+            {renderDangerZoneCard()}
           </div>
         )}
 
@@ -1673,9 +1901,192 @@ export default function SettingsSection() {
                 </button>
               </div>
             </div>
+
+            {/* Danger Zone Wipe within Vault Security */}
+            {renderDangerZoneCard()}
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 5: DANGER ZONE (MASTER DATA WIPE)                          */}
+        {/* ============================================================== */}
+        {activeTab === "danger" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {renderDangerZoneCard()}
+
+            {/* Explanatory Safety & Backup Recommendations Card */}
+            <div
+              className="rounded-2xl border p-6 space-y-4 shadow-sm text-xs"
+              style={{
+                backgroundColor: "var(--app-card)",
+                borderColor: "var(--app-border-subtle)",
+              }}
+            >
+              <div className="flex items-center gap-2.5 font-bold text-sm">
+                <ShieldCheck size={16} className="text-emerald-400" />
+                <span>Safeguards & Export Options Prior to Deletion</span>
+              </div>
+              <p className="opacity-70 leading-relaxed">
+                Before initiating a master wipe, we strongly encourage generating an offline JSON backup or downloading your consolidated CSV statements. Once the wipe is processed, all data will be permanently expunged from the PostgreSQL database and Redis caching layer.
+              </p>
+              <div className="flex items-center gap-3 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleExportAllJSON}
+                  disabled={exportingTarget !== null}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <Download size={13} />
+                  <span>Download Complete JSON Backup</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportMasterPDF}
+                  disabled={exportingTarget !== null}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <FileText size={13} />
+                  <span>Download Master Portfolio PDF</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* ============================================================== */}
+      {/* POPUP CONFIRMATION MODAL: MASTER DATA WIPE SAFEGUARD           */}
+      {/* ============================================================== */}
+      {wipeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-lg rounded-2xl border p-6 sm:p-7 space-y-5 shadow-2xl relative animate-in zoom-in-95 duration-200 border-rose-500/40"
+            style={{
+              backgroundColor: "var(--app-card)",
+              color: "var(--app-fg)",
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 pb-3 border-b border-[var(--app-border-subtle)]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold tracking-tight text-rose-400">Master Wipe: Erase All Data</h3>
+                  <p className="text-xs opacity-70">This action is permanent and cannot be undone.</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => !isWiping && setWipeModalOpen(false)}
+                disabled={isWiping}
+                className="p-1 rounded-lg border border-[var(--app-border-subtle)] opacity-60 hover:opacity-100 transition-opacity disabled:opacity-30 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Warning Details Callout */}
+            <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2 text-xs">
+              <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                <span>Are you absolutely certain?</span>
+              </div>
+              <p className="opacity-80 leading-relaxed">
+                You are about to execute a master wipe on your personal finance vault. The following records will be permanently deleted:
+              </p>
+              <ul className="list-disc list-inside space-y-1 opacity-90 pl-1 font-mono text-[11px] text-rose-200">
+                <li>All Expenses, Receipts & Outflows ({counts.expenses} items)</li>
+                <li>All Income Streams & Inflows ({counts.income} items)</li>
+                <li>All Account Transfers & Recurring Automation Rules</li>
+                <li>All Category Budgets & Pace Targets ({counts.budgets} items)</li>
+                <li>All Family Members, Goals & Emergency Vault Records</li>
+                <li>All Linked Accounts (Liquid Cash will reset to ₹0.00)</li>
+                <li>Complete Financial Audit History</li>
+              </ul>
+            </div>
+
+            {/* Offline Snapshot Backup Suggestion */}
+            <div
+              className="p-3 rounded-xl border flex items-center justify-between gap-3 text-xs"
+              style={{
+                borderColor: "var(--app-border-subtle)",
+                backgroundColor: "var(--app-bg)",
+              }}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-xs">Recommended: Download Backup</div>
+                <div className="text-[11px] opacity-60 truncate">Save a complete JSON snapshot prior to wiping.</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportAllJSON}
+                disabled={exportingTarget !== null || isWiping}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95 disabled:opacity-40"
+              >
+                {exportingTarget === "all_json" ? (
+                  <Loader2 size={12} className="animate-spin text-emerald-400" />
+                ) : (
+                  <Download size={12} />
+                )}
+                <span>Download JSON</span>
+              </button>
+            </div>
+
+            {/* Type Confirmation Safeguard */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider block opacity-75">
+                To confirm, type <span className="font-mono text-rose-400 font-extrabold select-all">DELETE</span> in the box below:
+              </label>
+              <input
+                type="text"
+                value={wipeConfirmationInput}
+                onChange={(e) => setWipeConfirmationInput(e.target.value)}
+                disabled={isWiping}
+                placeholder='Type "DELETE"'
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-rose-500/40 border-rose-500/30 transition-all uppercase"
+                style={{
+                  backgroundColor: "var(--app-bg)",
+                  color: "var(--app-fg)",
+                }}
+                autoFocus
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setWipeModalOpen(false)}
+                disabled={isWiping}
+                className="px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--app-border)] hover:bg-[var(--app-bg)] transition-all cursor-pointer opacity-80 hover:opacity-100 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleMasterWipe}
+                disabled={wipeConfirmationInput.trim().toUpperCase() !== "DELETE" || isWiping}
+                className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl border border-rose-500/50 bg-rose-600 hover:bg-rose-700 text-white transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {isWiping ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-white" />
+                    <span>Wiping Workspace Data...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} className="text-white" />
+                    <span>Permanently Wipe Everything</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
