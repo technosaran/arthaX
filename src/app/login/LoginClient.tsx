@@ -418,7 +418,7 @@ export default function LoginClient() {
             )}
 
             {/* Authentication Form */}
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-3">
               {/* Full Name Field (Sign Up Only) */}
               {mode === "signup" && (
                 <Input

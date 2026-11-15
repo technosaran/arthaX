@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Banknote, Pencil, Trash2 } from "lucide-react";
+import { Banknote, Pencil, Trash2, TrendingUp } from "lucide-react";
 import BankLogo from "@/components/BankLogo";
 
 export interface AccountData {
@@ -25,7 +25,7 @@ export type CardThemeId =
   | "amex-gold"
   | "titanium-slate";
 
-export type CardNetworkType = "visa" | "mastercard" | "rupay" | "cash" | "amex";
+export type CardNetworkType = "visa" | "mastercard" | "rupay" | "cash" | "amex" | "demat";
 
 export interface AppleWalletCardTheme {
   id: CardThemeId;
@@ -53,7 +53,7 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
 
   // Helper to attach network override
   const withNetwork = (theme: AppleWalletCardTheme): AppleWalletCardTheme => {
-    if (overrideNetwork && theme.network !== "cash") {
+    if (overrideNetwork && theme.network !== "cash" && theme.network !== "demat") {
       return { ...theme, network: overrideNetwork };
     }
     return theme;
@@ -167,20 +167,21 @@ export function getAppleWalletTheme(name: string, type: string): AppleWalletCard
     clean.includes("upstox") ||
     clean.includes("angel") ||
     cleanType.includes("trading") ||
-    cleanType.includes("demat")
+    cleanType.includes("demat") ||
+    cleanType.includes("investment")
   ) {
-    return withNetwork({
+    return {
       id: "demat-cyan",
       name: "Brokerage Obsidian",
-      bgGradient: "linear-gradient(145deg, #091724 0%, #11253a 48%, #060f18 100%)",
-      ambientGlow: "radial-gradient(circle at 82% 18%, rgba(6, 182, 212, 0.28) 0%, transparent 62%)",
-      borderColor: "rgba(6, 182, 212, 0.32)",
+      bgGradient: "linear-gradient(145deg, #071524 0%, #0c2339 48%, #05101a 100%)",
+      ambientGlow: "radial-gradient(circle at 82% 18%, rgba(6, 182, 212, 0.32) 0%, transparent 62%)",
+      borderColor: "rgba(6, 182, 212, 0.35)",
       chipVariant: "titanium",
-      network: "visa",
+      network: "demat",
       accentColor: "#06b6d4",
-      badgeText: "TRADING & DEMAT",
-      subLabel: "PORTFOLIO ASSETS",
-    });
+      badgeText: "INVESTMENT • DEMAT",
+      subLabel: "TRADING & ASSETS",
+    };
   }
 
   // 8. Amex / American Express
@@ -406,9 +407,21 @@ function CashBadge() {
   );
 }
 
+function DematBadge() {
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 backdrop-blur-md select-none shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.9)] animate-pulse" />
+      <span className="text-[9px] font-mono font-bold tracking-widest text-cyan-300 uppercase">
+        CDSL • NSE • BSE
+      </span>
+    </div>
+  );
+}
+
 export interface AppleWalletCardProps {
   account: AccountData;
   isCash?: boolean;
+  isDemat?: boolean;
   onEditCash?: (acc: AccountData) => void;
   onDelete?: (id: string) => void;
   formatCurrency?: (val: number) => string;
@@ -424,6 +437,7 @@ export interface AppleWalletCardProps {
 export default function AppleWalletCard({
   account,
   isCash = false,
+  isDemat = false,
   onEditCash,
   onDelete,
   formatCurrency,
@@ -437,6 +451,15 @@ export default function AppleWalletCard({
 }: AppleWalletCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const theme = getAppleWalletTheme(account.name, account.type);
+
+  const computedIsDemat =
+    isDemat ||
+    theme.network === "demat" ||
+    theme.id === "demat-cyan" ||
+    account.name.toLowerCase().includes("zerodha") ||
+    account.type.toLowerCase().includes("investment") ||
+    account.type.toLowerCase().includes("trading") ||
+    account.type.toLowerCase().includes("demat");
 
   const formatINR = (val: number) => {
     if (formatCurrency) return formatCurrency(val);
@@ -567,7 +590,11 @@ export default function AppleWalletCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] sm:text-[10px] font-mono tracking-[0.2em] uppercase font-semibold text-white/55">
-                {isCash ? "CASH IN HAND" : `DEBIT • ${account.type}`}
+                {isCash
+                  ? "CASH IN HAND"
+                  : computedIsDemat
+                  ? "INVESTMENT • DEMAT & TRADING"
+                  : `DEBIT • ${account.type}`}
               </span>
             </div>
             <div className="text-base sm:text-lg font-bold tracking-tight text-white capitalize mt-0.5 truncate max-w-[160px] sm:max-w-[210px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
@@ -584,7 +611,7 @@ export default function AppleWalletCard({
               FILTERED
             </span>
           )}
-          {!isCash && <ContactlessWave className="text-white/60 drop-shadow-sm" />}
+          {!isCash && !computedIsDemat && <ContactlessWave className="text-white/60 drop-shadow-sm" />}
 
           {isCash ? (
             <button
@@ -622,19 +649,40 @@ export default function AppleWalletCard({
               <Banknote size={15} />
               <span className="text-[9px] font-mono tracking-widest font-bold uppercase">PHYSICAL CURRENCY</span>
             </div>
+          ) : computedIsDemat ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 shadow-sm">
+              <TrendingUp size={14} className="text-cyan-400" />
+              <span className="text-[9px] font-mono tracking-widest font-bold uppercase">BROKERAGE DEMAT</span>
+            </div>
           ) : (
             <EMVChip variant={theme.chipVariant} />
           )}
 
           <span className="text-[9px] font-mono tracking-[0.24em] uppercase text-white/40 font-medium">
-            {isCash ? "LIQUID TENDER" : "SECURE CONTACTLESS"}
+            {isCash
+              ? "LIQUID TENDER"
+              : computedIsDemat
+              ? "CENTRAL DEPOSITORY • CDSL"
+              : "SECURE CONTACTLESS"}
           </span>
         </div>
 
-        {/* Card Number Mask */}
+        {/* Card Number Mask / Demat ID */}
         <div className="font-mono text-xs sm:text-sm tracking-[0.22em] font-medium text-white/85 select-all drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] mt-2.5">
           {isCash ? (
             <span>••••  ••••  LIQUID  CASH</span>
+          ) : computedIsDemat ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] tracking-wider font-semibold text-cyan-300/80 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 font-mono">
+                CLIENT ID
+              </span>
+              <span className="font-mono font-bold tracking-widest text-white">
+                {account.last_four || "HXH648"}
+              </span>
+              <span className="text-[10px] font-mono tracking-wider text-white/40">
+                • BO ID 12081600
+              </span>
+            </div>
           ) : (
             <span>••••  ••••  ••••  {account.last_four || "8821"}</span>
           )}
@@ -645,7 +693,7 @@ export default function AppleWalletCard({
       <div className="relative z-10 flex items-end justify-between pt-2 border-t border-white/10">
         <div>
           <span className="text-[9px] uppercase font-mono tracking-[0.18em] text-white/50 block font-semibold">
-            AVAILABLE BALANCE
+            {computedIsDemat ? "TRADING MARGIN BALANCE" : "AVAILABLE BALANCE"}
           </span>
           <span className="text-lg sm:text-2xl font-bold font-mono tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
             {formatINR(account.balance)}
@@ -656,6 +704,8 @@ export default function AppleWalletCard({
           {/* Authentic Network Badge */}
           {theme.network === "cash" ? (
             <CashBadge />
+          ) : theme.network === "demat" ? (
+            <DematBadge />
           ) : theme.network === "rupay" ? (
             <RuPayLogo />
           ) : theme.network === "mastercard" ? (

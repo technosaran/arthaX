@@ -1028,116 +1028,118 @@ export default function BudgetsSection() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingBudget ? "Edit Category Budget" : "Set Category Spending Limit"}
-        description={`Target Period: ${monthDisplayTitle}`}
-        size="lg"
+        title={editingBudget ? "Edit Budget" : "Set Budget"}
+        description={`Period: ${monthDisplayTitle}`}
+        size="md"
       >
-        <form onSubmit={handleSubmitBudget} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1.5">
-              Category
-            </label>
-            <Select
-              value={isCustomCategory ? "custom" : formCategory}
-              onChange={(e) => {
-                if (e.target.value === "custom") {
-                  setIsCustomCategory(true);
-                } else {
-                  setIsCustomCategory(false);
-                  setFormCategory(e.target.value);
-                  const found = BUDGET_CATEGORIES.find((c) => c.name === e.target.value);
-                  if (found && !formAmount) {
-                    setFormAmount(found.defaultAmount.toString());
+        <form onSubmit={handleSubmitBudget} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <Select
+                label="Category"
+                value={isCustomCategory ? "custom" : formCategory}
+                onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    setIsCustomCategory(true);
+                  } else {
+                    setIsCustomCategory(false);
+                    setFormCategory(e.target.value);
+                    const found = BUDGET_CATEGORIES.find((c) => c.name === e.target.value);
+                    if (found && !formAmount) {
+                      setFormAmount(found.defaultAmount.toString());
+                    }
                   }
-                }
-              }}
-            >
-              {BUDGET_CATEGORIES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-              <option value="custom">+ Custom Category Name...</option>
-            </Select>
-
-            {isCustomCategory && (
-              <div className="mt-2">
-                <Input
-                  placeholder="Enter custom category name (e.g. Photography, Vintage)"
-                  value={customCategoryName}
-                  onChange={(e) => setCustomCategoryName(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-          </div>
-
-          <div>
-            <Input
-              label="Monthly Budget Ceiling (₹ INR)"
-              type="number"
-              step="1"
-              min="1"
-              placeholder="e.g. 10000"
-              value={formAmount}
-              onChange={(e) => setFormAmount(e.target.value)}
-              required
-              leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
-            />
-
-            {/* Quick Increment Chips */}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {[1000, 5000, 10000, 25000].map((inc) => (
-                <button
-                  key={inc}
-                  type="button"
-                  onClick={() => {
-                    const curr = parseFloat(formAmount) || 0;
-                    setFormAmount((curr + inc).toString());
-                  }}
-                  className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:border-[var(--app-border)] cursor-pointer"
-                >
-                  +{formatINR(inc)}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormAmount("")}
-                className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--app-border-subtle)] text-[var(--app-muted)] hover:text-rose-400 cursor-pointer"
+                }}
               >
-                Clear
-              </button>
+                {BUDGET_CATEGORIES.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="custom">+ Custom Category...</option>
+              </Select>
+
+              {isCustomCategory && (
+                <div className="mt-1.5">
+                  <Input
+                    placeholder="Category name"
+                    value={customCategoryName}
+                    onChange={(e) => setCustomCategoryName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Input
+                label="Budget Limit (₹ INR) *"
+                type="number"
+                step="1"
+                min="1"
+                placeholder="e.g. 10000"
+                value={formAmount}
+                onChange={(e) => setFormAmount(e.target.value)}
+                required
+                leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
+              />
+
+              {/* Quick Increment Chips */}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {[5000, 10000, 25000].map((inc) => (
+                  <button
+                    key={inc}
+                    type="button"
+                    onClick={() => {
+                      const curr = parseFloat(formAmount) || 0;
+                      setFormAmount((curr + inc).toString());
+                    }}
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:border-[var(--app-border)] cursor-pointer"
+                  >
+                    +{formatINR(inc)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setFormAmount("")}
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--app-border-subtle)] text-[var(--app-muted)] hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5 text-xs">
-              <span className="font-semibold text-[var(--app-fg)]">
-                Warning Alert Threshold
-              </span>
-              <span className="font-mono font-bold text-amber-400">
-                {formThreshold}% of ceiling
-              </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <div className="flex items-center justify-between mb-1 text-[11px]">
+                <span className="font-semibold text-[var(--app-fg)]">
+                  Alert Threshold
+                </span>
+                <span className="font-mono font-bold text-amber-400">
+                  {formThreshold}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="50"
+                max="100"
+                step="5"
+                value={formThreshold}
+                onChange={(e) => setFormThreshold(e.target.value)}
+                className="w-full accent-amber-400 cursor-pointer h-1.5"
+              />
             </div>
-            <input
-              type="range"
-              min="50"
-              max="100"
-              step="5"
-              value={formThreshold}
-              onChange={(e) => setFormThreshold(e.target.value)}
-              className="w-full accent-amber-400 cursor-pointer"
+
+            <Input
+              label="Notes (Optional)"
+              placeholder="e.g. Monthly limit"
+              value={formNotes}
+              onChange={(e) => setFormNotes(e.target.value)}
             />
           </div>
 
-          <Input
-            label="Internal Notes (Optional)"
-            placeholder="e.g. Monthly limit for dining out, Swiggy orders, and weekend brunches"
-            value={formNotes}
-            onChange={(e) => setFormNotes(e.target.value)}
-          />
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="ghost"
@@ -1152,7 +1154,7 @@ export default function BudgetsSection() {
               size="sm"
               loading={submitting}
             >
-              {editingBudget ? "Save Changes" : "Set Budget Limit"}
+              {editingBudget ? "Save Changes" : "Set Budget"}
             </Button>
           </div>
         </form>
@@ -1162,8 +1164,8 @@ export default function BudgetsSection() {
       <Modal
         isOpen={!!deleteConfirmationId}
         onClose={() => setDeleteConfirmationId(null)}
-        title="Remove Category Budget?"
-        description="Are you sure you want to delete this category budget limit? Recorded transactions will remain untouched."
+        title="Remove Budget?"
+        description="Delete this category budget limit? Transactions remain untouched."
         size="sm"
       >
         <div className="flex items-center justify-end gap-2 pt-2">

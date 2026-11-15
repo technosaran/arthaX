@@ -890,15 +890,14 @@ export default function LedgerSection() {
         isOpen={!!selectedVoucher}
         onClose={() => setSelectedVoucher(null)}
         title="Transaction Details"
-        description="Double-entry reconciliation voucher"
-        size="md"
+        size="sm"
         footer={
           <div className="flex items-center justify-between w-full">
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
               className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-              icon={<Trash2 size={13} />}
+              icon={<Trash2 size={12} />}
               onClick={() => selectedVoucher && promptDeleteEntry(selectedVoucher)}
             >
               Delete & Reverse
@@ -906,7 +905,7 @@ export default function LedgerSection() {
 
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={() => setSelectedVoucher(null)}
             >
               Close
@@ -915,49 +914,49 @@ export default function LedgerSection() {
         }
       >
         {selectedVoucher && (
-          <div className="space-y-3.5">
+          <div className="space-y-2.5">
             {/* Voucher Amount Badge */}
             <div
-              className="p-3.5 rounded-xl border text-center space-y-1"
+              className="p-2.5 rounded-xl border text-center space-y-0.5"
               style={{
                 borderColor: "var(--app-border-subtle)",
                 backgroundColor: "var(--app-bg)",
               }}
             >
-              <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+              <div className="text-[9px] font-bold uppercase tracking-wider opacity-60">
                 {selectedVoucher.type === "CREDIT" ? "Credit Inflow" : "Debit Outflow"}
               </div>
               <div
-                className={`text-2xl sm:text-3xl font-extrabold font-mono tabular-nums ${
+                className={`text-xl sm:text-2xl font-extrabold font-mono tabular-nums ${
                   selectedVoucher.type === "CREDIT" ? "text-emerald-400" : "text-rose-400"
                 }`}
               >
                 {selectedVoucher.type === "CREDIT" ? "+" : "-"}
                 {formatINR(selectedVoucher.amount)}
               </div>
-              <div className="flex items-center justify-center gap-2 pt-0.5">
-                <EntityLogo name={selectedVoucher.title} category={selectedVoucher.category} size={22} />
+              <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                <EntityLogo name={selectedVoucher.title} category={selectedVoucher.category} size={18} />
                 <span className="text-xs opacity-80 font-semibold">{selectedVoucher.title}</span>
               </div>
             </div>
 
             {/* Metadata Fields */}
-            <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
-                <span className="opacity-60">Date of Transaction</span>
-                <span className="font-mono font-medium">{formatDateDisplay(selectedVoucher.date)}</span>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between py-0.5 border-b border-[var(--app-border-subtle)]">
+                <span className="opacity-60 text-[11px]">Date</span>
+                <span className="font-mono font-medium text-[11px]">{formatDateDisplay(selectedVoucher.date)}</span>
               </div>
 
-              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
-                <span className="opacity-60">Category</span>
+              <div className="flex items-center justify-between py-0.5 border-b border-[var(--app-border-subtle)]">
+                <span className="opacity-60 text-[11px]">Category</span>
                 <Badge variant="outline">{selectedVoucher.category}</Badge>
               </div>
 
-              <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
-                <span className="opacity-60">Account Linked</span>
+              <div className="flex items-center justify-between py-0.5 border-b border-[var(--app-border-subtle)]">
+                <span className="opacity-60 text-[11px]">Account</span>
                 {selectedVoucher.account ? (
-                  <div className="flex items-center gap-2 font-medium">
-                    <BankLogo name={selectedVoucher.account.name} size={20} />
+                  <div className="flex items-center gap-1.5 font-medium text-[11px]">
+                    <BankLogo name={selectedVoucher.account.name} size={16} />
                     <span>{selectedVoucher.account.name}</span>
                     {selectedVoucher.account.last_four &&
                       selectedVoucher.account.last_four.toUpperCase() !== "CASH" &&
@@ -966,29 +965,29 @@ export default function LedgerSection() {
                       )}
                   </div>
                 ) : (
-                  <span className="opacity-50 italic">None / Unallocated</span>
+                  <span className="opacity-50 italic text-[11px]">None / Unallocated</span>
                 )}
               </div>
 
               {selectedVoucher.frequency && (
-                <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
-                  <span className="opacity-60">Frequency</span>
-                  <span className="font-medium">{selectedVoucher.frequency}</span>
+                <div className="flex items-center justify-between py-0.5 border-b border-[var(--app-border-subtle)]">
+                  <span className="opacity-60 text-[11px]">Frequency</span>
+                  <span className="font-medium text-[11px]">{selectedVoucher.frequency}</span>
                 </div>
               )}
 
               {selectedVoucher.runningBalance !== undefined && (
-                <div className="flex items-center justify-between py-1 border-b border-[var(--app-border-subtle)]">
-                  <span className="opacity-60">Balance Post-Transaction</span>
-                  <span className="font-mono font-bold">{formatINR(selectedVoucher.runningBalance)}</span>
+                <div className="flex items-center justify-between py-0.5 border-b border-[var(--app-border-subtle)]">
+                  <span className="opacity-60 text-[11px]">Running Balance</span>
+                  <span className="font-mono font-bold text-[11px]">{formatINR(selectedVoucher.runningBalance)}</span>
                 </div>
               )}
 
               {selectedVoucher.notes && (
-                <div className="py-1 space-y-1">
-                  <span className="opacity-60 block text-[11px]">Notes & Narration:</span>
+                <div className="py-0.5 space-y-0.5">
+                  <span className="opacity-60 block text-[10px]">Notes:</span>
                   <div
-                    className="p-2.5 rounded-lg border font-mono text-[11px] whitespace-pre-wrap max-h-24 overflow-y-auto leading-relaxed"
+                    className="p-1.5 rounded-lg border font-mono text-[10px] whitespace-pre-wrap max-h-16 overflow-y-auto leading-relaxed"
                     style={{
                       borderColor: "var(--app-border-subtle)",
                       backgroundColor: "var(--app-bg)",
@@ -998,15 +997,6 @@ export default function LedgerSection() {
                   </div>
                 </div>
               )}
-
-              <div className="flex items-center justify-between py-1 opacity-50 text-[10px] font-mono gap-2">
-                <span className="truncate" title={`Voucher ID: ${selectedVoucher.id}`}>
-                  Voucher ID: {selectedVoucher.id.length > 16 ? `${selectedVoucher.id.slice(0, 8)}...${selectedVoucher.id.slice(-4)}` : selectedVoucher.id}
-                </span>
-                <span className="flex-shrink-0 font-semibold tracking-wider">
-                  Source: {selectedVoucher.sourceType.toUpperCase()}
-                </span>
-              </div>
             </div>
           </div>
         )}
@@ -1019,15 +1009,14 @@ export default function LedgerSection() {
           setIsDeleteModalOpen(false);
           setEntryToDelete(null);
         }}
-        title="Delete & Reverse Transaction"
-        description="Permanently delete entry and restore account balance."
-        size="md"
+        title="Delete & Reverse Entry"
+        size="sm"
         footer={
-          <div className="flex items-center justify-end gap-3 w-full">
+          <div className="flex items-center justify-end gap-2 w-full">
             <Button
               type="button"
               variant="outline"
-              size="md"
+              size="sm"
               disabled={deleting}
               onClick={() => {
                 setIsDeleteModalOpen(false);
@@ -1040,60 +1029,47 @@ export default function LedgerSection() {
             <Button
               type="button"
               variant="danger"
-              size="md"
+              size="sm"
               loading={deleting}
-              icon={<Trash2 size={13} />}
+              icon={<Trash2 size={12} />}
               onClick={confirmDeleteAndReverse}
             >
-              Delete & Reverse Balance
+              Delete & Reverse
             </Button>
           </div>
         }
       >
         {entryToDelete && (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             <p className="text-xs opacity-75 leading-relaxed">
-              Are you sure you want to permanently delete{" "}
-              <strong>&ldquo;{entryToDelete.title}&rdquo;</strong> (
+              Delete <strong>&ldquo;{entryToDelete.title}&rdquo;</strong> (
               <span className="font-mono font-bold">{formatINR(entryToDelete.amount)}</span>) from the ledger?
             </p>
 
             {/* Reversal Notice */}
-            {entryToDelete.account ? (
+            {entryToDelete.account && (
               <div
-                className="p-3.5 rounded-xl border space-y-1.5 text-xs"
+                className="p-2.5 rounded-xl border space-y-1 text-xs"
                 style={{
                   borderColor: "var(--app-border-subtle)",
                   backgroundColor: "var(--app-bg)",
                 }}
               >
-                <div className="flex items-center gap-2 font-bold">
-                  <RotateCcw size={14} className={entryToDelete.type === "DEBIT" ? "text-emerald-400" : "text-amber-400"} />
+                <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                  <RotateCcw size={12} className={entryToDelete.type === "DEBIT" ? "text-emerald-400" : "text-amber-400"} />
                   <span>Automatic Balance Reversal</span>
                 </div>
                 {entryToDelete.type === "DEBIT" ? (
-                  <p className="opacity-80 text-[11px] leading-relaxed">
-                    This was an outflow debit of <span className="font-mono font-bold text-emerald-400">+{formatINR(entryToDelete.amount)}</span>.
-                    Deleting it will <span className="text-emerald-400 font-semibold">refund the money back</span> into{" "}
+                  <p className="opacity-80 text-[10px] leading-relaxed">
+                    Will <span className="text-emerald-400 font-semibold">refund +{formatINR(entryToDelete.amount)}</span> back into{" "}
                     <span className="font-bold">{entryToDelete.account.name}</span>.
                   </p>
                 ) : (
-                  <p className="opacity-80 text-[11px] leading-relaxed">
-                    This was an inflow credit of <span className="font-mono font-bold text-rose-400">-{formatINR(entryToDelete.amount)}</span>.
-                    Deleting it will <span className="text-rose-400 font-semibold">deduct the money back</span> from{" "}
+                  <p className="opacity-80 text-[10px] leading-relaxed">
+                    Will <span className="text-rose-400 font-semibold">deduct -{formatINR(entryToDelete.amount)}</span> from{" "}
                     <span className="font-bold">{entryToDelete.account.name}</span>.
                   </p>
                 )}
-              </div>
-            ) : (
-              <div
-                className="p-3 rounded-xl border text-[11px] opacity-70"
-                style={{
-                  borderColor: "var(--app-border-subtle)",
-                  backgroundColor: "var(--app-bg)",
-                }}
-              >
-                This entry has no linked account. It will be removed from the ledger without affecting account balances.
               </div>
             )}
           </div>

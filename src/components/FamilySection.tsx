@@ -11,6 +11,7 @@ import {
   Mail,
   Send,
   RotateCcw,
+  CheckCircle2,
   FileText,
   Coins,
   Wallet,
@@ -1091,145 +1092,161 @@ export default function FamilySection() {
                   const percentSpent = allowance > 0 ? Math.round((spending / allowance) * 100) : 0;
 
                   return (
-                    <Card
+                    <div
                       key={member.id}
-                      interactive
-                      className="group relative flex flex-col justify-between overflow-hidden"
+                      className="group relative flex flex-col justify-between rounded-2xl sm:rounded-3xl border transition-all duration-300 p-5 sm:p-6 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5"
+                      style={{
+                        backgroundColor: "var(--app-card)",
+                        borderColor: "var(--app-border)",
+                      }}
                     >
+                      {/* Ambient dynamic glow reflecting member's avatar color */}
                       <div
-                        className="absolute -top-24 -right-24 w-48 h-48 rounded-full pointer-events-none opacity-10 blur-3xl transition-opacity group-hover:opacity-25"
-                        style={{ backgroundColor: member.avatar_color || "#10B981" }}
+                        className="absolute -top-20 -right-20 w-48 h-48 rounded-full pointer-events-none opacity-20 blur-3xl transition-opacity duration-500 group-hover:opacity-35"
+                        style={{
+                          background: `radial-gradient(circle, ${member.avatar_color || "#10B981"} 0%, transparent 70%)`,
+                        }}
                       />
+                      {/* Top rim highlight line */}
+                      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
 
-                      <div className="relative z-10">
+                      <div className="relative z-10 space-y-4">
                         {/* Member Header */}
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3.5 min-w-0">
                             <div
-                              className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md flex-shrink-0 ring-1 ring-white/20 transition-transform group-hover:scale-105"
+                              className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold font-mono text-sm text-white shadow-md flex-shrink-0 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105"
                               style={{
-                                background: `linear-gradient(135deg, ${member.avatar_color || "#10B981"}ee, ${member.avatar_color || "#10B981"}88)`,
-                                boxShadow: `0 4px 14px -2px ${(member.avatar_color || "#10B981")}40`,
+                                background: `linear-gradient(135deg, ${member.avatar_color || "#10B981"}, ${member.avatar_color || "#10B981"}aa)`,
+                                boxShadow: `0 8px 18px -4px ${(member.avatar_color || "#10B981")}45`,
                               }}
                             >
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <h3 className="text-base font-extrabold tracking-tight truncate capitalize" title={member.name}>
+                              <h3
+                                className="text-base sm:text-lg font-bold tracking-tight truncate capitalize text-[var(--app-fg)]"
+                                title={member.name}
+                              >
                                 {displayName}
                               </h3>
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <Badge variant={relBadge.variant} dot>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant={relBadge.variant} dot size="xs">
                                   {relBadge.label}
                                 </Badge>
                               </div>
                             </div>
                           </div>
 
-                          {/* Actions */}
+                          {/* Header Action: Discreet Edit */}
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
+                            <button
+                              type="button"
                               title="Edit Member"
                               onClick={() => {
                                 setEditingMember(member);
                                 setMemberModalOpen(true);
                               }}
+                              className="w-8 h-8 rounded-xl flex items-center justify-center text-[var(--app-fg-subtle)] hover:text-[var(--app-fg)] hover:bg-white/[0.08] border border-[var(--app-border-subtle)] transition-all cursor-pointer"
                             >
                               <Pencil size={13} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              title="Remove Member"
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                              onClick={() => handleDeleteMember(member.id, member.name)}
-                            >
-                              <Trash2 size={13} />
-                            </Button>
+                            </button>
                           </div>
                         </div>
 
                         {/* Financial Box */}
                         <div
-                          className="mt-4 p-4 rounded-xl border space-y-3 shadow-xs"
+                          className="p-4 rounded-2xl border space-y-3.5 transition-colors"
                           style={{
-                            backgroundColor: "var(--app-bg)",
+                            backgroundColor: "var(--app-card-subtle)",
                             borderColor: "var(--app-border-subtle)",
                           }}
                         >
                           <div className="flex items-end justify-between gap-2">
                             <div>
-                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--app-fg-subtle)] flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                                 {isAllTime ? "Total Sent" : `Sent in ${monthDisplayTitle}`}
                               </span>
-                              <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400 mt-0.5">
+                              <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400 mt-1 tabular-nums">
                                 {formatINR(spending)}
                               </div>
                             </div>
 
                             <div className="text-right">
-                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider opacity-60 block">
+                              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--app-fg-subtle)] block">
                                 Target Support
                               </span>
-                              <div className="text-sm sm:text-base font-extrabold font-mono tracking-tight opacity-90 mt-0.5">
+                              <div className="text-sm sm:text-base font-bold font-mono tracking-tight text-[var(--app-fg)] opacity-90 mt-1 tabular-nums">
                                 {allowance > 0 ? formatINR(allowance) : "None"}
                               </div>
                             </div>
                           </div>
 
-                          <div className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10">
+                          {/* Progress Bar */}
+                          <div className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10 p-[1px]">
                             <div
                               className="h-full rounded-full transition-all duration-500"
                               style={{
-                                width: `${Math.min(100, percentSpent)}%`,
+                                width: `${allowance > 0 ? Math.min(100, percentSpent) : 0}%`,
                                 background:
-                                  spending > allowance && allowance > 0
-                                    ? "linear-gradient(90deg, #f43f5e, #e11d48)"
-                                    : percentSpent >= 80
+                                  allowance > 0 && spending >= allowance
+                                    ? "linear-gradient(90deg, #10b981, #34d399)"
+                                    : percentSpent >= 75
                                     ? "linear-gradient(90deg, #10b981, #059669)"
                                     : `linear-gradient(90deg, ${member.avatar_color || "#3b82f6"}, #10b981)`,
+                                boxShadow:
+                                  allowance > 0 && spending >= allowance
+                                    ? "0 0 10px rgba(16, 185, 129, 0.4)"
+                                    : "none",
                               }}
                             />
                           </div>
 
+                          {/* Status & Progress Info (Clean, Non-Redundant) */}
                           <div className="flex items-center justify-between text-xs pt-0.5">
-                            <Badge variant="neutral">
-                              {percentSpent}% fulfilled
-                            </Badge>
-                            <span
-                              className="font-mono text-[11px] font-bold"
-                              style={{
-                                color:
-                                  allowance === 0
-                                    ? "inherit"
-                                    : remaining <= 0
-                                    ? "#10b981"
-                                    : "#f59e0b",
-                              }}
-                            >
-                              {allowance === 0
-                                ? "Flexible Support"
-                                : remaining <= 0
-                                ? "Target Met ✓"
-                                : `${formatINR(remaining)} Left`}
-                            </span>
+                            {allowance === 0 ? (
+                              <>
+                                <span className="text-[11px] font-mono text-[var(--app-fg-subtle)]">
+                                  Flexible Support
+                                </span>
+                                <span className="text-[11px] font-mono text-[var(--app-fg-subtle)]">
+                                  No target cap
+                                </span>
+                              </>
+                            ) : spending >= allowance ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                                  <CheckCircle2 size={11} className="text-emerald-400" />
+                                  Target Met
+                                </span>
+                                <span className="font-mono text-[11px] font-semibold text-[var(--app-fg-subtle)]">
+                                  {spending > allowance
+                                    ? `+${formatINR(spending - allowance)} above target (${percentSpent}%)`
+                                    : "100% fulfilled"}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-mono text-[11px] text-[var(--app-fg-subtle)]">
+                                  {percentSpent}% fulfilled
+                                </span>
+                                <span className="font-mono text-[11px] font-bold text-amber-400">
+                                  {formatINR(remaining)} Left
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
 
-                        {/* Notes */}
+                        {/* Notes (Minimal & Clean, No Heavy Box) */}
                         {member.notes && (
                           <div
-                            className="mt-3 px-3 py-2 rounded-xl border flex items-start gap-2 text-xs"
-                            style={{
-                              borderColor: "var(--app-border-subtle)",
-                              backgroundColor: "var(--app-bg)",
-                            }}
+                            className="px-1 flex items-center gap-2 text-xs text-[var(--app-fg-subtle)]"
+                            title={member.notes}
                           >
-                            <FileText size={13} className="text-sky-400 flex-shrink-0 mt-0.5 opacity-80" />
-                            <span className="opacity-80 line-clamp-2 leading-relaxed italic text-[11px]">
+                            <FileText size={12} className="text-sky-400/80 flex-shrink-0" />
+                            <span className="text-[11px] italic truncate opacity-85">
                               &ldquo;{member.notes}&rdquo;
                             </span>
                           </div>
@@ -1237,13 +1254,13 @@ export default function FamilySection() {
 
                         {/* Contact Chips */}
                         {(member.phone || member.email) && (
-                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
                             {member.phone && (
                               <div
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
                                 style={{
                                   borderColor: "var(--app-border-subtle)",
-                                  backgroundColor: "var(--app-bg)",
+                                  backgroundColor: "var(--app-card-subtle)",
                                 }}
                               >
                                 <Phone size={10} className="text-emerald-400" />
@@ -1255,7 +1272,7 @@ export default function FamilySection() {
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
                                 style={{
                                   borderColor: "var(--app-border-subtle)",
-                                  backgroundColor: "var(--app-bg)",
+                                  backgroundColor: "var(--app-card-subtle)",
                                 }}
                               >
                                 <Mail size={10} className="text-sky-400" />
@@ -1266,16 +1283,16 @@ export default function FamilySection() {
                         )}
                       </div>
 
-                      {/* Card Footer: Send Money & Reset */}
+                      {/* Card Footer: Send Money (Full width, No Refresh Button) */}
                       <div
-                        className="relative z-10 pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2"
+                        className="relative z-10 pt-4 mt-4 border-t flex items-center"
                         style={{ borderColor: "var(--app-border-subtle)" }}
                       >
                         <Button
                           variant="primary"
                           size="md"
-                          className="flex-1"
-                          icon={<Send size={13} className="text-emerald-400" />}
+                          className="w-full font-bold shadow-md shadow-emerald-500/15 hover:shadow-emerald-500/25 transition-all justify-center"
+                          icon={<Send size={14} className="text-emerald-200" />}
                           onClick={() => {
                             setTransferMember(member);
                             setTransferAmountInput("");
@@ -1287,20 +1304,8 @@ export default function FamilySection() {
                         >
                           Send Money
                         </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Reset monthly spending counter to ₹0"
-                          onClick={() => {
-                            setResetMember(member);
-                            setResetModalOpen(true);
-                          }}
-                        >
-                          <RotateCcw size={13} />
-                        </Button>
                       </div>
-                    </Card>
+                    </div>
                   );
                 })}
               </div>
@@ -1717,41 +1722,54 @@ export default function FamilySection() {
         isOpen={memberModalOpen}
         onClose={() => setMemberModalOpen(false)}
         title={editingMember ? "Edit Family Member" : "Add Family Member"}
-        description="Set relationship, monthly support target, and contact details."
-        size="lg"
+        size="md"
       >
-        <form onSubmit={handleSaveMember} className="space-y-4">
-          <Input
-            label="Full Name *"
-            name="name"
-            required
-            placeholder="e.g. Amma / Mom, Dad, Priya"
-            defaultValue={editingMember?.name || ""}
-          />
+        <form onSubmit={handleSaveMember} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Full Name *"
+              name="name"
+              required
+              placeholder="e.g. Mom, Dad, Aarav"
+              defaultValue={editingMember?.name || ""}
+            />
 
-          <Select
-            label="Relationship"
-            name="relationship"
-            defaultValue={editingMember?.relationship || "Parent"}
-            options={RELATIONSHIPS.map((rel) => ({ value: rel, label: rel }))}
-          />
+            <Select
+              label="Relationship"
+              name="relationship"
+              defaultValue={editingMember?.relationship || "Parent"}
+              options={RELATIONSHIPS.map((rel) => ({ value: rel, label: rel }))}
+            />
+          </div>
 
-          <Input
-            label="Monthly Support Target / Allowance (₹ INR)"
-            type="number"
-            name="monthly_allowance"
-            step="100"
-            min="0"
-            placeholder="0"
-            defaultValue={editingMember?.monthly_allowance || ""}
-            leftIcon={<span className="font-mono text-xs">₹</span>}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Monthly Allowance (₹ INR)"
+              type="number"
+              name="monthly_allowance"
+              step="100"
+              min="0"
+              placeholder="0"
+              defaultValue={editingMember?.monthly_allowance || ""}
+              leftIcon={<span className="font-mono text-xs">₹</span>}
+            />
 
-          <div>
-            <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
+            <Input
+              label="Phone / UPI Number"
+              type="tel"
+              name="phone"
+              placeholder="+91 98765 43210"
+              defaultValue={editingMember?.phone || ""}
+              leftIcon={<Phone size={12} />}
+            />
+          </div>
+
+          {/* Compact Avatar Color Selector */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+            <span className="text-[11px] font-semibold text-[var(--app-muted)] select-none">
               Avatar Color
-            </label>
-            <div className="flex items-center gap-2 flex-wrap">
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
               {AVATAR_COLORS.map((col) => (
                 <label key={col} className="relative cursor-pointer">
                   <input
@@ -1762,7 +1780,7 @@ export default function FamilySection() {
                     className="peer sr-only"
                   />
                   <div
-                    className="w-6 h-6 rounded-full border-2 peer-checked:ring-2 peer-checked:ring-white transition-all"
+                    className="w-5 h-5 rounded-full border peer-checked:ring-2 peer-checked:ring-emerald-400 peer-checked:scale-110 transition-all"
                     style={{ backgroundColor: col, borderColor: "rgba(255,255,255,0.2)" }}
                   />
                 </label>
@@ -1770,56 +1788,61 @@ export default function FamilySection() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Phone / UPI Number"
-              type="tel"
-              name="phone"
-              placeholder="+91 98765 43210"
-              defaultValue={editingMember?.phone || ""}
-              leftIcon={<Phone size={13} />}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Input
               label="Email (Optional)"
               type="email"
               name="email"
               placeholder="name@example.com"
               defaultValue={editingMember?.email || ""}
-              leftIcon={<Mail size={13} />}
+              leftIcon={<Mail size={12} />}
             />
-          </div>
 
-          <div>
-            <label className="block text-xs uppercase font-mono tracking-wider opacity-70 mb-1.5">
-              Notes / Bank / Transfer Details
-            </label>
-            <textarea
+            <Input
+              label="Notes / Bank Details (Optional)"
               name="notes"
-              rows={2}
-              placeholder="e.g. Monthly medical support, HDFC UPI transfer, or account number"
+              placeholder="e.g. UPI ID or account info"
               defaultValue={editingMember?.notes || ""}
-              className="w-full rounded-xl px-3.5 py-2 text-xs border focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors resize-none"
-              style={{ backgroundColor: "var(--app-bg)", borderColor: "var(--app-border)", color: "var(--app-fg)" }}
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => setMemberModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              loading={submitting}
-            >
-              Save Member
-            </Button>
+          <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
+            {editingMember ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                icon={<Trash2 size={12} />}
+                onClick={() => {
+                  const toDelete = editingMember;
+                  setMemberModalOpen(false);
+                  handleDeleteMember(toDelete.id, toDelete.name);
+                }}
+              >
+                Delete Member
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMemberModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={submitting}
+              >
+                Save Member
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>
@@ -1828,75 +1851,61 @@ export default function FamilySection() {
       <Modal
         isOpen={transferModalOpen && !!transferMember}
         onClose={() => setTransferModalOpen(false)}
-        title={`Log Money Sent to ${transferMember?.name || ""}`}
-        description={`Target: ${formatINR(transferMember?.monthly_allowance || 0)} • Sent: ${formatINR(transferMember?.current_spending || 0)}`}
+        title={`Send Money to ${transferMember?.name || ""}`}
         size="md"
       >
-        <form onSubmit={handleLogTransfer} className="space-y-4">
-          <Input
-            label="Amount Sent (₹ INR) *"
-            type="number"
-            step="1"
-            min="1"
-            placeholder="0"
-            value={transferAmountInput}
-            onChange={(e) => setTransferAmountInput(e.target.value)}
-            required
-            autoFocus
-            leftIcon={<span className="font-mono text-xs">₹</span>}
-          />
+        <form onSubmit={handleLogTransfer} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Amount Sent (₹ INR) *"
+              type="number"
+              step="1"
+              min="1"
+              placeholder="0"
+              value={transferAmountInput}
+              onChange={(e) => setTransferAmountInput(e.target.value)}
+              required
+              autoFocus
+              leftIcon={<span className="font-mono text-xs">₹</span>}
+            />
 
-          <Input
-            label="Transfer Date"
-            type="date"
-            value={transferDate}
-            onChange={(e) => setTransferDate(e.target.value)}
-            leftIcon={<Calendar size={13} />}
-          />
-
-          <Select
-            label="Payment Account"
-            value={transferAccountId}
-            onChange={(e) => setTransferAccountId(e.target.value)}
-            options={[
-              { value: "", label: "Unlinked / Direct Cash" },
-              ...accounts.map((acc) => ({
-                value: acc.id,
-                label: `${acc.name} (${acc.type}) — ${formatINR(acc.balance)}`,
-              })),
-            ]}
-          />
-
-          <Input
-            label="Purpose / Notes"
-            type="text"
-            placeholder="e.g. Monthly maintenance, Medical support, Gift"
-            value={transferNotes}
-            onChange={(e) => setTransferNotes(e.target.value)}
-          />
-
-          <div
-            className="p-3.5 rounded-xl border flex items-start gap-2.5 text-xs"
-            style={{
-              backgroundColor: "rgba(16, 185, 129, 0.08)",
-              borderColor: "rgba(16, 185, 129, 0.2)",
-              color: "var(--app-fg)",
-            }}
-          >
-            <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-            <div className="space-y-0.5 text-[11px] leading-relaxed">
-              <span className="font-semibold text-emerald-400 block">Managed Exclusively in Family Support</span>
-              <span className="opacity-70">
-                This transfer will deduct from your chosen payment account and be tracked directly under Transfer History, keeping your personal Expenses ledger clean.
-              </span>
-            </div>
+            <Input
+              label="Transfer Date"
+              type="date"
+              value={transferDate}
+              onChange={(e) => setTransferDate(e.target.value)}
+              leftIcon={<Calendar size={12} />}
+            />
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Select
+              label="Payment Account"
+              value={transferAccountId}
+              onChange={(e) => setTransferAccountId(e.target.value)}
+              options={[
+                { value: "", label: "Unlinked / Direct Cash" },
+                ...accounts.map((acc) => ({
+                  value: acc.id,
+                  label: `${acc.name} (${formatINR(acc.balance)})`,
+                })),
+              ]}
+            />
+
+            <Input
+              label="Purpose / Notes"
+              type="text"
+              placeholder="e.g. Maintenance, Medical, Gift"
+              value={transferNotes}
+              onChange={(e) => setTransferNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="outline"
-              size="md"
+              size="sm"
               onClick={() => setTransferModalOpen(false)}
             >
               Cancel
@@ -1904,7 +1913,7 @@ export default function FamilySection() {
             <Button
               type="submit"
               variant="primary"
-              size="md"
+              size="sm"
               loading={submitting}
             >
               Record Transfer
@@ -1918,21 +1927,20 @@ export default function FamilySection() {
         isOpen={resetModalOpen && !!resetMember}
         onClose={() => setResetModalOpen(false)}
         title="Reset Monthly Cycle"
-        description="Reset the monthly spending counter back to ₹0."
         size="sm"
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <p className="text-xs opacity-75 leading-relaxed">
-            Resetting will set <strong>{resetMember?.name}&apos;s</strong> current monthly spending counter from{" "}
+            Reset <strong>{resetMember?.name}&apos;s</strong> monthly spending counter from{" "}
             <strong className="text-emerald-400">{formatINR(resetMember?.current_spending || 0)}</strong> back to{" "}
-            <strong>₹0</strong> for the new billing cycle. Historical records will remain intact.
+            <strong>₹0</strong> for the new billing cycle.
           </p>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="outline"
-              size="md"
+              size="sm"
               onClick={() => setResetModalOpen(false)}
             >
               Cancel
@@ -1940,7 +1948,7 @@ export default function FamilySection() {
             <Button
               type="button"
               variant="danger"
-              size="md"
+              size="sm"
               loading={submitting}
               onClick={handleResetSpending}
             >

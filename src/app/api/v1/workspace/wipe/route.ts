@@ -71,7 +71,13 @@ async function handleWipe(req: NextRequest) {
       await supabaseAdmin.from("family_emergency_vault").delete().eq("user_id", userId);
       await supabaseAdmin.from("family_members").delete().eq("user_id", userId);
 
-      // 2f. Financial audit logs
+      // 2f. Financial audit logs, F&O derivatives, stocks & mutual funds
+      await supabaseAdmin.from("mutual_fund_transactions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("mutual_fund_holdings").delete().eq("user_id", userId);
+      await supabaseAdmin.from("fno_trades").delete().eq("user_id", userId);
+      await supabaseAdmin.from("fno_positions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("stock_transactions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("stock_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("financial_audit_logs").delete().eq("user_id", userId);
 
       // 2g. Accounts: preserve/seed Cash in Hand with 0.00 balance

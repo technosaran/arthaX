@@ -11,12 +11,10 @@ import {
   ShieldCheck,
   History,
   Search,
-  ArrowUpRight,
   ArrowDownRight,
   Trash2,
   Wallet,
   Calendar,
-  Filter,
   ChevronLeft,
   CheckCircle2,
   AlertCircle,
@@ -137,6 +135,15 @@ export default function AccountsSection() {
       acc.id === DEFAULT_CASH_ID ||
       acc.type === "Liquid Cash" ||
       acc.name.toLowerCase() === "cash in hand"
+    );
+  };
+
+  const isDematAccount = (acc: Account) => {
+    return (
+      acc.type.toUpperCase() === "INVESTMENT" ||
+      acc.name.toLowerCase().includes("zerodha") ||
+      acc.name.toLowerCase().includes("demat") ||
+      acc.name.toLowerCase().includes("trading")
     );
   };
 
@@ -720,7 +727,7 @@ export default function AccountsSection() {
           <div className="lg:col-span-5 space-y-4">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--app-muted)]">
-                Net Portfolio Value (Assets − Liabilities)
+                {totalLiabilities > 0 ? "Net Portfolio Value" : "Total Portfolio Value"}
               </span>
               <div className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight mt-1.5 tabular-nums">
                 {loading ? <Skeleton className="h-12 w-56 rounded-xl" /> : formatINR(netWorth)}
@@ -728,23 +735,55 @@ export default function AccountsSection() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
-                  Total Assets
-                </div>
-                <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
-                  {formatINR(totalAssets)}
-                </div>
-              </div>
+              {totalLiabilities > 0 ? (
+                <>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      Total Assets
+                    </div>
+                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                      {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatINR(totalAssets)}
+                    </div>
+                  </div>
 
-              <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
-                  Total Liabilities
-                </div>
-                <div className="text-sm font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
-                  {formatINR(totalLiabilities)}
-                </div>
-              </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      Total Liabilities
+                    </div>
+                    <div className="text-sm font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
+                      {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatINR(totalLiabilities)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      Active Accounts
+                    </div>
+                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                      {loading ? (
+                        <Skeleton className="h-5 w-16 rounded-md" />
+                      ) : (
+                        `${accounts.length} ${accounts.length === 1 ? "Account" : "Accounts"}`
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      Cash in Hand
+                    </div>
+                    <div className="text-sm font-bold font-mono text-sky-400 mt-0.5 tabular-nums">
+                      {loading ? (
+                        <Skeleton className="h-5 w-20 rounded-md" />
+                      ) : (
+                        formatINR(accounts.find(isCashAccount)?.balance || 0)
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -838,6 +877,7 @@ export default function AccountsSection() {
                   key={acc.id}
                   account={acc}
                   isCash={isCashAccount(acc)}
+                  isDemat={isDematAccount(acc)}
                   onEditCash={handleOpenEditCash}
                   onDelete={handleDeleteAccount}
                   formatCurrency={formatINR}
@@ -847,37 +887,6 @@ export default function AccountsSection() {
                   }}
                 />
               ))}
-            </div>
-          )}
-
-          {/* Selected Account Indicator Banner */}
-          {selectedAccountId && (
-            <div
-              className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-150"
-            >
-              <div className="flex items-center gap-2 text-sky-400 font-medium">
-                <Filter size={14} />
-                <span>
-                  Filtering by <strong>{accounts.find((a) => a.id === selectedAccountId)?.name}</strong> — {filteredHistory.length} records.
-                </span>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-auto">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => setSelectedAccountId(null)}
-                >
-                  Clear Filter
-                </Button>
-                <Button
-                  size="xs"
-                  variant="primary"
-                  iconRight={<ArrowUpRight size={12} />}
-                  onClick={() => setViewMode("history")}
-                >
-                  View History
-                </Button>
-              </div>
             </div>
           )}
         </div>
@@ -1113,7 +1122,7 @@ export default function AccountsSection() {
                       {/* Amount & Actions */}
                       <div className="col-span-2 w-full md:w-auto flex items-center justify-between md:justify-end gap-3 self-end md:self-auto">
                         <div
-                          className={`font-mono text-xs sm:text-sm font-bold tracking-tight tabular-nums ${
+                          className={`font-mono text-xs sm:text-sm font-bold tracking-tight tabular-nums whitespace-nowrap ${
                             isIncome || isTransferIncoming
                               ? "text-emerald-400"
                               : isExpense || isTransferOutgoing
@@ -1170,21 +1179,20 @@ export default function AccountsSection() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Add Connected Account"
-        description="Enter bank details to link a new card or financial holding."
-        size="lg"
+        title="Add Account"
+        size="md"
       >
-        <form onSubmit={handleAddAccount} className="space-y-4">
-          <Input
-            label="Bank or Institution Name"
-            placeholder="e.g. HDFC Bank, SBI, ICICI, Zerodha"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            leftIcon={<Landmark size={15} />}
-          />
+        <form onSubmit={handleAddAccount} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Bank / Institution Name *"
+              placeholder="e.g. HDFC Bank, SBI, Zerodha"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              leftIcon={<Landmark size={13} />}
+            />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Account Type"
               value={type}
@@ -1199,6 +1207,20 @@ export default function AccountsSection() {
                 { value: "Credit Card", label: "Credit Card" },
               ]}
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Initial Balance (₹ INR) *"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
+              required
+              leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
+            />
 
             <Input
               label="Last 4 Digits (Optional)"
@@ -1210,25 +1232,25 @@ export default function AccountsSection() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1.5">
+            <label className="block text-[11px] sm:text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1">
               Account Classification
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setClassification("asset")}
-                className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   classification === "asset"
                     ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold shadow-xs"
                     : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
                 }`}
               >
-                Asset (Bank / Savings / Demat)
+                Asset (Bank / Demat)
               </button>
               <button
                 type="button"
                 onClick={() => setClassification("liability")}
-                className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   classification === "liability"
                     ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold shadow-xs"
                     : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
@@ -1239,19 +1261,7 @@ export default function AccountsSection() {
             </div>
           </div>
 
-          <Input
-            label="Initial Balance (₹ INR)"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={balance}
-            onChange={(e) => setBalance(e.target.value)}
-            required
-            leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
-          />
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="ghost"
@@ -1277,12 +1287,11 @@ export default function AccountsSection() {
         isOpen={isEditingCash}
         onClose={() => setIsEditingCash(false)}
         title="Update Cash in Hand"
-        description="Record your physical wallet and liquid cash balance."
-        size="md"
+        size="sm"
       >
-        <form onSubmit={handleSaveCashBalance} className="space-y-4">
+        <form onSubmit={handleSaveCashBalance} className="space-y-2.5">
           <Input
-            label="Physical Cash Balance (₹ INR)"
+            label="Cash Balance (₹ INR) *"
             type="number"
             step="0.01"
             min="0"
@@ -1294,7 +1303,7 @@ export default function AccountsSection() {
             leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
           />
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="ghost"
@@ -1309,7 +1318,7 @@ export default function AccountsSection() {
               size="sm"
               loading={savingCash}
             >
-              Save Cash Balance
+              Save Cash
             </Button>
           </div>
         </form>
@@ -1320,13 +1329,12 @@ export default function AccountsSection() {
         isOpen={isTransferModalOpen}
         onClose={() => setIsTransferModalOpen(false)}
         title="Internal Account Transfer"
-        description="Shift liquidity between accounts atomically without distorting income or expense reports."
-        size="lg"
+        size="md"
       >
-        <form onSubmit={handleExecuteTransfer} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleExecuteTransfer} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select
-              label="From Account (Debit Source)"
+              label="From Account"
               value={transferFromId}
               onChange={(e) => setTransferFromId(e.target.value)}
               required
@@ -1340,7 +1348,7 @@ export default function AccountsSection() {
             </Select>
 
             <Select
-              label="To Account (Credit Destination)"
+              label="To Account"
               value={transferToId}
               onChange={(e) => setTransferToId(e.target.value)}
               required
@@ -1354,9 +1362,9 @@ export default function AccountsSection() {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Input
-              label="Transfer Amount (₹ INR)"
+              label="Transfer Amount (₹ INR) *"
               type="number"
               step="0.01"
               min="0.01"
@@ -1378,12 +1386,12 @@ export default function AccountsSection() {
 
           <Input
             label="Transfer Notes (Optional)"
-            placeholder="e.g. ATM withdrawal / Credit card bill settlement"
+            placeholder="e.g. ATM withdrawal / Bill settlement"
             value={transferNotes}
             onChange={(e) => setTransferNotes(e.target.value)}
           />
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="ghost"

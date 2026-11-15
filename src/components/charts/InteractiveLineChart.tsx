@@ -21,6 +21,8 @@ export interface LinePoint {
   label: string; // e.g. "Jun", "Jul"
   fullLabel?: string; // e.g. "July 2026"
   value: number;
+  count?: number; // Optional number of transactions
+  [key: string]: any;
 }
 
 export interface InteractiveLineChartProps {
@@ -57,7 +59,7 @@ export default function InteractiveLineChart({
   const [viewMode, setViewMode] = useState<"area" | "bar">(defaultView);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // Layout boundaries for SVG coordinate system (600 x 210)
+  // SVG coordinate boundaries (600 x 210)
   const svgWidth = 600;
   const svgHeight = 210;
   const paddingLeft = 56;
@@ -85,7 +87,7 @@ export default function InteractiveLineChart({
     return totalVal / data.length;
   }, [data, totalVal]);
 
-  // Nice scale calculations: perfectly rounded intervals
+  // Nice scale calculations: rounded intervals
   const scale = useMemo(() => {
     return getNiceScale(rawMax, 4);
   }, [rawMax]);
@@ -125,7 +127,7 @@ export default function InteractiveLineChart({
     return points.findIndex((pt) => pt.value === peakPoint.value);
   }, [peakPoint, points]);
 
-  // Build Monotone Cubic Spline (Fritsch-Carlson) - completely prevents undershoot below baseline!
+  // Build Monotone Cubic Spline (prevents baseline undershoot)
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
     return buildMonotoneCubicPath(points, baselineY, paddingTop);
@@ -156,7 +158,7 @@ export default function InteractiveLineChart({
   const barColumns = useMemo(() => {
     const count = points.length;
     if (count === 0) return [];
-    const colWidth = Math.min(38, Math.max(22, (plotWidth / count) * 0.48));
+    const colWidth = Math.min(38, Math.max(20, (plotWidth / count) * 0.46));
 
     return points.map((pt) => {
       const barHeight = Math.max(0, baselineY - pt.y);
@@ -176,7 +178,6 @@ export default function InteractiveLineChart({
     const rect = svgRef.current.getBoundingClientRect();
     const relativeX = (clientX - rect.left) * (svgWidth / rect.width);
 
-    // Hit-test to nearest month index
     let closestIdx = 0;
     let minDistance = Infinity;
 
@@ -204,7 +205,7 @@ export default function InteractiveLineChart({
     return ((curr - prev) / prev) * 100;
   }, [activePoint, points]);
 
-  // Percentage of 6-Month Total
+  // Percentage of Total
   const activePercentOfTotal = useMemo(() => {
     if (!activePoint || totalVal <= 0) return 0;
     return (activePoint.value / totalVal) * 100;
@@ -239,7 +240,7 @@ export default function InteractiveLineChart({
 
         {/* Right Section: Metrics + View Toggle */}
         <div className="flex items-center flex-wrap gap-2">
-          {/* 6-Month Total */}
+          {/* Total Badge */}
           {totalVal > 0 && (
             <div
               className="px-2.5 py-1 rounded-lg border text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-xs"
@@ -295,10 +296,10 @@ export default function InteractiveLineChart({
             <button
               type="button"
               onClick={() => setViewMode("area")}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
                 viewMode === "area"
                   ? "text-white shadow-xs"
-                  : "opacity-45 hover:opacity-100"
+                  : "opacity-45 hover:opacity-100 text-[var(--app-fg)]"
               }`}
               style={
                 viewMode === "area"
@@ -312,10 +313,10 @@ export default function InteractiveLineChart({
             <button
               type="button"
               onClick={() => setViewMode("bar")}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
                 viewMode === "bar"
                   ? "text-white shadow-xs"
-                  : "opacity-45 hover:opacity-100"
+                  : "opacity-45 hover:opacity-100 text-[var(--app-fg)]"
               }`}
               style={
                 viewMode === "bar"
@@ -352,29 +353,35 @@ export default function InteractiveLineChart({
             <defs>
               {/* Rich 4-stop volumetric area gradient */}
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-                <stop offset="40%" stopColor={color} stopOpacity="0.14" />
-                <stop offset="80%" stopColor={color} stopOpacity="0.03" />
+                <stop offset="0%" stopColor={color} stopOpacity="0.38" />
+                <stop offset="35%" stopColor={color} stopOpacity="0.16" />
+                <stop offset="75%" stopColor={color} stopOpacity="0.04" />
                 <stop offset="100%" stopColor={color} stopOpacity="0.0" />
               </linearGradient>
 
               {/* Bar gradient with vibrant top cap */}
               <linearGradient id={`barGradient-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity="0.95" />
-                <stop offset="60%" stopColor={color} stopOpacity="0.65" />
-                <stop offset="100%" stopColor={color} stopOpacity="0.30" />
+                <stop offset="50%" stopColor={color} stopOpacity="0.75" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.35" />
+              </linearGradient>
+
+              {/* Ghost slot track gradient for empty months in Bar view */}
+              <linearGradient id={`ghostSlot-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="currentColor" stopOpacity="0.05" />
+                <stop offset="100%" stopColor="currentColor" stopOpacity="0.01" />
               </linearGradient>
 
               {/* Laser crosshair scanning beam */}
               <linearGradient id={`crosshairBeam-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity="0.1" />
-                <stop offset="50%" stopColor={color} stopOpacity="0.75" />
+                <stop offset="50%" stopColor={color} stopOpacity="0.8" />
                 <stop offset="100%" stopColor={color} stopOpacity="0.15" />
               </linearGradient>
 
               {/* Glowing neon drop-shadow filter */}
               <filter id={`lineGlow-${gradientId}`} x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="5" floodColor={color} floodOpacity="0.45" />
+                <feDropShadow dx="0" dy="2" stdDeviation="5" floodColor={color} floodOpacity="0.5" />
               </filter>
             </defs>
 
@@ -425,7 +432,7 @@ export default function InteractiveLineChart({
                   textAnchor="middle"
                   className="text-[10px] font-mono fill-current opacity-60 font-semibold"
                 >
-                  No outflow recorded across these 6 months
+                  No {type === "expense" ? "outflows" : "inflows"} recorded across these 6 months
                 </text>
               </g>
             )}
@@ -496,7 +503,7 @@ export default function InteractiveLineChart({
                         cx={pt.x}
                         cy={pt.y}
                         r={isHovered ? 6 : isPeak ? 4.5 : isZero ? 2.5 : 3.5}
-                        fill={isHovered ? color : isZero ? "var(--app-card)" : "var(--app-card)"}
+                        fill={isHovered ? color : "var(--app-card)"}
                         stroke={color}
                         strokeWidth={isHovered ? 2.5 : isZero ? 1.5 : 2}
                         opacity={isZero && !isHovered ? 0.6 : 1}
@@ -528,11 +535,14 @@ export default function InteractiveLineChart({
                         width={col.barWidth}
                         height={plotHeight}
                         rx="5"
-                        fill="currentColor"
-                        opacity={isHovered ? 0.08 : 0.03}
+                        fill={`url(#ghostSlot-${gradientId})`}
+                        stroke="var(--app-border-subtle)"
+                        strokeWidth="0.5"
+                        strokeDasharray={isZero ? "2 2" : undefined}
+                        opacity={isHovered ? 0.35 : 0.15}
                       />
 
-                      {/* Active colored bar or zero pip */}
+                      {/* Active colored bar or zero indicator */}
                       {isZero ? (
                         <rect
                           x={col.x - 9}
@@ -544,22 +554,34 @@ export default function InteractiveLineChart({
                           opacity={isHovered ? 0.6 : 0.25}
                         />
                       ) : (
-                        <rect
-                          x={col.barX}
-                          y={col.barY}
-                          width={col.barWidth}
-                          height={col.barHeight}
-                          rx="4"
-                          fill={`url(#barGradient-${gradientId})`}
-                          opacity={isHovered ? 1 : 0.85}
-                          style={{
-                            filter: isHovered
-                              ? `drop-shadow(0 0 8px ${color})`
-                              : isPeak
-                              ? `drop-shadow(0 0 4px ${color}60)`
-                              : "none",
-                          }}
-                        />
+                        <>
+                          <rect
+                            x={col.barX}
+                            y={col.barY}
+                            width={col.barWidth}
+                            height={col.barHeight}
+                            rx="4"
+                            fill={`url(#barGradient-${gradientId})`}
+                            opacity={isHovered ? 1 : 0.85}
+                            style={{
+                              filter: isHovered
+                                ? `drop-shadow(0 0 8px ${color})`
+                                : isPeak
+                                ? `drop-shadow(0 0 4px ${color}60)`
+                                : "none",
+                            }}
+                          />
+                          {/* Value tag above bar */}
+                          <text
+                            x={col.x}
+                            y={Math.max(paddingTop + 10, col.barY - 6)}
+                            textAnchor="middle"
+                            className="text-[8.5px] font-mono font-bold fill-current opacity-85 select-none"
+                            style={{ fill: isPeak ? color : undefined }}
+                          >
+                            {abbreviateINR(col.value)}
+                          </text>
+                        </>
                       )}
                     </g>
                   );

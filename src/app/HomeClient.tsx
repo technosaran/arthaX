@@ -50,6 +50,15 @@ const TabLoadingFallback = () => (
 const AccountsSection = dynamic(() => import("@/components/AccountsSection"), {
   loading: TabLoadingFallback,
 });
+const StocksSection = dynamic(() => import("@/components/StocksSection"), {
+  loading: TabLoadingFallback,
+});
+const MutualFundsSection = dynamic(() => import("@/components/MutualFundsSection"), {
+  loading: TabLoadingFallback,
+});
+const FnoSection = dynamic(() => import("@/components/FnoSection"), {
+  loading: TabLoadingFallback,
+});
 const IncomeSection = dynamic(() => import("@/components/IncomeSection"), {
   loading: TabLoadingFallback,
 });
@@ -151,6 +160,21 @@ export default function HomeClient() {
           {visitedTabs.accounts && (
             <div className={`h-full w-full ${activeTab === "accounts" ? "block" : "hidden"}`}>
               <AccountsSection />
+            </div>
+          )}
+          {visitedTabs.stocks && (
+            <div className={`h-full w-full ${activeTab === "stocks" ? "block" : "hidden"}`}>
+              <StocksSection />
+            </div>
+          )}
+          {visitedTabs["mutual-funds"] && (
+            <div className={`h-full w-full ${activeTab === "mutual-funds" ? "block" : "hidden"}`}>
+              <MutualFundsSection />
+            </div>
+          )}
+          {visitedTabs.fno && (
+            <div className={`h-full w-full ${activeTab === "fno" ? "block" : "hidden"}`}>
+              <FnoSection />
             </div>
           )}
           {visitedTabs.income && (

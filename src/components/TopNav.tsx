@@ -8,6 +8,7 @@ import {
   Menu,
   LayoutDashboard,
   Landmark,
+  CandlestickChart,
   TrendingUp,
   TrendingDown,
   Target,
@@ -18,6 +19,8 @@ import {
   EyeOff,
   Sun,
   Moon,
+  Zap,
+  Coins,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
@@ -36,6 +39,9 @@ const TAB_META: Record<
 > = {
   dashboard: { label: "Financial Overview", icon: LayoutDashboard },
   accounts: { label: "Accounts & Cards", icon: Landmark },
+  stocks: { label: "Indian Equities & Stocks (Zerodha Kite)", icon: CandlestickChart },
+  "mutual-funds": { label: "Mutual Funds & SIPs (Zerodha Coin)", icon: Coins },
+  fno: { label: "Futures & Options", icon: Zap },
   income: { label: "Income & Inflows", icon: TrendingUp },
   expenses: { label: "Expenses & Outflows", icon: TrendingDown },
   budgets: { label: "Category Budgets", icon: Target },

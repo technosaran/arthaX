@@ -16,7 +16,6 @@ import {
   FileSpreadsheet,
   User,
   ShieldCheck,
-  RotateCcw,
   LogOut,
   Copy,
   AlertTriangle,
@@ -25,10 +24,6 @@ import {
   Bot,
   ExternalLink,
   RefreshCw,
-  Smartphone,
-  Mic,
-  MessageSquare,
-  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -51,6 +46,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import BankLogo from "@/components/BankLogo";
 
 // Utility function to escape CSV values according to RFC 4180
 function escapeCSV(val: unknown): string {
@@ -115,11 +111,36 @@ export default function SettingsSection() {
   const [copiedLinkToken, setCopiedLinkToken] = useState(false);
   const [refreshingTelegram, setRefreshingTelegram] = useState(false);
 
-  // Apple Siri & Shortcuts State
-  const [siriModalOpen, setSiriModalOpen] = useState(false);
-  const [copiedSiriUrl, setCopiedSiriUrl] = useState(false);
-  const [siriTesting, setSiriTesting] = useState(false);
-  const [siriGuideTab, setSiriGuideTab] = useState<"voice" | "sms">("voice");
+  // Zerodha Kite Integration State
+  const [zerodhaStatus, setZerodhaStatus] = useState<{
+    configured: boolean;
+    connected: boolean;
+    isTokenExpired: boolean;
+    apiKeyMasked: string | null;
+    userProfile: any | null;
+    lastSyncAt: string | null;
+    lastSyncStatus: string | null;
+    lastSyncSummary: any | null;
+    lastSyncError: string | null;
+    loginUrl: string | null;
+  }>({
+    configured: false,
+    connected: false,
+    isTokenExpired: true,
+    apiKeyMasked: null,
+    userProfile: null,
+    lastSyncAt: null,
+    lastSyncStatus: null,
+    lastSyncSummary: null,
+    lastSyncError: null,
+    loginUrl: null,
+  });
+  const [zerodhaApiKey, setZerodhaApiKey] = useState("");
+  const [zerodhaApiSecret, setZerodhaApiSecret] = useState("");
+  const [zerodhaRequestToken, setZerodhaRequestToken] = useState("");
+  const [savingZerodha, setSavingZerodha] = useState(false);
+  const [syncingZerodha, setSyncingZerodha] = useState(false);
+
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -270,6 +291,28 @@ export default function SettingsSection() {
     }
   }, []);
 
+  // Fetch Zerodha Integration Status
+  const fetchZerodhaStatus = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha", { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setZerodhaStatus(json.data);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Zerodha status:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === "integrations") {
       fetchTelegramStatus();
@@ -285,12 +328,144 @@ export default function SettingsSection() {
         }
       }, 3500);
 
+      fetchZerodhaStatus();
+
       return () => {
         window.removeEventListener("focus", onFocus);
         clearInterval(interval);
       };
     }
-  }, [activeTab, fetchTelegramStatus, telegramData.is_linked]);
+  }, [activeTab, fetchTelegramStatus, telegramData.is_linked, fetchZerodhaStatus]);
+
+  // Handle Zerodha URL Redirects / Callbacks
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const zerodhaConnected = url.searchParams.get("zerodha_connected");
+    const zerodhaError = url.searchParams.get("zerodha_error");
+    const reqToken = url.searchParams.get("request_token");
+
+    if (zerodhaConnected === "true") {
+      showToast("Zerodha Connected!", "Your Zerodha Kite session is active and ready to sync.", "success");
+      fetchZerodhaStatus();
+      // Clean up URL without full page reload
+      url.searchParams.delete("zerodha_connected");
+      window.history.replaceState({}, "", url.toString());
+    } else if (zerodhaError) {
+      showToast("Zerodha Connection Error", decodeURIComponent(zerodhaError), "error");
+      url.searchParams.delete("zerodha_error");
+      window.history.replaceState({}, "", url.toString());
+    } else if (reqToken) {
+      setZerodhaRequestToken(reqToken);
+      showToast("Request Token Captured", "Click 'Save Credentials' to complete authentication.", "info");
+      url.searchParams.delete("request_token");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [showToast, fetchZerodhaStatus]);
+
+  const handleSaveZerodha = async () => {
+    if (!zerodhaApiKey.trim() || !zerodhaApiSecret.trim()) {
+      showToast("Validation Error", "Please provide both API Key and API Secret.", "error");
+      return;
+    }
+
+    setSavingZerodha(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          apiKey: zerodhaApiKey.trim(),
+          apiSecret: zerodhaApiSecret.trim(),
+          requestToken: zerodhaRequestToken.trim() || null,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to save Zerodha credentials");
+      }
+
+      showToast("Zerodha Saved", json.data.message || "Credentials saved successfully", "success");
+      await fetchZerodhaStatus();
+
+      // If login URL provided and not yet connected, open Kite login in new tab
+      if (json.data.loginUrl && !json.data.connected) {
+        window.open(json.data.loginUrl, "_blank");
+      }
+    } catch (err: any) {
+      showToast("Error", err.message || "Failed to save Zerodha settings", "error");
+    } finally {
+      setSavingZerodha(false);
+    }
+  };
+
+  const handleSyncZerodha = async () => {
+    setSyncingZerodha(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/sync", {
+        method: "POST",
+        headers,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Sync failed");
+      }
+
+      const d = json.data;
+      showToast(
+        "Zerodha Portfolio Synced!",
+        `Updated ${d.stocksSynced} Stocks, ${d.fnoSynced} F&O Positions, and ${d.mfSynced} Mutual Funds.`,
+        "success"
+      );
+      await fetchZerodhaStatus();
+    } catch (err: any) {
+      showToast("Sync Error", err.message || "Failed to sync Zerodha portfolio", "error");
+    } finally {
+      setSyncingZerodha(false);
+    }
+  };
+
+  const handleDisconnectZerodha = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha", {
+        method: "DELETE",
+        headers,
+      });
+
+      if (res.ok) {
+        showToast("Zerodha Disconnected", "Credentials and session removed.", "info");
+        setZerodhaApiKey("");
+        setZerodhaApiSecret("");
+        setZerodhaRequestToken("");
+        await fetchZerodhaStatus();
+      }
+    } catch (err: any) {
+      showToast("Error", "Failed to disconnect Zerodha", "error");
+    }
+  };
 
   const handleRegenerateToken = async () => {
     setRefreshingTelegram(true);
@@ -1132,10 +1307,10 @@ export default function SettingsSection() {
 
   return (
     <main
-      className="flex-1 h-full px-3.5 sm:px-6 md:px-8 py-5 sm:py-8 overflow-y-auto transition-colors select-none"
+      className="flex-1 h-full p-4 sm:p-6 md:p-8 overflow-y-auto transition-colors select-none"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 pb-16">
+      <div className="w-full space-y-6 sm:space-y-8 pb-16">
         {/* TOP HEADER */}
         <PageHeader
           title="Settings"
@@ -1144,17 +1319,6 @@ export default function SettingsSection() {
             <Badge variant="violet" dot>
               Preferences & Vault
             </Badge>
-          }
-          actions={
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />}
-              loading={cacheSyncing}
-              onClick={handlePurgeCacheAndSync}
-            >
-              Sync Workspace
-            </Button>
           }
         />
 
@@ -1696,118 +1860,176 @@ export default function SettingsSection() {
               )}
             </Card>
 
-            {/* WHATSAPP & SIRI COMPANION CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* WhatsApp Card */}
-              <Card className="p-5 space-y-4 text-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 font-bold">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                      <MessageSquare size={15} />
-                    </div>
-                    <div>
-                      <div className="font-bold">WhatsApp Cloud API</div>
-                      <div className="text-[10px] opacity-60">Meta Graph Webhook</div>
-                    </div>
+            {/* ZERODHA KITE INTEGRATION CARD */}
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 border border-orange-500/25 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <BankLogo name="zerodha" size={22} />
                   </div>
-                  <Badge variant="emerald">Live Webhook</Badge>
-                </div>
-
-                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1 font-mono text-[10px]">
-                  <div className="opacity-50 uppercase tracking-wider text-[9px]">Webhook Route:</div>
-                  <div className="text-emerald-400">/api/webhooks/whatsapp</div>
-                </div>
-              </Card>
-
-              {/* Apple Siri Card */}
-              <Card className="p-5 space-y-4 text-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 font-bold">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
-                      <Mic size={15} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold tracking-tight">Zerodha Kite &amp; Coin Integration</h2>
+                      <Badge variant="warning" className="text-[10px] bg-orange-500/10 text-orange-400 border-orange-500/30">
+                        Personal Tier (₹0 Free)
+                      </Badge>
                     </div>
-                    <div>
-                      <div className="font-bold">Apple Siri Voice & iOS Automation</div>
-                      <div className="text-[10px] opacity-60">Siri Voice & Native Bank SMS Forwarding</div>
-                    </div>
-                  </div>
-                  <Badge variant="violet">Siri Ready</Badge>
-                </div>
-
-                <p className="text-[11px] opacity-70 leading-relaxed">
-                  Log expenses hands-free with <strong>&quot;Hey Siri, Log Expense&quot;</strong> or silently auto-forward your bank debit SMS directly on your iPhone.
-                </p>
-
-                <div className="p-2.5 rounded bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-1.5 font-mono text-[10px]">
-                  <div className="flex items-center justify-between">
-                    <span className="opacity-50 uppercase tracking-wider text-[9px]">Siri Webhook URL:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = typeof window !== "undefined"
-                          ? `${window.location.origin}/api/shortcuts/expense?key=arthax_siri_key_2026`
-                          : "https://arthax.vercel.app/api/shortcuts/expense?key=arthax_siri_key_2026";
-                        navigator.clipboard.writeText(url);
-                        setCopiedSiriUrl(true);
-                        showToast("URL Copied", "Siri Webhook URL copied to clipboard.", "success");
-                        setTimeout(() => setCopiedSiriUrl(false), 2000);
-                      }}
-                      className="text-indigo-400 hover:text-indigo-300 font-sans text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      {copiedSiriUrl ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                      {copiedSiriUrl ? "Copied" : "Copy URL"}
-                    </button>
-                  </div>
-                  <div className="text-indigo-400 truncate select-all">
-                    {typeof window !== "undefined" ? window.location.origin : "https://arthax.vercel.app"}/api/shortcuts/expense?key=arthax_siri_key_2026
+                    <p className="text-xs opacity-60">
+                      Sync your live Demat Stocks, F&amp;O Positions, and Mutual Funds (Coin) directly into ArthaX
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => setSiriModalOpen(true)}
-                    className="flex-1 text-xs"
-                  >
-                    <Smartphone size={13} className="mr-1.5" />
-                    Setup Guide (Voice & SMS)
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={siriTesting}
-                    onClick={async () => {
-                      setSiriTesting(true);
-                      try {
-                        const res = await fetch("/api/shortcuts/expense", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            "x-api-key": "arthax_siri_key_2026",
-                          },
-                          body: JSON.stringify({ text: "20 test coffee on cash" }),
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          showToast("Siri Connected", data.speech || "Test expense logged successfully!", "success");
-                        } else {
-                          showToast("Siri Test Notice", data.speech || data.display || "Failed to process test", "error");
-                        }
-                      } catch (err: unknown) {
-                        showToast("Error", err instanceof Error ? err.message : "Network error", "error");
-                      } finally {
-                        setSiriTesting(false);
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    {siriTesting ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <Sparkles size={13} className="mr-1.5 text-indigo-400" />}
-                    Test Siri Route
-                  </Button>
+                <div>
+                  {zerodhaStatus.connected ? (
+                    <Badge variant="emerald" dot>
+                      Connected: {zerodhaStatus.userProfile?.user_name || zerodhaStatus.userProfile?.client_id || "Active Session"}
+                    </Badge>
+                  ) : zerodhaStatus.configured ? (
+                    <Badge variant="amber">Daily Login Required</Badge>
+                  ) : (
+                    <Badge variant="neutral">Not Linked</Badge>
+                  )}
                 </div>
-              </Card>
-            </div>
+              </div>
+
+              {/* Connected State */}
+              {zerodhaStatus.connected ? (
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 size={14} />
+                        <span>Kite Session Active &amp; Ready</span>
+                      </div>
+                      <p className="opacity-70 text-[11px]">
+                        Client ID: <span className="font-mono text-xs font-semibold">{zerodhaStatus.userProfile?.client_id || "ZERODHA"}</span>
+                        {zerodhaStatus.userProfile?.email && <span> • {zerodhaStatus.userProfile.email}</span>}
+                        {zerodhaStatus.lastSyncAt && (
+                          <span> • Last Synced: <span className="font-mono">{new Date(zerodhaStatus.lastSyncAt).toLocaleTimeString()}</span></span>
+                        )}
+                      </p>
+                      {zerodhaStatus.lastSyncSummary && (
+                        <p className="text-[11px] text-emerald-400/90 font-mono">
+                          Last Sync: {zerodhaStatus.lastSyncSummary.stocks_synced || 0} Stocks, {zerodhaStatus.lastSyncSummary.fno_synced || 0} F&amp;O Positions, {zerodhaStatus.lastSyncSummary.mf_synced || 0} Mutual Funds
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
+                        disabled={syncingZerodha}
+                        onClick={handleSyncZerodha}
+                      >
+                        {syncingZerodha ? "Syncing..." : "Sync All 3 Sections"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={syncingZerodha}
+                        onClick={handleDisconnectZerodha}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Banner when configured but session needs morning login */}
+                  {zerodhaStatus.configured && (
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between flex-wrap gap-3">
+                      <div className="text-xs space-y-1">
+                        <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                          <AlertTriangle size={14} />
+                          <span>Daily Session Required</span>
+                        </div>
+                        <p className="opacity-70 text-[11px]">
+                          Your API keys ({zerodhaStatus.apiKeyMasked}) are saved. Zerodha access tokens expire daily at 6:00 AM IST. Log in to renew today&apos;s session.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {zerodhaStatus.loginUrl && (
+                          <a
+                            href={zerodhaStatus.loginUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-sm transition-all"
+                          >
+                            <BankLogo name="zerodha" size={14} />
+                            <span>Login with Kite</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Credentials Input Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold">Kite API Key</label>
+                      <Input
+                        placeholder="e.g. 24-character API Key"
+                        value={zerodhaApiKey}
+                        onChange={(e) => setZerodhaApiKey(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold">Kite API Secret</label>
+                      <Input
+                        type="password"
+                        placeholder="e.g. 32-character API Secret"
+                        value={zerodhaApiSecret}
+                        onChange={(e) => setZerodhaApiSecret(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold flex items-center justify-between">
+                      <span>Request Token (Optional / Direct Token Exchange)</span>
+                      <span className="text-[10px] opacity-60">Paste from Kite redirect URL or leave blank to authenticate via button</span>
+                    </label>
+                    <Input
+                      placeholder="Paste request_token from Kite redirect (optional)"
+                      value={zerodhaRequestToken}
+                      onChange={(e) => setZerodhaRequestToken(e.target.value)}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-[var(--app-border-subtle)]">
+                    <div className="text-[11px] opacity-60 flex items-center gap-1.5 flex-wrap">
+                      <span>Redirect URL for Kite Developer Portal:</span>
+                      <code className="bg-[var(--app-bg)] px-1.5 py-0.5 rounded border font-mono text-[10px]">
+                        {typeof window !== "undefined"
+                          ? `${window.location.origin}/api/v1/integrations/zerodha/callback`
+                          : "https://arthax.vercel.app/api/v1/integrations/zerodha/callback"}
+                      </code>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={savingZerodha || !zerodhaApiKey.trim() || !zerodhaApiSecret.trim()}
+                        onClick={handleSaveZerodha}
+                      >
+                        {savingZerodha ? "Saving..." : "Save Credentials"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+
           </div>
         )}
 
@@ -1856,18 +2078,8 @@ export default function SettingsSection() {
                 </div>
               </div>
 
-              {/* Action Buttons: Refresh & Sign Out */}
-              <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="md"
-                  icon={<RotateCcw size={13} className={cacheSyncing ? "animate-spin text-emerald-400" : ""} />}
-                  loading={cacheSyncing}
-                  onClick={handlePurgeCacheAndSync}
-                >
-                  Refresh Account Data
-                </Button>
-
+              {/* Action Buttons: Sign Out */}
+              <div className="flex items-center justify-end gap-3 pt-2 flex-wrap">
                 <Button
                   variant="danger"
                   size="md"
@@ -2014,193 +2226,6 @@ export default function SettingsSection() {
         </div>
       </Modal>
 
-      {/* APPLE SIRI & IOS SHORTCUTS MODAL */}
-      <Modal
-        isOpen={siriModalOpen}
-        onClose={() => setSiriModalOpen(false)}
-        title="Apple Siri & iOS Automation Guide"
-      >
-        <div className="space-y-5 text-xs">
-          {/* Navigation Tabs */}
-          <div className="flex border-b border-[var(--app-border-subtle)] pb-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSiriGuideTab("voice")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                siriGuideTab === "voice"
-                  ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/30"
-                  : "opacity-60 hover:opacity-100"
-              }`}
-            >
-              🗣️ Siri Voice Logging
-            </button>
-            <button
-              type="button"
-              onClick={() => setSiriGuideTab("sms")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                siriGuideTab === "sms"
-                  ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/30"
-                  : "opacity-60 hover:opacity-100"
-              }`}
-            >
-              📩 Automatic Bank SMS
-            </button>
-          </div>
-
-          {/* Webhook Configuration Box */}
-          <div className="p-3 rounded-xl bg-[var(--app-bg)] border border-[var(--app-border-subtle)] space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-semibold text-[var(--app-fg)]">Your Personal Webhook URL:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = typeof window !== "undefined"
-                    ? `${window.location.origin}/api/shortcuts/expense?key=arthax_siri_key_2026`
-                    : "https://arthax.vercel.app/api/shortcuts/expense?key=arthax_siri_key_2026";
-                  navigator.clipboard.writeText(url);
-                  setCopiedSiriUrl(true);
-                  showToast("Copied", "Webhook URL copied to clipboard.", "success");
-                  setTimeout(() => setCopiedSiriUrl(false), 2000);
-                }}
-                className="text-indigo-400 hover:text-indigo-300 font-sans text-[11px] flex items-center gap-1 cursor-pointer"
-              >
-                {copiedSiriUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                {copiedSiriUrl ? "Copied" : "Copy URL"}
-              </button>
-            </div>
-            <div className="font-mono text-[10px] text-indigo-400 p-2 rounded bg-[var(--app-card-bg)] border border-[var(--app-border-subtle)] select-all break-all">
-              {typeof window !== "undefined" ? window.location.origin : "https://arthax.vercel.app"}/api/shortcuts/expense?key=arthax_siri_key_2026
-            </div>
-            <div className="text-[10px] opacity-60">
-              Method: <strong>POST</strong> | Headers: <code>Content-Type: application/json</code>
-            </div>
-          </div>
-
-          {/* VOICE TAB INSTRUCTIONS */}
-          {siriGuideTab === "voice" && (
-            <div className="space-y-3">
-              <h4 className="font-bold text-sm text-[var(--app-fg)] flex items-center gap-2">
-                <span>Setup: &quot;Hey Siri, Log Expense&quot;</span>
-                <Badge variant="violet">2 Minutes</Badge>
-              </h4>
-              <ol className="space-y-2.5 list-decimal list-inside opacity-90 leading-relaxed text-[11px]">
-                <li>
-                  Open the <strong>Shortcuts</strong> app on your iPhone and tap <strong>+</strong> to create a new shortcut.
-                </li>
-                <li>
-                  Rename the shortcut to: <strong>Log Expense</strong> (or <strong>ArthaX</strong>).
-                </li>
-                <li>
-                  Add Action: <strong>Ask for Input</strong> ➡️ Prompt: <code>&quot;What did you spend?&quot;</code> (Type: Text).
-                </li>
-                <li>
-                  Add Action: <strong>Get Contents of URL</strong>:
-                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80 font-mono">
-                    <li>URL: (Paste your Webhook URL above)</li>
-                    <li>Method: POST</li>
-                    <li>Request Body: JSON ➡️ Key: <code>text</code>, Value: (Select <strong>Provided Input</strong>)</li>
-                  </ul>
-                </li>
-                <li>
-                  Add Action: <strong>Get Dictionary Value</strong> ➡️ Key: <code>speech</code> in <strong>Contents of URL</strong>.
-                </li>
-                <li>
-                  Add Action: <strong>Speak Text</strong> ➡️ Choose the Dictionary Value from above.
-                </li>
-              </ol>
-
-              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] space-y-1">
-                <div className="font-bold">🗣️ How to use:</div>
-                <div>Say: <em>&quot;Hey Siri, Log Expense&quot;</em> ➡️ Siri will ask <em>&quot;What did you spend?&quot;</em> ➡️ Say: <em>&quot;250 lunch on HDFC&quot;</em>. Siri logs it and speaks back your new balance!</div>
-              </div>
-            </div>
-          )}
-
-          {/* SMS TAB INSTRUCTIONS */}
-          {siriGuideTab === "sms" && (
-            <div className="space-y-3">
-              <h4 className="font-bold text-sm text-[var(--app-fg)] flex items-center gap-2">
-                <span>Automatic Bank SMS Logging on iPhone</span>
-                <Badge variant="emerald">100% Background</Badge>
-              </h4>
-              <ol className="space-y-2.5 list-decimal list-inside opacity-90 leading-relaxed text-[11px]">
-                <li>
-                  Open the <strong>Shortcuts</strong> app on your iPhone and tap the <strong>Automation</strong> tab at the bottom.
-                </li>
-                <li>
-                  Tap <strong>New Automation</strong> (or <strong>+</strong>) ➡️ Choose <strong>Message</strong>.
-                </li>
-                <li>
-                  Configure the Trigger:
-                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80">
-                    <li><strong>Message Contains:</strong> <code>debited</code> (or <code>spent</code>)</li>
-                    <li><strong>Sender:</strong> Leave empty (or select bank senders like HDFCBK, SBIN)</li>
-                    <li>Select: <strong>Run Immediately</strong> (Turn OFF &quot;Ask Before Running&quot;)</li>
-                  </ul>
-                </li>
-                <li>
-                  In the Action screen, add <strong>Get Contents of URL</strong>:
-                  <ul className="pl-5 pt-1 space-y-1 list-disc text-[10px] opacity-80 font-mono">
-                    <li>URL: (Paste your Webhook URL above)</li>
-                    <li>Method: POST</li>
-                    <li>Request Body: JSON ➡️ Key: <code>text</code>, Value: (Select <strong>Shortcut Input</strong>)</li>
-                  </ul>
-                </li>
-              </ol>
-
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] space-y-1">
-                <div className="font-bold">⚡ How it works:</div>
-                <div>Whenever your bank sends a debit SMS, your iPhone silently runs this in the background and updates ArthaX without you touching a button!</div>
-              </div>
-            </div>
-          )}
-
-          {/* Footer Action */}
-          <div className="flex items-center justify-between pt-3 border-t border-[var(--app-border-subtle)]">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={siriTesting}
-              onClick={async () => {
-                setSiriTesting(true);
-                try {
-                  const res = await fetch("/api/shortcuts/expense", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "x-api-key": "arthax_siri_key_2026",
-                    },
-                    body: JSON.stringify({ text: "15 test tea on cash" }),
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    showToast("Test Passed", data.speech, "success");
-                  } else {
-                    showToast("Test Failed", data.speech || "Error", "error");
-                  }
-                } catch {
-                  showToast("Error", "Network error", "error");
-                } finally {
-                  setSiriTesting(false);
-                }
-              }}
-            >
-              {siriTesting ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <Sparkles size={13} className="mr-1.5 text-indigo-400" />}
-              Send Test Voice Ping
-            </Button>
-
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => setSiriModalOpen(false)}
-            >
-              Done
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </main>
   );
 }

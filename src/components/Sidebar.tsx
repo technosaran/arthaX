@@ -4,12 +4,15 @@ import React, { useState } from "react";
 import {
   LayoutDashboard,
   Landmark,
+  CandlestickChart,
   TrendingUp,
   TrendingDown,
   Target,
   BookOpen,
   Users,
   Settings,
+  Zap,
+  Coins,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -36,6 +39,9 @@ interface NavItemDef {
 const NAV_ITEMS: NavItemDef[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "finance" },
   { id: "accounts", label: "Accounts", icon: Landmark, group: "finance" },
+  { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
+  { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance" },
+  { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
   { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
@@ -75,7 +81,7 @@ export default function Sidebar({
           onMouseEnter={() => setHoveredItemId(item.id)}
           onMouseLeave={() => setHoveredItemId(null)}
           className={`group relative flex items-center w-full rounded-xl transition-all duration-150 cursor-pointer fintech-focus ${
-            collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5 gap-3"
+            collapsed ? "justify-center px-2 py-2.5" : "px-2.5 py-2 gap-2.5"
           } ${
             isSelected
               ? "bg-[var(--app-card-elevated)] text-[var(--app-fg)] font-semibold border border-[var(--app-border)] shadow-xs"
@@ -85,7 +91,7 @@ export default function Sidebar({
         >
           {/* Active Accent Bar on Left */}
           {isSelected && !collapsed && (
-            <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[var(--app-accent)] shadow-[0_0_8px_var(--app-accent)]" />
+            <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-[var(--app-accent)] shadow-[0_0_8px_var(--app-accent)]" />
           )}
 
           <Icon
@@ -102,6 +108,11 @@ export default function Sidebar({
               <span className="truncate tracking-tight text-xs sm:text-[13px] flex-1 text-left">
                 {item.label}
               </span>
+              {item.tag && !isSelected && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                  {item.tag}
+                </span>
+              )}
               {isSelected && (
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)] flex-shrink-0 shadow-[0_0_6px_var(--app-accent)]" />
               )}
@@ -134,7 +145,7 @@ export default function Sidebar({
         className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col h-screen transition-all duration-300 ease-in-out select-none border-r ${
           collapsed
             ? "-translate-x-full md:translate-x-0 md:w-16"
-            : "translate-x-0 w-64 md:w-56 shadow-2xl md:shadow-none"
+            : "translate-x-0 w-56 md:w-48 shadow-2xl md:shadow-none"
         }`}
         style={{
           backgroundColor: "var(--app-bg)",
@@ -144,7 +155,7 @@ export default function Sidebar({
       >
         {/* Brand Header */}
         <div
-          className="flex items-center h-14 sm:h-16 px-3.5 border-b flex-shrink-0 border-[var(--app-border)]"
+          className="flex items-center h-14 sm:h-16 px-3 border-b flex-shrink-0 border-[var(--app-border)]"
         >
           {collapsed ? (
             <div className="w-full flex items-center justify-center">
@@ -176,11 +187,11 @@ export default function Sidebar({
         </div>
 
         {/* Navigation Groups */}
-        <nav className="flex-1 px-2.5 py-4 space-y-5 overflow-y-auto">
+        <nav className="flex-1 px-2 py-3.5 space-y-4 overflow-y-auto">
           {/* Group 1: FINANCE */}
           <div>
             {!collapsed && (
-              <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+              <div className="px-2.5 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
                 Financial Suite
               </div>
             )}
@@ -192,7 +203,7 @@ export default function Sidebar({
           {/* Group 2: SYSTEM */}
           <div>
             {!collapsed && (
-              <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+              <div className="px-2.5 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
                 Workspace
               </div>
             )}
@@ -204,7 +215,7 @@ export default function Sidebar({
 
         {/* Footer / User Session Control */}
         <div
-          className={`p-2.5 border-t border-[var(--app-border)] flex-shrink-0 space-y-2 ${
+          className={`p-2 border-t border-[var(--app-border)] flex-shrink-0 space-y-2 ${
             collapsed ? "flex flex-col items-center" : ""
           }`}
         >
@@ -219,8 +230,8 @@ export default function Sidebar({
               }}
               onMouseEnter={() => setHoveredItemId("signout")}
               onMouseLeave={() => setHoveredItemId(null)}
-              className={`group flex items-center w-full rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border border-transparent text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 fintech-focus ${
-                collapsed ? "justify-center px-2 py-2.5" : "gap-3"
+              className={`group flex items-center w-full rounded-xl px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border border-transparent text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 fintech-focus ${
+                collapsed ? "justify-center px-2 py-2.5" : "gap-2.5"
               }`}
               aria-label="Sign out of arthaX"
             >

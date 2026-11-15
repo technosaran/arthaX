@@ -29,11 +29,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || generatedId;
 
     return (
-      <div className="w-full space-y-1.5 text-left">
+      <div className="w-full space-y-1 text-left">
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-semibold tracking-tight text-[var(--app-fg)] select-none"
+            className="block text-[11px] sm:text-xs font-semibold tracking-tight text-[var(--app-fg)] select-none"
           >
             {label}
           </label>
@@ -41,7 +41,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3 flex items-center justify-center text-[var(--app-muted)] pointer-events-none">
+            <div className="absolute left-2.5 flex items-center justify-center text-[var(--app-muted)] pointer-events-none">
               {leftIcon}
             </div>
           )}
@@ -50,9 +50,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             disabled={disabled}
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs sm:text-sm font-medium transition-all duration-150 outline-hidden placeholder:text-[var(--app-muted)]/60 disabled:opacity-50 disabled:cursor-not-allowed ${
-              leftIcon ? "pl-9" : ""
-            } ${rightIcon ? "pr-9" : ""} ${
+            className={`w-full rounded-xl border px-3 py-1.5 sm:py-2 text-xs font-medium transition-all duration-150 outline-hidden placeholder:text-[var(--app-muted)]/60 disabled:opacity-50 disabled:cursor-not-allowed ${
+              leftIcon ? "pl-8.5" : ""
+            } ${rightIcon ? "pr-8.5" : ""} ${
               error
                 ? "border-rose-500/50 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
                 : "border-[var(--app-border)] focus:border-[var(--app-accent)] focus:ring-2 focus:ring-[var(--app-ring)]"
@@ -65,18 +65,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           />
 
           {rightIcon && (
-            <div className="absolute right-3 flex items-center justify-center text-[var(--app-muted)]">
+            <div className="absolute right-2.5 flex items-center justify-center text-[var(--app-muted)]">
               {rightIcon}
             </div>
           )}
         </div>
 
         {error ? (
-          <p className="text-[11px] text-rose-400 font-medium tracking-tight">
+          <p className="text-[10px] sm:text-[11px] text-rose-400 font-medium tracking-tight">
             {error}
           </p>
         ) : helperText ? (
-          <p className="text-[11px] text-[var(--app-muted)] font-normal">
+          <p className="text-[10px] sm:text-[11px] text-[var(--app-muted)] font-normal">
             {helperText}
           </p>
         ) : null}

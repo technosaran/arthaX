@@ -18,6 +18,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: ButtonSize;
   loading?: boolean;
   icon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
   iconRight?: React.ReactNode;
 }
 
@@ -30,6 +31,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       disabled = false,
       icon,
+      leftIcon,
       iconRight,
       className = "",
       style,
@@ -37,6 +39,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
+    const effectiveIcon = icon || leftIcon;
     const isDisabled = disabled || loading;
 
     // Base layout & interaction
@@ -99,7 +102,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {loading ? (
           <Loader2 size={size === "xs" || size === "icon-sm" ? 13 : 15} className="animate-spin" />
         ) : (
-          icon && <span className="flex-shrink-0">{icon}</span>
+          effectiveIcon && <span className="flex-shrink-0">{effectiveIcon}</span>
         )}
         {children && <span>{children}</span>}
         {!loading && iconRight && <span className="flex-shrink-0">{iconRight}</span>}

@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   CreditCard,
   Wallet,
+  Zap,
+  Coins,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -523,9 +525,15 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             <div className="lg:col-span-5 space-y-5">
               {/* Top Label & Recorded Balances Indicator */}
               <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
-                <span className="font-semibold text-[var(--app-fg)]">Total Net Worth</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
-                <span className="text-[var(--app-muted)]">Assets − Liabilities</span>
+                <span className="font-semibold text-[var(--app-fg)]">
+                  {totalLiabilities > 0 ? "Total Net Worth" : "Total Net Worth"}
+                </span>
+                {totalLiabilities > 0 && (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                    <span className="text-[var(--app-muted)]">Assets − Liabilities</span>
+                  </>
+                )}
               </div>
 
               {/* Massive Metric Amount */}
@@ -541,29 +549,63 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
               {/* Asset & Liability Quick Badges */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div
-                  className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
-                  style={{ backgroundColor: "var(--app-card-subtle)" }}
-                >
-                  <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
-                    Total Assets
-                  </div>
-                  <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
-                    {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
-                  </div>
-                </div>
+                {totalLiabilities > 0 ? (
+                  <>
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                        Total Assets
+                      </div>
+                      <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                        {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
+                      </div>
+                    </div>
 
-                <div
-                  className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
-                  style={{ backgroundColor: "var(--app-card-subtle)" }}
-                >
-                  <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
-                    Total Liabilities
-                  </div>
-                  <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
-                    {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalLiabilities)}
-                  </div>
-                </div>
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                        Total Liabilities
+                      </div>
+                      <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
+                        {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalLiabilities)}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                        Total Assets
+                      </div>
+                      <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                        {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
+                      </div>
+                    </div>
+
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                        Active Accounts
+                      </div>
+                      <div className="text-sm sm:text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums">
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 rounded-md" />
+                        ) : (
+                          `${accounts.length} ${accounts.length === 1 ? "Account" : "Accounts"}`
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Sub-Badges Pill Row */}
@@ -667,7 +709,37 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         )}
 
         {/* QUICK ACTIONS COMMAND BAR */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("stocks")}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-orange-500/40 hover:bg-orange-500/10 fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
+          >
+            <TrendingUp size={15} className="text-orange-400" />
+            <span>Stocks</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("mutual-funds")}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-emerald-500/40 hover:bg-emerald-500/10 fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
+          >
+            <Coins size={15} className="text-emerald-400" />
+            <span>Mutual Funds</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("fno")}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-amber-500/40 hover:bg-amber-500/10 fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
+          >
+            <Zap size={15} className="text-amber-400" />
+            <span>F&O Derivatives</span>
+          </button>
+
           <button
             type="button"
             onClick={() => onNavigate?.("accounts")}
@@ -1006,7 +1078,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
                     <div className="text-right flex-shrink-0">
                       <div
-                        className={`font-mono font-bold text-xs sm:text-sm tabular-nums ${
+                        className={`font-mono font-bold text-xs sm:text-sm tabular-nums whitespace-nowrap ${
                           isIncome
                             ? "text-emerald-400"
                             : isExpense

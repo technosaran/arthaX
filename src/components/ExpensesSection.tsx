@@ -46,6 +46,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CategoryFilterDropdown } from "@/components/ui/CategoryFilterDropdown";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 interface ExpenseItem {
@@ -264,6 +265,41 @@ export default function ExpensesSection() {
       return isToday ? `Today, ${date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : formatted;
     } catch {
       return dStr;
+    }
+  };
+
+  const getDateDetails = (dStr: string) => {
+    if (!dStr) return { dateStr: "", weekday: "", badge: null as "today" | "yesterday" | null };
+    try {
+      const parts = dStr.split("-");
+      if (parts.length !== 3) return { dateStr: dStr, weekday: "", badge: null };
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (isNaN(y) || isNaN(m) || isNaN(d)) return { dateStr: dStr, weekday: "", badge: null };
+
+      const targetDate = new Date(y, m - 1, d);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const compDate = new Date(y, m - 1, d);
+      compDate.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.round((today.getTime() - compDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      let badge: "today" | "yesterday" | null = null;
+      if (diffDays === 0) badge = "today";
+      else if (diffDays === 1) badge = "yesterday";
+
+      const dateStr = targetDate.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: targetDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+      });
+      const weekday = targetDate.toLocaleDateString("en-US", { weekday: "short" });
+
+      return { dateStr, weekday, badge };
+    } catch {
+      return { dateStr: dStr, weekday: "", badge: null };
     }
   };
 
@@ -600,16 +636,16 @@ export default function ExpensesSection() {
       }));
   }, [categoryTotals]);
 
-  // Line Chart: 6-Month Timeline Trend
+  // Line Chart: 6-Month Expense Timeline Trend
   const lineChartData: LinePoint[] = useMemo(() => {
-    const months: { key: string; label: string; fullLabel: string; value: number }[] = [];
+    const months: LinePoint[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const label = d.toLocaleString("default", { month: "short" });
       const fullLabel = d.toLocaleString("default", { month: "long", year: "numeric" });
-      months.push({ key, label, fullLabel, value: 0 });
+      months.push({ key, label, fullLabel, value: 0, count: 0 });
     }
 
     expenses.forEach((item) => {
@@ -618,6 +654,7 @@ export default function ExpensesSection() {
         const target = months.find((m) => m.key === itemKey);
         if (target) {
           target.value += item.amount;
+          target.count = (target.count || 0) + 1;
         }
       }
     });
@@ -855,18 +892,14 @@ export default function ExpensesSection() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
+          <CategoryFilterDropdown
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none cursor-pointer font-medium w-full sm:w-auto"
-          >
-            <option value="all">All Categories</option>
-            {EXPENSE_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryFilter}
+            categories={EXPENSE_CATEGORIES}
+            categoryColors={CATEGORY_COLORS}
+            allLabel="All Categories"
+            align="right"
+          />
         </div>
       </div>
 
@@ -901,10 +934,11 @@ export default function ExpensesSection() {
           <div
             className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-mono uppercase tracking-wider text-[var(--app-muted)] border-b border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] select-none font-semibold"
           >
-            <div className="col-span-4">Merchant / Payee</div>
-            <div className="col-span-3">Category</div>
-            <div className="col-span-3">Payment Account & Date</div>
-            <div className="col-span-2 text-right">Outflow Amount</div>
+            <div className="col-span-3">Merchant / Payee</div>
+            <div className="col-span-2">Category</div>
+            <div className="col-span-2">Payment Account</div>
+            <div className="col-span-2">Date Spent</div>
+            <div className="col-span-3 text-right">Outflow Amount</div>
           </div>
 
           {/* Transaction Rows */}
@@ -912,6 +946,7 @@ export default function ExpensesSection() {
             {displayedExpenses.map((item) => {
               const catColor = CATEGORY_COLORS[item.category] || "#71717A";
               const account = accounts.find((a) => a.id === item.account_id);
+              const dateInfo = getDateDetails(item.expense_date);
 
               return (
                 <div
@@ -921,7 +956,7 @@ export default function ExpensesSection() {
                   {/* Desktop Grid Row (md and up) */}
                   <div className="hidden md:grid grid-cols-12 items-center gap-4 py-3.5 px-5">
                     {/* Col 1: Logo + Title + Subtitle */}
-                    <div className="col-span-4 flex items-center gap-3.5 min-w-0 pr-2">
+                    <div className="col-span-3 flex items-center gap-3.5 min-w-0 pr-2">
                       <EntityLogo name={item.title} category={item.category} size={40} />
                       <div className="min-w-0">
                         <span
@@ -938,9 +973,9 @@ export default function ExpensesSection() {
                     </div>
 
                     {/* Col 2: Category Pill */}
-                    <div className="col-span-3 flex items-center gap-2 flex-wrap">
+                    <div className="col-span-2 flex items-center gap-2 flex-wrap">
                       <span
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors shrink-0"
                         style={{
                           backgroundColor: `${catColor}15`,
                           borderColor: `${catColor}35`,
@@ -952,35 +987,62 @@ export default function ExpensesSection() {
                       </span>
                     </div>
 
-                    {/* Col 3: Payment Account + Formatted Date */}
-                    <div className="col-span-3 flex flex-col justify-center gap-1">
-                      <div className="flex items-center gap-1.5 text-xs font-medium">
+                    {/* Col 3: Payment Account */}
+                    <div className="col-span-2 flex flex-col justify-center gap-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         {account ? (
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] font-medium border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-fg)] max-w-full"
                           >
-                            <BankLogo name={account.name} size={16} />
+                            <BankLogo name={account.name} size={15} />
                             <span className="truncate max-w-[130px]">{account.name}</span>
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] text-[var(--app-muted)] border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] font-medium text-[var(--app-muted)] border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
                           >
                             <Wallet size={12} className="text-rose-400" />
-                            <span>Cash / Direct</span>
+                            <span className="text-[var(--app-fg)]">Cash in Hand</span>
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--app-muted)]">
-                        <Calendar size={11} className="opacity-70" />
-                        <span>{formatDisplayDate(item.expense_date)}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--app-muted)] font-mono pl-1">
+                        <span className="uppercase text-[9px] px-1.5 py-0.2 rounded border border-[var(--app-border-subtle)] bg-[var(--app-card)] font-medium tracking-wider">
+                          {account?.type || "Cash"}
+                        </span>
+                        {account?.last_four && (
+                          <span className="opacity-75">•••• {account.last_four}</span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Col 4: Amount + Actions */}
-                    <div className="col-span-2 flex items-center justify-end gap-3.5">
-                      <div className="text-right">
-                        <div className="text-base font-bold font-mono tracking-tight text-rose-400 tabular-nums">
+                    {/* Col 4: Date Spent */}
+                    <div className="col-span-2 flex flex-col justify-center gap-1 min-w-0">
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--app-fg)] font-medium">
+                        <Calendar size={12} className="text-[var(--app-muted)] opacity-70 shrink-0" />
+                        <span className="truncate">{dateInfo.dateStr}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 pl-4">
+                        {dateInfo.badge === "today" ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Today
+                          </span>
+                        ) : dateInfo.badge === "yesterday" ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                            Yesterday
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-[var(--app-muted)] opacity-75">
+                            {dateInfo.weekday}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Col 5: Amount + Actions */}
+                    <div className="col-span-3 flex items-center justify-end gap-3 min-w-0">
+                      <div className="text-right shrink-0">
+                        <div className="text-base font-bold font-mono tracking-tight text-rose-400 tabular-nums whitespace-nowrap">
                           -{formatINR(item.amount)}
                         </div>
                         <span className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] opacity-60">
@@ -988,7 +1050,7 @@ export default function ExpensesSection() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <button
                           type="button"
                           onClick={() => openEditModal(item)}
@@ -1027,7 +1089,7 @@ export default function ExpensesSection() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-bold font-mono text-rose-400 tabular-nums">
+                        <div className="text-sm font-bold font-mono text-rose-400 tabular-nums whitespace-nowrap">
                           -{formatINR(item.amount)}
                         </div>
                         <span className="text-[9px] uppercase font-mono text-[var(--app-muted)]">Debited</span>
@@ -1045,6 +1107,11 @@ export default function ExpensesSection() {
                           }}
                         >
                           {item.category}
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--app-muted)] flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)]">
+                          <BankLogo name={account?.name || "Cash"} size={11} />
+                          <span>{account?.name || "Cash in Hand"}</span>
+                          {account?.last_four && <span className="opacity-70">••{account.last_four}</span>}
                         </span>
                         <span className="text-[10px] font-mono text-[var(--app-muted)] flex items-center gap-1">
                           <Calendar size={10} />
@@ -1081,23 +1148,22 @@ export default function ExpensesSection() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingExpense ? "Edit Expense Entry" : "Record New Expense"}
-        description="Enter expense details. If linked to an account, balance will automatically be debited."
-        size="lg"
+        title={editingExpense ? "Edit Expense" : "Record Expense"}
+        size="md"
       >
-        <form onSubmit={handleSubmitExpense} className="space-y-4">
-          <Input
-            label="Expense Title or Merchant"
-            placeholder="e.g. Swiggy, DMart, Rent, Electricity Bill"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            leftIcon={<CreditCard size={15} />}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmitExpense} className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Input
-              label="Amount (₹ INR)"
+              label="Expense Title / Merchant *"
+              placeholder="e.g. Swiggy, Rent, DMart"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              leftIcon={<CreditCard size={13} />}
+            />
+
+            <Input
+              label="Amount (₹ INR) *"
               type="number"
               step="0.01"
               min="0"
@@ -1107,17 +1173,9 @@ export default function ExpensesSection() {
               required
               leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
             />
-
-            <Input
-              label="Expense Date"
-              type="date"
-              value={expenseDate}
-              onChange={(e) => setExpenseDate(e.target.value)}
-              required
-            />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select
               label="Category"
               value={category}
@@ -1126,7 +1184,7 @@ export default function ExpensesSection() {
             />
 
             <Select
-              label="Paid From (Account / Card)"
+              label="Paid From"
               value={accountId}
               onChange={(e) => setAccountId(e.target.value)}
             >
@@ -1139,15 +1197,25 @@ export default function ExpensesSection() {
             </Select>
           </div>
 
-          <Input
-            label="Notes / Memo (Optional)"
-            placeholder="e.g. Paid via UPI QR / Split with colleagues"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Expense Date"
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+              required
+            />
+
+            <Input
+              label="Notes / Memo (Optional)"
+              placeholder="e.g. Split with team"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
 
           {!editingExpense && accountId && (
-            <label className="flex items-center gap-2 pt-1 text-xs text-[var(--app-muted)] cursor-pointer">
+            <label className="flex items-center gap-2 pt-0.5 text-[11px] text-[var(--app-muted)] cursor-pointer">
               <input
                 type="checkbox"
                 checked={deductFromAccount}
@@ -1158,7 +1226,7 @@ export default function ExpensesSection() {
             </label>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--app-border-subtle)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button
               type="button"
               variant="ghost"

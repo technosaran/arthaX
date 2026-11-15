@@ -13,7 +13,8 @@ export type BadgeVariant =
   | "amber"
   | "emerald"
   | "rose"
-  | "sky";
+  | "sky"
+  | "accent";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -68,6 +69,10 @@ export const Badge: React.FC<BadgeProps> = ({
     sky: {
       container: "bg-sky-500/10 text-sky-400 border-sky-500/20",
       dotColor: "bg-sky-400",
+    },
+    accent: {
+      container: "bg-[var(--app-accent-subtle)] text-[var(--app-accent)] border-[var(--app-accent)]/20",
+      dotColor: "bg-[var(--app-accent)]",
     },
     violet: {
       container: "bg-violet-500/10 text-violet-400 border-violet-500/20",
