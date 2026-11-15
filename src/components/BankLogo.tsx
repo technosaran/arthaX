@@ -482,34 +482,7 @@ function AppleMark({ size, className = "" }: { size: number; className?: string 
   );
 }
 
-function ZerodhaMark({ size, className = "" }: { size: number; className?: string }) {
-  return (
-    <div
-      className={`flex items-center justify-center flex-shrink-0 rounded-md overflow-hidden ${className}`}
-      style={{ width: size, height: size, backgroundColor: "#387ED1" }}
-      title="Zerodha"
-    >
-      <svg viewBox="0 0 24 24" className="w-[72%] h-[72%]" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20.378 5.835A27.267 27.267 0 0124 12.169V0H13.666c2.486 1.343 4.763 3.308 6.712 5.835zM5.48 1.297c-1.914 0-3.755.409-5.48 1.166V24h22.944C22.766 11.44 15 1.297 5.48 1.297z" />
-      </svg>
-    </div>
-  );
-}
 
-function KiteMark({ size, className = "" }: { size: number; className?: string }) {
-  return (
-    <div
-      className={`flex items-center justify-center flex-shrink-0 rounded-md overflow-hidden bg-white ${className}`}
-      style={{ width: size, height: size }}
-      title="Zerodha Kite"
-    >
-      <svg viewBox="0 0 90 60" className="w-[82%] h-[82%]" xmlns="http://www.w3.org/2000/svg">
-        <polygon fill="#F6461A" points="30 0 0 30 30 60 60 30 90 0 30 0" />
-        <polygon fill="#DB342C" points="30 60 60 30 90 60 30 60" />
-      </svg>
-    </div>
-  );
-}
 
 function GrowwMark({ size, className = "" }: { size: number; className?: string }) {
   return (
@@ -846,11 +819,7 @@ export function getKnownBankMark(name: string): string | null {
   // 24. Apple
   if (/\b(apple|apple\s*card|apple\s*cash)\b/i.test(clean)) return "apple";
 
-  // 25. Zerodha / Kite / Coin
-  if (/\bkite\b/i.test(clean)) return "kite";
-  if (/\b(zerodha|coin)\b/i.test(clean)) return "zerodha";
-
-  // 26. Groww
+  // 25. Groww
   if (/\bgroww\b/i.test(clean)) return "groww";
 
   // 27. Paytm
@@ -942,10 +911,6 @@ function renderKnownMark(knownMark: string, size: number, className = ""): React
       return <AmexMark size={size} className={className} />;
     case "apple":
       return <AppleMark size={size} className={className} />;
-    case "zerodha":
-      return <ZerodhaMark size={size} className={className} />;
-    case "kite":
-      return <KiteMark size={size} className={className} />;
     case "groww":
       return <GrowwMark size={size} className={className} />;
     case "paytm":
@@ -1025,8 +990,8 @@ export default function BankLogo({
   const domain = getBankDomain(name);
   const candidateUrls: string[] = domain
     ? [
-        getVectorLogoUrl(domain),
         getLogosDevUrl(domain, size),
+        getVectorLogoUrl(domain),
         getGoogleFaviconUrl(domain, 128),
       ]
     : [];

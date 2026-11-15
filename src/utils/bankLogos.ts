@@ -52,7 +52,10 @@ const COMMON_BANKS: Record<string, string> = {
   "dbs bank": "dbs.com",
   // Indian Fintech, Neobanks & Brokerages
   zerodha: "zerodha.com",
+  "zerodha kite": "zerodha.com",
+  "zerodha coin": "zerodha.com",
   kite: "zerodha.com",
+  coin: "zerodha.com",
   groww: "groww.in",
   paytm: "paytm.com",
   "paytm payments bank": "paytm.com",
