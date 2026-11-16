@@ -32,6 +32,7 @@ export const CACHE_KEYS = {
   FAMILY_RESPONSIBILITIES: "family_responsibilities",
   STOCKS: "stocks",
   MUTUAL_FUNDS: "mutual_funds",
+  GOALS: "goals",
 } as const;
 
 /**

@@ -17,6 +17,7 @@ import {
   ChevronRight,
   LogOut,
   X,
+  Trophy,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
@@ -45,6 +46,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
   { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
+  { id: "goals", label: "Goals", icon: Trophy, group: "finance" },
   { id: "family", label: "Family", icon: Users, group: "finance" },
   { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance" },
   { id: "settings", label: "Settings", icon: Settings, group: "system" },

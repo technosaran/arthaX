@@ -21,6 +21,7 @@ import {
   Moon,
   Zap,
   Coins,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
@@ -45,6 +46,7 @@ const TAB_META: Record<
   income: { label: "Income & Inflows", icon: TrendingUp },
   expenses: { label: "Expenses & Outflows", icon: TrendingDown },
   budgets: { label: "Category Budgets", icon: Target },
+  goals: { label: "Financial Goals & Milestones", icon: Trophy },
   family: { label: "Family Financials", icon: Users },
   ledger: { label: "Master Ledger", icon: BookOpen },
   settings: { label: "Settings & Vault", icon: Settings },

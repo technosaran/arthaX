@@ -68,6 +68,9 @@ const ExpensesSection = dynamic(() => import("@/components/ExpensesSection"), {
 const BudgetsSection = dynamic(() => import("@/components/BudgetsSection"), {
   loading: TabLoadingFallback,
 });
+const GoalsSection = dynamic(() => import("@/components/GoalsSection"), {
+  loading: TabLoadingFallback,
+});
 const FamilySection = dynamic(() => import("@/components/FamilySection"), {
   loading: TabLoadingFallback,
 });
@@ -190,6 +193,11 @@ export default function HomeClient() {
           {visitedTabs.budgets && (
             <div className={`h-full w-full ${activeTab === "budgets" ? "block" : "hidden"}`}>
               <BudgetsSection />
+            </div>
+          )}
+          {visitedTabs.goals && (
+            <div className={`h-full w-full ${activeTab === "goals" ? "block" : "hidden"}`}>
+              <GoalsSection />
             </div>
           )}
           {visitedTabs.family && (
