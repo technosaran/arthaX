@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setTelegramWebhook, getTelegramWebhookInfo, deleteTelegramWebhook, setTelegramBotCommands } from "@/utils/telegram";
+import { constantTimeCompare } from "@/utils/crypto";
+
+/**
+ * Validates admin authorization for Telegram webhook maintenance.
+ * Protects against hostile webhook redirection and man-in-the-middle attacks.
+ */
+function verifyAdminAuth(req: NextRequest): boolean {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) {
+    return true;
+  }
+
+  const adminKey = process.env.ADMIN_API_KEY || process.env.CRON_SECRET;
+  if (!adminKey) {
+    // If no admin secret is configured, fail-closed to prevent exposure
+    return false;
+  }
+
+  const providedKey =
+    req.headers.get("x-admin-key") ||
+    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    "";
+
+  return constantTimeCompare(providedKey.trim(), adminKey.trim());
+}
 
 /**
  * Telegram Webhook Setup & Inspection Endpoint
@@ -8,12 +32,20 @@ import { setTelegramWebhook, getTelegramWebhookInfo, deleteTelegramWebhook, setT
  * DELETE: Unregisters the webhook
  */
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!verifyAdminAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized: Admin privileges required." }, { status: 401 });
+  }
+
   const info = await getTelegramWebhookInfo();
   return NextResponse.json(info);
 }
 
 export async function POST(req: NextRequest) {
+  if (!verifyAdminAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized: Admin privileges required." }, { status: 401 });
+  }
+
   try {
     let body: { webhook_url?: string; secret_token?: string } = {};
     try {
@@ -49,7 +81,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  if (!verifyAdminAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized: Admin privileges required." }, { status: 401 });
+  }
+
   const res = await deleteTelegramWebhook();
   return NextResponse.json(res);
 }

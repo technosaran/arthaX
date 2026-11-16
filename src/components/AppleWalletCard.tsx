@@ -422,6 +422,7 @@ export interface AppleWalletCardProps {
   account: AccountData;
   isCash?: boolean;
   isDemat?: boolean;
+  isZerodha?: boolean;
   onEditCash?: (acc: AccountData) => void;
   onDelete?: (id: string) => void;
   formatCurrency?: (val: number) => string;
@@ -438,6 +439,7 @@ export default function AppleWalletCard({
   account,
   isCash = false,
   isDemat = false,
+  isZerodha = false,
   onEditCash,
   onDelete,
   formatCurrency,
@@ -460,6 +462,11 @@ export default function AppleWalletCard({
     account.type.toLowerCase().includes("investment") ||
     account.type.toLowerCase().includes("trading") ||
     account.type.toLowerCase().includes("demat");
+
+  const computedIsZerodha =
+    isZerodha ||
+    account.name.toLowerCase().includes("zerodha") ||
+    account.name.toLowerCase().includes("kite");
 
   const formatINR = (val: number) => {
     if (formatCurrency) return formatCurrency(val);
@@ -625,7 +632,7 @@ export default function AppleWalletCard({
               <Pencil size={11} />
               <span>Edit</span>
             </button>
-          ) : (
+          ) : computedIsZerodha ? null : (
             <button
               onClick={(e) => {
                 e.stopPropagation();

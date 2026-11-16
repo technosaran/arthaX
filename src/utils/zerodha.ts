@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { logger } from "@/utils/logger";
+import { getAutoLoginCredentials, performZerodhaAutoLogin } from "@/utils/zerodhaAutoLogin";
+import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
 
 export interface ZerodhaProfile {
   client_id: string;
@@ -30,6 +33,7 @@ export interface ZerodhaIntegrationRecord {
     stocks_synced: number;
     fno_synced: number;
     mf_synced: number;
+    wallet_balance?: number;
   } | null;
   is_active: boolean;
   created_at: string;
@@ -84,22 +88,56 @@ export async function getZerodhaIntegration(userId: string): Promise<{
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (error || !data) {
+    let record = data;
+    const envApiKey = process.env.ZERODHA_API_KEY;
+    const envApiSecret = process.env.ZERODHA_API_SECRET;
+    const authorizedUserId = (process.env.ZERODHA_AUTHORIZED_USER_ID || "").trim();
+    const isAuthorizedOwner = !authorizedUserId || userId === "default_user" || userId === authorizedUserId;
+
+    if (!record && envApiKey && envApiSecret && isAuthorizedOwner) {
+      const encryptedSecret = encryptSensitiveData(envApiSecret, "broker-credentials");
+      const { data: upserted } = await supabaseAdmin
+        .from("zerodha_integrations")
+        .upsert(
+          {
+            user_id: userId,
+            api_key: envApiKey,
+            api_secret: encryptedSecret,
+          },
+          { onConflict: "user_id" }
+        )
+        .select("*")
+        .maybeSingle();
+      if (upserted) {
+        record = upserted;
+      }
+    }
+
+    if (!record) {
       return {
-        configured: false,
+        configured: Boolean(isAuthorizedOwner && envApiKey && envApiSecret),
         connected: false,
         integration: null,
         isTokenExpired: true,
       };
     }
 
-    const tokenValid = isTokenValidToday(data.token_generated_at);
-    const hasAccessToken = Boolean(data.access_token);
+    // Decrypt credentials transparently with fallback support
+    const decryptedRecord: ZerodhaIntegrationRecord = {
+      ...record,
+      api_secret: decryptSensitiveData(record.api_secret, "broker-credentials") || "",
+      access_token: decryptSensitiveData(record.access_token, "broker-credentials"),
+      public_token: decryptSensitiveData(record.public_token, "broker-credentials"),
+      request_token: decryptSensitiveData(record.request_token, "broker-credentials"),
+    };
+
+    const tokenValid = isTokenValidToday(decryptedRecord.token_generated_at);
+    const hasAccessToken = Boolean(decryptedRecord.access_token);
 
     return {
-      configured: Boolean(data.api_key && data.api_secret),
+      configured: Boolean(decryptedRecord.api_key && decryptedRecord.api_secret),
       connected: hasAccessToken && tokenValid,
-      integration: data as ZerodhaIntegrationRecord,
+      integration: decryptedRecord,
       isTokenExpired: !tokenValid,
     };
   } catch (err) {
@@ -242,6 +280,50 @@ export async function fetchKiteMfHoldings(apiKey: string, accessToken: string) {
 }
 
 /**
+ * Fetch Cash Balance / Margins (Zerodha Wallet) from Kite Connect.
+ */
+export async function fetchKiteMargins(apiKey: string, accessToken: string): Promise<{
+  equity?: {
+    enabled?: boolean;
+    net?: number;
+    available?: {
+      live_balance?: number;
+      cash?: number;
+      opening_balance?: number;
+      intraday_payin?: number;
+    };
+  };
+  commodity?: {
+    enabled?: boolean;
+    net?: number;
+    available?: {
+      live_balance?: number;
+      cash?: number;
+    };
+  };
+} | null> {
+  try {
+    const res = await fetch("https://api.kite.trade/user/margins", {
+      headers: {
+        "X-Kite-Version": "3",
+        Authorization: `token ${apiKey}:${accessToken}`,
+      },
+    });
+
+    const json = await res.json();
+    if (!res.ok || json.status === "error") {
+      logger.warn("[Zerodha Margins] API notice:", json.message);
+      return null;
+    }
+
+    return json.data || null;
+  } catch (err: any) {
+    logger.warn("[Zerodha Margins] Network error:", err.message);
+    return null;
+  }
+}
+
+/**
  * Parse an F&O trading symbol into underlying, type, strike, and expiry.
  * Examples:
  *  - "NIFTY26NOV24000CE" -> symbol: "NIFTY", type: "CE", strike: 24000, expiry: "2026-11-26"
@@ -304,6 +386,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
   stocksSynced: number;
   fnoSynced: number;
   mfSynced: number;
+  walletBalance?: number;
   error?: string;
 }> {
   try {
@@ -320,30 +403,91 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       };
     }
 
-    if (!connected || !integration.access_token || isTokenExpired) {
-      return {
-        success: false,
-        stocksSynced: 0,
-        fnoSynced: 0,
-        mfSynced: 0,
-        error: "Zerodha session expired or not authenticated. Please log in with Zerodha today.",
-      };
+    let activeApiKey = integration.api_key;
+    let activeAccessToken = integration.access_token;
+
+    // Check if session needs renewal (daily 6:00 AM IST reset)
+    if (!connected || !activeAccessToken || isTokenExpired) {
+      const autoCreds = getAutoLoginCredentials(integration, userId);
+      if (autoCreds) {
+        logger.info("[Zerodha Sync] Daily session expired. Attempting automated TOTP auto-login...");
+        const loginRes = await performZerodhaAutoLogin(autoCreds);
+
+        if (loginRes.success && loginRes.accessToken) {
+          activeAccessToken = loginRes.accessToken;
+          activeApiKey = autoCreds.apiKey;
+
+          await supabaseAdmin
+            .from("zerodha_integrations")
+            .update({
+              access_token: encryptSensitiveData(loginRes.accessToken, "broker-credentials"),
+              public_token: encryptSensitiveData(loginRes.publicToken || null, "broker-credentials"),
+              request_token: encryptSensitiveData(loginRes.requestToken || null, "broker-credentials"),
+              token_generated_at: new Date().toISOString(),
+              user_profile: loginRes.profile || integration.user_profile,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+          logger.info("[Zerodha Sync] Automated TOTP login successful! Daily session renewed.");
+        } else {
+          logger.warn("[Zerodha Sync] Auto-login failed:", loginRes.error);
+          return {
+            success: false,
+            stocksSynced: 0,
+            fnoSynced: 0,
+            mfSynced: 0,
+            error: `Zerodha session expired. Auto-login failed (${loginRes.error || "Unknown"}). Please click 'Login with Kite' in Settings.`,
+          };
+        }
+      } else {
+        return {
+          success: false,
+          stocksSynced: 0,
+          fnoSynced: 0,
+          mfSynced: 0,
+          error: "Zerodha session expired or not authenticated. Please log in with Zerodha today or configure auto-login in .env.local.",
+        };
+      }
     }
 
-    const { api_key, access_token } = integration;
+    const apiKey = activeApiKey;
+    const accessToken = activeAccessToken;
 
-    // 1. Ensure a Zerodha account exists in `accounts` table for linked attribution
+    // 1. Fetch data from Kite API for holdings, positions, mutual funds, and cash margins in parallel
+    const [holdingsRes, positionsRes, mfHoldingsRes, marginsRes] = await Promise.allSettled([
+      fetchKiteHoldings(apiKey, accessToken),
+      fetchKitePositions(apiKey, accessToken),
+      fetchKiteMfHoldings(apiKey, accessToken),
+      fetchKiteMargins(apiKey, accessToken),
+    ]);
+
+    // Compute live wallet/margin cash balance
+    let walletBalance = 0;
+    if (marginsRes.status === "fulfilled" && marginsRes.value) {
+      const eqNet = Number(marginsRes.value?.equity?.net ?? marginsRes.value?.equity?.available?.live_balance ?? 0);
+      const comNet = Number(marginsRes.value?.commodity?.net ?? marginsRes.value?.commodity?.available?.live_balance ?? 0);
+      walletBalance = Math.round((eqNet + comNet) * 100) / 100;
+    }
+
+    // 2. Ensure or update Zerodha account in `accounts` table with fresh wallet cash balance
     let zerodhaAccountId: string | null = null;
     try {
       const { data: existingAccount } = await supabaseAdmin
         .from("accounts")
-        .select("id")
+        .select("id, balance")
         .eq("user_id", userId)
         .ilike("name", "%Zerodha%")
         .maybeSingle();
 
       if (existingAccount) {
         zerodhaAccountId = existingAccount.id;
+        await supabaseAdmin
+          .from("accounts")
+          .update({
+            balance: walletBalance,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingAccount.id);
       } else {
         const { data: newAccount } = await supabaseAdmin
           .from("accounts")
@@ -351,7 +495,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
             user_id: userId,
             name: "Zerodha Trading & Demat",
             type: "INVESTMENT",
-            balance: 0,
+            balance: walletBalance,
             currency: "INR",
             last_four: "HXH648",
           })
@@ -362,13 +506,6 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     } catch (accErr) {
       logger.warn("[Zerodha Sync] Account lookup skipped:", String(accErr));
     }
-
-    // 2. Fetch data from Kite API for all 3 sections in parallel
-    const [holdingsRes, positionsRes, mfHoldingsRes] = await Promise.allSettled([
-      fetchKiteHoldings(api_key, access_token),
-      fetchKitePositions(api_key, access_token),
-      fetchKiteMfHoldings(api_key, access_token),
-    ]);
 
     let stocksSynced = 0;
     let fnoSynced = 0;
@@ -477,7 +614,12 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     }
 
     // 3. Update Integration status
-    const summary = { stocks_synced: stocksSynced, fno_synced: fnoSynced, mf_synced: mfSynced };
+    const summary = {
+      stocks_synced: stocksSynced,
+      fno_synced: fnoSynced,
+      mf_synced: mfSynced,
+      wallet_balance: walletBalance,
+    };
     await supabaseAdmin
       .from("zerodha_integrations")
       .update({
@@ -489,11 +631,24 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       })
       .eq("user_id", userId);
 
+    // Invalidate Redis caches so Accounts & Portfolio views instantly reflect the fresh balance
+    try {
+      await Promise.allSettled([
+        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS)),
+        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.STOCKS)),
+        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.MUTUAL_FUNDS)),
+        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO)),
+      ]);
+    } catch (cacheErr) {
+      logger.warn("[Zerodha Sync] Cache invalidation skipped:", String(cacheErr));
+    }
+
     return {
       success: true,
       stocksSynced,
       fnoSynced,
       mfSynced,
+      walletBalance,
     };
   } catch (err: any) {
     logger.error("[Zerodha Sync] Failed to sync:", err);

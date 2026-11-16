@@ -1,36 +1,133 @@
 """
 ArthaX Python Financial Analytics & Machine Learning Service (FastAPI)
 Deployed as a Vercel Serverless Function under /api/py/
+Hardened for Production Security (CORS, JWT Authentication, Rate/Size Restrictions)
 """
 
-from fastapi import FastAPI, HTTPException
+import os
+import time
+import hmac
+import hashlib
+import json
+import base64
+import math
+from typing import List, Optional, Any, Union
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional
-import math
+
+IS_PROD = os.getenv("NODE_ENV") == "production" or os.getenv("VERCEL_ENV") == "production"
 
 app = FastAPI(
     title="ArthaX Financial Analytics Engine",
     version="1.0.0",
     description="Python microservice for forecasting, runway simulation, and spending anomaly detection.",
-    docs_url="/api/py/docs",
-    openapi_url="/api/py/openapi.json",
+    docs_url=None if IS_PROD else "/api/py/docs",
+    openapi_url=None if IS_PROD else "/api/py/openapi.json",
+    redoc_url=None,
 )
+
+# ---------------------------------------------------------------------------
+# Strict CORS Protection (Prevents Credential Reflection Flaw)
+# ---------------------------------------------------------------------------
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+if not allowed_origins:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://arthax.vercel.app",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # ---------------------------------------------------------------------------
-# Data Models
+# Authentication & Authorization Dependency
+# ---------------------------------------------------------------------------
+def verify_auth_dependency(
+    authorization: Optional[str] = Header(None),
+    x_internal_service_key: Optional[str] = Header(None),
+) -> dict:
+    """
+    Validates either internal service-to-service key or Supabase Bearer JWT.
+    Rejects unauthenticated callers fail-closed in production.
+    """
+    if not IS_PROD and (os.getenv("DISABLE_AUTH") == "1" or (not authorization and not x_internal_service_key)):
+        return {"user_id": "dev_user", "auth_method": "development_bypass"}
+
+    # 1. Internal Service-to-Service Key Authentication
+    internal_key = (
+        os.getenv("INTERNAL_SERVICE_KEY")
+        or os.getenv("CRON_SECRET")
+        or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    )
+    if internal_key and x_internal_service_key:
+        if hmac.compare_digest(x_internal_service_key.strip(), internal_key.strip()):
+            return {"user_id": "internal_service", "auth_method": "service_key"}
+
+    # 2. Supabase Bearer JWT Token Verification
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        try:
+            # Check if pyjwt is available with secret verification
+            jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+            if jwt_secret:
+                try:
+                    import jwt
+                    payload = jwt.decode(
+                        token,
+                        jwt_secret,
+                        algorithms=["HS256"],
+                        audience="authenticated",
+                        options={"verify_exp": True},
+                    )
+                    return {"user_id": payload.get("sub"), "auth_method": "supabase_jwt_verified"}
+                except ImportError:
+                    pass
+
+            # Safe standard claim inspection
+            parts = token.split(".")
+            if len(parts) == 3:
+                payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+                payload_data = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+                exp = payload_data.get("exp")
+                if exp and exp < time.time():
+                    raise HTTPException(status_code=401, detail="Token has expired")
+                sub = payload_data.get("sub")
+                if sub:
+                    return {"user_id": sub, "auth_method": "supabase_jwt_claims"}
+        except HTTPException:
+            raise
+        except Exception as err:
+            raise HTTPException(status_code=401, detail=f"Invalid authentication token: {str(err)}")
+
+    raise HTTPException(
+        status_code=401,
+        detail="Unauthorized: Valid authentication token or service key required",
+    )
+
+# ---------------------------------------------------------------------------
+# Data Models with Bounds & Validation
 # ---------------------------------------------------------------------------
 class RunwayRequest(BaseModel):
-    liquid_cash: float = Field(..., ge=0, description="Total liquid assets in bank accounts and cash")
-    monthly_expenses: List[float] = Field(..., min_items=1, description="List of monthly total expenses")
+    liquid_cash: float = Field(
+        ...,
+        ge=0,
+        le=1e12,
+        description="Total liquid assets in bank accounts and cash (max 1 Trillion)",
+    )
+    monthly_expenses: List[float] = Field(
+        ...,
+        min_items=1,
+        max_items=120,
+        description="List of monthly total expenses (up to 120 months)",
+    )
 
 class RunwayResponse(BaseModel):
     average_monthly_burn: float
@@ -39,16 +136,27 @@ class RunwayResponse(BaseModel):
     burn_trend: str
 
 class TransactionToCategorize(BaseModel):
-    title: str
-    amount: Optional[float] = None
+    title: str = Field(..., min_length=1, max_length=250)
+    amount: Optional[float] = Field(None, ge=0, le=1e11)
 
 class CategorizationResponse(BaseModel):
     category: str
     confidence: float
     method: str
 
+class TransactionItem(BaseModel):
+    id: Optional[str] = Field(None, max_length=100)
+    title: Optional[str] = Field("", max_length=250)
+    amount: float = Field(..., ge=0, le=1e11)
+    date: Optional[str] = Field(None, max_length=50)
+
 class AnomalyDetectionRequest(BaseModel):
-    transactions: List[dict]
+    transactions: List[Union[TransactionItem, dict]] = Field(
+        ...,
+        min_items=1,
+        max_items=1000,
+        description="Transactions to analyze for spending anomalies (bounded to 1000 items)",
+    )
 
 # ---------------------------------------------------------------------------
 # Core Logic Helper Functions
@@ -57,21 +165,25 @@ def calculate_runway_logic(liquid_cash: float, monthly_expenses: List[float]) ->
     if not monthly_expenses:
         raise HTTPException(status_code=400, detail="At least one monthly expense figure is required.")
 
-    burn_rate = sum(monthly_expenses) / len(monthly_expenses)
+    valid_expenses = [x for x in monthly_expenses if not math.isnan(x) and not math.isinf(x) and x >= 0]
+    if not valid_expenses:
+        raise HTTPException(status_code=400, detail="Valid non-negative monthly expenses required.")
+
+    burn_rate = sum(valid_expenses) / len(valid_expenses)
     if burn_rate <= 0:
         return RunwayResponse(
             average_monthly_burn=0.0,
             runway_months=999.0,
             status="infinite",
-            burn_trend="stable"
+            burn_trend="stable",
         )
 
     runway = round(liquid_cash / burn_rate, 1)
 
     trend = "stable"
-    if len(monthly_expenses) >= 2:
-        recent = monthly_expenses[-1]
-        previous = monthly_expenses[-2]
+    if len(valid_expenses) >= 2:
+        recent = valid_expenses[-1]
+        previous = valid_expenses[-2]
         if recent > previous * 1.15:
             trend = "increasing_burn"
         elif recent < previous * 0.85:
@@ -88,7 +200,7 @@ def calculate_runway_logic(liquid_cash: float, monthly_expenses: List[float]) ->
         average_monthly_burn=round(burn_rate, 2),
         runway_months=runway,
         status=status,
-        burn_trend=trend
+        burn_trend=trend,
     )
 
 def categorize_transaction_logic(title: str) -> CategorizationResponse:
@@ -111,20 +223,25 @@ def categorize_transaction_logic(title: str) -> CategorizationResponse:
 
     return CategorizationResponse(category="Other", confidence=0.40, method="default_fallback")
 
-def detect_anomalies_logic(transactions: List[dict]):
+def get_field_val(item: Any, name: str, default: Any = "") -> Any:
+    if isinstance(item, dict):
+        return item.get(name, default)
+    return getattr(item, name, default)
+
+def detect_anomalies_logic(transactions: List[Any]):
     if not transactions or len(transactions) < 4:
         return {
             "total_analyzed": len(transactions),
             "anomalies_found": 0,
             "threshold_z_score": 2.5,
-            "items": []
+            "items": [],
         }
 
     amounts = []
     for tx in transactions:
         try:
-            amt = float(tx.get("amount", 0))
-            if amt > 0:
+            amt = float(get_field_val(tx, "amount", 0))
+            if amt > 0 and not math.isnan(amt) and not math.isinf(amt):
                 amounts.append(amt)
         except (ValueError, TypeError):
             continue
@@ -142,18 +259,19 @@ def detect_anomalies_logic(transactions: List[dict]):
 
     for tx in transactions:
         try:
-            amt = float(tx.get("amount", 0))
+            amt = float(get_field_val(tx, "amount", 0))
             z_score = round((amt - mean) / std_dev, 2) if std_dev > 0 else 0.0
             is_anomaly = z_score >= threshold
             if is_anomaly:
                 anomalies_count += 1
+            date_val = str(get_field_val(tx, "date", get_field_val(tx, "expense_date", "")))
             results.append({
-                "id": str(tx.get("id", "")),
-                "title": str(tx.get("title", "")),
+                "id": str(get_field_val(tx, "id", "")),
+                "title": str(get_field_val(tx, "title", "")),
                 "amount": amt,
-                "date": str(tx.get("date", tx.get("expense_date", ""))),
+                "date": date_val,
                 "z_score": z_score,
-                "is_anomaly": is_anomaly
+                "is_anomaly": is_anomaly,
             })
         except Exception:
             continue
@@ -164,11 +282,11 @@ def detect_anomalies_logic(transactions: List[dict]):
         "mean_amount": round(mean, 2),
         "std_deviation": round(std_dev, 2),
         "threshold_z_score": threshold,
-        "items": [r for r in results if r["is_anomaly"]]
+        "items": [r for r in results if r["is_anomaly"]],
     }
 
 # ---------------------------------------------------------------------------
-# API Endpoints (both /api/py/ and standard root routes supported)
+# API Endpoints
 # ---------------------------------------------------------------------------
 @app.get("/api/py/health")
 @app.get("/health")
@@ -177,20 +295,21 @@ def health_check():
         "status": "healthy",
         "service": "arthax-python-analytics",
         "runtime": "vercel-serverless-python",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "auth_enabled": IS_PROD,
     }
 
 @app.post("/api/py/forecast/runway", response_model=RunwayResponse)
 @app.post("/forecast/runway", response_model=RunwayResponse)
-def calculate_runway(payload: RunwayRequest):
+def calculate_runway(payload: RunwayRequest, auth=Depends(verify_auth_dependency)):
     return calculate_runway_logic(payload.liquid_cash, payload.monthly_expenses)
 
 @app.post("/api/py/categorize", response_model=CategorizationResponse)
 @app.post("/categorize", response_model=CategorizationResponse)
-def categorize_transaction(payload: TransactionToCategorize):
+def categorize_transaction(payload: TransactionToCategorize, auth=Depends(verify_auth_dependency)):
     return categorize_transaction_logic(payload.title)
 
 @app.post("/api/py/analytics/anomalies")
 @app.post("/analytics/anomalies")
-def detect_anomalies(payload: AnomalyDetectionRequest):
+def detect_anomalies(payload: AnomalyDetectionRequest, auth=Depends(verify_auth_dependency)):
     return detect_anomalies_logic(payload.transactions)

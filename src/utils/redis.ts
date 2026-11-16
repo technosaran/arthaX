@@ -37,7 +37,7 @@ export const CACHE_KEYS = {
 
 /**
  * Helper to scope cache keys per user for complete multi-tenant isolation.
- * Throws if userId is not provided to strictly prevent cross-tenant key leakage.
+ * Strictly throws if userId is not provided to prevent cross-tenant key leakage.
  */
 export const getUserCacheKey = (userId: string | undefined | null, resource: string): string => {
   if (!userId || typeof userId !== "string" || !userId.trim()) {

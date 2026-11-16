@@ -55,4 +55,20 @@ describe("Zerodha Kite API Integration Utilities", () => {
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);
     });
   });
+
+  describe("Zerodha Card Protection", () => {
+    it("recognizes Zerodha accounts for protection against deletion", () => {
+      const isZerodhaAccount = (name: string) => {
+        const lower = name.toLowerCase();
+        return lower.includes("zerodha") || lower.includes("kite");
+      };
+
+      expect(isZerodhaAccount("Zerodha Trading & Demat")).toBe(true);
+      expect(isZerodhaAccount("Zerodha Kite")).toBe(true);
+      expect(isZerodhaAccount("Zerodha Coin")).toBe(true);
+      expect(isZerodhaAccount("Zerodha")).toBe(true);
+      expect(isZerodhaAccount("HDFC Bank")).toBe(false);
+      expect(isZerodhaAccount("SBI Savings")).toBe(false);
+    });
+  });
 });

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import { clearLocalFinancialCache } from "@/utils/cacheClient";
 
 interface UserProfile {
   name: string;
@@ -125,13 +126,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchProfile(currentUser.id, fallbackName);
       } else {
         setProfile(null);
-        try {
-          window.localStorage.removeItem("arthax_cached_profile");
-        } catch {}
+        clearLocalFinancialCache();
       }
 
       setLoading(false);
       if (event === "SIGNED_OUT") {
+        clearLocalFinancialCache();
         router.push("/login");
       }
     });
@@ -179,9 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const supabase = createClient();
-    try {
-      window.localStorage.removeItem("arthax_cached_profile");
-    } catch {}
+    clearLocalFinancialCache();
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);

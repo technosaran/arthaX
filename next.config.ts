@@ -2,30 +2,32 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  poweredByHeader: false,
+  productionBrowserSourceMaps: false,
   rewrites: async () => {
-    return [
+    const isDev = process.env.NODE_ENV === "development";
+    const rules = [
       {
         source: "/api/py/:path*",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/:path*"
-            : "/api/",
-      },
-      {
-        source: "/docs",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/docs"
-            : "/api/py/docs",
-      },
-      {
-        source: "/openapi.json",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/openapi.json"
-            : "/api/py/openapi.json",
+        destination: isDev ? "http://127.0.0.1:8000/api/py/:path*" : "/api/",
       },
     ];
+
+    // Expose interactive API documentation only in local development
+    if (isDev) {
+      rules.push(
+        {
+          source: "/docs",
+          destination: "http://127.0.0.1:8000/api/py/docs",
+        },
+        {
+          source: "/openapi.json",
+          destination: "http://127.0.0.1:8000/api/py/openapi.json",
+        }
+      );
+    }
+
+    return rules;
   },
   experimental: {
     optimizePackageImports: ["lucide-react"],

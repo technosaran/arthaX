@@ -5,6 +5,7 @@ import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expen
 import { sendWhatsAppTextMessage } from "@/utils/whatsapp";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString } from "@/utils/monthUtils";
+import { constantTimeCompare } from "@/utils/crypto";
 
 /**
  * Webhook Verification Handler (GET)
@@ -16,10 +17,16 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  const verifyToken =
-    process.env.WHATSAPP_VERIFY_TOKEN || "arthax_secure_whatsapp_token_2026";
+  const configuredToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (mode === "subscribe" && token === verifyToken) {
+  if (isProduction && !configuredToken) {
+    return NextResponse.json({ error: "Server configuration error: WHATSAPP_VERIFY_TOKEN missing." }, { status: 500 });
+  }
+
+  const verifyToken = configuredToken || (process.env.NODE_ENV === "test" || process.env.VITEST ? "arthax_secure_whatsapp_token_2026" : "");
+
+  if (mode === "subscribe" && token && constantTimeCompare(token, verifyToken)) {
     console.log("[WhatsApp Webhook] Handshake verified successfully.");
     return new Response(challenge || "", { status: 200 });
   }
@@ -59,7 +66,12 @@ export async function POST(req: NextRequest) {
     const appSecret = process.env.WHATSAPP_APP_SECRET;
     const signature = req.headers.get("x-hub-signature-256");
 
-    // Enforce HMAC-SHA256 signature verification in production if app secret is configured
+    // Enforce HMAC-SHA256 signature verification in production
+    const isProduction = process.env.NODE_ENV === "production";
+    if (isProduction && !appSecret) {
+      return NextResponse.json({ error: "Server configuration error: WHATSAPP_APP_SECRET missing." }, { status: 500 });
+    }
+
     if (appSecret) {
       const isValid = verifyMetaSignature(rawBody, signature, appSecret);
       if (!isValid) {
@@ -85,7 +97,10 @@ export async function POST(req: NextRequest) {
     if (typeof body.text === "string") {
       messageText = body.text;
       senderPhone = typeof body.phone === "string" ? body.phone : "test_user";
-      explicitUserId = typeof body.user_id === "string" ? body.user_id : "";
+      // Prevent cross-user privilege escalation: explicit user_id is only accepted in test/dev modes
+      if (process.env.NODE_ENV === "test" || process.env.VITEST || !isProduction) {
+        explicitUserId = typeof body.user_id === "string" ? body.user_id : "";
+      }
       messageId = typeof body.message_id === "string" ? body.message_id : `direct_${Date.now()}`;
     } else if (Array.isArray(body.entry) && body.entry[0]) {
       const entryObj = body.entry[0] as { changes?: Array<{ value?: { metadata?: { phone_number_id?: string }; messages?: Array<{ id?: string; from?: string; type?: string; text?: { body?: string } }> } }> };

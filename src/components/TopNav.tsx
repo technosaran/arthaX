@@ -6,51 +6,22 @@ import {
   Settings,
   LogOut,
   Menu,
-  LayoutDashboard,
-  Landmark,
-  CandlestickChart,
-  TrendingUp,
-  TrendingDown,
-  Target,
-  BookOpen,
-  Users,
   ShieldCheck,
   Eye,
   EyeOff,
   Sun,
   Moon,
-  Zap,
-  Coins,
-  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
 
 interface TopNavProps {
-  activeTab: string;
+  activeTab?: string;
   setActiveTab: (tab: string) => void;
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 }
-
-const TAB_META: Record<
-  string,
-  { label: string; icon: React.ComponentType<{ size?: number; className?: string }> }
-> = {
-  dashboard: { label: "Financial Overview", icon: LayoutDashboard },
-  accounts: { label: "Accounts & Cards", icon: Landmark },
-  stocks: { label: "Indian Equities & Stocks (Zerodha Kite)", icon: CandlestickChart },
-  "mutual-funds": { label: "Mutual Funds & SIPs (Zerodha Coin)", icon: Coins },
-  fno: { label: "Futures & Options", icon: Zap },
-  income: { label: "Income & Inflows", icon: TrendingUp },
-  expenses: { label: "Expenses & Outflows", icon: TrendingDown },
-  budgets: { label: "Category Budgets", icon: Target },
-  goals: { label: "Financial Goals & Milestones", icon: Trophy },
-  family: { label: "Family Financials", icon: Users },
-  ledger: { label: "Master Ledger", icon: BookOpen },
-  settings: { label: "Settings & Vault", icon: Settings },
-};
 
 export default function TopNav({
   activeTab,
@@ -117,9 +88,6 @@ export default function TopNav({
     return displayName.slice(0, 2).toUpperCase();
   }, [displayName]);
 
-  const activeMeta = TAB_META[activeTab] || { label: "Overview", icon: LayoutDashboard };
-  const TabIcon = activeMeta.icon;
-
   const togglePrivacyMask = () => {
     const root = document.documentElement;
     const isMasked = root.classList.toggle("privacy-masked");
@@ -156,8 +124,8 @@ export default function TopNav({
         color: "var(--app-fg)",
       }}
     >
-      {/* Left: Mobile Toggle & Breadcrumbs */}
-      <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 pr-2">
+      {/* Left: Mobile Navigation Drawer Toggle */}
+      <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
@@ -166,17 +134,6 @@ export default function TopNav({
         >
           <Menu size={16} />
         </button>
-
-        <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0 font-medium">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border border-[var(--app-border)] bg-[var(--app-card)]"
-          >
-            <TabIcon size={14} className="text-[var(--app-accent)]" />
-          </div>
-          <span className="font-semibold tracking-tight text-[var(--app-fg)] truncate">
-            {activeMeta.label}
-          </span>
-        </div>
       </div>
 
       {/* Right: Quick Action Controls & User Avatar */}

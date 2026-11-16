@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { rateLimit } from "@/utils/rateLimit";
+import { logger } from "@/utils/logger";
 import { z } from "zod";
 
 const WipeRequestSchema = z.object({
@@ -15,6 +17,17 @@ async function handleWipe(req: NextRequest) {
   if (!user || !userId) {
     return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 });
   }
+
+  // Rate limiting to prevent abuse or denial-of-service wipes
+  const rl = await rateLimit(`workspace_wipe:${userId}`, 5, 3600);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many reset attempts. Please try again later." },
+      { status: 429 }
+    );
+  }
+
+  logger.warn(`[Audit Trail] User ${userId} initiated workspace wipe`, "WorkspaceWipe");
 
   try {
     const body = await req.json().catch(() => ({}));

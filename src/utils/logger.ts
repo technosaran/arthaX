@@ -20,6 +20,22 @@ const SENSITIVE_KEYS = new Set([
   "service_role",
   "service_key",
   "cookie",
+  "totp",
+  "totp_secret",
+  "totpsecret",
+  "pin",
+  "cvv",
+  "pan",
+  "aadhaar",
+  "account_number",
+  "bank_account",
+  "session_token",
+  "request_token",
+  "public_token",
+  "kite_secret",
+  "private_key",
+  "encryption_key",
+  "master_key",
 ]);
 
 /**

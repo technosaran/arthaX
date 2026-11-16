@@ -67,6 +67,19 @@ export default function InteractiveDonutChart({
     });
   }, [segments, totalValue]);
 
+  // Dynamic font sizing for center values based on formatted text length
+  const formattedCenterTotal = useMemo(() => {
+    return formatter(totalValue).replace(".00", "");
+  }, [formatter, totalValue]);
+
+  const centerTotalFontSize = useMemo(() => {
+    const len = formattedCenterTotal.length;
+    if (len > 16) return "text-[10px] tracking-tighter";
+    if (len > 12) return "text-[11px] tracking-tight";
+    if (len > 9) return "text-xs tracking-tight";
+    return "text-xs sm:text-[13px] tracking-tight";
+  }, [formattedCenterTotal]);
+
   // Compute strokeDasharray and strokeDashoffset for each segment with clean gaps
   const renderedSegments = useMemo(() => {
     const gapAngle = validSegments.length > 1 ? 2.5 : 0; // 2.5px micro-gap between slices
@@ -95,6 +108,19 @@ export default function InteractiveDonutChart({
       ? renderedSegments[hoveredIndex]
       : null;
 
+  const activeSegmentFormatted = useMemo(() => {
+    if (!activeSegment) return "";
+    return formatter(activeSegment.value).replace(".00", "");
+  }, [formatter, activeSegment]);
+
+  const activeSegmentFontSize = useMemo(() => {
+    const len = activeSegmentFormatted.length;
+    if (len > 16) return "text-[10px] tracking-tighter";
+    if (len > 12) return "text-[11px] tracking-tight";
+    if (len > 9) return "text-xs tracking-tight";
+    return "text-xs sm:text-sm tracking-tight";
+  }, [activeSegmentFormatted]);
+
   if (validSegments.length === 0 || totalValue <= 0) {
     return (
       <div className="h-48 flex flex-col items-center justify-center text-center p-6 text-xs opacity-60 w-full select-none">
@@ -119,7 +145,7 @@ export default function InteractiveDonutChart({
       className={`flex flex-col ${
         variant === "compact"
           ? "items-center gap-5"
-          : "sm:flex-row items-center gap-6 lg:gap-10"
+          : "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-6 lg:gap-8"
       } w-full`}
     >
       {/* Donut SVG Ring Container with Luminescent Bloom */}
@@ -233,7 +259,7 @@ export default function InteractiveDonutChart({
 
         {/* Dynamic Center Crystal Lens Display */}
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none rounded-full transition-all duration-200"
+          className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none rounded-full transition-all duration-200 overflow-hidden"
           style={{
             margin: strokeWidth + 6,
             background: `radial-gradient(circle, var(--app-card) 60%, var(--app-bg) 100%)`,
@@ -246,15 +272,19 @@ export default function InteractiveDonutChart({
           }}
         >
           {activeSegment ? (
-            <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150 px-2">
+            <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150 px-2 max-w-full">
               <span
-                className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[95px] mb-0.5"
+                className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[100px] mb-0.5"
                 style={{ color: activeSegment.color }}
+                title={activeSegment.label}
               >
                 {activeSegment.label}
               </span>
-              <span className="text-xs sm:text-sm font-extrabold font-mono tracking-tight leading-tight">
-                {formatter(activeSegment.value).replace(".00", "")}
+              <span
+                className={`${activeSegmentFontSize} font-extrabold font-mono leading-tight max-w-[112px] truncate`}
+                title={activeSegmentFormatted}
+              >
+                {activeSegmentFormatted}
               </span>
               <span
                 className="text-[9px] font-bold font-mono px-2 py-0.5 mt-1 rounded-full border tracking-tight"
@@ -268,15 +298,16 @@ export default function InteractiveDonutChart({
               </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center animate-in fade-in duration-150 px-2">
-              <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60">
+            <div className="flex flex-col items-center animate-in fade-in duration-150 px-2 max-w-full">
+              <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60 truncate max-w-[100px]">
                 {totalLabel}
               </span>
               <span
-                className="text-xs sm:text-[13px] font-extrabold font-mono tracking-tight leading-tight mt-0.5"
+                className={`${centerTotalFontSize} font-extrabold font-mono leading-tight mt-0.5 max-w-[112px] truncate`}
                 style={{ color: centerColor || "var(--app-fg)" }}
+                title={formattedCenterTotal}
               >
-                {formatter(totalValue).replace(".00", "")}
+                {formattedCenterTotal}
               </span>
               <span className="text-[9px] font-mono opacity-50 mt-0.5 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -288,7 +319,7 @@ export default function InteractiveDonutChart({
       </div>
 
       {/* Rich Interactive Legend with Proportional Progress Meters */}
-      <div className="w-full sm:max-w-xs space-y-2.5">
+      <div className="w-full sm:w-auto flex-1 sm:max-w-xs min-w-0 space-y-2.5">
         {title && (
           <div
             className="flex items-center justify-between pb-2 border-b select-none"

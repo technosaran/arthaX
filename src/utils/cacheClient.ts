@@ -163,3 +163,30 @@ export async function invalidateCacheKeys(keys: string | string[]): Promise<void
     }).catch(() => {});
   }
 }
+
+/**
+ * Completely purges all local financial cache items from Memory and LocalStorage.
+ * Mandatory on user logout or session termination to prevent data leakage.
+ */
+export function clearLocalFinancialCache(): void {
+  // 1. Purge in-memory cache
+  memoryCache.clear();
+
+  // 2. Purge all localStorage entries starting with 'arthax_c_' or 'arthax_cached_'
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && (key.startsWith("arthax_c_") || key.startsWith("arthax_cached_"))) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const k of keysToRemove) {
+        window.localStorage.removeItem(k);
+      }
+    } catch {
+      // Ignore fallback errors
+    }
+  }
+}

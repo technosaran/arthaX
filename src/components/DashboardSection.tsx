@@ -355,6 +355,26 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       .reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
   }, [accounts]);
 
+  // Formatted Net Worth (omitting trailing .00 for whole numbers to ensure crisp elegance & avoid truncation)
+  const formattedNetWorth = useMemo(() => {
+    const formatted = formatCurrency(netWorth);
+    return formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
+  }, [formatCurrency, netWorth]);
+
+  // Dynamic Net Worth font sizing based on string length to guarantee zero overflow
+  const netWorthFontSize = useMemo(() => {
+    const len = formattedNetWorth.length;
+    if (len > 16) {
+      // 17+ chars (e.g. ₹9,93,56,00,08,832)
+      return "text-2xl sm:text-3xl lg:text-3xl xl:text-4xl 2xl:text-5xl";
+    }
+    if (len > 12) {
+      // 13-16 chars (e.g. ₹10,00,00,000)
+      return "text-3xl sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl";
+    }
+    return "text-3xl sm:text-5xl xl:text-6xl";
+  }, [formattedNetWorth]);
+
   const liquidPct = useMemo(() => {
     if (totalAssets <= 0) return 100;
     const liquid = accounts
@@ -520,13 +540,13 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           {/* Ambient Glow Gradient */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center relative z-10">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center relative z-10">
             {/* Left Column: Total Net Worth Summary */}
-            <div className="lg:col-span-5 space-y-5">
+            <div className="xl:col-span-5 space-y-5 min-w-0">
               {/* Top Label & Recorded Balances Indicator */}
               <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
                 <span className="font-semibold text-[var(--app-fg)]">
-                  {totalLiabilities > 0 ? "Total Net Worth" : "Total Net Worth"}
+                  Total Net Worth
                 </span>
                 {totalLiabilities > 0 && (
                   <>
@@ -536,13 +556,16 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 )}
               </div>
 
-              {/* Massive Metric Amount */}
-              <div className="space-y-1">
-                <div className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight font-mono text-[var(--app-fg)] tabular-nums">
+              {/* Massive Metric Amount with Dynamic Sizing & Overflow Protection */}
+              <div className="space-y-1 min-w-0">
+                <div
+                  className={`${netWorthFontSize} font-extrabold tracking-tight font-mono text-[var(--app-fg)] tabular-nums truncate`}
+                  title={formatCurrency(netWorth)}
+                >
                   {loading ? (
                     <Skeleton className="h-14 w-64 rounded-xl" />
                   ) : (
-                    formatCurrency(netWorth)
+                    formattedNetWorth
                   )}
                 </div>
               </div>
@@ -552,25 +575,31 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 {totalLiabilities > 0 ? (
                   <>
                     <div
-                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
                       style={{ backgroundColor: "var(--app-card-subtle)" }}
                     >
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                         Total Assets
                       </div>
-                      <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                      <div
+                        className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate"
+                        title={formatCurrency(totalAssets)}
+                      >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
                       </div>
                     </div>
 
                     <div
-                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
                       style={{ backgroundColor: "var(--app-card-subtle)" }}
                     >
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                         Total Liabilities
                       </div>
-                      <div className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
+                      <div
+                        className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums truncate"
+                        title={formatCurrency(totalLiabilities)}
+                      >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalLiabilities)}
                       </div>
                     </div>
@@ -578,25 +607,28 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 ) : (
                   <>
                     <div
-                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
                       style={{ backgroundColor: "var(--app-card-subtle)" }}
                     >
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                         Total Assets
                       </div>
-                      <div className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                      <div
+                        className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate"
+                        title={formatCurrency(totalAssets)}
+                      >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
                       </div>
                     </div>
 
                     <div
-                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors"
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
                       style={{ backgroundColor: "var(--app-card-subtle)" }}
                     >
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                         Active Accounts
                       </div>
-                      <div className="text-sm sm:text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums">
+                      <div className="text-sm sm:text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums truncate">
                         {loading ? (
                           <Skeleton className="h-5 w-16 rounded-md" />
                         ) : (
@@ -623,7 +655,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
             {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
             <div
-              className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8 border-[var(--app-border-subtle)]"
+              className="xl:col-span-7 min-w-0 flex items-center justify-center xl:justify-end border-t xl:border-t-0 xl:border-l pt-6 xl:pt-0 xl:pl-8 border-[var(--app-border-subtle)]"
             >
               {loading ? (
                 <div className="flex items-center justify-center h-48 w-full">

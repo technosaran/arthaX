@@ -24,6 +24,7 @@ import {
   Bot,
   ExternalLink,
   RefreshCw,
+  Zap,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -116,6 +117,8 @@ export default function SettingsSection() {
     configured: boolean;
     connected: boolean;
     isTokenExpired: boolean;
+    autoLoginConfigured?: boolean;
+    autoLoginUserIdMasked?: string | null;
     apiKeyMasked: string | null;
     userProfile: any | null;
     lastSyncAt: string | null;
@@ -127,6 +130,8 @@ export default function SettingsSection() {
     configured: false,
     connected: false,
     isTokenExpired: true,
+    autoLoginConfigured: false,
+    autoLoginUserIdMasked: null,
     apiKeyMasked: null,
     userProfile: null,
     lastSyncAt: null,
@@ -140,6 +145,7 @@ export default function SettingsSection() {
   const [zerodhaRequestToken, setZerodhaRequestToken] = useState("");
   const [savingZerodha, setSavingZerodha] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
+  const [autoLoggingInZerodha, setAutoLoggingInZerodha] = useState(false);
 
 
   // Master Data Wipe State
@@ -438,6 +444,39 @@ export default function SettingsSection() {
       showToast("Sync Error", err.message || "Failed to sync Zerodha portfolio", "error");
     } finally {
       setSyncingZerodha(false);
+    }
+  };
+
+  const handleAutoLoginZerodha = async () => {
+    setAutoLoggingInZerodha(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/auto-login", {
+        method: "POST",
+        headers,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Auto-login failed");
+      }
+
+      showToast(
+        "Auto-Login Successful! ⚡",
+        "Kite Connect session renewed and portfolio synced automatically.",
+        "success"
+      );
+      await fetchZerodhaStatus();
+    } catch (err: any) {
+      showToast("Auto-Login Error", err.message || "Failed to auto-login to Zerodha", "error");
+    } finally {
+      setAutoLoggingInZerodha(false);
     }
   };
 
@@ -1939,8 +1978,32 @@ export default function SettingsSection() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Banner when configured but session needs morning login */}
-                  {zerodhaStatus.configured && (
+                  {/* Banner when configured: either Auto-Login active or Daily manual login required */}
+                  {zerodhaStatus.autoLoginConfigured ? (
+                    <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 flex items-center justify-between flex-wrap gap-3">
+                      <div className="text-xs space-y-1">
+                        <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                          <Zap size={14} className="fill-emerald-400" />
+                          <span>Automated Daily Login Active</span>
+                          <Badge variant="success" size="sm">Hands-Free</Badge>
+                        </div>
+                        <p className="opacity-70 text-[11px]">
+                          Auto-login is configured for user {zerodhaStatus.autoLoginUserIdMasked || "Kite"}. Your portfolio automatically syncs every day without manual login.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={autoLoggingInZerodha}
+                          onClick={handleAutoLoginZerodha}
+                          icon={<RefreshCw size={12} className={autoLoggingInZerodha ? "animate-spin" : ""} />}
+                        >
+                          {autoLoggingInZerodha ? "Logging In..." : "Run Auto-Login Now"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : zerodhaStatus.configured ? (
                     <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between flex-wrap gap-3">
                       <div className="text-xs space-y-1">
                         <div className="font-semibold text-amber-400 flex items-center gap-1.5">
@@ -1948,7 +2011,7 @@ export default function SettingsSection() {
                           <span>Daily Session Required</span>
                         </div>
                         <p className="opacity-70 text-[11px]">
-                          Your API keys ({zerodhaStatus.apiKeyMasked}) are saved. Zerodha access tokens expire daily at 6:00 AM IST. Log in to renew today&apos;s session.
+                          Your API keys ({zerodhaStatus.apiKeyMasked}) are saved. Zerodha access tokens expire daily at 6:00 AM IST. Log in to renew today&apos;s session, or enable auto-login below.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1966,7 +2029,7 @@ export default function SettingsSection() {
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Credentials Input Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2024,6 +2087,29 @@ export default function SettingsSection() {
                         {savingZerodha ? "Saving..." : "Save Credentials"}
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Auto-Login Instructions Card */}
+                  <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2">
+                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
+                      <Zap size={13} className="text-amber-400" />
+                      <span>How to enable Zero-Click Daily Auto-Login:</span>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 opacity-80 text-[11px] leading-relaxed">
+                      <li>In Kite Web, open <strong>My Profile &rarr; Password & Security &rarr; Enable External TOTP</strong>.</li>
+                      <li>Copy the 32-character secret key underneath the QR code.</li>
+                      <li>Add your credentials to <code className="font-mono bg-[var(--app-bg)] px-1 rounded">.env.local</code>:</li>
+                    </ol>
+                    <div className="p-2.5 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)] font-mono text-[11px] space-y-0.5 select-all text-emerald-400">
+                      <div>ZERODHA_USER_ID=your_client_id</div>
+                      <div>ZERODHA_PASSWORD=your_kite_password</div>
+                      <div>ZERODHA_TOTP_SECRET=your_32_char_totp_secret</div>
+                      <div>ZERODHA_API_KEY=your_kite_api_key</div>
+                      <div>ZERODHA_API_SECRET=your_kite_api_secret</div>
+                    </div>
+                    <p className="text-[10px] opacity-60">
+                      Once added, ArthaX computes the 6-digit 2FA code programmatically and syncs your portfolio silently every morning with zero clicks.
+                    </p>
                   </div>
                 </div>
               )}

@@ -52,19 +52,17 @@ interface Account {
 
 export interface AccountActivity {
   id: string;
-  sourceType: "transfer" | "expense" | "income";
-  type: "TRANSFER" | "DEBIT" | "CREDIT";
+  sourceType: "transfer";
+  type: "TRANSFER";
   title: string;
   amount: number;
   date: string;
   notes?: string | null;
   category?: string | null;
-  accountId?: string | null;
-  accountName?: string | null;
-  fromAccountId?: string | null;
-  fromAccountName?: string | null;
-  toAccountId?: string | null;
-  toAccountName?: string | null;
+  fromAccountId: string;
+  fromAccountName: string;
+  toAccountId: string;
+  toAccountName: string;
   created_at?: string;
 }
 
@@ -92,11 +90,11 @@ export default function AccountsSection() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"holdings" | "history">("holdings");
 
-  // History and Activity State
+  // History and Activity State (Account Section Data Only)
   const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
   const [historyLoading, setHistoryLoading] = useState<boolean>(initialHistory.length === 0);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "transfers" | "expenses" | "income">("all");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "inflow" | "outflow">("all");
   const [historySearch, setHistorySearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(25);
   const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
@@ -147,6 +145,13 @@ export default function AccountsSection() {
     );
   };
 
+  const isZerodhaAccount = (acc: Account) => {
+    return (
+      acc.name.toLowerCase().includes("zerodha") ||
+      acc.name.toLowerCase().includes("kite")
+    );
+  };
+
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
     if (!user) return;
     setErrorMsg(null);
@@ -168,8 +173,8 @@ export default function AccountsSection() {
     try {
       const supabase = createClient();
 
-      // Parallel burst: Fetch accounts and full activity history
-      const [accountsRes, transfersRes, expensesRes, incomeRes] = await Promise.all([
+      // Parallel burst: Fetch accounts and internal transfers (Account Section data only)
+      const [accountsRes, transfersRes] = await Promise.all([
         supabase
           .from("accounts")
           .select("id, name, type, balance, last_four, classification, created_at")
@@ -180,18 +185,6 @@ export default function AccountsSection() {
           .select("id, from_account_id, to_account_id, amount, transfer_date, notes, created_at")
           .eq("user_id", user.id)
           .order("transfer_date", { ascending: false })
-          .limit(100),
-        supabase
-          .from("expenses")
-          .select("id, title, amount, category, account_id, expense_date, notes, created_at")
-          .eq("user_id", user.id)
-          .order("expense_date", { ascending: false })
-          .limit(100),
-        supabase
-          .from("income")
-          .select("id, title, amount, category, account_id, received_date, notes, created_at")
-          .eq("user_id", user.id)
-          .order("received_date", { ascending: false })
           .limit(100),
       ]);
 
@@ -249,7 +242,7 @@ export default function AccountsSection() {
       setAccounts(fetchedAccounts);
       saveToCache(redisKey, fetchedAccounts);
 
-      // Build unified Chronological Account History
+      // Build Account Transfers History (Account Section data only)
       const accountMap = new Map<string, string>();
       fetchedAccounts.forEach((a) => accountMap.set(a.id, a.name));
 
@@ -274,44 +267,6 @@ export default function AccountsSection() {
             toAccountId: t.to_account_id,
             toAccountName: toName,
             created_at: t.created_at,
-          });
-        });
-      }
-
-      // Expenses / Debits
-      if (expensesRes.data) {
-        expensesRes.data.forEach((e) => {
-          unifiedActivity.push({
-            id: e.id,
-            sourceType: "expense",
-            type: "DEBIT",
-            title: e.title || "Expense",
-            amount: Number(e.amount) || 0,
-            date: e.expense_date,
-            notes: e.notes,
-            category: e.category,
-            accountId: e.account_id,
-            accountName: e.account_id ? accountMap.get(e.account_id) || "Unknown Card" : "Unassigned",
-            created_at: e.created_at,
-          });
-        });
-      }
-
-      // Income / Credits
-      if (incomeRes.data) {
-        incomeRes.data.forEach((i) => {
-          unifiedActivity.push({
-            id: i.id,
-            sourceType: "income",
-            type: "CREDIT",
-            title: i.title || "Income Received",
-            amount: Number(i.amount) || 0,
-            date: i.received_date,
-            notes: i.notes,
-            category: i.category,
-            accountId: i.account_id,
-            accountName: i.account_id ? accountMap.get(i.account_id) || "Unknown Card" : "Unassigned",
-            created_at: i.created_at,
           });
         });
       }
@@ -416,27 +371,25 @@ export default function AccountsSection() {
       // 1. Account filter
       if (selectedAccountId) {
         const matchesAccount =
-          item.accountId === selectedAccountId ||
           item.fromAccountId === selectedAccountId ||
           item.toAccountId === selectedAccountId;
         if (!matchesAccount) return false;
+
+        // Inflow / Outflow filter for selected account
+        if (historyTypeFilter === "inflow" && item.toAccountId !== selectedAccountId) return false;
+        if (historyTypeFilter === "outflow" && item.fromAccountId !== selectedAccountId) return false;
       }
 
-      // 2. Type filter
-      if (historyTypeFilter === "transfers" && item.sourceType !== "transfer") return false;
-      if (historyTypeFilter === "expenses" && item.sourceType !== "expense") return false;
-      if (historyTypeFilter === "income" && item.sourceType !== "income") return false;
-
-      // 3. Search query
+      // 2. Search query
       if (historySearch.trim()) {
         const q = historySearch.toLowerCase();
         const matches =
           item.title.toLowerCase().includes(q) ||
           (item.notes && item.notes.toLowerCase().includes(q)) ||
           (item.category && item.category.toLowerCase().includes(q)) ||
-          (item.accountName && item.accountName.toLowerCase().includes(q)) ||
-          (item.fromAccountName && item.fromAccountName.toLowerCase().includes(q)) ||
-          (item.toAccountName && item.toAccountName.toLowerCase().includes(q));
+          item.fromAccountName.toLowerCase().includes(q) ||
+          item.toAccountName.toLowerCase().includes(q) ||
+          String(item.amount).includes(q);
         if (!matches) return false;
       }
 
@@ -445,32 +398,26 @@ export default function AccountsSection() {
   }, [activityHistory, selectedAccountId, historyTypeFilter, historySearch]);
 
   const historyStats = useMemo(() => {
-    let totalInflow = 0;
-    let totalOutflow = 0;
-    let transferCount = 0;
+    let totalVolume = 0;
+    let accountInflow = 0;
+    let accountOutflow = 0;
 
     for (const item of filteredHistory) {
-      if (item.sourceType === "income") {
-        totalInflow += item.amount;
-      } else if (item.sourceType === "expense") {
-        totalOutflow += item.amount;
-      } else if (item.sourceType === "transfer") {
-        transferCount++;
-        if (selectedAccountId) {
-          if (item.toAccountId === selectedAccountId) {
-            totalInflow += item.amount;
-          } else if (item.fromAccountId === selectedAccountId) {
-            totalOutflow += item.amount;
-          }
+      totalVolume += item.amount;
+      if (selectedAccountId) {
+        if (item.toAccountId === selectedAccountId) {
+          accountInflow += item.amount;
+        } else if (item.fromAccountId === selectedAccountId) {
+          accountOutflow += item.amount;
         }
       }
     }
 
     return {
-      totalInflow,
-      totalOutflow,
-      netFlow: totalInflow - totalOutflow,
-      transferCount,
+      totalVolume,
+      accountInflow,
+      accountOutflow,
+      netFlow: accountInflow - accountOutflow,
       totalCount: filteredHistory.length,
     };
   }, [filteredHistory, selectedAccountId]);
@@ -565,8 +512,14 @@ export default function AccountsSection() {
   const handleDeleteAccount = async (id: string) => {
     if (!user) return;
     const target = accounts.find((a) => a.id === id);
-    if (target && isCashAccount(target)) {
-      showToast("Protected Account", "Cash in Hand is a permanent built-in card and cannot be deleted.", "info");
+    if (target && (isCashAccount(target) || isZerodhaAccount(target))) {
+      showToast(
+        "Protected Account",
+        isCashAccount(target)
+          ? "Cash in Hand is a permanent built-in card and cannot be deleted."
+          : "Zerodha Trading & Demat is an integrated account and cannot be deleted here.",
+        "info"
+      );
       return;
     }
 
@@ -642,6 +595,24 @@ export default function AccountsSection() {
 
   const netWorth = totalAssets - totalLiabilities;
   const totalBalance = totalAssets;
+
+  // Formatted Net Worth (omitting trailing .00 for whole numbers to ensure clean elegance & prevent truncation)
+  const formattedNetWorth = useMemo(() => {
+    const formatted = formatINR(netWorth);
+    return formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
+  }, [netWorth]);
+
+  // Dynamic Net Worth font sizing based on string length to guarantee zero overflow
+  const netWorthFontSize = useMemo(() => {
+    const len = formattedNetWorth.length;
+    if (len > 16) {
+      return "text-2xl sm:text-3xl lg:text-3xl xl:text-4xl 2xl:text-5xl";
+    }
+    if (len > 12) {
+      return "text-3xl sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl";
+    }
+    return "text-3xl sm:text-5xl xl:text-6xl";
+  }, [formattedNetWorth]);
 
   const typeMap = accounts.reduce((acc, curr) => {
     acc[curr.type] = (acc[curr.type] || 0) + curr.balance;
@@ -722,46 +693,55 @@ export default function AccountsSection() {
         className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-[var(--app-border)] transition-colors shadow-sm mb-6 sm:mb-8"
         style={{ backgroundColor: "var(--app-card)" }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center">
           {/* Left Column: Total Portfolio Summary */}
-          <div className="lg:col-span-5 space-y-4">
+          <div className="xl:col-span-5 space-y-4 min-w-0">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--app-muted)]">
                 {totalLiabilities > 0 ? "Net Portfolio Value" : "Total Portfolio Value"}
               </span>
-              <div className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight mt-1.5 tabular-nums">
-                {loading ? <Skeleton className="h-12 w-56 rounded-xl" /> : formatINR(netWorth)}
+              <div
+                className={`${netWorthFontSize} font-extrabold font-mono tracking-tight mt-1.5 tabular-nums truncate`}
+                title={formatINR(netWorth)}
+              >
+                {loading ? <Skeleton className="h-12 w-56 rounded-xl" /> : formattedNetWorth}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
               {totalLiabilities > 0 ? (
                 <>
-                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] min-w-0">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                       Total Assets
                     </div>
-                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                    <div
+                      className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate"
+                      title={formatINR(totalAssets)}
+                    >
                       {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatINR(totalAssets)}
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] min-w-0">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                       Total Liabilities
                     </div>
-                    <div className="text-sm font-bold font-mono text-rose-400 mt-0.5 tabular-nums">
+                    <div
+                      className="text-sm font-bold font-mono text-rose-400 mt-0.5 tabular-nums truncate"
+                      title={formatINR(totalLiabilities)}
+                    >
                       {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatINR(totalLiabilities)}
                     </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] min-w-0">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                       Active Accounts
                     </div>
-                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">
+                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate">
                       {loading ? (
                         <Skeleton className="h-5 w-16 rounded-md" />
                       ) : (
@@ -770,11 +750,14 @@ export default function AccountsSection() {
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] min-w-0">
+                    <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                       Cash in Hand
                     </div>
-                    <div className="text-sm font-bold font-mono text-sky-400 mt-0.5 tabular-nums">
+                    <div
+                      className="text-sm font-bold font-mono text-sky-400 mt-0.5 tabular-nums truncate"
+                      title={formatINR(accounts.find(isCashAccount)?.balance || 0)}
+                    >
                       {loading ? (
                         <Skeleton className="h-5 w-20 rounded-md" />
                       ) : (
@@ -788,7 +771,7 @@ export default function AccountsSection() {
           </div>
 
           {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
-          <div className="lg:col-span-7 flex items-center justify-end border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-8 border-[var(--app-border-subtle)]">
+          <div className="xl:col-span-7 min-w-0 flex items-center justify-center xl:justify-end border-t xl:border-t-0 xl:border-l pt-6 xl:pt-0 xl:pl-8 border-[var(--app-border-subtle)]">
             {loading ? (
               <div className="flex items-center justify-center h-44 w-full">
                 <Skeleton className="w-36 h-36 rounded-full" />
@@ -822,8 +805,8 @@ export default function AccountsSection() {
             },
             {
               value: "history",
-              label: `Activity Log (${filteredHistory.length})`,
-              icon: <History size={13} />,
+              label: `Account Transfers (${filteredHistory.length})`,
+              icon: <ArrowRightLeft size={13} />,
             },
           ]}
         />
@@ -878,6 +861,7 @@ export default function AccountsSection() {
                   account={acc}
                   isCash={isCashAccount(acc)}
                   isDemat={isDematAccount(acc)}
+                  isZerodha={isZerodhaAccount(acc)}
                   onEditCash={handleOpenEditCash}
                   onDelete={handleDeleteAccount}
                   formatCurrency={formatINR}
@@ -892,7 +876,7 @@ export default function AccountsSection() {
         </div>
       )}
 
-      {/* ACCOUNT HISTORY & RECENT ACTIVITY SECTION */}
+      {/* ACCOUNT HISTORY & TRANSFERS SECTION (Account Section data only) */}
       {viewMode === "history" && (
         <div className="space-y-4 animate-in fade-in duration-200">
           <div className="flex items-center justify-between pb-1">
@@ -905,7 +889,7 @@ export default function AccountsSection() {
               <span>Back to Accounts</span>
             </button>
             <span className="text-xs text-[var(--app-muted)] font-mono">
-              Chronological Ledger Feed
+              Account Transfer History
             </span>
           </div>
 
@@ -915,31 +899,43 @@ export default function AccountsSection() {
           >
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-              {[
-                { id: "all", label: "All Activity" },
-                { id: "transfers", label: "Transfers" },
-                { id: "expenses", label: "Debits" },
-                { id: "income", label: "Credits" },
-              ].map((tab) => (
+              {selectedAccountId ? (
+                [
+                  { id: "all", label: "All Transfers" },
+                  { id: "inflow", label: "Inflow (Received)" },
+                  { id: "outflow", label: "Outflow (Sent)" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setHistoryTypeFilter(tab.id as any)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                      historyTypeFilter === tab.id
+                        ? "border-sky-500/50 bg-sky-500/10 text-sky-400 font-bold shadow-xs"
+                        : "border-transparent text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))
+              ) : (
                 <button
-                  key={tab.id}
-                  onClick={() => setHistoryTypeFilter(tab.id as any)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
-                    historyTypeFilter === tab.id
-                      ? "border-sky-500/50 bg-sky-500/10 text-sky-400 font-bold shadow-xs"
-                      : "border-transparent text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
-                  }`}
+                  type="button"
+                  onClick={() => setHistoryTypeFilter("all")}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-sky-500/50 bg-sky-500/10 text-sky-400 font-bold shadow-xs cursor-pointer"
                 >
-                  {tab.label}
+                  All Transfers ({activityHistory.length})
                 </button>
-              ))}
+              )}
             </div>
 
             {/* Right: Search & Account Selector */}
             <div className="flex flex-wrap items-center gap-2.5">
               <select
                 value={selectedAccountId || ""}
-                onChange={(e) => setSelectedAccountId(e.target.value || null)}
+                onChange={(e) => {
+                  setSelectedAccountId(e.target.value || null);
+                  setHistoryTypeFilter("all");
+                }}
                 className="px-3 py-1.5 text-xs rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none transition-colors cursor-pointer font-medium"
               >
                 <option value="">All Accounts ({accounts.length})</option>
@@ -954,7 +950,7 @@ export default function AccountsSection() {
                 <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--app-muted)]" />
                 <input
                   type="text"
-                  placeholder="Search activity..."
+                  placeholder="Search transfers..."
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
                   className="pl-8 pr-7 py-1.5 text-xs rounded-xl border border-[var(--app-border)] bg-[var(--app-input-bg)] text-[var(--app-fg)] focus:outline-none w-36 sm:w-48 font-medium"
@@ -975,31 +971,46 @@ export default function AccountsSection() {
           <div
             className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] flex items-center justify-between text-xs font-mono"
           >
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Inflow:</span>
-                <span className="text-emerald-400 font-bold">{formatINR(historyStats.totalInflow)}</span>
+            {selectedAccountId ? (
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Inflow:</span>
+                  <span className="text-emerald-400 font-bold">+{formatINR(historyStats.accountInflow)}</span>
+                </div>
+                <span className="opacity-20">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Outflow:</span>
+                  <span className="text-rose-400 font-bold">-{formatINR(historyStats.accountOutflow)}</span>
+                </div>
+                <span className="opacity-20">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Net Transfer:</span>
+                  <span
+                    className={`font-bold ${
+                      historyStats.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {historyStats.netFlow >= 0 ? "+" : ""}
+                    {formatINR(historyStats.netFlow)}
+                  </span>
+                </div>
               </div>
-              <span className="opacity-20">•</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Outflow:</span>
-                <span className="text-rose-400 font-bold">{formatINR(historyStats.totalOutflow)}</span>
+            ) : (
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Total Transferred:</span>
+                  <span className="text-sky-400 font-bold">{formatINR(historyStats.totalVolume)}</span>
+                </div>
+                <span className="opacity-20">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Flow:</span>
+                  <span className="text-emerald-400 font-bold">Internal Reconciled</span>
+                </div>
               </div>
-              <span className="opacity-20">•</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase text-[var(--app-muted)] font-medium">Net:</span>
-                <span
-                  className={`font-bold ${
-                    historyStats.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {formatINR(historyStats.netFlow)}
-                </span>
-              </div>
-            </div>
+            )}
 
             <span className="text-[11px] text-[var(--app-muted)]">
-              {filteredHistory.length} total entries
+              {filteredHistory.length} {filteredHistory.length === 1 ? "entry" : "entries"}
             </span>
           </div>
 
@@ -1008,15 +1019,15 @@ export default function AccountsSection() {
             <CardSkeleton rows={6} />
           ) : filteredHistory.length === 0 ? (
             <EmptyState
-              icon={<History size={32} className="text-sky-400" />}
-              title="No Account Activity Found"
+              icon={<ArrowRightLeft size={32} className="text-sky-400" />}
+              title="No Account Transfers Found"
               description={
-                selectedAccountId || historyTypeFilter !== "all" || historySearch
-                  ? "No transactions or transfers match your current filter settings."
-                  : "Transactions, transfers, and card expenditures will appear here automatically."
+                selectedAccountId || historySearch
+                  ? "No internal transfers match your current filter settings."
+                  : "Internal transfers between bank accounts, credit cards, and cash reserves will appear here."
               }
               action={
-                selectedAccountId || historyTypeFilter !== "all" || historySearch ? (
+                selectedAccountId || historySearch ? (
                   <Button
                     size="sm"
                     variant="secondary"
@@ -1028,7 +1039,24 @@ export default function AccountsSection() {
                   >
                     Clear All Filters
                   </Button>
-                ) : undefined
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={<ArrowRightLeft size={14} />}
+                    onClick={() => {
+                      if (accounts.length < 2) {
+                        showToast("Need 2 Accounts", "Please create at least 2 accounts to transfer funds.", "info");
+                        return;
+                      }
+                      setTransferFromId(accounts[0]?.id || "");
+                      setTransferToId(accounts[1]?.id || "");
+                      setIsTransferModalOpen(true);
+                    }}
+                  >
+                    Transfer Funds
+                  </Button>
+                )
               }
             />
           ) : (
@@ -1049,20 +1077,16 @@ export default function AccountsSection() {
               {/* Rows */}
               <div className="divide-y divide-[var(--app-border-subtle)]">
                 {filteredHistory.slice(0, visibleCount).map((item) => {
-                  const isTransfer = item.sourceType === "transfer";
-                  const isIncome = item.sourceType === "income";
-                  const isExpense = item.sourceType === "expense";
-
                   let isTransferOutgoing = false;
                   let isTransferIncoming = false;
-                  if (isTransfer && selectedAccountId) {
+                  if (selectedAccountId) {
                     if (item.fromAccountId === selectedAccountId) isTransferOutgoing = true;
                     if (item.toAccountId === selectedAccountId) isTransferIncoming = true;
                   }
 
                   return (
                     <div
-                      key={`${item.sourceType}-${item.id}`}
+                      key={item.id}
                       className="p-4 sm:px-5 sm:py-3.5 flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-start md:items-center hover:bg-[var(--app-card-hover)] transition-colors"
                     >
                       {/* Date */}
@@ -1074,13 +1098,7 @@ export default function AccountsSection() {
 
                       {/* Type Badge */}
                       <div className="col-span-2">
-                        {isTransfer ? (
-                          <Badge variant="info">Transfer</Badge>
-                        ) : isIncome ? (
-                          <Badge variant="success">Credit</Badge>
-                        ) : (
-                          <Badge variant="danger">Debit</Badge>
-                        )}
+                        <Badge variant="info">Transfer</Badge>
                       </div>
 
                       {/* Description & Category */}
@@ -1090,7 +1108,7 @@ export default function AccountsSection() {
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] font-mono text-[var(--app-muted)] truncate">
-                            {item.category || (isTransfer ? "Internal Transfer" : "General")}
+                            {item.category || "Internal Transfer"}
                           </span>
                           {item.notes && (
                             <span className="text-[10px] text-[var(--app-muted)] opacity-70 truncate" title={item.notes}>
@@ -1102,57 +1120,49 @@ export default function AccountsSection() {
 
                       {/* Account Flow */}
                       <div className="col-span-3 min-w-0">
-                        {isTransfer ? (
-                          <div className="flex items-center gap-1.5 text-xs font-medium">
-                            <span className="truncate text-[var(--app-muted)] font-mono text-[11px]" title={item.fromAccountName || ""}>
-                              {item.fromAccountName}
-                            </span>
-                            <span className="text-sky-400 flex-shrink-0">➔</span>
-                            <span className="truncate text-[var(--app-muted)] font-mono text-[11px]" title={item.toAccountName || ""}>
-                              {item.toAccountName}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-xs font-mono text-[var(--app-muted)] truncate text-[11px]">
-                            {item.accountName}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          <span className="truncate text-[var(--app-muted)] font-mono text-[11px]" title={item.fromAccountName || ""}>
+                            {item.fromAccountName}
+                          </span>
+                          <span className="text-sky-400 flex-shrink-0">➔</span>
+                          <span className="truncate text-[var(--app-muted)] font-mono text-[11px]" title={item.toAccountName || ""}>
+                            {item.toAccountName}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Amount & Actions */}
                       <div className="col-span-2 w-full md:w-auto flex items-center justify-between md:justify-end gap-3 self-end md:self-auto">
                         <div
                           className={`font-mono text-xs sm:text-sm font-bold tracking-tight tabular-nums whitespace-nowrap ${
-                            isIncome || isTransferIncoming
+                            isTransferIncoming
                               ? "text-emerald-400"
-                              : isExpense || isTransferOutgoing
+                              : isTransferOutgoing
                               ? "text-rose-400"
                               : "text-sky-400"
                           }`}
                         >
-                          {isIncome || isTransferIncoming
+                          {isTransferIncoming
                             ? `+${formatINR(item.amount)}`
-                            : isExpense || isTransferOutgoing
+                            : isTransferOutgoing
                             ? `-${formatINR(item.amount)}`
                             : formatINR(item.amount)}
                         </div>
 
                         {/* Transfer Delete / Rollback Action */}
-                        {isTransfer && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTransfer(item.id)}
-                            disabled={deletingTransferId === item.id}
-                            title="Reverse transfer and restore balances"
-                            className="w-7 h-7 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] flex items-center justify-center text-[var(--app-muted)] hover:text-rose-400 hover:border-rose-500/30 transition-all cursor-pointer disabled:opacity-30"
-                          >
-                            {deletingTransferId === item.id ? (
-                              <Loader2 size={12} className="animate-spin text-rose-400" />
-                            ) : (
-                              <Trash2 size={12} />
-                            )}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransfer(item.id)}
+                          disabled={deletingTransferId === item.id}
+                          title="Reverse transfer and restore balances"
+                          className="w-7 h-7 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] flex items-center justify-center text-[var(--app-muted)] hover:text-rose-400 hover:border-rose-500/30 transition-all cursor-pointer disabled:opacity-30"
+                        >
+                          {deletingTransferId === item.id ? (
+                            <Loader2 size={12} className="animate-spin text-rose-400" />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                        </button>
                       </div>
                     </div>
                   );

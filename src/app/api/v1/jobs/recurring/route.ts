@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { constantTimeCompare } from "@/utils/crypto";
 
 function computeNextRunDate(currentDateStr: string, frequency: string): string {
   const d = new Date(currentDateStr);
@@ -22,14 +23,21 @@ function computeNextRunDate(currentDateStr: string, frequency: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  // 1. Authenticate Job Invoker (QStash Signature or Internal CRON_SECRET)
+  // 1. Authenticate Job Invoker (Strict CRON_SECRET constant-time validation)
   const authHeader = req.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
-  const isQStashMessage = Boolean(req.headers.get("upstash-signature"));
+  const isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !isQStashMessage) {
-    logger.warn("Unauthorized recurring job attempt", "QStashJob");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isTest) {
+    if (!cronSecret) {
+      logger.error("CRON_SECRET environment variable is missing on server", "QStashJob");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
+    const expectedHeader = `Bearer ${cronSecret}`;
+    if (!constantTimeCompare(authHeader.trim(), expectedHeader.trim())) {
+      logger.warn("Unauthorized recurring job attempt", "QStashJob");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const todayStr = new Date().toISOString().split("T")[0];

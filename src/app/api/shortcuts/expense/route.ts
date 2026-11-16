@@ -4,6 +4,8 @@ import { parseExpenseMessage, matchAccount, AccountSummary } from "@/utils/expen
 import { classifyFinancialMessage } from "@/utils/financeParser";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { getLocalDateString, getCurrentMonthYear } from "@/utils/monthUtils";
+import { constantTimeCompare } from "@/utils/crypto";
+import { rateLimit } from "@/utils/rateLimit";
 
 interface ShortcutRequestBody {
   text?: string;
@@ -51,11 +53,8 @@ export async function POST(req: NextRequest) {
     // 1. Authenticate Request
     // -------------------------------------------------------------
     const authHeader = req.headers.get("authorization") || "";
-    const apiKeyHeader =
-      req.headers.get("x-api-key") ||
-      req.nextUrl.searchParams.get("key") ||
-      body.api_key ||
-      "";
+    // Disallow API key in URL query parameter (prevents secret leaks in server logs & browser history)
+    const apiKeyHeader = req.headers.get("x-api-key") || body.api_key || "";
     const configuredApiKey = process.env.SHORTCUTS_API_KEY;
 
     let userId: string | null = null;
@@ -71,9 +70,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!userId && configuredApiKey && apiKeyHeader === configuredApiKey) {
+    if (!userId && configuredApiKey && constantTimeCompare(apiKeyHeader.trim(), configuredApiKey.trim())) {
+      const isDevOrTest = process.env.NODE_ENV !== "production" || process.env.VITEST;
+      // In production, prevent arbitrary tenant ID injection; use configured authorized user mapping
       userId =
-        body.user_id ||
+        (isDevOrTest && body.user_id ? body.user_id : null) ||
         process.env.SHORTCUTS_AUTHORIZED_USER_ID ||
         process.env.WHATSAPP_AUTHORIZED_USER_ID ||
         process.env.TELEGRAM_AUTHORIZED_USER_ID ||

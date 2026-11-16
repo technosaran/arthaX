@@ -8,6 +8,8 @@ import {
   exchangeRequestToken,
   isTokenValidToday,
 } from "@/utils/zerodha";
+import { getAutoLoginCredentials } from "@/utils/zerodhaAutoLogin";
+import { encryptSensitiveData } from "@/utils/crypto";
 import { z } from "zod";
 
 const SaveCredentialsSchema = z.object({
@@ -39,6 +41,10 @@ export async function GET(req: NextRequest) {
         configured: status.configured,
         connected: status.connected,
         isTokenExpired: status.isTokenExpired,
+        autoLoginConfigured: Boolean(getAutoLoginCredentials(status.integration, userId)),
+        autoLoginUserIdMasked: getAutoLoginCredentials(status.integration, userId)?.userId
+          ? `${getAutoLoginCredentials(status.integration, userId)!.userId.slice(0, 2)}••••`
+          : null,
         apiKeyMasked: status.integration?.api_key
           ? `${status.integration.api_key.slice(0, 3)}••••${status.integration.api_key.slice(-3)}`
           : null,
@@ -108,10 +114,10 @@ export async function POST(req: NextRequest) {
         {
           user_id: userId,
           api_key: apiKey.trim(),
-          api_secret: apiSecret.trim(),
-          request_token: requestToken ? requestToken.trim() : null,
-          access_token: finalAccessToken,
-          public_token: finalPublicToken,
+          api_secret: encryptSensitiveData(apiSecret.trim(), "broker-credentials"),
+          request_token: encryptSensitiveData(requestToken ? requestToken.trim() : null, "broker-credentials"),
+          access_token: encryptSensitiveData(finalAccessToken, "broker-credentials"),
+          public_token: encryptSensitiveData(finalPublicToken, "broker-credentials"),
           user_profile: finalProfile,
           token_generated_at: tokenGeneratedAt,
           updated_at: new Date().toISOString(),

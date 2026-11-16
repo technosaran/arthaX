@@ -213,10 +213,15 @@ create or replace function public.decrement_account_balance(
 returns numeric
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_new_balance numeric;
 begin
+  if auth.role() <> 'service_role' and (auth.uid() is null or auth.uid()::text <> p_user_id) then
+    raise exception 'Access denied: unauthorized balance decrement.';
+  end if;
+
   update public.accounts
   set balance = round((balance - p_amount)::numeric, 2)
   where id = p_account_id and user_id = p_user_id
@@ -234,10 +239,15 @@ create or replace function public.increment_account_balance(
 returns numeric
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_new_balance numeric;
 begin
+  if auth.role() <> 'service_role' and (auth.uid() is null or auth.uid()::text <> p_user_id) then
+    raise exception 'Access denied: unauthorized balance increment.';
+  end if;
+
   update public.accounts
   set balance = round((balance + p_amount)::numeric, 2)
   where id = p_account_id and user_id = p_user_id
@@ -1113,24 +1123,53 @@ DECLARE
   v_deleted_family_vault int := 0;
   v_deleted_family_members int := 0;
   v_deleted_accounts int := 0;
+  v_deleted_mf_tx int := 0;
+  v_deleted_mf_holdings int := 0;
+  v_deleted_fno_trades int := 0;
+  v_deleted_fno_pos int := 0;
+  v_deleted_stock_tx int := 0;
+  v_deleted_stock_holdings int := 0;
 BEGIN
   IF p_user_id IS NULL OR trim(p_user_id) = '' THEN
     RAISE EXCEPTION 'p_user_id is required';
   END IF;
 
-  -- 1. Transfers (must delete before accounts due to ON DELETE RESTRICT on accounts)
+  -- CRITICAL SECURITY CHECK: Caller must be service_role or the user themselves
+  IF auth.role() <> 'service_role' AND (auth.uid() IS NULL OR auth.uid()::text <> p_user_id) THEN
+    RAISE EXCEPTION 'Access denied: caller is not authorized to wipe user data.';
+  END IF;
+
+  -- 1. Investment tables
+  DELETE FROM public.mutual_fund_transactions WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_mf_tx = ROW_COUNT;
+
+  DELETE FROM public.mutual_fund_holdings WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_mf_holdings = ROW_COUNT;
+
+  DELETE FROM public.fno_trades WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_fno_trades = ROW_COUNT;
+
+  DELETE FROM public.fno_positions WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_fno_pos = ROW_COUNT;
+
+  DELETE FROM public.stock_transactions WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_stock_tx = ROW_COUNT;
+
+  DELETE FROM public.stock_holdings WHERE user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted_stock_holdings = ROW_COUNT;
+
+  -- 2. Transfers
   DELETE FROM public.transfers WHERE user_id = p_user_id;
   GET DIAGNOSTICS v_deleted_transfers = ROW_COUNT;
 
-  -- 2. Recurring transaction rules
+  -- 3. Recurring rules
   DELETE FROM public.recurring_rules WHERE user_id = p_user_id;
   GET DIAGNOSTICS v_deleted_rules = ROW_COUNT;
 
-  -- 3. Expenses
+  -- 4. Expenses & Income
   DELETE FROM public.expenses WHERE user_id = p_user_id;
   GET DIAGNOSTICS v_deleted_expenses = ROW_COUNT;
 
-  -- 4. Income
   DELETE FROM public.income WHERE user_id = p_user_id;
   GET DIAGNOSTICS v_deleted_income = ROW_COUNT;
 
@@ -1154,7 +1193,7 @@ BEGIN
   -- 7. Audit logs
   DELETE FROM public.financial_audit_logs WHERE user_id = p_user_id;
 
-  -- 8. Identify existing Cash in Hand account
+  -- 8. Accounts: reset default cash account, delete remainder
   SELECT id INTO v_cash_id
   FROM public.accounts
   WHERE user_id = p_user_id
@@ -1166,42 +1205,222 @@ BEGIN
   ORDER BY created_at ASC
   LIMIT 1;
 
-  -- Delete all other accounts
   IF v_cash_id IS NOT NULL THEN
     DELETE FROM public.accounts WHERE user_id = p_user_id AND id <> v_cash_id;
     GET DIAGNOSTICS v_deleted_accounts = ROW_COUNT;
 
-    -- Reset Cash in Hand balance to 0.00
     UPDATE public.accounts
-    SET balance = 0.00,
-        updated_at = timezone('utc'::text, now())
+    SET balance = 0.00
     WHERE id = v_cash_id;
   ELSE
     DELETE FROM public.accounts WHERE user_id = p_user_id;
     GET DIAGNOSTICS v_deleted_accounts = ROW_COUNT;
 
-    -- Create fresh default cash account
     INSERT INTO public.accounts (user_id, name, type, balance, last_four)
     VALUES (p_user_id, 'Cash in Hand', 'Liquid Cash', 0.00, 'CASH');
   END IF;
 
   RETURN jsonb_build_object(
     'success', true,
-    'message', 'Workspace wiped successfully',
+    'message', 'Workspace wiped securely',
     'deleted_transfers', v_deleted_transfers,
     'deleted_rules', v_deleted_rules,
     'deleted_expenses', v_deleted_expenses,
     'deleted_income', v_deleted_income,
     'deleted_budgets', v_deleted_budgets,
     'deleted_accounts', v_deleted_accounts,
-    'deleted_family_members', v_deleted_family_members,
-    'deleted_family_goals', v_deleted_family_goals,
-    'deleted_family_resp', v_deleted_family_resp,
-    'deleted_family_vault', v_deleted_family_vault
+    'deleted_stocks', v_deleted_stock_holdings,
+    'deleted_fno', v_deleted_fno_pos,
+    'deleted_mutual_funds', v_deleted_mf_holdings
   );
 END;
 $$;
 
--- Grant execution to authenticated users and service role
-GRANT EXECUTE ON FUNCTION public.fn_wipe_user_data(text) TO authenticated;
+-- Revoke execute from public/authenticated, restrict to service_role
+REVOKE EXECUTE ON FUNCTION public.fn_wipe_user_data(text) FROM PUBLIC, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_wipe_user_data(text) TO service_role;
+
+-- ----------------------------------------------------------------------------
+-- 10. INVESTMENT & DERIVATIVES MODULES
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.stock_holdings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  symbol text NOT NULL,
+  exchange text NOT NULL DEFAULT 'NSE' CHECK (exchange IN ('NSE', 'BSE')),
+  company_name text NOT NULL,
+  sector text DEFAULT 'Other',
+  quantity numeric(14, 4) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  avg_buy_price numeric(15, 2) NOT NULL DEFAULT 0 CHECK (avg_buy_price >= 0),
+  currency varchar(3) NOT NULL DEFAULT 'INR',
+  account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  notes text,
+  target_price numeric(15, 2) NULL,
+  stop_loss numeric(15, 2) NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_user_symbol_exchange UNIQUE (user_id, symbol, exchange)
+);
+ALTER TABLE public.stock_holdings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own stock holdings" ON public.stock_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own stock holdings" ON public.stock_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own stock holdings" ON public.stock_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own stock holdings" ON public.stock_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.stock_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  holding_id uuid REFERENCES public.stock_holdings(id) ON DELETE CASCADE,
+  symbol text NOT NULL,
+  exchange text NOT NULL DEFAULT 'NSE' CHECK (exchange IN ('NSE', 'BSE')),
+  type text NOT NULL CHECK (type IN ('BUY', 'SELL')),
+  quantity numeric(14, 4) NOT NULL CHECK (quantity > 0),
+  price numeric(15, 2) NOT NULL CHECK (price >= 0),
+  brokerage_charges numeric(10, 2) DEFAULT 0,
+  transaction_date date NOT NULL DEFAULT current_date,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.stock_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own stock transactions" ON public.stock_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own stock transactions" ON public.stock_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own stock transactions" ON public.stock_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own stock transactions" ON public.stock_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.fno_positions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  symbol text NOT NULL,
+  instrument_type text NOT NULL CHECK (instrument_type IN ('CE', 'PE', 'FUT')),
+  strike_price numeric(15, 2) NULL,
+  expiry_date date NOT NULL,
+  side text NOT NULL CHECK (side IN ('BUY', 'SELL')),
+  product text NOT NULL DEFAULT 'NRML' CHECK (product IN ('NRML', 'MIS', 'CNC')),
+  lot_size integer NOT NULL DEFAULT 25 CHECK (lot_size > 0),
+  lots numeric(10, 2) NOT NULL DEFAULT 1 CHECK (lots > 0),
+  quantity numeric(14, 4) NOT NULL CHECK (quantity > 0),
+  avg_price numeric(15, 2) NOT NULL DEFAULT 0 CHECK (avg_price >= 0),
+  ltp numeric(15, 2) DEFAULT NULL,
+  status text NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
+  exit_price numeric(15, 2) NULL,
+  exit_date timestamptz NULL,
+  target_price numeric(15, 2) NULL,
+  stop_loss numeric(15, 2) NULL,
+  strategy_name text DEFAULT 'Naked Position',
+  account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.fno_positions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own fno positions" ON public.fno_positions FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own fno positions" ON public.fno_positions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own fno positions" ON public.fno_positions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own fno positions" ON public.fno_positions FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.fno_trades (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  position_id uuid REFERENCES public.fno_positions(id) ON DELETE CASCADE,
+  symbol text NOT NULL,
+  instrument_type text NOT NULL CHECK (instrument_type IN ('CE', 'PE', 'FUT')),
+  strike_price numeric(15, 2) NULL,
+  expiry_date date NOT NULL,
+  side text NOT NULL CHECK (side IN ('BUY', 'SELL')),
+  action text NOT NULL CHECK (action IN ('ENTRY', 'EXIT', 'ADJUSTMENT')),
+  quantity numeric(14, 4) NOT NULL CHECK (quantity > 0),
+  price numeric(15, 2) NOT NULL CHECK (price >= 0),
+  brokerage numeric(10, 2) DEFAULT 20.00,
+  exchange_charges numeric(10, 2) DEFAULT 0,
+  gst numeric(10, 2) DEFAULT 0,
+  stt numeric(10, 2) DEFAULT 0,
+  pnl numeric(15, 2) DEFAULT 0,
+  trade_date timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  notes text NULL
+);
+ALTER TABLE public.fno_trades ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own fno trades" ON public.fno_trades FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own fno trades" ON public.fno_trades FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own fno trades" ON public.fno_trades FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own fno trades" ON public.fno_trades FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.mutual_fund_holdings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  scheme_code text NOT NULL,
+  scheme_name text NOT NULL,
+  fund_house text NOT NULL DEFAULT 'Other',
+  category text NOT NULL DEFAULT 'Equity',
+  sub_category text NULL,
+  plan_type text NOT NULL DEFAULT 'Direct' CHECK (plan_type IN ('Direct', 'Regular')),
+  dividend_option text NOT NULL DEFAULT 'Growth' CHECK (dividend_option IN ('Growth', 'IDCW', 'Bonus')),
+  folio_number text NOT NULL DEFAULT 'COIN_DEMAT',
+  units numeric(16, 4) NOT NULL DEFAULT 0 CHECK (units >= 0),
+  avg_nav numeric(15, 4) NOT NULL DEFAULT 0 CHECK (avg_nav >= 0),
+  invested_amount numeric(15, 2) NOT NULL DEFAULT 0 CHECK (invested_amount >= 0),
+  current_nav numeric(15, 4) NOT NULL DEFAULT 0 CHECK (current_nav >= 0),
+  previous_nav numeric(15, 4) DEFAULT 0,
+  nav_date date NULL,
+  isin text NULL,
+  is_sip_active boolean NOT NULL DEFAULT false,
+  sip_amount numeric(15, 2) DEFAULT 0 CHECK (sip_amount >= 0),
+  sip_frequency text DEFAULT 'MONTHLY' CHECK (sip_frequency IN ('WEEKLY', 'MONTHLY', 'QUARTERLY')),
+  sip_day integer DEFAULT 1 CHECK (sip_day >= 1 AND sip_day <= 31),
+  sip_step_up_percent numeric(5, 2) DEFAULT 0 CHECK (sip_step_up_percent >= 0),
+  account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_user_folio_scheme UNIQUE (user_id, folio_number, scheme_code)
+);
+ALTER TABLE public.mutual_fund_holdings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own mf holdings" ON public.mutual_fund_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own mf holdings" ON public.mutual_fund_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own mf holdings" ON public.mutual_fund_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own mf holdings" ON public.mutual_fund_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.mutual_fund_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  holding_id uuid REFERENCES public.mutual_fund_holdings(id) ON DELETE CASCADE,
+  type text NOT NULL CHECK (type IN ('SIP', 'BUY', 'SELL', 'SWITCH_IN', 'SWITCH_OUT')),
+  units numeric(16, 4) NOT NULL CHECK (units > 0),
+  nav numeric(15, 4) NOT NULL CHECK (nav >= 0),
+  amount numeric(15, 2) NOT NULL CHECK (amount >= 0),
+  stamp_duty numeric(8, 2) DEFAULT 0,
+  transaction_date date NOT NULL DEFAULT current_date,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.mutual_fund_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own mf transactions" ON public.mutual_fund_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own mf transactions" ON public.mutual_fund_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own mf transactions" ON public.mutual_fund_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own mf transactions" ON public.mutual_fund_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.zerodha_integrations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT auth.uid()::text,
+  api_key text NOT NULL,
+  api_secret text NOT NULL,
+  request_token text NULL,
+  access_token text NULL,
+  public_token text NULL,
+  token_generated_at timestamptz NULL,
+  user_profile jsonb NULL,
+  last_sync_at timestamptz NULL,
+  last_sync_status text NULL DEFAULT 'NEVER_SYNCED',
+  last_sync_error text NULL,
+  last_sync_summary jsonb NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_zerodha_integrations_user UNIQUE (user_id)
+);
+ALTER TABLE public.zerodha_integrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own zerodha integration" ON public.zerodha_integrations FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own zerodha integration" ON public.zerodha_integrations FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own zerodha integration" ON public.zerodha_integrations FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own zerodha integration" ON public.zerodha_integrations FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
+
