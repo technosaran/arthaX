@@ -82,7 +82,7 @@ export async function getZerodhaIntegration(userId: string): Promise<{
   isTokenExpired: boolean;
 }> {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from("zerodha_integrations")
       .select("*")
       .eq("user_id", userId)
@@ -91,8 +91,15 @@ export async function getZerodhaIntegration(userId: string): Promise<{
     let record = data;
     const envApiKey = process.env.ZERODHA_API_KEY;
     const envApiSecret = process.env.ZERODHA_API_SECRET;
-    const authorizedUserId = (process.env.ZERODHA_AUTHORIZED_USER_ID || "").trim();
-    const isAuthorizedOwner = !authorizedUserId || userId === "default_user" || userId === authorizedUserId;
+    const rawAuthorized = (process.env.ZERODHA_AUTHORIZED_USER_ID || "").trim();
+    const authorizedUserIds = rawAuthorized
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const isAuthorizedOwner =
+      authorizedUserIds.length === 0 ||
+      userId === "default_user" ||
+      authorizedUserIds.includes(userId);
 
     if (!record && envApiKey && envApiSecret && isAuthorizedOwner) {
       const encryptedSecret = encryptSensitiveData(envApiSecret, "broker-credentials");
@@ -209,11 +216,12 @@ export async function exchangeRequestToken(
         order_types: data.order_types,
       },
     };
-  } catch (err: any) {
-    logger.error("[Zerodha] Error exchanging request token:", err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Network error while connecting to Zerodha Kite API";
+    logger.error("[Zerodha] Error exchanging request token:", "ZerodhaAPI", err);
     return {
       success: false,
-      error: err.message || "Network error while connecting to Zerodha Kite API",
+      error: msg,
     };
   }
 }
@@ -317,8 +325,9 @@ export async function fetchKiteMargins(apiKey: string, accessToken: string): Pro
     }
 
     return json.data || null;
-  } catch (err: any) {
-    logger.warn("[Zerodha Margins] Network error:", err.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn("[Zerodha Margins] Network error:", msg);
     return null;
   }
 }
@@ -342,7 +351,7 @@ export function parseFnoSymbol(tradingsymbol: string): {
   let instrument_type: "CE" | "PE" | "FUT" = "FUT";
   let strike_price: number | null = null;
   const today = new Date().toISOString().split("T")[0];
-  let expiry_date = today;
+  const expiry_date = today;
 
   if (clean.endsWith("FUT")) {
     instrument_type = "FUT";
@@ -355,7 +364,6 @@ export function parseFnoSymbol(tradingsymbol: string): {
       strike_price = parseFloat(match[3]) || null;
     } else {
       // Basic split
-      const optType = clean.slice(-2) as "CE" | "PE";
       const rest = clean.slice(0, -2);
       const strikeMatch = rest.match(/\d+$/);
       if (strikeMatch) {
@@ -461,6 +469,23 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       fetchKiteMargins(apiKey, accessToken),
     ]);
 
+    // If all portfolio endpoints failed, return error immediately
+    if (
+      holdingsRes.status === "rejected" &&
+      positionsRes.status === "rejected" &&
+      mfHoldingsRes.status === "rejected"
+    ) {
+      const firstError = (holdingsRes.reason as Error)?.message || "Failed to fetch portfolio data from Zerodha Kite API";
+      logger.error("[Zerodha Sync] All portfolio endpoints failed:", firstError);
+      return {
+        success: false,
+        stocksSynced: 0,
+        fnoSynced: 0,
+        mfSynced: 0,
+        error: firstError,
+      };
+    }
+
     // Compute live wallet/margin cash balance
     let walletBalance = 0;
     if (marginsRes.status === "fulfilled" && marginsRes.value) {
@@ -513,19 +538,21 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
 
     // --- Section 1: Stocks Sync ---
     if (holdingsRes.status === "fulfilled" && Array.isArray(holdingsRes.value)) {
+      const activeSymbols = new Set<string>();
       for (const h of holdingsRes.value) {
         const totalQty = (h.quantity || 0) + (h.t1_quantity || 0);
         if (totalQty <= 0) continue;
 
         const exchange = (h.exchange || "NSE").toUpperCase() === "BSE" ? "BSE" : "NSE";
         const symbol = (h.tradingsymbol || "").toUpperCase();
+        activeSymbols.add(`${symbol}:${exchange}`);
 
         await supabaseAdmin.from("stock_holdings").upsert(
           {
             user_id: userId,
             symbol,
             exchange,
-            company_name: h.tradingsymbol,
+            company_name: h.tradingsymbol || symbol,
             sector: "Other",
             quantity: totalQty,
             avg_buy_price: h.average_price || 0,
@@ -538,11 +565,39 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         );
         stocksSynced++;
       }
+
+      // Cleanup previously synced Zerodha stocks that are no longer held
+      try {
+        const { data: oldHoldings } = await supabaseAdmin
+          .from("stock_holdings")
+          .select("id, symbol, exchange, notes")
+          .eq("user_id", userId)
+          .ilike("notes", "%Synced from Zerodha Kite%");
+
+        if (oldHoldings && oldHoldings.length > 0) {
+          const toDelete = oldHoldings.filter(
+            (o) => !activeSymbols.has(`${o.symbol.toUpperCase()}:${o.exchange.toUpperCase()}`)
+          );
+          for (const d of toDelete) {
+            await supabaseAdmin.from("stock_holdings").delete().eq("id", d.id);
+          }
+        }
+      } catch (cleanupErr) {
+        logger.warn("[Zerodha Sync] Old stock holdings cleanup notice:", String(cleanupErr));
+      }
     }
 
     // --- Section 2: F&O Positions Sync ---
     if (positionsRes.status === "fulfilled") {
       const netPositions = positionsRes.value?.net || [];
+
+      // Clean up previous Zerodha synced positions for this user to avoid duplicate rows
+      await supabaseAdmin
+        .from("fno_positions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("strategy_name", "Zerodha Live Sync");
+
       for (const p of netPositions) {
         const qty = p.quantity || 0;
         if (qty === 0 && !p.m2m) continue; // Skip completely empty flat positions
@@ -578,6 +633,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
 
     // --- Section 3: Mutual Funds Sync ---
     if (mfHoldingsRes.status === "fulfilled" && Array.isArray(mfHoldingsRes.value)) {
+      const activeFunds = new Set<string>();
       for (const mf of mfHoldingsRes.value) {
         const units = mf.quantity || 0;
         if (units <= 0) continue;
@@ -587,6 +643,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         const avgNav = mf.average_price || 0;
         const investedAmount = units * avgNav;
         const currentNav = mf.last_price || avgNav;
+        activeFunds.add(`${schemeCode}:${folioNumber}`);
 
         await supabaseAdmin.from("mutual_fund_holdings").upsert(
           {
@@ -607,9 +664,27 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
             notes: `Synced from Zerodha Coin DEMAT. Tradingsymbol: ${mf.tradingsymbol}`,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "user_id,scheme_code,folio_number" }
+          { onConflict: "user_id,folio_number,scheme_code" }
         );
         mfSynced++;
+      }
+
+      // Cleanup previously synced Coin holdings that are no longer held
+      try {
+        const { data: oldMfs } = await supabaseAdmin
+          .from("mutual_fund_holdings")
+          .select("id, scheme_code, folio_number, notes")
+          .eq("user_id", userId)
+          .ilike("notes", "%Synced from Zerodha Coin DEMAT%");
+
+        if (oldMfs && oldMfs.length > 0) {
+          const toDelete = oldMfs.filter((o) => !activeFunds.has(`${o.scheme_code}:${o.folio_number}`));
+          for (const d of toDelete) {
+            await supabaseAdmin.from("mutual_fund_holdings").delete().eq("id", d.id);
+          }
+        }
+      } catch (cleanupErr) {
+        logger.warn("[Zerodha Sync] Old mutual fund holdings cleanup notice:", String(cleanupErr));
       }
     }
 
@@ -650,14 +725,15 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       mfSynced,
       walletBalance,
     };
-  } catch (err: any) {
-    logger.error("[Zerodha Sync] Failed to sync:", err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error during sync";
+    logger.error("[Zerodha Sync] Failed to sync:", "ZerodhaSync", err);
     await supabaseAdmin
       .from("zerodha_integrations")
       .update({
         last_sync_at: new Date().toISOString(),
         last_sync_status: "FAILED",
-        last_sync_error: err.message || "Unknown error during sync",
+        last_sync_error: msg,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
@@ -667,7 +743,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       stocksSynced: 0,
       fnoSynced: 0,
       mfSynced: 0,
-      error: err.message || "Failed to sync Zerodha portfolio",
+      error: msg || "Failed to sync Zerodha portfolio",
     };
   }
 }

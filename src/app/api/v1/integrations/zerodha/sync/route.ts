@@ -1,12 +1,11 @@
 import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
 import { syncAllZerodhaSections } from "@/utils/zerodha";
 
 // POST: Trigger manual sync of all 3 portfolio sections from Zerodha
 export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {
@@ -32,12 +31,14 @@ export async function POST(req: NextRequest) {
         stocksSynced: result.stocksSynced,
         fnoSynced: result.fnoSynced,
         mfSynced: result.mfSynced,
+        walletBalance: result.walletBalance ?? 0,
       },
       undefined,
       200,
       req
     );
-  } catch (err: any) {
-    return apiError(err.message || "Internal server error during sync", "INTERNAL_SERVER_ERROR", 500, undefined, req);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error during sync";
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }

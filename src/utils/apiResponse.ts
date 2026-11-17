@@ -124,9 +124,9 @@ export const apiRateLimited = (msg: string = "Rate limit exceeded. Please try ag
  * Higher-order wrapper for route handlers that guarantees correlation IDs and safe exception catching.
  */
 export function withApiHandler<T = unknown>(
-  handler: (req: NextRequest, ctx?: any) => Promise<NextResponse<ApiResponse<T>> | NextResponse>
+  handler: (req: NextRequest, ctx?: unknown) => Promise<NextResponse<ApiResponse<T>> | NextResponse>
 ) {
-  return async (req: NextRequest, ctx?: any): Promise<NextResponse> => {
+  return async (req: NextRequest, ctx?: unknown): Promise<NextResponse> => {
     const requestId = extractRequestId(req);
     const start = Date.now();
     try {

@@ -72,6 +72,15 @@ describe("Advanced Backend Architecture Suite", () => {
       expect(body.error.code).toBe("VALIDATION_ERROR");
       expect(body.error.details).toEqual(details);
     });
+
+    it("formats specialized 403 forbidden error", async () => {
+      const res = apiForbidden("Tenant access denied");
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("FORBIDDEN");
+      expect(body.error.message).toBe("Tenant access denied");
+    });
   });
 
   describe("Distributed Rate Limiter & Abuse Prevention", () => {

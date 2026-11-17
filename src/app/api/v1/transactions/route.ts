@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   try {
-    let expensesPromise = Promise.resolve({ data: [] as any[], count: 0, error: null as any });
-    let incomePromise = Promise.resolve({ data: [] as any[], count: 0, error: null as any });
+    type SupabaseListResult = { data: Record<string, unknown>[] | null; count: number | null; error: { message: string } | null };
+    let expensesPromise: Promise<SupabaseListResult> = Promise.resolve({ data: [], count: 0, error: null });
+    let incomePromise: Promise<SupabaseListResult> = Promise.resolve({ data: [], count: 0, error: null });
 
     if (type === "all" || type === "expense") {
       let expQuery = supabaseAdmin
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
       if (category) expQuery = expQuery.eq("category", category);
       if (search) expQuery = expQuery.ilike("title", `%${search}%`);
 
-      expensesPromise = expQuery.range(offset, offset + limit - 1) as any;
+      expensesPromise = expQuery.range(offset, offset + limit - 1) as unknown as Promise<SupabaseListResult>;
     }
 
     if (type === "all" || type === "income") {
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
       if (category) incQuery = incQuery.eq("category", category);
       if (search) incQuery = incQuery.ilike("title", `%${search}%`);
 
-      incomePromise = incQuery.range(offset, offset + limit - 1) as any;
+      incomePromise = incQuery.range(offset, offset + limit - 1) as unknown as Promise<SupabaseListResult>;
     }
 
     const [expRes, incRes] = await Promise.all([expensesPromise, incomePromise]);
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       })),
     ];
 
-    unifiedList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    unifiedList.sort((a, b) => new Date(String(b.date)).getTime() - new Date(String(a.date)).getTime());
 
     return apiSuccess(
       unifiedList.slice(0, limit),
@@ -158,7 +159,7 @@ export async function POST(req: NextRequest) {
 
     const data = parseResult.data;
 
-    let rpcResponse: any;
+    let rpcResponse: unknown;
     if (data.type === "expense") {
       const { data: result, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
         p_user_id: userId,
@@ -229,7 +230,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    let result: any;
+    let result: unknown;
     if (type === "expense") {
       const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_delete_expense_atomic", {
         p_expense_id: id,

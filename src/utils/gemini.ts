@@ -192,6 +192,7 @@ export async function parseFinancialInputWithGemini({
     promptInstruction = `Parse this financial input: "${text || ""}"`;
   }
 
+  promptInstruction += ` User: ${userName}.`;
   if (accountsSummary.length > 0) {
     promptInstruction += `\nUser's existing accounts: ${accountsSummary.map((a) => a.name).join(", ")}. If an account name is mentioned or implied, map it to accountQuery.`;
   }

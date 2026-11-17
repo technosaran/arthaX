@@ -330,7 +330,6 @@ export async function PUT(req: NextRequest) {
 
 // DELETE: Delete a mutual fund holding
 export async function DELETE(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { exchangeRequestToken } from "@/utils/zerodha";
+import { encryptSensitiveData } from "@/utils/crypto";
 import { logger } from "@/utils/logger";
 
 export async function GET(req: NextRequest) {
@@ -22,11 +23,12 @@ export async function GET(req: NextRequest) {
     const { user, userId } = await getAuthenticatedUser(req);
 
     if (!user || !userId) {
-      // If auth cookie was lost during external redirect, redirect back with token in URL param
-      // so the client-side settings page can complete the exchange with its existing auth session
+      // Never leak request_token in URL query parameters to avoid server access log & browser history exposure
       return NextResponse.redirect(
         new URL(
-          `/?tab=settings&section=integrations&request_token=${encodeURIComponent(requestToken)}`,
+          `/?tab=settings&section=integrations&zerodha_error=${encodeURIComponent(
+            "Session expired during Kite authentication. Please log in to ArthaX and reconnect."
+          )}`,
           baseUrl
         )
       );
@@ -64,13 +66,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Save access_token in database
+    // Save access_token in database with AES-256-GCM authenticated encryption
     await supabaseAdmin
       .from("zerodha_integrations")
       .update({
-        access_token: exchange.accessToken,
-        public_token: exchange.publicToken || null,
-        request_token: requestToken,
+        access_token: encryptSensitiveData(exchange.accessToken, "broker-credentials"),
+        public_token: encryptSensitiveData(exchange.publicToken || null, "broker-credentials"),
+        request_token: encryptSensitiveData(requestToken, "broker-credentials"),
         token_generated_at: new Date().toISOString(),
         user_profile: exchange.profile || null,
         updated_at: new Date().toISOString(),
@@ -80,13 +82,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL("/?tab=settings&section=integrations&zerodha_connected=true", baseUrl)
     );
-  } catch (err: any) {
-    logger.error("[Zerodha Callback] Unhandled error:", err);
+  } catch (err: unknown) {
+    logger.error("[Zerodha Callback] Unhandled error:", "ZerodhaCallback", err);
+    const msg = err instanceof Error ? err.message : "Unexpected error occurred during Zerodha callback";
     return NextResponse.redirect(
       new URL(
-        `/?tab=settings&section=integrations&zerodha_error=${encodeURIComponent(
-          err.message || "Unexpected error occurred during Zerodha callback"
-        )}`,
+        `/?tab=settings&section=integrations&zerodha_error=${encodeURIComponent(msg)}`,
         baseUrl
       )
     );

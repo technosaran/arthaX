@@ -203,12 +203,18 @@ export default function LedgerSection() {
     }
   };
 
+  const { todayStr, yesterdayStr } = useMemo(() => {
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    const y = new Date(now.getTime() - 86400000);
+    const yesterday = y.toISOString().split("T")[0];
+    return { todayStr: today, yesterdayStr: yesterday };
+  }, []);
+
   // Get relative date tag
   const getRelativeDateTag = (dateStr: string) => {
-    const today = new Date().toISOString().split("T")[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    if (dateStr === today) return "Today";
-    if (dateStr === yesterday) return "Yesterday";
+    if (dateStr === todayStr) return "Today";
+    if (dateStr === yesterdayStr) return "Yesterday";
     return null;
   };
 

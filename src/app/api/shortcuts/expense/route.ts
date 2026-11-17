@@ -22,6 +22,20 @@ interface ShortcutRequestBody {
  */
 export async function POST(req: NextRequest) {
   try {
+    // 0. Anti-Brute Force Rate Limiting
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const ipLimit = await rateLimit(`shortcuts_ip:${clientIp}`, 30, 60);
+    if (!ipLimit.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          speech: "Too many requests. Please wait a minute before trying again.",
+          display: "Rate limit exceeded. Please wait a moment.",
+        },
+        { status: 429 }
+      );
+    }
+
     let body: ShortcutRequestBody;
     try {
       body = (await req.json()) as ShortcutRequestBody;
@@ -71,10 +85,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!userId && configuredApiKey && constantTimeCompare(apiKeyHeader.trim(), configuredApiKey.trim())) {
-      const isDevOrTest = process.env.NODE_ENV !== "production" || process.env.VITEST;
-      // In production, prevent arbitrary tenant ID injection; use configured authorized user mapping
+      const isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
+      // Prevent arbitrary tenant ID injection; strictly use configured authorized user mapping
       userId =
-        (isDevOrTest && body.user_id ? body.user_id : null) ||
+        (isTest && body.user_id ? body.user_id : null) ||
         process.env.SHORTCUTS_AUTHORIZED_USER_ID ||
         process.env.WHATSAPP_AUTHORIZED_USER_ID ||
         process.env.TELEGRAM_AUTHORIZED_USER_ID ||

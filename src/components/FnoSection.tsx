@@ -126,8 +126,14 @@ export default function FnoSection() {
     if (!user) return;
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const [posRes, accRes] = await Promise.all([
-        fetch("/api/v1/fno/positions"),
+        fetch("/api/v1/fno/positions", { headers }),
         supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
       ]);
 
@@ -151,28 +157,47 @@ export default function FnoSection() {
   useEffect(() => {
     fetchData();
     // Silent background auto-sync from Zerodha when session is active
-    fetch("/api/v1/integrations/zerodha/sync", { method: "POST" })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && (json.data?.fnoSynced > 0)) {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+        const json = await res.json();
+        if (json.success) {
           fetchData();
         }
-      })
-      .catch(() => {});
-  }, [fetchData]);
+      } catch {}
+    })();
+  }, [fetchData, supabase]);
 
   // Sync F&O positions directly from Zerodha Kite API
   const handleSyncZerodha = async () => {
     setSyncingZerodha(true);
     try {
-      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST" });
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to sync Zerodha positions");
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Failed to sync Zerodha positions";
+        throw new Error(errorMsg);
       }
+      const count = json.data?.fnoSynced ?? 0;
       showToast(
         "Zerodha Synced!",
-        `Successfully synced ${json.data.fnoSynced} F&O positions from Zerodha Kite.`,
+        count > 0
+          ? `Successfully synced ${count} F&O positions from Zerodha Kite.`
+          : `Zerodha F&O sync completed! No open derivative positions in Zerodha.`,
         "success"
       );
       await fetchData();

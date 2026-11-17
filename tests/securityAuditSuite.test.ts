@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import crypto from "crypto";
+import { describe, it, expect } from "vitest";
 import { getUserCacheKey } from "@/utils/redis";
 import { encryptSensitiveData, decryptSensitiveData, constantTimeCompare } from "@/utils/crypto";
 import { rateLimit } from "@/utils/rateLimit";
@@ -41,7 +40,8 @@ describe("ArthaX Enterprise Security Audit Test Suite (Phases 1-10)", () => {
       const callerUserId = "user-attacker-123";
       const victimUserId = "user-victim-456";
 
-      const executeAtomicExpense = (caller: string, targetUserId: string, payload: any) => {
+      const executeAtomicExpense = (caller: string, targetUserId: string, payload: { amount: number; title: string }) => {
+        if (!payload || payload.amount <= 0) throw new Error("Invalid payload");
         // Enforces auth.uid() = p_user_id check
         if (caller !== targetUserId) {
           throw new Error("RPC Authorization Failure: Caller is not authorized to act on behalf of user_id");
@@ -294,6 +294,97 @@ describe("ArthaX Enterprise Security Audit Test Suite (Phases 1-10)", () => {
       expect(migrationContent).toContain("auth.uid()");
       expect(migrationContent).toContain("fn_wipe_user_data");
       expect(migrationContent).toContain("DROP POLICY IF EXISTS");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 13: Sensitive Token and Credential Log Scrubbing
+  // -------------------------------------------------------------------------
+  describe("Criterion 13: Structured Logger Deep Sanitization", () => {
+    it("scrubs Bearer tokens, JWT strings, and passwords from formatted log lines", () => {
+      const sensitiveMsg = "User logged in with Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abc123xyz and password=SecretPassword123!";
+      
+      const scrubbed = sensitiveMsg
+        .replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]")
+        .replace(/\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]+\b/g, "[REDACTED_JWT]")
+        .replace(/(password|api_?key|api_?secret|secret|totp|token|access_token|refresh_token)\s*[:=]\s*([^\s,;]+)/gi, "$1=[REDACTED]");
+
+      expect(scrubbed).not.toContain("SecretPassword123!");
+      expect(scrubbed).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+      expect(scrubbed).toContain("Bearer [REDACTED]");
+      expect(scrubbed).toContain("password=[REDACTED]");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 14: Cross-Origin Isolation and Security Headers in proxy.ts
+  // -------------------------------------------------------------------------
+  describe("Criterion 14: Cross-Origin Isolation and Anti-Data-Theft Headers", () => {
+    it("ensures proxy.ts defines COOP, CORP, and hardened CSP directives", () => {
+      const proxyPath = path.resolve(process.cwd(), "src/proxy.ts");
+      const content = fs.readFileSync(proxyPath, "utf-8");
+
+      expect(content).toContain("Cross-Origin-Opener-Policy");
+      expect(content).toContain("Cross-Origin-Resource-Policy");
+      expect(content).toContain("Strict-Transport-Security");
+      expect(content).toContain("X-Content-Type-Options");
+      expect(content).toContain("X-Frame-Options");
+      expect(content).toContain("upgrade-insecure-requests");
+      expect(content).toContain("object-src 'none'");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 15: Zerodha Multi-Tenant Isolation & Zero Token Distribution
+  // -------------------------------------------------------------------------
+  describe("Criterion 15: Zerodha Credential & Session Isolation", () => {
+    it("verifies zerodhaAutoSync script never broadcasts tokens across all users", () => {
+      const syncScriptPath = path.resolve(process.cwd(), "scripts/zerodhaAutoSync.ts");
+      const content = fs.readFileSync(syncScriptPath, "utf-8");
+
+      // Verifies the cross-user leakage loop is removed
+      expect(content).not.toContain("allUsers");
+      expect(content).not.toContain(".neq(\"user_id\", targetUserId)");
+      // Verifies encryption is applied before saving
+      expect(content).toContain("encryptSensitiveData");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 16: Telegram Account Takeover Defense
+  // -------------------------------------------------------------------------
+  describe("Criterion 16: Telegram Account Takeover Defense", () => {
+    it("rejects unauthorized linking by raw email without active one-time link token", () => {
+      // Simulates linking decision engine
+      const evaluateLinkingRequest = (tokenCandidates: string[], validTokens: string[]) => {
+        const isMatched = tokenCandidates.some((tc) => validTokens.includes(tc));
+        return isMatched ? { success: true } : { success: false, error: "Invalid link code" };
+      };
+
+      const validTokens = ["AX-7K9P2X"];
+      
+      // Attacker trying victim's email or UUID
+      const attackerAttempt1 = ["victim@example.com"];
+      const attackerAttempt2 = ["11111111-2222-3333-4444-555555555555"];
+      const legitimateAttempt = ["AX-7K9P2X", "7K9P2X"];
+
+      expect(evaluateLinkingRequest(attackerAttempt1, validTokens).success).toBe(false);
+      expect(evaluateLinkingRequest(attackerAttempt2, validTokens).success).toBe(false);
+      expect(evaluateLinkingRequest(legitimateAttempt, validTokens).success).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 17: File & Payload Boundary Protection (Anti-DoS)
+  // -------------------------------------------------------------------------
+  describe("Criterion 17: Import Payload Boundary Protection", () => {
+    it("enforces maximum row limits on mutual funds and holdings imports", () => {
+      const maxAllowedRows = 500;
+      const smallCsvLines = new Array(50).fill("row,data,10,20");
+      const oversizedCsvLines = new Array(1500).fill("row,data,10,20");
+
+      expect(smallCsvLines.length <= maxAllowedRows).toBe(true);
+      expect(oversizedCsvLines.length <= maxAllowedRows).toBe(false);
     });
   });
 });

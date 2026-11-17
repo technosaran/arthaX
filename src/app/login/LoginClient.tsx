@@ -46,7 +46,22 @@ export default function LoginClient() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get("error");
+      if (err) {
+        if (err === "auth_callback_failed") {
+          return "Google authentication failed or was cancelled. Please try again.";
+        } else if (err === "missing_config") {
+          return "Authentication configuration error: Supabase URL or keys are missing.";
+        } else {
+          return `Authentication error: ${err}`;
+        }
+      }
+    }
+    return null;
+  });
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Auto-redirect if user already has an active session
@@ -55,23 +70,6 @@ export default function LoginClient() {
       router.replace("/");
     }
   }, [user, authLoading, router]);
-
-  // Check URL query parameters for callback errors
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const err = params.get("error");
-      if (err) {
-        if (err === "auth_callback_failed") {
-          setErrorMessage("Google authentication failed or was cancelled. Please try again.");
-        } else if (err === "missing_config") {
-          setErrorMessage("Authentication configuration error: Supabase URL or keys are missing.");
-        } else {
-          setErrorMessage(`Authentication error: ${err}`);
-        }
-      }
-    }
-  }, []);
 
   // Clean error translation for user-friendly UX
   const formatAuthError = (msg: string) => {
@@ -167,7 +165,7 @@ export default function LoginClient() {
         if (data.session) {
           setSuccessMessage("Account created successfully! Setting up your workspace...");
           setTimeout(() => {
-            window.location.href = "/";
+            router.push("/");
           }, 400);
         } else {
           const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -184,7 +182,7 @@ export default function LoginClient() {
           } else {
             setSuccessMessage("Welcome to arthaX! Loading your dashboard...");
             setTimeout(() => {
-              window.location.href = "/";
+              router.push("/");
             }, 400);
           }
         }
@@ -211,7 +209,7 @@ export default function LoginClient() {
       } else {
         setSuccessMessage("Identity verified. Navigating to personal dashboard...");
         setTimeout(() => {
-          window.location.href = "/";
+          router.push("/");
         }, 300);
       }
     } catch (err: unknown) {

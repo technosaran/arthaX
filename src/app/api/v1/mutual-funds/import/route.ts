@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
 import { inferCategoryAndAsset, inferFundHouse } from "../search/route";
 
 interface ParsedImportRow {
@@ -40,11 +41,16 @@ function parseCSVLine(line: string): string[] {
 }
 
 export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {
     return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  // Rate limit: 15 imports per minute to prevent DoS & resource exhaustion
+  const rl = await rateLimit(`mf_import:${userId}`, 15, 60);
+  if (!rl.success) {
+    return apiError("Too many import requests. Please wait a moment.", "RATE_LIMITED", 429, undefined, req);
   }
 
   try {
@@ -52,6 +58,11 @@ export async function POST(req: NextRequest) {
     let rowsToProcess: Record<string, unknown>[] = [];
 
     if (body.csvText && typeof body.csvText === "string") {
+      // Bound max CSV payload size (1MB limit)
+      if (body.csvText.length > 1024 * 1024) {
+        return apiError("CSV payload too large. Maximum size is 1MB.", "BAD_REQUEST", 400, undefined, req);
+      }
+
       // Parse CSV text
       const lines = body.csvText
         .split(/\r?\n/)
@@ -60,6 +71,10 @@ export async function POST(req: NextRequest) {
 
       if (lines.length < 2) {
         return apiError("CSV must contain a header row and at least one data row.", "BAD_REQUEST", 400, undefined, req);
+      }
+
+      if (lines.length > 500) {
+        return apiError("CSV exceeds the maximum limit of 500 rows per import.", "BAD_REQUEST", 400, undefined, req);
       }
 
       const headers = parseCSVLine(lines[0]).map((h) =>
@@ -77,6 +92,9 @@ export async function POST(req: NextRequest) {
         rowsToProcess.push(rowObj);
       }
     } else if (Array.isArray(body.holdings)) {
+      if (body.holdings.length > 500) {
+        return apiError("Holdings array exceeds maximum limit of 500 items.", "BAD_REQUEST", 400, undefined, req);
+      }
       rowsToProcess = body.holdings;
     } else {
       return apiError("Please provide either 'csvText' or 'holdings' array in request body.", "BAD_REQUEST", 400, undefined, req);

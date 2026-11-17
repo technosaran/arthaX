@@ -130,6 +130,15 @@ describe("Zerodha Automated TOTP & Auto-Login Utilities", () => {
       const ownerCreds = getAutoLoginCredentials(null, "owner-uuid-1234");
       expect(ownerCreds).not.toBeNull();
       expect(ownerCreds?.userId).toBe("AB1234");
+
+      // Multiple comma-separated authorized user IDs
+      process.env.ZERODHA_AUTHORIZED_USER_ID = "owner-uuid-1234, second-owner-uuid-5678";
+      const secondOwnerCreds = getAutoLoginCredentials(null, "second-owner-uuid-5678");
+      expect(secondOwnerCreds).not.toBeNull();
+      expect(secondOwnerCreds?.userId).toBe("AB1234");
+
+      const thirdStrangerCreds = getAutoLoginCredentials(null, "unauthorized-stranger-9999");
+      expect(thirdStrangerCreds).toBeNull();
     });
   });
 

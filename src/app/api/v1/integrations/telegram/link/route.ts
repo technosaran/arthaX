@@ -58,10 +58,16 @@ export async function GET(req: NextRequest) {
     }
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot";
-    const targetToken = linkToken || userId;
-    const deepLink = `https://telegram.me/${botUsername}?start=${encodeURIComponent(targetToken)}`;
-    const appUri = `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(targetToken)}`;
-    const webTelegramUrl = `https://web.telegram.org/a/#?tgaddr=${encodeURIComponent(`tg://resolve?domain=${botUsername}&start=${targetToken}`)}`;
+    const targetToken = linkToken || "";
+    const deepLink = targetToken
+      ? `https://telegram.me/${botUsername}?start=${encodeURIComponent(targetToken)}`
+      : `https://telegram.me/${botUsername}`;
+    const appUri = targetToken
+      ? `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(targetToken)}`
+      : `tg://resolve?domain=${botUsername}`;
+    const webTelegramUrl = targetToken
+      ? `https://web.telegram.org/a/#?tgaddr=${encodeURIComponent(`tg://resolve?domain=${botUsername}&start=${targetToken}`)}`
+      : `https://web.telegram.org/a/#?tgaddr=${encodeURIComponent(`tg://resolve?domain=${botUsername}`)}`;
 
     return NextResponse.json(
       {

@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       }
       finalQty = newTotalQty;
 
-      const { data: updated, error: updateErr } = await supabaseAdmin
+      const { error: updateErr } = await supabaseAdmin
         .from("stock_holdings")
         .update({
           quantity: finalQty,
@@ -296,7 +296,6 @@ export async function PUT(req: NextRequest) {
 
 // DELETE: Delete a holding
 export async function DELETE(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {

@@ -165,7 +165,9 @@ export default function SettingsSection() {
   const [exportingTarget, setExportingTarget] = useState<string | null>(null);
 
   const nameInputRef = useRef(greetingName);
-  nameInputRef.current = greetingName;
+  useEffect(() => {
+    nameInputRef.current = greetingName;
+  }, [greetingName]);
   const isDirtyRef = useRef(false);
 
   const userId = user?.id || "default_user";
@@ -396,7 +398,11 @@ export default function SettingsSection() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to save Zerodha credentials");
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Failed to save Zerodha credentials";
+        throw new Error(errorMsg);
       }
 
       showToast("Zerodha Saved", json.data.message || "Credentials saved successfully", "success");
@@ -430,7 +436,11 @@ export default function SettingsSection() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Sync failed");
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Sync failed";
+        throw new Error(errorMsg);
       }
 
       const d = json.data;
@@ -464,7 +474,11 @@ export default function SettingsSection() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Auto-login failed");
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Auto-login failed";
+        throw new Error(errorMsg);
       }
 
       showToast(

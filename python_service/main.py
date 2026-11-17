@@ -66,10 +66,17 @@ def verify_auth_dependency(
         if hmac.compare_digest(x_internal_service_key.strip(), internal_key.strip()):
             return {"user_id": "internal_service", "auth_method": "service_key"}
 
+    # 2. Supabase Bearer JWT Token Verification (Cryptographically Enforced)
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
         try:
             jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+            if not jwt_secret and IS_PROD:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Server configuration error: SUPABASE_JWT_SECRET is required for authenticated verification",
+                )
+
             if jwt_secret:
                 try:
                     import jwt
@@ -78,22 +85,31 @@ def verify_auth_dependency(
                         jwt_secret,
                         algorithms=["HS256"],
                         audience="authenticated",
-                        options={"verify_exp": True},
+                        options={"verify_exp": True, "verify_signature": True},
                     )
-                    return {"user_id": payload.get("sub"), "auth_method": "supabase_jwt_verified"}
+                    sub = payload.get("sub")
+                    if not sub:
+                        raise HTTPException(status_code=401, detail="Invalid token: missing subject claim")
+                    return {"user_id": sub, "auth_method": "supabase_jwt_verified"}
                 except ImportError:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Cryptographic dependency missing: pyjwt is required for secure authentication",
+                    )
+            elif not IS_PROD:
+                # Non-production local inspection only
+                try:
+                    import jwt
+                    payload = jwt.decode(
+                        token,
+                        options={"verify_signature": False, "verify_exp": True},
+                        algorithms=["HS256"],
+                    )
+                    sub = payload.get("sub")
+                    if sub:
+                        return {"user_id": sub, "auth_method": "dev_unverified_jwt"}
+                except Exception:
                     pass
-
-            parts = token.split(".")
-            if len(parts) == 3:
-                payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
-                payload_data = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
-                exp = payload_data.get("exp")
-                if exp and exp < time.time():
-                    raise HTTPException(status_code=401, detail="Token has expired")
-                sub = payload_data.get("sub")
-                if sub:
-                    return {"user_id": sub, "auth_method": "supabase_jwt_claims"}
         except HTTPException:
             raise
         except Exception as err:

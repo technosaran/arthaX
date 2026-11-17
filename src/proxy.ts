@@ -14,6 +14,13 @@ export async function proxy(request: NextRequest) {
   // MIME type sniffing prevention
   headers.set("X-Content-Type-Options", "nosniff");
 
+  // XSS Protection for legacy browsers
+  headers.set("X-XSS-Protection", "1; mode=block");
+
+  // Cross-Origin Isolation (Protects against cross-window financial data theft & Spectre side-channel attacks)
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+
   // Referrer leakage prevention
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
@@ -35,11 +42,13 @@ export async function proxy(request: NextRequest) {
     "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://img.logo.dev https://unavatar.io https://t3.gstatic.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.upstash.io https://api.kite.trade",
+    "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    "upgrade-insecure-requests",
   ];
   headers.set("Content-Security-Policy", cspDirectives.join("; "));
 

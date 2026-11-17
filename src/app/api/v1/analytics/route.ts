@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { getCachedData, setCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getCachedData, setCachedData, getUserCacheKey } from "@/utils/redis";
 import { getCurrentMonthYear, getLocalDateString, formatMonthDisplay } from "@/utils/monthUtils";
 import { apiSuccess, apiError, apiUnauthorized, extractRequestId } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
@@ -85,7 +85,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const todayStr = getLocalDateString(new Date(), "Asia/Kolkata");
     const monthStart = `${targetMonth}-01`;
     // Compute last day of target month
     const [yearNum, monthNum] = targetMonth.split("-").map(Number);

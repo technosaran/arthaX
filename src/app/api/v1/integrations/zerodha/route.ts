@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { extractRequestId, apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
+import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
 import {
   getZerodhaIntegration,
   exchangeRequestToken,
-  isTokenValidToday,
 } from "@/utils/zerodha";
 import { getAutoLoginCredentials } from "@/utils/zerodhaAutoLogin";
 import { encryptSensitiveData } from "@/utils/crypto";
@@ -21,7 +20,6 @@ const SaveCredentialsSchema = z.object({
 
 // GET: Check Zerodha Integration Status
 export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {
@@ -61,14 +59,14 @@ export async function GET(req: NextRequest) {
       200,
       req
     );
-  } catch (err: any) {
-    return apiError(err.message || "Failed to get Zerodha status", "INTERNAL_SERVER_ERROR", 500, undefined, req);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to get Zerodha status";
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
 
 // POST: Save Credentials or Exchange Request Token
 export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {
@@ -108,7 +106,7 @@ export async function POST(req: NextRequest) {
 
     const tokenGeneratedAt = finalAccessToken ? new Date().toISOString() : null;
 
-    const { data: saved, error: dbErr } = await supabaseAdmin
+    const { error: dbErr } = await supabaseAdmin
       .from("zerodha_integrations")
       .upsert(
         {
@@ -146,8 +144,9 @@ export async function POST(req: NextRequest) {
       200,
       req
     );
-  } catch (err: any) {
-    return apiError(err.message || "Failed to save Zerodha credentials", "INTERNAL_SERVER_ERROR", 500, undefined, req);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to save Zerodha credentials";
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }
 
@@ -161,7 +160,8 @@ export async function DELETE(req: NextRequest) {
   try {
     await supabaseAdmin.from("zerodha_integrations").delete().eq("user_id", userId);
     return apiSuccess({ message: "Zerodha integration removed successfully" }, undefined, 200, req);
-  } catch (err: any) {
-    return apiError(err.message || "Failed to remove Zerodha integration", "INTERNAL_SERVER_ERROR", 500, undefined, req);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to remove Zerodha integration";
+    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
   }
 }

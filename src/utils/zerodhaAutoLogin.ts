@@ -16,7 +16,7 @@ export interface ZerodhaAutoLoginResult {
   accessToken?: string;
   publicToken?: string;
   requestToken?: string;
-  profile?: any;
+  profile?: Record<string, unknown> | null;
   error?: string;
 }
 
@@ -105,8 +105,9 @@ export function mergeCookies(existingCookies: string, newSetCookies: string[]): 
  * Helper to extract set-cookie headers from a Fetch response across environments.
  */
 function extractSetCookies(res: Response): string[] {
-  if (typeof (res.headers as any).getSetCookie === "function") {
-    return (res.headers as any).getSetCookie();
+  const headersWithCookies = res.headers as unknown as { getSetCookie?: () => string[] };
+  if (typeof headersWithCookies.getSetCookie === "function") {
+    return headersWithCookies.getSetCookie();
   }
   const raw = res.headers.get("set-cookie");
   return raw ? [raw] : [];
@@ -121,14 +122,18 @@ export function getAutoLoginCredentials(
   integration?: ZerodhaIntegrationRecord | null,
   currentUserId?: string
 ): ZerodhaAutoLoginParams | null {
-  const authorizedUserId = (process.env.ZERODHA_AUTHORIZED_USER_ID || "").trim();
+  const rawAuthorized = (process.env.ZERODHA_AUTHORIZED_USER_ID || "").trim();
+  const authorizedUserIds = rawAuthorized
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
-  // If an authorized user ID is specified, ensure other users cannot use the env credentials
+  // If authorized user IDs are specified, ensure unauthorized users cannot use the env credentials
   if (
-    authorizedUserId &&
+    authorizedUserIds.length > 0 &&
     currentUserId &&
     currentUserId !== "default_user" &&
-    currentUserId !== authorizedUserId
+    !authorizedUserIds.includes(currentUserId)
   ) {
     logger.warn(`[Zerodha Security] Unauthorized user ${currentUserId} attempted to use owner Zerodha credentials.`);
     return null;
@@ -137,7 +142,7 @@ export function getAutoLoginCredentials(
   // In production, require explicit authorizedUserId pairing to prevent cross-tenant credential exposure
   if (
     process.env.NODE_ENV === "production" &&
-    !authorizedUserId &&
+    authorizedUserIds.length === 0 &&
     currentUserId &&
     currentUserId !== "default_user"
   ) {
@@ -335,13 +340,13 @@ export async function performZerodhaAutoLogin(
       accessToken: exchange.accessToken,
       publicToken: exchange.publicToken,
       requestToken,
-      profile: exchange.profile,
+      profile: exchange.profile as Record<string, unknown> | null | undefined,
     };
-  } catch (err: any) {
-    logger.error("[Zerodha Auto-Login] Unexpected exception:", err);
+  } catch (err: unknown) {
+    logger.error("[Zerodha Auto-Login] Unexpected exception:", "ZerodhaAutoLogin", err);
     return {
       success: false,
-      error: err.message || "Unexpected network error during Zerodha auto-login.",
+      error: err instanceof Error ? err.message : "Unexpected network error during Zerodha auto-login.",
     };
   }
 }

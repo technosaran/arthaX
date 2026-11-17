@@ -169,76 +169,8 @@ export default function StocksSection() {
     }).format(val);
   }, []);
 
-  // Fetch initial data: holdings, transactions, accounts
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const [holdingsRes, accountsRes] = await Promise.all([
-        fetch("/api/v1/stocks/holdings"),
-        supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
-      ]);
-
-      if (accountsRes.data) {
-        setAccounts(accountsRes.data);
-      }
-
-      if (holdingsRes.ok) {
-        const json = await holdingsRes.json();
-        const holdingsData: StockHolding[] = json.holdings || [];
-        setHoldings(holdingsData);
-        setTransactions(json.transactions || []);
-
-        // Immediately fetch live quotes for all holdings
-        if (holdingsData.length > 0) {
-          fetchQuotesForHoldings(holdingsData, false);
-        }
-      }
-    } catch (err) {
-      console.error("[Stocks] Error loading holdings:", err);
-      showToast("Error", "Failed to load stock portfolio", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [user, supabase, showToast]);
-
-  useEffect(() => {
-    fetchData();
-    // Silent background auto-sync from Zerodha when session is active
-    fetch("/api/v1/integrations/zerodha/sync", { method: "POST" })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && (json.data?.stocksSynced > 0)) {
-          fetchData();
-        }
-      })
-      .catch(() => {});
-  }, [fetchData]);
-
-  // Sync holdings directly from Zerodha Kite API
-  const handleSyncZerodha = async () => {
-    setSyncingZerodha(true);
-    try {
-      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to sync Zerodha portfolio");
-      }
-      showToast(
-        "Zerodha Synced!",
-        `Successfully synced ${json.data.stocksSynced} stocks from Zerodha Kite.`,
-        "success"
-      );
-      await fetchData();
-    } catch (err: any) {
-      showToast("Sync Error", err.message || "Failed to sync Zerodha stocks", "error");
-    } finally {
-      setSyncingZerodha(false);
-    }
-  };
-
   // Fetch real Indian market quotes from /api/v1/stocks/quote
-  const fetchQuotesForHoldings = async (list: StockHolding[], force = false) => {
+  const fetchQuotesForHoldings = useCallback(async (list: StockHolding[], force = false) => {
     if (list.length === 0) return;
     try {
       setRefreshingQuotes(true);
@@ -268,6 +200,101 @@ export default function StocksSection() {
     } finally {
       setRefreshingQuotes(false);
     }
+  }, [showToast]);
+
+  // Fetch initial data: holdings, transactions, accounts
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const [holdingsRes, accountsRes] = await Promise.all([
+        fetch("/api/v1/stocks/holdings", { headers }),
+        supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
+      ]);
+
+      if (accountsRes.data) {
+        setAccounts(accountsRes.data);
+      }
+
+      if (holdingsRes.ok) {
+        const json = await holdingsRes.json();
+        const holdingsData: StockHolding[] = json.holdings || [];
+        setHoldings(holdingsData);
+        setTransactions(json.transactions || []);
+
+        // Immediately fetch live quotes for all holdings
+        if (holdingsData.length > 0) {
+          fetchQuotesForHoldings(holdingsData, false);
+        }
+      }
+    } catch (err) {
+      console.error("[Stocks] Error loading holdings:", err);
+      showToast("Error", "Failed to load stock portfolio", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, supabase, showToast, fetchQuotesForHoldings]);
+
+  useEffect(() => {
+    fetchData();
+    // Silent background auto-sync from Zerodha when session is active
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+        const json = await res.json();
+        if (json.success) {
+          fetchData();
+        }
+      } catch {}
+    })();
+  }, [fetchData, supabase]);
+
+  // Sync holdings directly from Zerodha Kite API
+  const handleSyncZerodha = async () => {
+    setSyncingZerodha(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Failed to sync Zerodha portfolio";
+        throw new Error(errorMsg);
+      }
+      const count = json.data?.stocksSynced ?? 0;
+      const wallet = json.data?.walletBalance;
+      showToast(
+        "Zerodha Synced!",
+        count > 0
+          ? `Successfully synced ${count} stocks from Zerodha Kite.`
+          : `Zerodha sync completed! Wallet balance: ₹${wallet ?? 0}. No active stock holdings in Zerodha DEMAT.`,
+        "success"
+      );
+      await fetchData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sync Zerodha stocks";
+      showToast("Sync Error", msg, "error");
+    } finally {
+      setSyncingZerodha(false);
+    }
   };
 
   const handleRefreshQuotes = () => {
@@ -282,7 +309,8 @@ export default function StocksSection() {
     let profitableCount = 0;
     let lossCount = 0;
 
-    const enriched = holdings.map((h) => {
+    const enriched = [];
+    for (const h of holdings) {
       const quoteKey = `${h.symbol}:${h.exchange}`;
       const quote = quotes[quoteKey];
 
@@ -307,7 +335,7 @@ export default function StocksSection() {
       if (pnl >= 0) profitableCount++;
       else lossCount++;
 
-      return {
+      enriched.push({
         ...h,
         qty,
         avgPrice,
@@ -320,8 +348,8 @@ export default function StocksSection() {
         dayChangePercent,
         dayTotalChange,
         quote,
-      };
-    });
+      });
+    }
 
     const totalPnL = totalCurrentValue - totalInvested;
     const totalPnLPercent = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;

@@ -22,7 +22,6 @@ const AutoLoginSchema = z.object({
 
 // POST: Execute headless automated TOTP login and sync portfolio
 export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {
@@ -122,9 +121,10 @@ export async function POST(req: NextRequest) {
       200,
       req
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error during Zerodha auto-login";
     return apiError(
-      err.message || "Internal server error during Zerodha auto-login",
+      msg,
       "INTERNAL_SERVER_ERROR",
       500,
       undefined,

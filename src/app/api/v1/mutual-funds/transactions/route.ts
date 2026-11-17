@@ -197,7 +197,6 @@ export async function POST(req: NextRequest) {
 
 // DELETE: Delete a transaction
 export async function DELETE(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {

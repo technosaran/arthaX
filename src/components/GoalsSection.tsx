@@ -354,7 +354,7 @@ export default function GoalsSection() {
     const supabase = createClient();
 
     try {
-      let newAmount =
+      const newAmount =
         depositType === "add"
           ? depositTargetGoal.current_amount + delta
           : Math.max(0, depositTargetGoal.current_amount - delta);

@@ -177,13 +177,46 @@ export default function MutualFundsSection() {
     }).format(val);
   }, []);
 
+  // Fetch live NAV quotes from MFAPI
+  const fetchNavsForHoldings = useCallback(async (holdingsList: MutualFundHolding[], notify = true) => {
+    if (holdingsList.length === 0) return;
+    try {
+      setRefreshingNavs(true);
+      const codes = Array.from(new Set(holdingsList.map((h) => h.scheme_code))).join(",");
+      const res = await fetch(`/api/v1/mutual-funds/nav?codes=${encodeURIComponent(codes)}`);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.quotes) {
+          setQuotes((prev) => ({ ...prev, ...json.quotes }));
+          if (notify) {
+            showToast("Updated", "Latest AMFI NAVs loaded successfully", "success");
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[MF NAV] Batch fetch failed:", err);
+      if (notify) {
+        showToast("Notice", "Could not refresh live NAVs. Using last recorded prices.", "info");
+      }
+    } finally {
+      setRefreshingNavs(false);
+    }
+  }, [showToast]);
+
   // Fetch initial data: holdings, transactions, accounts
   const fetchData = useCallback(async () => {
     if (!user) return;
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const [holdingsRes, accountsRes] = await Promise.all([
-        fetch("/api/v1/mutual-funds/holdings"),
+        fetch("/api/v1/mutual-funds/holdings", { headers }),
         supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
       ]);
 
@@ -208,67 +241,60 @@ export default function MutualFundsSection() {
     } finally {
       setLoading(false);
     }
-  }, [user, supabase, showToast]);
+  }, [user, supabase, showToast, fetchNavsForHoldings]);
 
   useEffect(() => {
     fetchData();
     // Silent background auto-sync from Zerodha when session is active
-    fetch("/api/v1/integrations/zerodha/sync", { method: "POST" })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && (json.data?.mfSynced > 0)) {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+        const json = await res.json();
+        if (json.success) {
           fetchData();
         }
-      })
-      .catch(() => {});
-  }, [fetchData]);
+      } catch {}
+    })();
+  }, [fetchData, supabase]);
 
   // Sync Coin DEMAT Mutual Funds directly from Zerodha Kite API
   const handleSyncZerodha = async () => {
     setSyncingZerodha(true);
     try {
-      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST" });
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to sync Zerodha Coin portfolio");
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Failed to sync Zerodha Coin portfolio";
+        throw new Error(errorMsg);
       }
+      const count = json.data?.mfSynced ?? 0;
       showToast(
         "Zerodha Coin Synced!",
-        `Successfully synced ${json.data.mfSynced} mutual funds from Zerodha Coin.`,
+        count > 0
+          ? `Successfully synced ${count} mutual funds from Zerodha Coin.`
+          : `Zerodha Coin sync completed! No active mutual fund holdings in Zerodha DEMAT.`,
         "success"
       );
       await fetchData();
-    } catch (err: any) {
-      showToast("Sync Error", err.message || "Failed to sync Zerodha mutual funds", "error");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sync Zerodha mutual funds";
+      showToast("Sync Error", msg, "error");
     } finally {
       setSyncingZerodha(false);
-    }
-  };
-
-  // Fetch live NAV quotes from MFAPI
-  const fetchNavsForHoldings = async (holdingsList: MutualFundHolding[], notify = true) => {
-    if (holdingsList.length === 0) return;
-    try {
-      setRefreshingNavs(true);
-      const codes = Array.from(new Set(holdingsList.map((h) => h.scheme_code))).join(",");
-      const res = await fetch(`/api/v1/mutual-funds/nav?codes=${encodeURIComponent(codes)}`);
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.quotes) {
-          setQuotes((prev) => ({ ...prev, ...json.quotes }));
-          if (notify) {
-            showToast("Updated", "Latest AMFI NAVs loaded successfully", "success");
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("[MF NAV] Batch fetch failed:", err);
-      if (notify) {
-        showToast("Notice", "Could not refresh live NAVs. Using last recorded prices.", "info");
-      }
-    } finally {
-      setRefreshingNavs(false);
     }
   };
 
@@ -281,7 +307,7 @@ export default function MutualFundsSection() {
     let monthlySipCommitment = 0;
     let elssInvested = 0;
 
-    holdings.forEach((h) => {
+    for (const h of holdings) {
       const liveQuote = quotes[h.scheme_code];
       const nav = liveQuote?.currentNav || h.current_nav || h.avg_nav;
       const change = liveQuote?.change || 0;
@@ -309,7 +335,7 @@ export default function MutualFundsSection() {
       if (h.category.toLowerCase().includes("elss") || h.scheme_name.toLowerCase().includes("elss") || h.scheme_name.toLowerCase().includes("tax saver")) {
         elssInvested += invested;
       }
-    });
+    }
 
     const totalPnL = totalCurrentValue - totalInvested;
     const totalPnLPercent = totalInvested > 0 ? +((totalPnL / totalInvested) * 100).toFixed(2) : 0;

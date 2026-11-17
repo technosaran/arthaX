@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
       if (linkCandidate) {
         const tokenCandidates = normalizeLinkTokenCandidates(linkCandidate);
 
-        // A. Match by Link Token in user_settings
+        // A. Match strictly by secure Link Token in user_settings (Prevents Account Takeover)
         const { data: targetUser } = await supabaseAdmin
           .from("user_settings")
           .select("id, name, telegram_link_token")
@@ -249,67 +249,6 @@ export async function POST(req: NextRequest) {
         if (targetUser?.id) {
           matchedUserId = targetUser.id;
           matchedUserName = targetUser.name || "User";
-        }
-
-        // B. Match by User ID directly (UUID)
-        if (!matchedUserId && /^[0-9a-fA-F-]{36}$/.test(linkCandidate)) {
-          const { data: userById } = await supabaseAdmin
-            .from("user_settings")
-            .select("id, name")
-            .eq("id", linkCandidate)
-            .limit(1)
-            .maybeSingle();
-          if (userById?.id) {
-            matchedUserId = userById.id;
-            matchedUserName = userById.name || "User";
-          }
-        }
-
-        // C. Match by Email (e.g. user@example.com or /link user@example.com)
-        if (!matchedUserId && linkCandidate.includes("@")) {
-          const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
-          const foundAuth = (usersList?.users || []).find(
-            (u) => u.email?.toLowerCase() === linkCandidate.toLowerCase()
-          );
-          if (foundAuth?.id) {
-            matchedUserId = foundAuth.id;
-            const { data: uSet } = await supabaseAdmin
-              .from("user_settings")
-              .select("name")
-              .eq("id", foundAuth.id)
-              .maybeSingle();
-            matchedUserName = uSet?.name || foundAuth.email?.split("@")[0] || "User";
-          }
-        }
-
-        // D. Match family_members by email or phone
-        if (!matchedUserId) {
-          const { data: fm } = await supabaseAdmin
-            .from("family_members")
-            .select("id, user_id, name")
-            .or(`email.ilike.${linkCandidate},phone.eq.${linkCandidate}`)
-            .limit(1)
-            .maybeSingle();
-
-          if (fm?.user_id) {
-            await supabaseAdmin
-              .from("family_members")
-              .update({
-                telegram_chat_id: chatIdStr,
-                telegram_username: senderUsername || null,
-              })
-              .eq("id", fm.id);
-
-            await sendTelegramMessage({
-              chatId,
-              text:
-                `🎉 <b>Family Member Connected!</b>\n\n` +
-                `Welcome <b>${escapeTelegramHtml(fm.name)}</b>. Your Telegram chat is now linked to record shared household expenses.\n\n` +
-                `<b>Try:</b> <code>Dinner 450 HDFC</code> or forward any bank debit SMS!`,
-              replyMarkup: getStandardInlineKeyboard(webAppUrl),
-            });
-            return NextResponse.json({ success: true, linked_family_member: fm.id });
-          }
         }
       }
 

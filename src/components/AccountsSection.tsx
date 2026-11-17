@@ -193,7 +193,7 @@ export default function AccountsSection() {
         return;
       }
 
-      let fetchedAccounts: Account[] = (accountsRes.data || []).map((acc) => ({
+      const fetchedAccounts: Account[] = (accountsRes.data || []).map((acc) => ({
         id: acc.id,
         name: acc.name,
         type: acc.type,
