@@ -27,6 +27,8 @@ import {
   BarChart3,
   List,
   LayoutGrid,
+  RotateCw,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -139,7 +141,7 @@ export default function StocksSection() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [quotes, setQuotes] = useState<Record<string, StockQuote>>({});
   const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
-  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string; balance?: number }[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -215,7 +217,7 @@ export default function StocksSection() {
 
       const [holdingsRes, accountsRes] = await Promise.all([
         fetch("/api/v1/stocks/holdings", { headers }),
-        supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
+        supabase.from("accounts").select("id, name, type, balance").order("name", { ascending: true }),
       ]);
 
       if (accountsRes.data) {
@@ -478,6 +480,15 @@ export default function StocksSection() {
     return `https://in.tradingview.com/chart/?symbol=${exchange}:${encodeURIComponent(symbol)}`;
   };
 
+  const zerodhaAccount = useMemo(() => {
+    return accounts.find(
+      (a) =>
+        a.name.toLowerCase().includes("zerodha") ||
+        a.name.toLowerCase().includes("kite") ||
+        a.type.toUpperCase() === "INVESTMENT"
+    );
+  }, [accounts]);
+
   return (
     <main
       className="flex-1 h-full p-4 sm:p-6 md:p-8 overflow-y-auto select-none space-y-6 sm:space-y-8"
@@ -492,6 +503,42 @@ export default function StocksSection() {
           </span>
         }
         description="Indian markets (NSE & BSE) portfolio with real-time price updates auto-synced from Zerodha Kite"
+        badge={
+          <div className="flex items-center gap-2">
+            <Badge variant="neutral">
+              {holdings.length} {holdings.length === 1 ? "Holding" : "Holdings"}
+            </Badge>
+            {zerodhaAccount && (
+              <Badge variant="success" className="font-mono">
+                Demat Wallet: {formatINR(Number(zerodhaAccount.balance) || 0)}
+              </Badge>
+            )}
+          </div>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<RotateCw size={13} className={refreshingQuotes ? "animate-spin" : ""} />}
+              disabled={refreshingQuotes}
+              onClick={handleRefreshQuotes}
+              title="Refresh live market quotes"
+            >
+              Refresh Quotes
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
+              disabled={syncingZerodha}
+              onClick={handleSyncZerodha}
+              title="Sync Zerodha Demat holdings and margins"
+            >
+              {syncingZerodha ? "Syncing Zerodha..." : "Sync Zerodha"}
+            </Button>
+          </div>
+        }
       />
 
       {/* TOP PORTFOLIO STATS (ZERODHA KITE STYLE) */}
@@ -754,7 +801,22 @@ export default function StocksSection() {
             <EmptyState
               icon={<TrendingUp size={36} className="text-emerald-400" />}
               title="No Stocks Found in Portfolio"
-              description="Your Demat stock holdings from Zerodha Kite will automatically synchronize and appear here."
+              description={
+                zerodhaAccount && Number(zerodhaAccount.balance) > 0
+                  ? `Zerodha Demat wallet cash margin is active: ${formatINR(Number(zerodhaAccount.balance))}. Stock holdings will appear automatically once purchased in Zerodha Kite.`
+                  : "Your Demat stock holdings from Zerodha Kite will automatically synchronize and appear here."
+              }
+              action={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<RefreshCw size={14} className={syncingZerodha ? "animate-spin" : ""} />}
+                  disabled={syncingZerodha}
+                  onClick={handleSyncZerodha}
+                >
+                  {syncingZerodha ? "Syncing Zerodha..." : "Sync Zerodha Now"}
+                </Button>
+              }
             />
           ) : displayedHoldings.length === 0 ? (
             <div className="p-8 text-center rounded-2xl bg-[var(--app-card)] border border-[var(--app-border)]">

@@ -446,7 +446,7 @@ export default function SettingsSection() {
       const d = json.data;
       showToast(
         "Zerodha Portfolio Synced!",
-        `Updated ${d.stocksSynced} Stocks, ${d.fnoSynced} F&O Positions, and ${d.mfSynced} Mutual Funds.`,
+        `Trading cash margin: ₹${d.walletBalance ?? 0} • Synced ${d.stocksSynced} Stocks, ${d.fnoSynced} F&O Positions, and ${d.mfSynced} Mutual Funds.`,
         "success"
       );
       await fetchZerodhaStatus();
@@ -1965,6 +1965,9 @@ export default function SettingsSection() {
                       {zerodhaStatus.lastSyncSummary && (
                         <p className="text-[11px] text-emerald-400/90 font-mono">
                           Last Sync: {zerodhaStatus.lastSyncSummary.stocks_synced || 0} Stocks, {zerodhaStatus.lastSyncSummary.fno_synced || 0} F&amp;O Positions, {zerodhaStatus.lastSyncSummary.mf_synced || 0} Mutual Funds
+                          {zerodhaStatus.lastSyncSummary.wallet_balance !== undefined && (
+                            <span> • Wallet Cash: ₹{zerodhaStatus.lastSyncSummary.wallet_balance}</span>
+                          )}
                         </p>
                       )}
                     </div>

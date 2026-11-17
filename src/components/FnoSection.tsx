@@ -340,6 +340,20 @@ export default function FnoSection() {
             <span>Futures & Options (F&O) Derivatives</span>
           </span>
         }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
+              disabled={syncingZerodha}
+              onClick={handleSyncZerodha}
+              title="Sync Zerodha F&O positions"
+            >
+              {syncingZerodha ? "Syncing..." : "Sync Zerodha F&O"}
+            </Button>
+          </div>
+        }
       />
 
       {/* 2. TOP METRICS DASHBOARD CARDS */}
@@ -497,6 +511,19 @@ export default function FnoSection() {
                   positions.length === 0
                     ? "Your open positions and trades from Zerodha Kite will automatically synchronize and appear here."
                     : "No positions match your search and filter criteria."
+                }
+                action={
+                  positions.length === 0 ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<RefreshCw size={14} className={syncingZerodha ? "animate-spin" : ""} />}
+                      disabled={syncingZerodha}
+                      onClick={handleSyncZerodha}
+                    >
+                      {syncingZerodha ? "Syncing..." : "Sync Zerodha F&O Now"}
+                    </Button>
+                  ) : undefined
                 }
               />
             </div>

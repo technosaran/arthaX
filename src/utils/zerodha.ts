@@ -501,20 +501,25 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         .from("accounts")
         .select("id, balance")
         .eq("user_id", userId)
-        .ilike("name", "%Zerodha%")
+        .or("name.ilike.%Zerodha%,name.ilike.%Kite%")
         .maybeSingle();
 
       if (existingAccount) {
         zerodhaAccountId = existingAccount.id;
-        await supabaseAdmin
+        const { error: updateErr } = await supabaseAdmin
           .from("accounts")
           .update({
             balance: walletBalance,
-            updated_at: new Date().toISOString(),
           })
           .eq("id", existingAccount.id);
+
+        if (updateErr) {
+          logger.error("[Zerodha Sync] Failed to update account balance:", updateErr.message);
+        } else {
+          logger.info(`[Zerodha Sync] Updated Zerodha account (${existingAccount.id}) balance to ₹${walletBalance}`);
+        }
       } else {
-        const { data: newAccount } = await supabaseAdmin
+        const { data: newAccount, error: insertErr } = await supabaseAdmin
           .from("accounts")
           .insert({
             user_id: userId,
@@ -526,7 +531,12 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           })
           .select("id")
           .maybeSingle();
-        if (newAccount) zerodhaAccountId = newAccount.id;
+
+        if (insertErr) {
+          logger.error("[Zerodha Sync] Failed to insert Zerodha account:", insertErr.message);
+        } else if (newAccount) {
+          zerodhaAccountId = newAccount.id;
+        }
       }
     } catch (accErr) {
       logger.warn("[Zerodha Sync] Account lookup skipped:", String(accErr));

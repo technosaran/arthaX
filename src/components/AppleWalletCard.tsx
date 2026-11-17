@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Banknote, Pencil, Trash2, TrendingUp } from "lucide-react";
+import { Banknote, Pencil, RefreshCw, Trash2, TrendingUp } from "lucide-react";
 import BankLogo from "@/components/BankLogo";
 
 export interface AccountData {
@@ -424,6 +424,8 @@ export interface AppleWalletCardProps {
   isDemat?: boolean;
   isZerodha?: boolean;
   onEditCash?: (acc: AccountData) => void;
+  onSyncZerodha?: (acc: AccountData) => void;
+  isSyncing?: boolean;
   onDelete?: (id: string) => void;
   formatCurrency?: (val: number) => string;
   className?: string;
@@ -441,6 +443,8 @@ export default function AppleWalletCard({
   isDemat = false,
   isZerodha = false,
   onEditCash,
+  onSyncZerodha,
+  isSyncing = false,
   onDelete,
   formatCurrency,
   className = "",
@@ -632,7 +636,20 @@ export default function AppleWalletCard({
               <Pencil size={11} />
               <span>Edit</span>
             </button>
-          ) : computedIsZerodha ? null : (
+          ) : computedIsZerodha ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSyncZerodha?.(account);
+              }}
+              title="Sync Zerodha Margins & Holdings"
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 hover:bg-cyan-500/35 active:scale-95 text-cyan-300 backdrop-blur-md border border-cyan-500/30 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={11} className={isSyncing ? "animate-spin" : ""} />
+              <span>{isSyncing ? "Syncing..." : "Sync"}</span>
+            </button>
+          ) : (
             <button
               onClick={(e) => {
                 e.stopPropagation();

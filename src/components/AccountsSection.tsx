@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Landmark,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -103,6 +104,7 @@ export default function AccountsSection() {
   const [isEditingCash, setIsEditingCash] = useState(false);
   const [cashBalanceInput, setCashBalanceInput] = useState("");
   const [savingCash, setSavingCash] = useState(false);
+  const [syncingZerodha, setSyncingZerodha] = useState(false);
 
   // Form states for new accounts
   const [name, setName] = useState("");
@@ -585,6 +587,46 @@ export default function AccountsSection() {
     setSavingCash(false);
   };
 
+  const handleSyncZerodha = async () => {
+    setSyncingZerodha(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha/sync", {
+        method: "POST",
+        headers,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const errorMsg =
+          json.error?.message ||
+          (typeof json.error === "string" ? json.error : null) ||
+          "Sync failed";
+        throw new Error(errorMsg);
+      }
+
+      const d = json.data;
+      showToast(
+        "Zerodha Wallet & Portfolio Synced!",
+        `Trading cash margin: ${formatINR(d.walletBalance ?? 0)}. Synced ${d.stocksSynced ?? 0} Stocks, ${d.fnoSynced ?? 0} F&O Positions.`,
+        "success"
+      );
+      await invalidateCacheKeys([redisKey, redisLedgerKey]);
+      await fetchAccounts(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sync Zerodha wallet";
+      showToast("Sync Error", msg, "error");
+    } finally {
+      setSyncingZerodha(false);
+    }
+  };
+
   const totalAssets = accounts
     .filter((a) => a.classification !== "liability")
     .reduce((acc, curr) => acc + curr.balance, 0);
@@ -652,6 +694,17 @@ export default function AccountsSection() {
         }
         actions={
           <>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
+              disabled={syncingZerodha}
+              onClick={handleSyncZerodha}
+              title="Sync Zerodha wallet margin and holdings"
+            >
+              {syncingZerodha ? "Syncing Zerodha..." : "Sync Zerodha"}
+            </Button>
+
             <Button
               variant="secondary"
               size="sm"
@@ -863,6 +916,8 @@ export default function AccountsSection() {
                   isDemat={isDematAccount(acc)}
                   isZerodha={isZerodhaAccount(acc)}
                   onEditCash={handleOpenEditCash}
+                  onSyncZerodha={handleSyncZerodha}
+                  isSyncing={syncingZerodha}
                   onDelete={handleDeleteAccount}
                   formatCurrency={formatINR}
                   isSelected={selectedAccountId === acc.id}

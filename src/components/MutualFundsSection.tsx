@@ -482,6 +482,18 @@ export default function MutualFundsSection() {
             </h1>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
+            disabled={syncingZerodha}
+            onClick={handleSyncZerodha}
+            title="Sync Zerodha Coin mutual funds"
+          >
+            {syncingZerodha ? "Syncing Coin..." : "Sync Zerodha Coin"}
+          </Button>
+        </div>
       </div>
 
       {/* 2. STAT CARDS / EXECUTIVE KPI BAR */}
@@ -758,6 +770,19 @@ export default function MutualFundsSection() {
                 searchQuery || filterType !== "all"
                   ? "Try clearing filters to view your investments."
                   : "Your mutual fund holdings from Zerodha Coin will automatically synchronize and appear here."
+              }
+              action={
+                !searchQuery && filterType === "all" ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<RefreshCw size={14} className={syncingZerodha ? "animate-spin" : ""} />}
+                    disabled={syncingZerodha}
+                    onClick={handleSyncZerodha}
+                  >
+                    {syncingZerodha ? "Syncing Coin..." : "Sync Zerodha Coin Now"}
+                  </Button>
+                ) : undefined
               }
             />
           ) : displayMode === "table" ? (
