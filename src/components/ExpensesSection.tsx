@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -29,7 +29,7 @@ import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -168,6 +168,7 @@ export default function ExpensesSection() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialExpenses);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialAccounts);
   const [loading, setLoading] = useState<boolean>(initialExpenses.length === 0);
+  const inFlightRef = useRef<{ expenses: boolean; accounts: boolean }>({ expenses: false, accounts: false });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -305,7 +306,9 @@ export default function ExpensesSection() {
 
   // 1. Fetch Accounts for linking
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current.accounts) return;
+    inFlightRef.current.accounts = true;
+
     if (!skipCache) {
       const cached = getFromLocalCache<AccountItem[]>(redisAccountsKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
@@ -334,12 +337,15 @@ export default function ExpensesSection() {
       }
     } catch {
       // Non-blocking
+    } finally {
+      inFlightRef.current.accounts = false;
     }
   }, [user, redisAccountsKey]);
 
   // 2. Fetch Expenses
   const fetchExpenses = useCallback(async (skipCache: boolean = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current.expenses) return;
+    inFlightRef.current.expenses = true;
     setErrorMsg(null);
 
     if (!skipCache) {
@@ -382,6 +388,7 @@ export default function ExpensesSection() {
       setErrorMsg("Unable to load expenses.");
     } finally {
       setLoading(false);
+      inFlightRef.current.expenses = false;
     }
   }, [user, redisExpensesKey]);
 
@@ -424,6 +431,22 @@ export default function ExpensesSection() {
     };
   }, [user, fetchExpenses, fetchAccounts]);
 
+  // Synchronize expenses whenever another section modifies financial data
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchExpenses(true);
+      fetchAccounts(true);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchExpenses, fetchAccounts]);
+
   const openAddModal = () => {
     setEditingExpense(null);
     setTitle("");
@@ -453,7 +476,7 @@ export default function ExpensesSection() {
     if (!user) return;
     const parsedAmount = parseFloat(amount);
     if (!title.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
-      showToast("Invalid Input", "Please enter a valid title and positive amount.", "error");
+      showToast("Invalid Expense Input", "Please enter a valid expense title and an amount greater than ₹0.", "warning");
       return;
     }
 
@@ -476,15 +499,11 @@ export default function ExpensesSection() {
         });
 
         if (error) {
-          showToast("Update Failed", error.message || "Failed to update record.", "error");
+          showToast("Expense Update Failed", error.message || "Failed to update record.", "error");
         } else {
           showToast("Expense Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated and balances reconciled.`, "success");
           setIsModalOpen(false);
-          await invalidateCacheKeys([
-            redisExpensesKey,
-            redisAccountsKey,
-            redisLedgerKey,
-          ]);
+          await invalidateAllFinancialCache(user.id);
           await fetchExpenses(true);
           await fetchAccounts(true);
         }
@@ -502,22 +521,18 @@ export default function ExpensesSection() {
         });
 
         if (error) {
-          showToast("Create Failed", error.message || "Failed to log expense.", "error");
+          showToast("Expense Record Failed", error.message || "Failed to log expense.", "error");
         } else {
-          showToast("Expense Logged", `${title.trim()} (${formatINR(parsedAmount)}) recorded.`, "success");
+          showToast("Expense Recorded", `${title.trim()} (${formatINR(parsedAmount)}) recorded successfully.`, "success");
           setIsModalOpen(false);
-          await invalidateCacheKeys([
-            redisExpensesKey,
-            redisAccountsKey,
-            redisLedgerKey,
-          ]);
+          await invalidateAllFinancialCache(user.id);
           await fetchExpenses(true);
           await fetchAccounts(true);
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to record expense.";
-      showToast("Operation Failed", msg, "error");
+      showToast("Expense Operation Failed", msg, "error");
     } finally {
       setSubmitting(false);
     }
@@ -534,20 +549,16 @@ export default function ExpensesSection() {
       });
 
       if (error) {
-        showToast("Delete Failed", error.message || "Could not delete expense.", "error");
+        showToast("Expense Deletion Failed", error.message || "Could not delete expense.", "error");
       } else {
-        showToast("Expense Deleted", `${itemTitle} removed and account balance restored.`, "info");
-        await invalidateCacheKeys([
-          redisExpensesKey,
-          redisAccountsKey,
-          redisLedgerKey,
-        ]);
+        showToast("Expense Deleted", `"${itemTitle}" removed and account balance restored.`, "info");
+        await invalidateAllFinancialCache(user.id);
         await fetchExpenses(true);
         await fetchAccounts(true);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to remove expense.";
-      showToast("Delete Failed", msg, "error");
+      showToast("Expense Deletion Failed", msg, "error");
     }
   };
 
@@ -1197,7 +1208,7 @@ export default function ExpensesSection() {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
             <Input
               label="Expense Date"
               type="date"
@@ -1206,25 +1217,20 @@ export default function ExpensesSection() {
               required
             />
 
-            <Input
-              label="Notes / Memo (Optional)"
-              placeholder="e.g. Split with team"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            {!editingExpense && accountId ? (
+              <label className="flex items-center gap-2 py-2 px-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[11px] text-[var(--app-muted)] cursor-pointer hover:border-[var(--app-border)]">
+                <input
+                  type="checkbox"
+                  checked={deductFromAccount}
+                  onChange={(e) => setDeductFromAccount(e.target.checked)}
+                  className="rounded accent-emerald-500 cursor-pointer"
+                />
+                <span className="truncate">Deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
+              </label>
+            ) : (
+              <div />
+            )}
           </div>
-
-          {!editingExpense && accountId && (
-            <label className="flex items-center gap-2 pt-0.5 text-[11px] text-[var(--app-muted)] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={deductFromAccount}
-                onChange={(e) => setDeductFromAccount(e.target.checked)}
-                className="rounded accent-emerald-500 cursor-pointer"
-              />
-              <span>Deduct from {accounts.find((a) => a.id === accountId)?.name} balance</span>
-            </label>
-          )}
 
           <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import Logo from "@/components/Logo";
 import {
   Loader2,
@@ -34,6 +35,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 export default function LoginClient() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
 
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
 
@@ -103,7 +105,9 @@ export default function LoginClient() {
     // 1. FORGOT PASSWORD MODE
     if (mode === "forgot") {
       if (!cleanEmail) {
-        setErrorMessage("Please enter your registered email address.");
+        const msg = "Please enter your registered email address.";
+        setErrorMessage(msg);
+        showToast("Email Required", msg, "warning");
         return;
       }
       setLoading(true);
@@ -113,16 +117,18 @@ export default function LoginClient() {
           redirectTo: `${origin}/auth/callback?next=/settings`,
         });
         if (error) {
-          setErrorMessage(formatAuthError(error.message));
+          const formatted = formatAuthError(error.message);
+          setErrorMessage(formatted);
+          showToast("Password Reset Failed", formatted, "error");
         } else {
-          setSuccessMessage(
-            "Password reset instructions have been dispatched to your email address."
-          );
+          const successText = "Password reset instructions have been dispatched to your email address.";
+          setSuccessMessage(successText);
+          showToast("Reset Link Dispatched", successText, "success");
         }
       } catch (err: unknown) {
-        setErrorMessage(
-          err instanceof Error ? err.message : "Failed to initiate password reset."
-        );
+        const errText = err instanceof Error ? err.message : "Failed to initiate password reset.";
+        setErrorMessage(errText);
+        showToast("Reset Error", errText, "error");
       } finally {
         setLoading(false);
       }
@@ -132,15 +138,21 @@ export default function LoginClient() {
     // 2. SIGN UP MODE
     if (mode === "signup") {
       if (!fullName.trim()) {
-        setErrorMessage("Please enter your full name.");
+        const msg = "Please enter your full name.";
+        setErrorMessage(msg);
+        showToast("Name Required", msg, "warning");
         return;
       }
       if (password.length < 6) {
-        setErrorMessage("Password must be at least 6 characters long.");
+        const msg = "Password must be at least 6 characters long.";
+        setErrorMessage(msg);
+        showToast("Password Too Short", msg, "warning");
         return;
       }
       if (password !== confirmPassword) {
-        setErrorMessage("Passwords do not match. Please re-enter.");
+        const msg = "Passwords do not match. Please re-enter.";
+        setErrorMessage(msg);
+        showToast("Passwords Mismatch", msg, "warning");
         return;
       }
 
@@ -157,13 +169,17 @@ export default function LoginClient() {
         });
 
         if (error) {
-          setErrorMessage(formatAuthError(error.message));
+          const formatted = formatAuthError(error.message);
+          setErrorMessage(formatted);
+          showToast("Sign Up Failed", formatted, "error");
           setLoading(false);
           return;
         }
 
         if (data.session) {
-          setSuccessMessage("Account created successfully! Setting up your workspace...");
+          const welcomeMsg = "Account created successfully! Setting up your workspace...";
+          setSuccessMessage(welcomeMsg);
+          showToast("Account Created", welcomeMsg, "success");
           setTimeout(() => {
             router.push("/");
           }, 400);
@@ -174,22 +190,24 @@ export default function LoginClient() {
           });
 
           if (signInError) {
-            setSuccessMessage(
-              "Account registered successfully! Please sign in with your credentials."
-            );
+            const registeredMsg = "Account registered successfully! Please sign in with your credentials.";
+            setSuccessMessage(registeredMsg);
+            showToast("Registration Complete", registeredMsg, "success");
             setMode("signin");
             setLoading(false);
           } else {
-            setSuccessMessage("Welcome to arthaX! Loading your dashboard...");
+            const welcomeMsg = "Welcome to arthaX! Loading your dashboard...";
+            setSuccessMessage(welcomeMsg);
+            showToast("Welcome to arthaX", welcomeMsg, "success");
             setTimeout(() => {
               router.push("/");
             }, 400);
           }
         }
       } catch (err: unknown) {
-        setErrorMessage(
-          err instanceof Error ? err.message : "An unexpected error occurred during signup."
-        );
+        const errText = err instanceof Error ? err.message : "An unexpected error occurred during signup.";
+        setErrorMessage(errText);
+        showToast("Signup Error", errText, "error");
         setLoading(false);
       }
       return;
@@ -204,18 +222,22 @@ export default function LoginClient() {
       });
 
       if (error) {
-        setErrorMessage(formatAuthError(error.message));
+        const formatted = formatAuthError(error.message);
+        setErrorMessage(formatted);
+        showToast("Sign In Failed", formatted, "error");
         setLoading(false);
       } else {
-        setSuccessMessage("Identity verified. Navigating to personal dashboard...");
+        const successText = "Identity verified. Navigating to personal dashboard...";
+        setSuccessMessage(successText);
+        showToast("Welcome Back!", successText, "success");
         setTimeout(() => {
           router.push("/");
         }, 300);
       }
     } catch (err: unknown) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "An unexpected error occurred during login."
-      );
+      const errText = err instanceof Error ? err.message : "An unexpected error occurred during login.";
+      setErrorMessage(errText);
+      showToast("Sign In Error", errText, "error");
       setLoading(false);
     }
   };
@@ -223,6 +245,7 @@ export default function LoginClient() {
   const handleGoogleSignIn = async () => {
     setErrorMessage(null);
     setLoading(true);
+    showToast("Connecting to Google", "Redirecting to Google secure authentication...", "info");
     try {
       const supabase = createClient();
       const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -238,13 +261,15 @@ export default function LoginClient() {
       });
 
       if (error) {
-        setErrorMessage(formatAuthError(error.message));
+        const formatted = formatAuthError(error.message);
+        setErrorMessage(formatted);
+        showToast("Google Auth Failed", formatted, "error");
         setLoading(false);
       }
     } catch (err: unknown) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to initiate Google authentication."
-      );
+      const errText = err instanceof Error ? err.message : "Failed to initiate Google authentication.";
+      setErrorMessage(errText);
+      showToast("Google Auth Error", errText, "error");
       setLoading(false);
     }
   };

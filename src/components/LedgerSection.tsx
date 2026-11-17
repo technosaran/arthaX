@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   BookOpen,
   Loader2,
@@ -119,6 +119,7 @@ export default function LedgerSection() {
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const inFlightRef = useRef<boolean>(false);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -235,7 +236,8 @@ export default function LedgerSection() {
 
   // Fetch All Ledger Telemetry
   const fetchAllData = useCallback(async (skipCache = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     setErrorMsg(null);
 
     if (!skipCache) {
@@ -320,6 +322,7 @@ export default function LedgerSection() {
       setErrorMsg("Unable to load ledger entries. Please try again.");
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, redisLedgerKey]);
 
@@ -345,6 +348,21 @@ export default function LedgerSection() {
       supabase.removeChannel(channel);
     };
   }, [user, fetchAllData]);
+
+  // Synchronize ledger whenever another section modifies financial data
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchAllData(true);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchAllData]);
 
   const accountsMap = useMemo(() => {
     const map = new Map<string, AccountItem>();
@@ -508,9 +526,9 @@ export default function LedgerSection() {
         });
 
         if (rpcError) {
-          showToast("Delete Failed", rpcError.message || "Could not delete entry.", "error");
+          showToast("Deletion Failed", rpcError.message || "Could not delete ledger entry.", "error");
         } else {
-          showToast("Reversed & Deleted", `${entryToDelete.title} deleted and balance restored to account.`, "info");
+          showToast("Transaction Reversed", `"${entryToDelete.title}" deleted and balance restored to account.`, "info");
           setIsDeleteModalOpen(false);
           if (selectedVoucher?.id === entryToDelete.id) {
             setSelectedVoucher(null);
@@ -526,9 +544,9 @@ export default function LedgerSection() {
         });
 
         if (rpcError) {
-          showToast("Delete Failed", rpcError.message || "Could not delete entry.", "error");
+          showToast("Deletion Failed", rpcError.message || "Could not delete ledger entry.", "error");
         } else {
-          showToast("Reversed & Deleted", `${entryToDelete.title} deleted and balance reversed.`, "info");
+          showToast("Transaction Reversed", `"${entryToDelete.title}" deleted and credited balance reversed.`, "info");
           setIsDeleteModalOpen(false);
           if (selectedVoucher?.id === entryToDelete.id) {
             setSelectedVoucher(null);
@@ -539,7 +557,7 @@ export default function LedgerSection() {
         }
       }
     } catch {
-      showToast("Error", "Failed to reverse and delete entry.", "error");
+      showToast("Reversal Failed", "Failed to reverse transaction and restore balance.", "error");
     } finally {
       setDeleting(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Trophy,
   Plus,
@@ -114,6 +114,7 @@ export default function GoalsSection() {
 
   const [goals, setGoals] = useState<GoalItem[]>(initialGoals);
   const [loading, setLoading] = useState<boolean>(initialGoals.length === 0);
+  const inFlightRef = useRef<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -152,7 +153,8 @@ export default function GoalsSection() {
   // 1. Fetch Goals from Supabase
   const fetchGoals = useCallback(
     async (skipCache: boolean = false) => {
-      if (!user) return;
+      if (!user || inFlightRef.current) return;
+      inFlightRef.current = true;
       setErrorMsg(null);
       try {
         if (!skipCache) {
@@ -189,20 +191,18 @@ export default function GoalsSection() {
         setErrorMsg(err.message || "Failed to load financial goals.");
       } finally {
         setLoading(false);
+        inFlightRef.current = false;
       }
     },
     [user, redisGoalsKey]
   );
 
+  // 2. Initial Fetch & Realtime Subscription
   useEffect(() => {
     fetchGoals();
-  }, [fetchGoals]);
-
-  // 2. Realtime Subscription
-  useEffect(() => {
     if (!user) return;
-    const supabase = createClient();
 
+    const supabase = createClient();
     const channel = supabase
       .channel("public:family_goals:realtime")
       .on(
@@ -285,11 +285,11 @@ export default function GoalsSection() {
     const currentVal = parseFloat(formCurrentAmount) || 0;
 
     if (!formTitle.trim()) {
-      showToast("Please enter a goal title.", "error");
+      showToast("Goal Title Required", "Please enter a descriptive title for your financial goal.", "warning");
       return;
     }
     if (isNaN(targetVal) || targetVal <= 0) {
-      showToast("Please enter a valid target amount greater than zero.", "error");
+      showToast("Invalid Target Amount", "Please enter a valid target savings amount greater than ₹0.", "warning");
       return;
     }
 
@@ -320,11 +320,11 @@ export default function GoalsSection() {
           .eq("user_id", user.id);
 
         if (error) throw error;
-        showToast("Goal updated successfully!", "success");
+        showToast("Goal Updated", `"${formTitle.trim()}" milestones and details have been saved.`, "success");
       } else {
         const { error } = await supabase.from("family_goals").insert([payload]);
         if (error) throw error;
-        showToast("New financial goal created!", "success");
+        showToast("Goal Created", `New goal "${formTitle.trim()}" (${formatINR(targetVal)}) established!`, "success");
       }
 
       setIsFormModalOpen(false);
@@ -333,7 +333,7 @@ export default function GoalsSection() {
       await fetchGoals(true);
     } catch (err: any) {
       console.error("[Goals] Save error:", err);
-      showToast(err.message || "Failed to save goal.", "error");
+      showToast("Goal Save Failed", err.message || "Failed to save goal.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -346,7 +346,7 @@ export default function GoalsSection() {
 
     const delta = parseFloat(depositAmount);
     if (isNaN(delta) || delta <= 0) {
-      showToast("Please enter a valid positive amount.", "error");
+      showToast("Invalid Amount", "Please enter a valid contribution amount greater than ₹0.", "warning");
       return;
     }
 
@@ -380,12 +380,12 @@ export default function GoalsSection() {
 
       if (depositType === "add") {
         if (isNowCompleted && depositTargetGoal.status !== "completed") {
-          showToast(`🎉 Congratulations! You reached 100% of "${depositTargetGoal.title}"!`, "success");
+          showToast("Goal Achieved! 🎉", `Congratulations! You reached 100% of "${depositTargetGoal.title}"!`, "success");
         } else {
-          showToast(`Saved ${formatINR(delta)} towards "${depositTargetGoal.title}"!`, "success");
+          showToast("Funds Contributed", `Saved ${formatINR(delta)} towards "${depositTargetGoal.title}".`, "success");
         }
       } else {
-        showToast(`Withdrew ${formatINR(delta)} from "${depositTargetGoal.title}".`, "info");
+        showToast("Funds Withdrawn", `Withdrew ${formatINR(delta)} from "${depositTargetGoal.title}".`, "info");
       }
 
       setIsDepositModalOpen(false);
@@ -395,7 +395,7 @@ export default function GoalsSection() {
       await fetchGoals(true);
     } catch (err: any) {
       console.error("[Goals] Deposit error:", err);
-      showToast(err.message || "Failed to update goal balance.", "error");
+      showToast("Update Failed", err.message || "Failed to update goal balance.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -414,11 +414,17 @@ export default function GoalsSection() {
         .eq("user_id", user.id);
 
       if (error) throw error;
-      showToast(nextStatus === "paused" ? "Goal paused." : "Goal resumed!", "info");
+      showToast(
+        nextStatus === "paused" ? "Goal Paused" : "Goal Resumed",
+        nextStatus === "paused"
+          ? `Tracking for "${goal.title}" is paused.`
+          : `"${goal.title}" is now active and tracking progress.`,
+        nextStatus === "paused" ? "info" : "success"
+      );
       invalidateCacheKeys([redisGoalsKey]);
       await fetchGoals(true);
     } catch (err: any) {
-      showToast(err.message || "Failed to update status", "error");
+      showToast("Status Update Failed", err.message || "Failed to update status", "error");
     }
   };
 
@@ -435,13 +441,13 @@ export default function GoalsSection() {
         .eq("user_id", user.id);
 
       if (error) throw error;
-      showToast("Goal removed successfully.", "success");
+      showToast("Goal Removed", "Financial goal and milestones have been permanently removed.", "info");
       setDeleteConfirmationId(null);
       invalidateCacheKeys([redisGoalsKey]);
       await fetchGoals(true);
     } catch (err: any) {
       console.error("[Goals] Delete error:", err);
-      showToast(err.message || "Failed to delete goal.", "error");
+      showToast("Deletion Failed", err.message || "Failed to delete goal.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -960,118 +966,67 @@ export default function GoalsSection() {
         onClose={() => setIsFormModalOpen(false)}
         title={editingGoal ? "Edit Financial Goal" : "Create Financial Goal"}
         description="Set your savings target, deadline, and category to track milestone progress."
-        size="lg"
+        size="md"
       >
-        <form onSubmit={handleSubmitGoal} className="space-y-4">
-          {/* Title */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-              Goal Title *
-            </label>
+        <form onSubmit={handleSubmitGoal} className="space-y-2.5">
+          {/* Row 1: Title & Category */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Input
-              placeholder="e.g. 6 Months Emergency Fund, New Car, Goa Vacation"
+              label="Goal Title *"
+              placeholder="e.g. Emergency Fund, New Car"
               value={formTitle}
               onChange={(e) => setFormTitle(e.target.value)}
               required
               autoFocus
             />
+
+            <Select
+              label="Category"
+              value={formCategory}
+              onChange={(e) => handleCategorySelect(e.target.value)}
+              options={GOAL_CATEGORIES.map((c) => ({
+                value: c.name,
+                label: c.name,
+              }))}
+            />
           </div>
 
-          {/* Category Select */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-                Category
-              </label>
+          {/* Row 2: Amounts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Target Amount (₹) *"
+              type="number"
+              placeholder="100000"
+              value={formTargetAmount}
+              onChange={(e) => setFormTargetAmount(e.target.value)}
+              min="1"
+              step="any"
+              required
+            />
+
+            <Input
+              label="Initial Saved Amount (₹)"
+              type="number"
+              placeholder="0"
+              value={formCurrentAmount}
+              onChange={(e) => setFormCurrentAmount(e.target.value)}
+              min="0"
+              step="any"
+            />
+          </div>
+
+          {/* Row 3: Deadline & Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input
+              label="Target Deadline"
+              type="date"
+              value={formTargetDate}
+              onChange={(e) => setFormTargetDate(e.target.value)}
+            />
+
+            {editingGoal ? (
               <Select
-                value={formCategory}
-                onChange={(e) => handleCategorySelect(e.target.value)}
-                options={GOAL_CATEGORIES.map((c) => ({
-                  value: c.name,
-                  label: c.name,
-                }))}
-              />
-            </div>
-
-            {/* Target Date */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-                Target Deadline
-              </label>
-              <Input
-                type="date"
-                value={formTargetDate}
-                onChange={(e) => setFormTargetDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Amounts */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-                Target Amount (₹) *
-              </label>
-              <Input
-                type="number"
-                placeholder="100000"
-                value={formTargetAmount}
-                onChange={(e) => setFormTargetAmount(e.target.value)}
-                min="1"
-                step="any"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-                Initial Saved Amount (₹)
-              </label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={formCurrentAmount}
-                onChange={(e) => setFormCurrentAmount(e.target.value)}
-                min="0"
-                step="any"
-              />
-            </div>
-          </div>
-
-          {/* Visual Icon Picker */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-              Card Icon
-            </label>
-            <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 p-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
-              {Object.keys(ICON_MAP).map((iconKey) => {
-                const IconComp = ICON_MAP[iconKey];
-                const isSelected = formIcon === iconKey;
-                return (
-                  <button
-                    key={iconKey}
-                    type="button"
-                    onClick={() => setFormIcon(iconKey)}
-                    className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-[var(--app-accent)] text-white shadow-xs scale-105"
-                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
-                    }`}
-                  >
-                    <IconComp size={18} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Status Selection (only if editing) */}
-          {editingGoal && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-                Status
-              </label>
-              <Select
+                label="Goal Status"
                 value={formStatus}
                 onChange={(e) => setFormStatus(e.target.value as any)}
                 options={[
@@ -1080,25 +1035,13 @@ export default function GoalsSection() {
                   { value: "paused", label: "Paused" },
                 ]}
               />
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-              Notes & Motivation (Optional)
-            </label>
-            <textarea
-              rows={2}
-              placeholder="e.g. Invest in Parag Parikh Flexi Cap every month; aim to book flights by Diwali."
-              value={formNotes}
-              onChange={(e) => setFormNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] text-[var(--app-fg)] focus:outline-hidden focus:border-[var(--app-accent)] transition-colors resize-none"
-            />
+            ) : (
+              <div />
+            )}
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--app-border)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border)]">
             <Button
               type="button"
               variant="secondary"
@@ -1139,44 +1082,38 @@ export default function GoalsSection() {
         }
         size="md"
       >
-        <form onSubmit={handleDepositSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--app-muted)] uppercase tracking-wider">
-              {depositType === "add" ? "Deposit Amount (₹) *" : "Withdraw Amount (₹) *"}
-            </label>
-            <Input
-              type="number"
-              placeholder="5000"
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
-              min="1"
-              step="any"
-              autoFocus
-              required
-            />
-          </div>
+        <form onSubmit={handleDepositSubmit} className="space-y-2.5">
+          <Input
+            label={depositType === "add" ? "Deposit Amount (₹) *" : "Withdraw Amount (₹) *"}
+            type="number"
+            placeholder="5000"
+            value={depositAmount}
+            onChange={(e) => setDepositAmount(e.target.value)}
+            min="1"
+            step="any"
+            autoFocus
+            required
+          />
 
           {/* Quick Preset Amount Chips */}
-          <div className="space-y-1.5">
-            <label className="text-xs text-[var(--app-muted)]">Quick add amount:</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {[1000, 5000, 10000, 25000, 50000].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setDepositAmount(preset.toString())}
-                  className="px-2.5 py-1 text-xs font-mono font-semibold rounded-lg border border-[var(--app-border)] bg-[var(--app-card-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] transition-colors cursor-pointer"
-                >
-                  +{formatINR(preset)}
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span className="text-[10px] text-[var(--app-muted)] font-mono">Quick:</span>
+            {[1000, 5000, 10000, 25000, 50000].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setDepositAmount(preset.toString())}
+                className="px-2 py-0.5 text-xs font-mono font-semibold rounded-lg border border-[var(--app-border)] bg-[var(--app-card-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] transition-colors cursor-pointer"
+              >
+                +{formatINR(preset)}
+              </button>
+            ))}
           </div>
 
           {/* New Expected Total Preview */}
           {depositAmount && !isNaN(parseFloat(depositAmount)) && depositTargetGoal && (
             <div
-              className="p-3 rounded-xl border text-xs space-y-1"
+              className="p-2.5 rounded-xl border text-xs space-y-1"
               style={{
                 borderColor: "var(--app-border)",
                 backgroundColor: "var(--app-card-subtle)",
@@ -1211,7 +1148,7 @@ export default function GoalsSection() {
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--app-border)]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border)]">
             <Button
               type="button"
               variant="secondary"

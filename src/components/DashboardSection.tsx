@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   PieChart as PieChartIcon,
   Plus,
@@ -22,6 +22,7 @@ import {
   Wallet,
   Zap,
   Coins,
+  Gem,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -114,22 +115,26 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
   const redisPortfolioKey = getUserCacheKey(user?.id, CACHE_KEYS.PORTFOLIO);
 
-  // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
+  // Synchronous Tier 1 & 2 Local Cache load (0ms latency for warm sessions < 120s)
   const initialCache = useMemo(() => {
     return getFromLocalCache<{
       name: string;
       netWorth: number;
       accounts: AccountItem[];
+      expenses?: ExpenseItem[];
+      incomes?: IncomeItem[];
+      transfers?: TransferItem[];
     }>(redisPortfolioKey);
   }, [redisPortfolioKey]);
 
   const [name, setName] = useState<string>(profile?.name || initialCache?.name || "");
   const [netWorth, setNetWorth] = useState<number>(initialCache?.netWorth || 0);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [incomes, setIncomes] = useState<IncomeItem[]>([]);
-  const [transfers, setTransfers] = useState<TransferItem[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(initialCache?.expenses || []);
+  const [incomes, setIncomes] = useState<IncomeItem[]>(initialCache?.incomes || []);
+  const [transfers, setTransfers] = useState<TransferItem[]>(initialCache?.transfers || []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
+  const inFlightRef = useRef<boolean>(false);
 
   const displayName = profile?.name || name;
 
@@ -140,7 +145,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   // Synchronize greeting name whenever profile arrives or updates
   useEffect(() => {
     if (profile?.name) {
-      setName(profile.name);
+      setName((prev) => (prev === profile.name ? prev : profile.name));
     }
   }, [profile?.name]);
 
@@ -154,7 +159,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
 
     try {
       const supabase = createClient();
@@ -188,11 +194,10 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       // 1. Resolve user display name
       const resolvedName =
         profile?.name ||
-        name ||
         user.user_metadata?.full_name ||
         user.email?.split("@")[0] ||
         "User";
-      setName(resolvedName);
+      setName((prev) => (prev === resolvedName ? prev : resolvedName));
 
       // 2. Resolve accounts and accurate net worth (Assets - Liabilities)
       let mapped: AccountItem[] = [];
@@ -232,18 +237,26 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       if (incomeRes.data) setIncomes(incomeRes.data as IncomeItem[]);
       if (transfersRes.data) setTransfers(transfersRes.data as TransferItem[]);
 
-      // 3. Update multi-tier cache
-      saveToCache(redisPortfolioKey, {
-        name: resolvedName,
-        netWorth: total,
-        accounts: mapped,
-      });
+      // 3. Update multi-tier cache (synchronized snapshot with 120s warm TTL)
+      saveToCache(
+        redisPortfolioKey,
+        {
+          name: resolvedName,
+          netWorth: total,
+          accounts: mapped,
+          expenses: (expensesRes.data as ExpenseItem[])?.filter((e) => !isFamilyTransfer(e)) || [],
+          incomes: (incomeRes.data as IncomeItem[]) || [],
+          transfers: (transfersRes.data as TransferItem[]) || [],
+        },
+        120
+      );
     } catch (err) {
       console.warn("Error fetching dashboard telemetry:", err);
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
-  }, [user, redisPortfolioKey, profile?.name, name]);
+  }, [user, redisPortfolioKey, profile?.name]);
 
   useEffect(() => {
     const updateTimeGreeting = () => {
@@ -301,6 +314,21 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       supabase.removeChannel(channel);
     };
   }, [user, fetchDashboardData]);
+
+  // Synchronize dashboard whenever financial data is updated in any tab
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchDashboardData();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchDashboardData]);
 
   // Current Month Calculations
   const currentMonthPrefix = useMemo(() => {
@@ -668,6 +696,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                   totalValue={totalAssets > 0 ? totalAssets : netWorth}
                   segments={donutSegments}
                   formatter={formatCurrency}
+                  align="end"
                   emptyMessage="No asset allocation data available."
                   emptySubMessage="Add bank accounts or cash in hand to see your portfolio breakdown."
                   icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
@@ -741,7 +770,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         )}
 
         {/* QUICK ACTIONS COMMAND BAR */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
           <button
             type="button"
             onClick={() => onNavigate?.("stocks")}
@@ -760,6 +789,26 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           >
             <Coins size={15} className="text-emerald-400" />
             <span>Mutual Funds</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("gold-silver")}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-amber-500/40 hover:bg-amber-500/10 fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
+          >
+            <Gem size={15} className="text-amber-400" />
+            <span>Gold & Silver</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("bonds")}
+            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-sky-500/40 hover:bg-sky-500/10 fintech-focus"
+            style={{ backgroundColor: "var(--app-card)" }}
+          >
+            <ShieldCheck size={15} className="text-sky-400" />
+            <span>Bonds</span>
           </button>
 
           <button

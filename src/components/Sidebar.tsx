@@ -13,6 +13,8 @@ import {
   Settings,
   Zap,
   Coins,
+  Gem,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -21,6 +23,7 @@ import {
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 
 interface SidebarProps {
   activeTab: string;
@@ -42,6 +45,8 @@ const NAV_ITEMS: NavItemDef[] = [
   { id: "accounts", label: "Accounts", icon: Landmark, group: "finance" },
   { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
   { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance" },
+  { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance" },
+  { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance" },
   { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
@@ -59,6 +64,7 @@ export default function Sidebar({
   setCollapsed,
 }: SidebarProps) {
   const { signOut } = useAuth();
+  const { showToast } = useToast();
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   const handleTabSelect = (tabId: string) => {
@@ -224,11 +230,12 @@ export default function Sidebar({
           <div className="relative w-full">
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (typeof window !== "undefined" && window.innerWidth < 768) {
                   setCollapsed(true);
                 }
-                signOut();
+                showToast("Signing Out", "Ending session and securing financial data...", "info");
+                await signOut();
               }}
               onMouseEnter={() => setHoveredItemId("signout")}
               onMouseLeave={() => setHoveredItemId(null)}

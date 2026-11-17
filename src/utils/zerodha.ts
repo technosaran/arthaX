@@ -384,14 +384,70 @@ export function parseFnoSymbol(tradingsymbol: string): {
 }
 
 /**
- * Full Sync Orchestrator for all 3 Sections:
+ * Helper to identify whether a Kite portfolio holding is a Bond, G-Sec, SDL, or SGB.
+ */
+export function isBondInstrument(symbol: string, isin?: string): boolean {
+  const sym = (symbol || "").toUpperCase().trim();
+  const isinCode = (isin || "").toUpperCase().trim();
+
+  // 1. Central Government Securities & T-Bills by ISIN
+  if (isinCode.startsWith("IN00")) return true;
+
+  // 2. State Development Loans (SDLs) by state ISIN prefixes (non-equity)
+  if (/^IN(1[0-9]|2[0-9]|3[0-9]|0[1-9])/.test(isinCode) && !isinCode.startsWith("INE") && !isinCode.startsWith("INF")) {
+    return true;
+  }
+
+  // 3. Sovereign Gold Bonds (SGB)
+  if (sym.startsWith("SGB") || sym.includes("-SG") || sym.includes("-GB")) {
+    return true;
+  }
+
+  // 4. Central G-Secs or T-Bills by symbol
+  if (
+    sym.endsWith("-GS") ||
+    sym.endsWith("-TB") ||
+    sym.includes("GS20") ||
+    /^\d{2,3}GS\d{2,4}/.test(sym) ||
+    /^\d{2,3}D\d{4,6}/.test(sym)
+  ) {
+    return true;
+  }
+
+  // 5. State Development Loans by symbol
+  if (sym.includes("SDL") || sym.endsWith("-SD")) {
+    return true;
+  }
+
+  // 6. Corporate Bonds & NCD Series on NSE/BSE (Debt segment)
+  if (
+    /-N[0-9A-Z]$/.test(sym) ||
+    /-N[0-9A-Z]{2}$/.test(sym) ||
+    sym.includes("NCD") ||
+    sym.includes("BOND") ||
+    sym.includes("-NC") ||
+    sym.includes("-ND") ||
+    sym.includes("-NF") ||
+    sym.includes("-NG") ||
+    sym.includes("-NH")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Full Sync Orchestrator for all 4 Sections:
  * 1. Stocks -> stock_holdings
- * 2. F&O -> fno_positions
- * 3. Mutual Funds -> mutual_fund_holdings
+ * 2. Bonds & Fixed Income -> bond_holdings
+ * 3. F&O -> fno_positions
+ * 4. Mutual Funds -> mutual_fund_holdings
  */
 export async function syncAllZerodhaSections(userId: string): Promise<{
   success: boolean;
   stocksSynced: number;
+  bondsSynced: number;
   fnoSynced: number;
   mfSynced: number;
   walletBalance?: number;
@@ -405,6 +461,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       return {
         success: false,
         stocksSynced: 0,
+        bondsSynced: 0,
         fnoSynced: 0,
         mfSynced: 0,
         error: "Zerodha integration is not configured. Please provide your API Key and Secret.",
@@ -442,6 +499,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           return {
             success: false,
             stocksSynced: 0,
+            bondsSynced: 0,
             fnoSynced: 0,
             mfSynced: 0,
             error: `Zerodha session expired. Auto-login failed (${loginRes.error || "Unknown"}). Please click 'Login with Kite' in Settings.`,
@@ -451,6 +509,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         return {
           success: false,
           stocksSynced: 0,
+          bondsSynced: 0,
           fnoSynced: 0,
           mfSynced: 0,
           error: "Zerodha session expired or not authenticated. Please log in with Zerodha today or configure auto-login in .env.local.",
@@ -480,6 +539,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       return {
         success: false,
         stocksSynced: 0,
+        bondsSynced: 0,
         fnoSynced: 0,
         mfSynced: 0,
         error: firstError,
@@ -543,37 +603,104 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     }
 
     let stocksSynced = 0;
+    let bondsSynced = 0;
     let fnoSynced = 0;
     let mfSynced = 0;
 
-    // --- Section 1: Stocks Sync ---
+    // Fetch existing user bond holdings to preserve custom user-entered properties (e.g. platform, coupon rate)
+    const { data: existingBonds } = await supabaseAdmin
+      .from("bond_holdings")
+      .select("id, isin, platform, name, issuer_name, coupon_rate, coupon_frequency, maturity_date, face_value, bond_type, credit_rating")
+      .eq("user_id", userId);
+
+    const existingBondMap = new Map((existingBonds || []).map((b) => [b.isin.toUpperCase(), b]));
+
+    // --- Section 1: Stocks & Bonds Demat Holdings Sync ---
     if (holdingsRes.status === "fulfilled" && Array.isArray(holdingsRes.value)) {
       const activeSymbols = new Set<string>();
+
       for (const h of holdingsRes.value) {
         const totalQty = (h.quantity || 0) + (h.t1_quantity || 0);
         if (totalQty <= 0) continue;
 
         const exchange = (h.exchange || "NSE").toUpperCase() === "BSE" ? "BSE" : "NSE";
         const symbol = (h.tradingsymbol || "").toUpperCase();
-        activeSymbols.add(`${symbol}:${exchange}`);
+        const isin = (h.isin || "").toUpperCase();
 
-        await supabaseAdmin.from("stock_holdings").upsert(
-          {
-            user_id: userId,
-            symbol,
-            exchange,
-            company_name: h.tradingsymbol || symbol,
-            sector: "Other",
-            quantity: totalQty,
-            avg_buy_price: h.average_price || 0,
-            account_id: zerodhaAccountId,
-            currency: "INR",
-            notes: `Synced from Zerodha Kite. ISIN: ${h.isin || "N/A"}`,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,symbol,exchange" }
-        );
-        stocksSynced++;
+        if (isBondInstrument(symbol, isin)) {
+          // Detected Bond / G-Sec / SGB instrument in Zerodha Demat
+          const existingBond = existingBondMap.get(isin);
+
+          let bondType: "CORPORATE" | "GOVERNMENT" | "STATE_DEVELOPMENT" | "SGB" | "TAX_FREE" | "OTHER" = "CORPORATE";
+          let issuerName = symbol.split("-")[0] || symbol;
+          let creditRating = "CRISIL AAA";
+
+          if (isin.startsWith("IN00") || symbol.endsWith("-GS") || symbol.endsWith("-TB") || symbol.includes("GS20")) {
+            bondType = "GOVERNMENT";
+            issuerName = "Government of India / RBI";
+            creditRating = "SOVEREIGN";
+          } else if (symbol.startsWith("SGB") || symbol.includes("-SG") || symbol.includes("-GB")) {
+            bondType = "SGB";
+            issuerName = "Reserve Bank of India";
+            creditRating = "SOVEREIGN";
+          } else if (isin.startsWith("IN31") || isin.startsWith("IN29")) {
+            bondType = "STATE_DEVELOPMENT";
+            issuerName = "State Government";
+            creditRating = "SOVEREIGN";
+          }
+
+          const faceValue = existingBond?.face_value ? Number(existingBond.face_value) : (isin.startsWith("IN00") ? 100 : 1000);
+          const avgBuyPrice = h.average_price || faceValue;
+          const currentPrice = h.last_price || h.close_price || avgBuyPrice;
+          const investedAmount = Math.round(totalQty * avgBuyPrice * 100) / 100;
+
+          await supabaseAdmin.from("bond_holdings").upsert(
+            {
+              user_id: userId,
+              isin: isin || `BOND_${symbol}`,
+              name: existingBond?.name || h.tradingsymbol || symbol,
+              issuer_name: existingBond?.issuer_name || issuerName,
+              bond_type: existingBond?.bond_type || bondType,
+              platform: existingBond?.platform || "ZERODHA",
+              demat_account_id: zerodhaAccountId,
+              demat_broker: "ZERODHA",
+              face_value: faceValue,
+              quantity: totalQty,
+              avg_buy_price: Math.round(avgBuyPrice * 100) / 100,
+              invested_amount: investedAmount,
+              current_price: Math.round(currentPrice * 100) / 100,
+              coupon_rate: existingBond?.coupon_rate ?? 7.5,
+              coupon_frequency: existingBond?.coupon_frequency || "ANNUAL",
+              maturity_date: existingBond?.maturity_date || "2033-01-01",
+              credit_rating: existingBond?.credit_rating || creditRating,
+              notes: `Confirmed in Zerodha Demat (CDSL). ISIN: ${isin || "N/A"}`,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,isin" }
+          );
+          bondsSynced++;
+        } else {
+          // Regular Equity Stock
+          activeSymbols.add(`${symbol}:${exchange}`);
+
+          await supabaseAdmin.from("stock_holdings").upsert(
+            {
+              user_id: userId,
+              symbol,
+              exchange,
+              company_name: h.tradingsymbol || symbol,
+              sector: "Other",
+              quantity: totalQty,
+              avg_buy_price: h.average_price || 0,
+              account_id: zerodhaAccountId,
+              currency: "INR",
+              notes: `Synced from Zerodha Kite. ISIN: ${h.isin || "N/A"}`,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,symbol,exchange" }
+          );
+          stocksSynced++;
+        }
       }
 
       // Cleanup previously synced Zerodha stocks that are no longer held
@@ -701,6 +828,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     // 3. Update Integration status
     const summary = {
       stocks_synced: stocksSynced,
+      bonds_synced: bondsSynced,
       fno_synced: fnoSynced,
       mf_synced: mfSynced,
       wallet_balance: walletBalance,
@@ -721,6 +849,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
       await Promise.allSettled([
         invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS)),
         invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.STOCKS)),
+        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.BONDS)),
         invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.MUTUAL_FUNDS)),
         invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO)),
       ]);
@@ -731,6 +860,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     return {
       success: true,
       stocksSynced,
+      bondsSynced,
       fnoSynced,
       mfSynced,
       walletBalance,
@@ -751,6 +881,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     return {
       success: false,
       stocksSynced: 0,
+      bondsSynced: 0,
       fnoSynced: 0,
       mfSynced: 0,
       error: msg || "Failed to sync Zerodha portfolio",

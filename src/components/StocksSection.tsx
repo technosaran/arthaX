@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -134,7 +134,7 @@ const SECTOR_COLORS: Record<string, string> = {
 export default function StocksSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Holdings & Quotes State
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
@@ -145,6 +145,10 @@ export default function StocksSection() {
 
   // UI state
   const [loading, setLoading] = useState(true);
+  const inFlightRef = useRef<boolean>(false);
+  const autoSyncedRef = useRef<boolean>(false);
+  const holdingsRef = useRef<StockHolding[]>([]);
+  holdingsRef.current = holdings;
   const [refreshingQuotes, setRefreshingQuotes] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");
@@ -191,13 +195,13 @@ export default function StocksSection() {
           setMarketStatus(data.marketStatus);
         }
         if (force) {
-          showToast("Quotes Updated", "Latest Indian market prices refreshed successfully", "success");
+          showToast("Quotes Updated", "Latest Indian stock market prices refreshed successfully.", "success");
         }
       }
     } catch (err) {
       console.error("[Stocks] Error updating quotes:", err);
       if (force) {
-        showToast("Quote Refresh Failed", "Could not fetch latest market prices", "error");
+        showToast("Quote Refresh Failed", "Could not fetch latest market prices from NSE/BSE.", "error");
       }
     } finally {
       setRefreshingQuotes(false);
@@ -206,9 +210,12 @@ export default function StocksSection() {
 
   // Fetch initial data: holdings, transactions, accounts
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
-      setLoading(true);
+      if (holdingsRef.current.length === 0) {
+        setLoading(true);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {};
       if (session?.access_token) {
@@ -237,29 +244,33 @@ export default function StocksSection() {
       }
     } catch (err) {
       console.error("[Stocks] Error loading holdings:", err);
-      showToast("Error", "Failed to load stock portfolio", "error");
+      showToast("Portfolio Load Failed", "Failed to load stock portfolio data. Please check connection.", "error");
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, supabase, showToast, fetchQuotesForHoldings]);
 
   useEffect(() => {
     fetchData();
-    // Silent background auto-sync from Zerodha when session is active
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = {};
-        if (session?.access_token) {
-          headers["Authorization"] = `Bearer ${session.access_token}`;
-        }
-        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
-        const json = await res.json();
-        if (json.success) {
-          fetchData();
-        }
-      } catch {}
-    })();
+    // Silent background auto-sync from Zerodha only once when session is active
+    if (!autoSyncedRef.current) {
+      autoSyncedRef.current = true;
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const headers: Record<string, string> = {};
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
+          const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+          const json = await res.json();
+          if (json.success) {
+            fetchData();
+          }
+        } catch {}
+      })();
+    }
   }, [fetchData, supabase]);
 
   // Sync holdings directly from Zerodha Kite API
@@ -293,7 +304,7 @@ export default function StocksSection() {
       await fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sync Zerodha stocks";
-      showToast("Sync Error", msg, "error");
+      showToast("Zerodha Sync Failed", msg, "error");
     } finally {
       setSyncingZerodha(false);
     }

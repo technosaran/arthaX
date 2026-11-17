@@ -1424,3 +1424,134 @@ CREATE POLICY "Users can insert own zerodha integration" ON public.zerodha_integ
 CREATE POLICY "Users can update own zerodha integration" ON public.zerodha_integrations FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
 CREATE POLICY "Users can delete own zerodha integration" ON public.zerodha_integrations FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
+
+-- ----------------------------------------------------------------------------
+-- 11. BONDS & FIXED INCOME MODULE (IndiaBonds, GoldenPi & Zerodha Demat)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.bond_holdings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  isin text NOT NULL,
+  name text NOT NULL,
+  issuer_name text NOT NULL,
+  bond_type text NOT NULL DEFAULT 'CORPORATE' CHECK (bond_type IN ('CORPORATE', 'GOVERNMENT', 'STATE_DEVELOPMENT', 'SGB', 'TAX_FREE', 'OTHER')),
+  platform text NOT NULL DEFAULT 'INDIABONDS' CHECK (platform IN ('INDIABONDS', 'GOLDENPI', 'ZERODHA', 'WINT_WEALTH', 'OTHER')),
+  demat_account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  demat_broker text NOT NULL DEFAULT 'ZERODHA',
+  face_value numeric(15, 2) NOT NULL DEFAULT 1000.00 CHECK (face_value > 0),
+  quantity numeric(14, 4) NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+  avg_buy_price numeric(15, 2) NOT NULL DEFAULT 1000.00 CHECK (avg_buy_price >= 0),
+  invested_amount numeric(15, 2) NOT NULL DEFAULT 0 CHECK (invested_amount >= 0),
+  current_price numeric(15, 2) NULL,
+  coupon_rate numeric(6, 3) NOT NULL DEFAULT 0 CHECK (coupon_rate >= 0),
+  ytm numeric(6, 3) NULL CHECK (ytm >= 0),
+  coupon_frequency text NOT NULL DEFAULT 'ANNUAL' CHECK (coupon_frequency IN ('MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'CUMULATIVE_AT_MATURITY')),
+  next_coupon_date date NULL,
+  maturity_date date NOT NULL,
+  issue_date date NULL,
+  credit_rating text NULL DEFAULT 'CRISIL AAA',
+  rating_agency text NULL DEFAULT 'CRISIL',
+  seniority text NOT NULL DEFAULT 'SENIOR_SECURED' CHECK (seniority IN ('SENIOR_SECURED', 'SENIOR_UNSECURED', 'SUBORDINATED_TIER_2', 'PERPETUAL_AT1', 'GOVERNMENT_GUARANTEED')),
+  tax_status text NOT NULL DEFAULT 'TAXABLE' CHECK (tax_status IN ('TAXABLE', 'TAX_FREE', 'TDS_EXEMPT')),
+  order_reference text NULL,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_user_bond_isin UNIQUE (user_id, isin)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bond_holdings_user ON public.bond_holdings(user_id);
+CREATE INDEX IF NOT EXISTS idx_bond_holdings_isin ON public.bond_holdings(isin);
+ALTER TABLE public.bond_holdings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own bond holdings" ON public.bond_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own bond holdings" ON public.bond_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own bond holdings" ON public.bond_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own bond holdings" ON public.bond_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+CREATE TABLE IF NOT EXISTS public.bond_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  holding_id uuid REFERENCES public.bond_holdings(id) ON DELETE CASCADE,
+  isin text NOT NULL,
+  type text NOT NULL CHECK (type IN ('BUY', 'SELL', 'COUPON_PAYOUT', 'MATURITY_REDEMPTION')),
+  quantity numeric(14, 4) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  price numeric(15, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  amount numeric(15, 2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  platform text NOT NULL DEFAULT 'INDIABONDS',
+  demat_account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  transaction_date date NOT NULL DEFAULT current_date,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_bond_transactions_user ON public.bond_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_bond_transactions_holding ON public.bond_transactions(holding_id);
+ALTER TABLE public.bond_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own bond transactions" ON public.bond_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own bond transactions" ON public.bond_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own bond transactions" ON public.bond_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own bond transactions" ON public.bond_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+
+-- ----------------------------------------------------------------------------
+-- 12. PHYSICAL GOLD & SILVER BULLION MODULE
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.bullion_holdings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  metal text NOT NULL CHECK (metal IN ('GOLD', 'SILVER')),
+  name text NOT NULL,
+  item_type text NOT NULL DEFAULT 'COIN' CHECK (item_type IN ('COIN', 'BAR', 'JEWELRY', 'SOVEREIGN', 'BULLION', 'UTENSIL', 'OTHER')),
+  purity text NOT NULL,
+  purity_percentage numeric(5, 2) NOT NULL DEFAULT 99.90 CHECK (purity_percentage > 0 AND purity_percentage <= 100),
+  weight_grams numeric(14, 4) NOT NULL CHECK (weight_grams > 0),
+  quantity numeric(10, 2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  buy_price_per_gram numeric(15, 2) NOT NULL CHECK (buy_price_per_gram >= 0),
+  making_charges numeric(15, 2) NOT NULL DEFAULT 0 CHECK (making_charges >= 0),
+  tax_gst numeric(15, 2) NOT NULL DEFAULT 0 CHECK (tax_gst >= 0),
+  total_buy_price numeric(15, 2) NOT NULL CHECK (total_buy_price >= 0),
+  purchase_date date NOT NULL DEFAULT current_date,
+  storage_location text NOT NULL DEFAULT 'Home Safe',
+  cert_id text NULL,
+  account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS public.bullion_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  holding_id uuid REFERENCES public.bullion_holdings(id) ON DELETE CASCADE,
+  metal text NOT NULL CHECK (metal IN ('GOLD', 'SILVER')),
+  type text NOT NULL CHECK (type IN ('BUY', 'SELL')),
+  weight_grams numeric(14, 4) NOT NULL CHECK (weight_grams > 0),
+  price_per_gram numeric(15, 2) NOT NULL CHECK (price_per_gram >= 0),
+  making_charges numeric(15, 2) NOT NULL DEFAULT 0,
+  tax_gst numeric(15, 2) NOT NULL DEFAULT 0,
+  total_amount numeric(15, 2) NOT NULL CHECK (total_amount >= 0),
+  transaction_date date NOT NULL DEFAULT current_date,
+  notes text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_bullion_holdings_user ON public.bullion_holdings(user_id);
+CREATE INDEX IF NOT EXISTS idx_bullion_holdings_metal ON public.bullion_holdings(metal);
+CREATE INDEX IF NOT EXISTS idx_bullion_holdings_storage ON public.bullion_holdings(storage_location);
+CREATE INDEX IF NOT EXISTS idx_bullion_transactions_user ON public.bullion_transactions(user_id, transaction_date DESC);
+CREATE INDEX IF NOT EXISTS idx_bullion_transactions_holding ON public.bullion_transactions(holding_id);
+
+ALTER TABLE public.bullion_holdings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bullion_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own bullion holdings" ON public.bullion_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own bullion holdings" ON public.bullion_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own bullion holdings" ON public.bullion_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own bullion holdings" ON public.bullion_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+CREATE POLICY "Users can view own bullion transactions" ON public.bullion_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own bullion transactions" ON public.bullion_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own bullion transactions" ON public.bullion_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own bullion transactions" ON public.bullion_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');

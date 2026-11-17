@@ -95,6 +95,7 @@ async function main() {
       console.log(`🎉 Sync Complete for ${targetUserId}!`);
       console.log(`   - Wallet Cash Balance: ₹${syncResult.walletBalance ?? 0}`);
       console.log(`   - Stocks Synced: ${syncResult.stocksSynced}`);
+      console.log(`   - Bonds Synced: ${syncResult.bondsSynced ?? 0}`);
       console.log(`   - F&O Positions Synced: ${syncResult.fnoSynced}`);
       console.log(`   - Mutual Funds Synced: ${syncResult.mfSynced}`);
     }

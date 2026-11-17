@@ -25,6 +25,9 @@ import {
   ExternalLink,
   RefreshCw,
   Zap,
+  Mail,
+  Calendar,
+  KeyRound,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -82,63 +85,117 @@ interface DataCounts {
 
 type SettingsTab = "profile" | "statements" | "integrations" | "security" | "danger";
 
-export default function SettingsSection() {
+interface SettingsSectionProps {
+  initialTab?: SettingsTab;
+}
+
+interface TelegramData {
+  is_linked: boolean;
+  telegram_username: string | null;
+  telegram_chat_id: string | null;
+  link_token: string | null;
+  bot_username: string;
+  loading: boolean;
+}
+
+interface ZerodhaStatus {
+  configured: boolean;
+  connected: boolean;
+  isTokenExpired: boolean;
+  autoLoginConfigured?: boolean;
+  autoLoginUserIdMasked?: string | null;
+  apiKeyMasked: string | null;
+  userProfile: any | null;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  lastSyncSummary: any | null;
+  lastSyncError: string | null;
+  loginUrl: string | null;
+}
+
+export default function SettingsSection({ initialTab = "profile" }: SettingsSectionProps = {}) {
   const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
   const { theme } = useTheme();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const userId = user?.id || "default_user";
+  const zerodhaCacheKey = useMemo(() => getUserCacheKey(userId, CACHE_KEYS.ZERODHA), [userId]);
+  const telegramCacheKey = useMemo(() => getUserCacheKey(userId, CACHE_KEYS.TELEGRAM), [userId]);
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const sectionParam = params.get("section") as SettingsTab;
+      if (["profile", "statements", "integrations", "security", "danger"].includes(sectionParam)) {
+        return sectionParam;
+      }
+    }
+    return initialTab;
+  });
   const [greetingName, setGreetingName] = useState(profile?.name || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [cacheSyncing, setCacheSyncing] = useState(false);
   const [copiedAccountId, setCopiedAccountId] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
-  // Telegram Integration State
-  const [telegramData, setTelegramData] = useState<{
-    is_linked: boolean;
-    telegram_username: string | null;
-    telegram_chat_id: string | null;
-    link_token: string | null;
-    bot_username: string;
-    loading: boolean;
-  }>({
-    is_linked: Boolean(profile?.telegram_chat_id),
-    telegram_username: profile?.telegram_username || null,
-    telegram_chat_id: profile?.telegram_chat_id || null,
-    link_token: profile?.telegram_link_token || null,
-    bot_username: "Artha_X_bot",
-    loading: false,
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Telegram Integration State - hydrated instantly from cache to prevent empty state flash
+  const [telegramData, setTelegramData] = useState<TelegramData>(() => {
+    const cached = getFromLocalCache<TelegramData>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.TELEGRAM));
+    if (cached) {
+      return {
+        ...cached,
+        loading: false,
+      };
+    }
+    const hasProfileChatId = Boolean(profile?.telegram_chat_id);
+    return {
+      is_linked: hasProfileChatId,
+      telegram_username: profile?.telegram_username || null,
+      telegram_chat_id: profile?.telegram_chat_id || null,
+      link_token: profile?.telegram_link_token || null,
+      bot_username: "Artha_X_bot",
+      loading: false,
+    };
+  });
+  const [loadingTelegram, setLoadingTelegram] = useState<boolean>(() => {
+    const cached = getFromLocalCache<TelegramData>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.TELEGRAM));
+    if (cached) return false;
+    if (profile?.telegram_chat_id) return false;
+    return true;
   });
   const [copiedLinkToken, setCopiedLinkToken] = useState(false);
   const [refreshingTelegram, setRefreshingTelegram] = useState(false);
 
-  // Zerodha Kite Integration State
-  const [zerodhaStatus, setZerodhaStatus] = useState<{
-    configured: boolean;
-    connected: boolean;
-    isTokenExpired: boolean;
-    autoLoginConfigured?: boolean;
-    autoLoginUserIdMasked?: string | null;
-    apiKeyMasked: string | null;
-    userProfile: any | null;
-    lastSyncAt: string | null;
-    lastSyncStatus: string | null;
-    lastSyncSummary: any | null;
-    lastSyncError: string | null;
-    loginUrl: string | null;
-  }>({
-    configured: false,
-    connected: false,
-    isTokenExpired: true,
-    autoLoginConfigured: false,
-    autoLoginUserIdMasked: null,
-    apiKeyMasked: null,
-    userProfile: null,
-    lastSyncAt: null,
-    lastSyncStatus: null,
-    lastSyncSummary: null,
-    lastSyncError: null,
-    loginUrl: null,
+  // Zerodha Kite Integration State - hydrated instantly from cache to prevent empty state flash
+  const [zerodhaStatus, setZerodhaStatus] = useState<ZerodhaStatus>(() => {
+    const cached = getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.ZERODHA));
+    if (cached) {
+      return cached;
+    }
+    return {
+      configured: false,
+      connected: false,
+      isTokenExpired: true,
+      autoLoginConfigured: false,
+      autoLoginUserIdMasked: null,
+      apiKeyMasked: null,
+      userProfile: null,
+      lastSyncAt: null,
+      lastSyncStatus: null,
+      lastSyncSummary: null,
+      lastSyncError: null,
+      loginUrl: null,
+    };
+  });
+  const [loadingZerodha, setLoadingZerodha] = useState<boolean>(() => {
+    const cached = getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.ZERODHA));
+    return !cached;
   });
   const [zerodhaApiKey, setZerodhaApiKey] = useState("");
   const [zerodhaApiSecret, setZerodhaApiSecret] = useState("");
@@ -163,6 +220,8 @@ export default function SettingsSection() {
   });
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [exportingTarget, setExportingTarget] = useState<string | null>(null);
+  const inFlightTelegramRef = useRef<boolean>(false);
+  const inFlightZerodhaRef = useRef<boolean>(false);
 
   const nameInputRef = useRef(greetingName);
   useEffect(() => {
@@ -170,7 +229,6 @@ export default function SettingsSection() {
   }, [greetingName]);
   const isDirtyRef = useRef(false);
 
-  const userId = user?.id || "default_user";
   const googleAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
   const isGoogleUser = !!googleAvatarUrl || user?.app_metadata?.provider === "google" || user?.identities?.some((i) => i.provider === "google");
 
@@ -242,6 +300,76 @@ export default function SettingsSection() {
     }
   }, [user]);
 
+  // Fetch Telegram Integration Status with Bearer token authentication
+  const fetchTelegramStatus = useCallback(async (showLoading = false) => {
+    if (inFlightTelegramRef.current) return;
+    inFlightTelegramRef.current = true;
+    if (showLoading) {
+      setLoadingTelegram(true);
+    }
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/telegram/link", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const freshData: TelegramData = {
+            is_linked: Boolean(data.is_linked),
+            telegram_username: data.telegram_username || null,
+            telegram_chat_id: data.telegram_chat_id || null,
+            link_token: data.link_token || null,
+            bot_username: data.bot_username || "Artha_X_bot",
+            loading: false,
+          };
+          setTelegramData(freshData);
+          saveToLocalCache(telegramCacheKey, freshData, 86400);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Telegram link status:", err);
+    } finally {
+      setLoadingTelegram(false);
+      inFlightTelegramRef.current = false;
+    }
+  }, [telegramCacheKey]);
+
+  // Fetch Zerodha Integration Status
+  const fetchZerodhaStatus = useCallback(async (showLoading = false) => {
+    if (inFlightZerodhaRef.current) return;
+    inFlightZerodhaRef.current = true;
+    if (showLoading) {
+      setLoadingZerodha(true);
+    }
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/zerodha", { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setZerodhaStatus(json.data);
+          saveToLocalCache(zerodhaCacheKey, json.data, 86400);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Zerodha status:", err);
+    } finally {
+      setLoadingZerodha(false);
+      inFlightZerodhaRef.current = false;
+    }
+  }, [zerodhaCacheKey]);
+
   useEffect(() => {
     refreshCounts();
 
@@ -257,6 +385,9 @@ export default function SettingsSection() {
             setGreetingName(payload.new.name);
             updateProfileLocally?.({ name: payload.new.name });
           }
+          if (payload.new?.telegram_chat_id !== undefined || payload.new?.telegram_username !== undefined) {
+            fetchTelegramStatus(false);
+          }
         }
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "accounts", filter: `user_id=eq.${userId}` }, () => refreshCounts())
@@ -268,112 +399,98 @@ export default function SettingsSection() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, user, refreshCounts, updateProfileLocally]);
+  }, [userId, user, refreshCounts, updateProfileLocally, fetchTelegramStatus]);
 
-  // Fetch Telegram Integration Status with Bearer token authentication
-  const fetchTelegramStatus = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
-      }
-
-      const res = await fetch("/api/v1/integrations/telegram/link", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setTelegramData({
-            is_linked: data.is_linked,
-            telegram_username: data.telegram_username,
-            telegram_chat_id: data.telegram_chat_id,
-            link_token: data.link_token,
-            bot_username: data.bot_username || "Artha_X_bot",
-            loading: false,
-          });
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to fetch Telegram link status:", err);
+  // Pre-fetch integration statuses on mount in the background so data is ready instantly (only if not on integrations tab)
+  useEffect(() => {
+    if (activeTab !== "integrations") {
+      fetchTelegramStatus(false);
+      fetchZerodhaStatus(false);
     }
-  }, []);
+  }, [fetchTelegramStatus, fetchZerodhaStatus, activeTab]);
 
-  // Fetch Zerodha Integration Status
-  const fetchZerodhaStatus = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
-      }
-
-      const res = await fetch("/api/v1/integrations/zerodha", { headers });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          setZerodhaStatus(json.data);
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to fetch Zerodha status:", err);
+  // Sync profile telegram changes if profile arrives after mount
+  useEffect(() => {
+    if (profile?.telegram_chat_id && !telegramData.is_linked) {
+      setTelegramData((prev) => ({
+        ...prev,
+        is_linked: true,
+        telegram_chat_id: profile.telegram_chat_id || prev.telegram_chat_id,
+        telegram_username: profile.telegram_username || prev.telegram_username,
+        link_token: profile.telegram_link_token || prev.link_token,
+      }));
+      setLoadingTelegram(false);
     }
-  }, []);
+  }, [profile, telegramData.is_linked]);
+
+  const telegramLinkedRef = useRef(telegramData.is_linked);
+  useEffect(() => {
+    telegramLinkedRef.current = telegramData.is_linked;
+  }, [telegramData.is_linked]);
 
   useEffect(() => {
     if (activeTab === "integrations") {
-      fetchTelegramStatus();
+      fetchTelegramStatus(false);
+      fetchZerodhaStatus(false);
 
       const onFocus = () => {
-        fetchTelegramStatus();
+        fetchTelegramStatus(false);
+        fetchZerodhaStatus(false);
       };
       window.addEventListener("focus", onFocus);
 
       const interval = setInterval(() => {
-        if (!telegramData.is_linked) {
-          fetchTelegramStatus();
+        if (!telegramLinkedRef.current) {
+          fetchTelegramStatus(false);
         }
-      }, 3500);
-
-      fetchZerodhaStatus();
+      }, 4000);
 
       return () => {
         window.removeEventListener("focus", onFocus);
         clearInterval(interval);
       };
     }
-  }, [activeTab, fetchTelegramStatus, telegramData.is_linked, fetchZerodhaStatus]);
+  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus]);
 
-  // Handle Zerodha URL Redirects / Callbacks
+  // Handle Zerodha URL Redirects / Callbacks and section deep links
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     const zerodhaConnected = url.searchParams.get("zerodha_connected");
     const zerodhaError = url.searchParams.get("zerodha_error");
     const reqToken = url.searchParams.get("request_token");
+    const section = url.searchParams.get("section");
+
+    if (section && ["profile", "statements", "integrations", "security", "danger"].includes(section)) {
+      if (activeTab !== section) {
+        setActiveTab(section as SettingsTab);
+      }
+    }
 
     if (zerodhaConnected === "true") {
       showToast("Zerodha Connected!", "Your Zerodha Kite session is active and ready to sync.", "success");
-      fetchZerodhaStatus();
+      fetchZerodhaStatus(false);
       // Clean up URL without full page reload
       url.searchParams.delete("zerodha_connected");
+      url.searchParams.delete("section");
       window.history.replaceState({}, "", url.toString());
     } else if (zerodhaError) {
       showToast("Zerodha Connection Error", decodeURIComponent(zerodhaError), "error");
       url.searchParams.delete("zerodha_error");
+      url.searchParams.delete("section");
       window.history.replaceState({}, "", url.toString());
     } else if (reqToken) {
       setZerodhaRequestToken(reqToken);
       showToast("Request Token Captured", "Click 'Save Credentials' to complete authentication.", "info");
       url.searchParams.delete("request_token");
+      url.searchParams.delete("section");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [showToast, fetchZerodhaStatus]);
+  }, [showToast, fetchZerodhaStatus, activeTab]);
 
   const handleSaveZerodha = async () => {
     if (!zerodhaApiKey.trim() || !zerodhaApiSecret.trim()) {
-      showToast("Validation Error", "Please provide both API Key and API Secret.", "error");
+      showToast("Credentials Required", "Please provide both Zerodha API Key and API Secret.", "warning");
       return;
     }
 
@@ -405,7 +522,7 @@ export default function SettingsSection() {
         throw new Error(errorMsg);
       }
 
-      showToast("Zerodha Saved", json.data.message || "Credentials saved successfully", "success");
+      showToast("Zerodha Connected", json.data.message || "Credentials and API keys saved successfully.", "success");
       await fetchZerodhaStatus();
 
       // If login URL provided and not yet connected, open Kite login in new tab
@@ -413,7 +530,7 @@ export default function SettingsSection() {
         window.open(json.data.loginUrl, "_blank");
       }
     } catch (err: any) {
-      showToast("Error", err.message || "Failed to save Zerodha settings", "error");
+      showToast("Zerodha Setup Failed", err.message || "Failed to save Zerodha settings.", "error");
     } finally {
       setSavingZerodha(false);
     }
@@ -445,13 +562,13 @@ export default function SettingsSection() {
 
       const d = json.data;
       showToast(
-        "Zerodha Portfolio Synced!",
+        "Zerodha Portfolio Synced",
         `Trading cash margin: ₹${d.walletBalance ?? 0} • Synced ${d.stocksSynced} Stocks, ${d.fnoSynced} F&O Positions, and ${d.mfSynced} Mutual Funds.`,
         "success"
       );
       await fetchZerodhaStatus();
     } catch (err: any) {
-      showToast("Sync Error", err.message || "Failed to sync Zerodha portfolio", "error");
+      showToast("Zerodha Sync Failed", err.message || "Failed to sync Zerodha portfolio.", "error");
     } finally {
       setSyncingZerodha(false);
     }
@@ -488,7 +605,7 @@ export default function SettingsSection() {
       );
       await fetchZerodhaStatus();
     } catch (err: any) {
-      showToast("Auto-Login Error", err.message || "Failed to auto-login to Zerodha", "error");
+      showToast("Auto-Login Failed", err.message || "Failed to auto-login to Zerodha.", "error");
     } finally {
       setAutoLoggingInZerodha(false);
     }
@@ -509,14 +626,29 @@ export default function SettingsSection() {
       });
 
       if (res.ok) {
-        showToast("Zerodha Disconnected", "Credentials and session removed.", "info");
+        showToast("Zerodha Disconnected", "Credentials and active session removed.", "info");
         setZerodhaApiKey("");
         setZerodhaApiSecret("");
         setZerodhaRequestToken("");
-        await fetchZerodhaStatus();
+        const resetStatus: ZerodhaStatus = {
+          configured: false,
+          connected: false,
+          isTokenExpired: true,
+          autoLoginConfigured: false,
+          autoLoginUserIdMasked: null,
+          apiKeyMasked: null,
+          userProfile: null,
+          lastSyncAt: null,
+          lastSyncStatus: null,
+          lastSyncSummary: null,
+          lastSyncError: null,
+          loginUrl: null,
+        };
+        setZerodhaStatus(resetStatus);
+        saveToLocalCache(zerodhaCacheKey, resetStatus, 86400);
       }
     } catch (err: any) {
-      showToast("Error", "Failed to disconnect Zerodha", "error");
+      showToast("Disconnect Failed", "Failed to disconnect Zerodha credentials.", "error");
     }
   };
 
@@ -538,12 +670,16 @@ export default function SettingsSection() {
       if (res.ok) {
         const data = await res.json();
         if (data.link_token) {
-          setTelegramData((prev) => ({ ...prev, link_token: data.link_token }));
-          showToast("New Code Generated", "Use this code with /link in Telegram", "success");
+          setTelegramData((prev) => {
+            const updated = { ...prev, link_token: data.link_token };
+            saveToLocalCache(telegramCacheKey, updated, 86400);
+            return updated;
+          });
+          showToast("Telegram Link Code Generated", "Use this code with /link in Telegram bot.", "success");
         }
       }
     } catch {
-      showToast("Error", "Failed to generate new Telegram code", "error");
+      showToast("Code Generation Failed", "Failed to generate new Telegram link code.", "error");
     } finally {
       setRefreshingTelegram(false);
     }
@@ -565,11 +701,20 @@ export default function SettingsSection() {
         body: JSON.stringify({ action: "unlink" }),
       });
       if (res.ok) {
-        await fetchTelegramStatus();
-        showToast("Telegram Disconnected", "Your Telegram chat is no longer linked to arthaX.", "success");
+        const resetTg: TelegramData = {
+          is_linked: false,
+          telegram_username: null,
+          telegram_chat_id: null,
+          link_token: null,
+          bot_username: "Artha_X_bot",
+          loading: false,
+        };
+        setTelegramData(resetTg);
+        saveToLocalCache(telegramCacheKey, resetTg, 86400);
+        showToast("Telegram Disconnected", "Your Telegram chat is no longer linked to arthaX.", "info");
       }
     } catch {
-      showToast("Error", "Failed to disconnect Telegram", "error");
+      showToast("Disconnect Failed", "Failed to disconnect Telegram integration.", "error");
     } finally {
       setRefreshingTelegram(false);
     }
@@ -584,7 +729,7 @@ export default function SettingsSection() {
 
     const nameToSave = (customName !== undefined ? customName : greetingName).trim();
     if (!nameToSave) {
-      showToast("Validation Error", "Greeting name cannot be empty.", "error");
+      showToast("Name Required", "Greeting name cannot be empty.", "warning");
       return;
     }
 
@@ -649,7 +794,7 @@ export default function SettingsSection() {
     if (user?.id) {
       navigator.clipboard.writeText(user.id);
       setCopiedAccountId(true);
-      showToast("Copied", "Account ID copied to clipboard.", "success");
+      showToast("Copied to Clipboard", "Account ID copied to clipboard.", "success");
       setTimeout(() => setCopiedAccountId(false), 2000);
     }
   };
@@ -671,10 +816,10 @@ export default function SettingsSection() {
       await refreshCounts();
       if (refreshProfile) await refreshProfile();
 
-      showToast("Refreshed", "All account balances and datasets synchronized.", "success");
+      showToast("Data Synchronized", "All account balances and financial datasets synchronized.", "success");
     } catch (err) {
       console.error("Refresh failed:", err);
-      showToast("Error", "Could not refresh data.", "error");
+      showToast("Sync Failed", "Could not synchronize data. Please try again.", "error");
     } finally {
       setCacheSyncing(false);
     }
@@ -683,7 +828,7 @@ export default function SettingsSection() {
   // Master Wipe Entire Workspace Data Handler
   const handleMasterWipe = async () => {
     if (wipeConfirmationInput.trim().toUpperCase() !== "DELETE") {
-      showToast("Confirmation Required", 'Please type "DELETE" to confirm data wipe.', "error");
+      showToast("Confirmation Required", 'Please type "DELETE" exactly to confirm data wipe.', "warning");
       return;
     }
 
@@ -1458,11 +1603,13 @@ export default function SettingsSection() {
                 className="p-4 sm:p-5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="flex items-center gap-4">
-                  {googleAvatarUrl ? (
+                  {googleAvatarUrl && !avatarError ? (
                     <img
                       src={googleAvatarUrl}
                       alt={greetingName || "User"}
                       className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30 flex-shrink-0 shadow-sm"
+                      referrerPolicy="no-referrer"
+                      onError={() => setAvatarError(true)}
                     />
                   ) : (
                     <div
@@ -1564,6 +1711,90 @@ export default function SettingsSection() {
                     </span>
                   </div>
                   <span className="text-[10px] font-mono opacity-50 hidden sm:inline">Active</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Comprehensive Account Profile Details & Status Card */}
+            <Card className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border-subtle)] flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck size={16} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight">Account Profile Details</h2>
+                    <p className="text-xs opacity-60">Verified credentials and active authentication session</p>
+                  </div>
+                </div>
+
+                <Badge variant="emerald" dot>
+                  Active Session
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {/* Email Item */}
+                <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                      <Mail size={11} />
+                      <span>Primary Email</span>
+                    </span>
+                    <Badge variant="emerald" size="xs">Verified</Badge>
+                  </div>
+                  <div className="text-xs font-semibold font-mono truncate text-[var(--app-fg)]">
+                    {user?.email || "Local Guest Mode"}
+                  </div>
+                </div>
+
+                {/* Full Legal / Auth Name */}
+                <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                    <User size={11} />
+                    <span>Auth Identity Name</span>
+                  </span>
+                  <div className="text-xs font-semibold truncate text-[var(--app-fg)]">
+                    {user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || "arthaX User"}
+                  </div>
+                </div>
+
+                {/* Auth Provider */}
+                <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                    <KeyRound size={11} />
+                    <span>Authentication Provider</span>
+                  </span>
+                  <div className="text-xs font-semibold truncate text-[var(--app-fg)] flex items-center gap-1.5">
+                    {isGoogleUser ? (
+                      <>
+                        <span className="text-sky-400">Google OAuth (SSO)</span>
+                        <CheckCircle2 size={12} className="text-emerald-400" />
+                      </>
+                    ) : (
+                      <span>Email & Secure Password</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Account UUID */}
+                <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">
+                    Account UUID
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono opacity-80 truncate select-all">
+                      {user?.id || "default_user"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyAccountId}
+                      className="p-1 rounded hover:bg-[var(--app-card-hover)] text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors cursor-pointer"
+                      title="Copy full UUID"
+                    >
+                      {copiedAccountId ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -1757,7 +1988,12 @@ export default function SettingsSection() {
                 </div>
 
                 <div>
-                  {telegramData.is_linked ? (
+                  {loadingTelegram ? (
+                    <Badge variant="neutral" className="opacity-75 animate-pulse flex items-center gap-1.5 text-[10px]">
+                      <Loader2 size={11} className="animate-spin text-[#229ED9]" />
+                      <span>Checking...</span>
+                    </Badge>
+                  ) : telegramData.is_linked ? (
                     <Badge variant="emerald" dot>
                       Connected: @{telegramData.telegram_username || "Direct Chat"}
                     </Badge>
@@ -1768,7 +2004,17 @@ export default function SettingsSection() {
               </div>
 
               {/* Status & Connection Actions */}
-              {telegramData.is_linked ? (
+              {loadingTelegram ? (
+                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] space-y-3 animate-pulse">
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="space-y-1.5 flex-1 min-w-[200px]">
+                      <div className="h-4 w-40 rounded bg-[var(--app-border-subtle)]" />
+                      <div className="h-3 w-56 rounded bg-[var(--app-border-subtle)] opacity-70" />
+                    </div>
+                    <div className="h-8 w-24 rounded-lg bg-[var(--app-border-subtle)] opacity-60" />
+                  </div>
+                </div>
+              ) : telegramData.is_linked ? (
                 <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
                     <div className="space-y-1">
@@ -1891,7 +2137,7 @@ export default function SettingsSection() {
                               navigator.clipboard.writeText(codeToCopy);
                               setCopiedLinkToken(true);
                               setTimeout(() => setCopiedLinkToken(false), 2000);
-                              showToast("Copied to clipboard", codeToCopy, "success");
+                              showToast("Copied to Clipboard", `Code "${codeToCopy}" copied. Send it to @${telegramData.bot_username || "arthaX_bot"}.`, "success");
                             }}
                           >
                             {copiedLinkToken ? "Copied" : "Copy"}
@@ -1934,7 +2180,12 @@ export default function SettingsSection() {
                 </div>
 
                 <div>
-                  {zerodhaStatus.connected ? (
+                  {loadingZerodha ? (
+                    <Badge variant="neutral" className="opacity-75 animate-pulse flex items-center gap-1.5 text-[10px]">
+                      <Loader2 size={11} className="animate-spin text-orange-400" />
+                      <span>Checking...</span>
+                    </Badge>
+                  ) : zerodhaStatus.connected ? (
                     <Badge variant="emerald" dot>
                       Connected: {zerodhaStatus.userProfile?.user_name || zerodhaStatus.userProfile?.client_id || "Active Session"}
                     </Badge>
@@ -1947,7 +2198,17 @@ export default function SettingsSection() {
               </div>
 
               {/* Connected State */}
-              {zerodhaStatus.connected ? (
+              {loadingZerodha ? (
+                <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] space-y-3 animate-pulse">
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="space-y-1.5 flex-1 min-w-[200px]">
+                      <div className="h-4 w-48 rounded bg-[var(--app-border-subtle)]" />
+                      <div className="h-3 w-72 rounded bg-[var(--app-border-subtle)] opacity-70" />
+                    </div>
+                    <div className="h-8 w-28 rounded-lg bg-[var(--app-border-subtle)] opacity-60" />
+                  </div>
+                </div>
+              ) : zerodhaStatus.connected ? (
                 <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-3 text-xs">
                     <div className="space-y-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Zap,
   TrendingUp,
@@ -99,6 +99,10 @@ export default function FnoSection() {
   const [trades, setTrades] = useState<FnoTrade[]>([]);
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const inFlightRef = useRef<boolean>(false);
+  const autoSyncedRef = useRef<boolean>(false);
+  const positionsRef = useRef<FnoPosition[]>([]);
+  positionsRef.current = positions;
 
   // Filter & Search
   const [positionFilter, setPositionFilter] = useState<"all" | "open" | "closed">("open");
@@ -123,9 +127,12 @@ export default function FnoSection() {
 
   // Fetch Positions & Accounts
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
-      setLoading(true);
+      if (positionsRef.current.length === 0) {
+        setLoading(true);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {};
       if (session?.access_token) {
@@ -148,29 +155,33 @@ export default function FnoSection() {
       }
     } catch (err) {
       console.error("[F&O] Error loading data:", err);
-      showToast("Error", "Failed to load F&O derivatives data", "error");
+      showToast("F&O Data Failed", "Could not load Futures & Options positions.", "error");
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, supabase, showToast]);
 
   useEffect(() => {
     fetchData();
-    // Silent background auto-sync from Zerodha when session is active
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = {};
-        if (session?.access_token) {
-          headers["Authorization"] = `Bearer ${session.access_token}`;
-        }
-        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
-        const json = await res.json();
-        if (json.success) {
-          fetchData();
-        }
-      } catch {}
-    })();
+    // Silent background auto-sync from Zerodha only once when session is active
+    if (!autoSyncedRef.current) {
+      autoSyncedRef.current = true;
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const headers: Record<string, string> = {};
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
+          const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+          const json = await res.json();
+          if (json.success) {
+            fetchData();
+          }
+        } catch {}
+      })();
+    }
   }, [fetchData, supabase]);
 
   // Sync F&O positions directly from Zerodha Kite API
@@ -202,7 +213,7 @@ export default function FnoSection() {
       );
       await fetchData();
     } catch (err: any) {
-      showToast("Sync Error", err.message || "Failed to sync Zerodha F&O positions", "error");
+      showToast("F&O Sync Failed", err.message || "Failed to sync Zerodha F&O positions.", "error");
     } finally {
       setSyncingZerodha(false);
     }

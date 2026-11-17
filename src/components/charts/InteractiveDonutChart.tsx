@@ -25,6 +25,9 @@ export interface InteractiveDonutChartProps {
   icon?: React.ReactNode;
   centerColor?: string;
   maxLegendHeight?: string;
+  align?: "start" | "center" | "end";
+  maxLegendWidth?: string;
+  className?: string;
 }
 
 export default function InteractiveDonutChart({
@@ -46,6 +49,9 @@ export default function InteractiveDonutChart({
   icon,
   centerColor,
   maxLegendHeight = "max-h-52",
+  align = "start",
+  maxLegendWidth = "sm:max-w-xs",
+  className = "",
 }: InteractiveDonutChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -140,13 +146,20 @@ export default function InteractiveDonutChart({
     );
   }
 
+  const alignmentClass = useMemo(() => {
+    if (variant === "compact") return "items-center gap-5";
+    if (align === "end") {
+      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center xl:justify-end gap-6 lg:gap-8";
+    }
+    if (align === "center") {
+      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-6 lg:gap-8";
+    }
+    return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-6 lg:gap-8";
+  }, [variant, align]);
+
   return (
     <div
-      className={`flex flex-col ${
-        variant === "compact"
-          ? "items-center gap-5"
-          : "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-6 lg:gap-8"
-      } w-full`}
+      className={`flex flex-col ${alignmentClass} w-full ${className}`.trim()}
     >
       {/* Donut SVG Ring Container with Luminescent Bloom */}
       <div className="flex justify-center items-center relative flex-shrink-0 select-none group">
@@ -319,7 +332,11 @@ export default function InteractiveDonutChart({
       </div>
 
       {/* Rich Interactive Legend with Proportional Progress Meters */}
-      <div className="w-full sm:w-auto flex-1 sm:max-w-xs min-w-0 space-y-2.5">
+      <div
+        className={`w-full sm:w-auto min-w-0 space-y-2.5 ${
+          align === "end" ? "sm:flex-initial" : "flex-1"
+        } ${maxLegendWidth}`}
+      >
         {title && (
           <div
             className="flex items-center justify-between pb-2 border-b select-none"

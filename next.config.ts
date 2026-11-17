@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: false,
   devIndicators: false,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
@@ -42,4 +44,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: "techno-saran-jz",
+  project: "arthax",
+
+  // Only print logs for uploading source maps in CI
+  silent: !process.env.CI,
+});

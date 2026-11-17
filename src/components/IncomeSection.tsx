@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -28,7 +28,7 @@ import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -115,6 +115,7 @@ export default function IncomeSection() {
   const [incomes, setIncomes] = useState<IncomeItem[]>(initialIncomes);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialAccounts);
   const [loading, setLoading] = useState<boolean>(initialIncomes.length === 0);
+  const inFlightRef = useRef<{ income: boolean; accounts: boolean }>({ income: false, accounts: false });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -253,7 +254,9 @@ export default function IncomeSection() {
 
   // 1. Fetch Accounts for linking
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current.accounts) return;
+    inFlightRef.current.accounts = true;
+
     if (!skipCache) {
       const cached = getFromLocalCache<AccountItem[]>(redisAccountsKey);
       if (cached && Array.isArray(cached) && cached.length > 0) {
@@ -282,12 +285,15 @@ export default function IncomeSection() {
       }
     } catch {
       // Non-blocking
+    } finally {
+      inFlightRef.current.accounts = false;
     }
   }, [user, redisAccountsKey]);
 
   // 2. Fetch Income records
   const fetchIncome = useCallback(async (skipCache: boolean = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current.income) return;
+    inFlightRef.current.income = true;
     setErrorMsg(null);
 
     if (!skipCache) {
@@ -328,6 +334,7 @@ export default function IncomeSection() {
       setErrorMsg("Unable to load income records.");
     } finally {
       setLoading(false);
+      inFlightRef.current.income = false;
     }
   }, [user, redisIncomeKey]);
 
@@ -370,6 +377,22 @@ export default function IncomeSection() {
     };
   }, [user, fetchIncome, fetchAccounts]);
 
+  // Synchronize income whenever another section modifies financial data
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchIncome(true);
+      fetchAccounts(true);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchIncome, fetchAccounts]);
+
   const openAddModal = () => {
     setEditingIncome(null);
     setTitle("");
@@ -401,7 +424,7 @@ export default function IncomeSection() {
     if (!user) return;
     const parsedAmount = parseFloat(amount);
     if (!title.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
-      showToast("Invalid Input", "Please enter a valid title and positive amount.", "error");
+      showToast("Invalid Income Input", "Please enter a valid title and an income amount greater than ₹0.", "warning");
       return;
     }
 
@@ -422,15 +445,11 @@ export default function IncomeSection() {
         }).eq("id", editingIncome.id).eq("user_id", user.id);
 
         if (error) {
-          showToast("Update Failed", error.message || "Failed to update record.", "error");
+          showToast("Income Update Failed", error.message || "Failed to update record.", "error");
         } else {
           showToast("Income Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated.`, "success");
           setIsModalOpen(false);
-          await invalidateCacheKeys([
-            redisIncomeKey,
-            redisAccountsKey,
-            redisLedgerKey,
-          ]);
+          await invalidateAllFinancialCache(user.id);
           await fetchIncome(true);
           await fetchAccounts(true);
         }
@@ -449,22 +468,18 @@ export default function IncomeSection() {
         });
 
         if (error) {
-          showToast("Record Failed", error.message || "Please check inputs.", "error");
+          showToast("Income Record Failed", error.message || "Please check inputs.", "error");
         } else {
-          showToast("Income Recorded", `${title.trim()} (${formatINR(parsedAmount)}) added.`, "success");
+          showToast("Income Recorded", `${title.trim()} (${formatINR(parsedAmount)}) credited to your portfolio.`, "success");
           setIsModalOpen(false);
-          await invalidateCacheKeys([
-            redisIncomeKey,
-            redisAccountsKey,
-            redisLedgerKey,
-          ]);
+          await invalidateAllFinancialCache(user.id);
           await fetchIncome(true);
           await fetchAccounts(true);
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
-      showToast("Operation Failed", msg, "error");
+      showToast("Income Operation Failed", msg, "error");
     } finally {
       setSubmitting(false);
     }
@@ -479,14 +494,10 @@ export default function IncomeSection() {
     });
 
     if (error) {
-      showToast("Delete Failed", error.message || "Could not remove income record.", "error");
+      showToast("Income Deletion Failed", error.message || "Could not remove income record.", "error");
     } else {
-      showToast("Income Removed", `${name} deleted and balance reversed.`, "info");
-      await invalidateCacheKeys([
-        redisIncomeKey,
-        redisAccountsKey,
-        redisLedgerKey,
-      ]);
+      showToast("Income Removed", `"${name}" deleted and credited balance reversed.`, "info");
+      await invalidateAllFinancialCache(user.id);
       await fetchIncome(true);
       await fetchAccounts(true);
     }
@@ -1135,22 +1146,15 @@ export default function IncomeSection() {
             />
           </div>
 
-          <Input
-            label="Notes / Description (Optional)"
-            placeholder="e.g. Bonus / Invoice #104"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-
           {!editingIncome && accountId && (
-            <label className="flex items-center gap-2 pt-0.5 text-[11px] text-[var(--app-muted)] cursor-pointer">
+            <label className="flex items-center gap-2 py-1.5 px-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[11px] text-[var(--app-muted)] cursor-pointer hover:border-[var(--app-border)]">
               <input
                 type="checkbox"
                 checked={creditToAccount}
                 onChange={(e) => setCreditToAccount(e.target.checked)}
                 className="rounded accent-emerald-500 cursor-pointer"
               />
-              <span>Deposit into {accounts.find((a) => a.id === accountId)?.name} balance</span>
+              <span className="truncate">Deposit into {accounts.find((a) => a.id === accountId)?.name} balance</span>
             </label>
           )}
 

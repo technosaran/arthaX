@@ -76,7 +76,7 @@ export const Modal: React.FC<ModalProps> = ({
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizeClasses[size]} rounded-2xl border p-4 sm:p-5 shadow-2xl z-10 transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} rounded-2xl border p-3.5 sm:p-4.5 shadow-2xl z-10 transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[92vh] flex flex-col`}
         style={{
           backgroundColor: "var(--app-card)",
           borderColor: "var(--app-border)",
@@ -86,7 +86,7 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-start justify-between gap-3 pb-2.5 sm:pb-3 border-b border-[var(--app-border-subtle)] flex-shrink-0">
+          <div className="flex items-start justify-between gap-3 pb-2 sm:pb-2.5 border-b border-[var(--app-border-subtle)] flex-shrink-0">
             <div className="min-w-0 pr-2">
               {title && (
                 <h2 className="text-sm sm:text-base font-bold tracking-tight text-[var(--app-fg)] truncate">
@@ -114,13 +114,13 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content with smooth scrolling and dedicated scrollbar breathing room */}
-        <div className="py-2.5 sm:py-3 overflow-y-auto flex-1 min-h-0 pr-1 sm:pr-1.5 [scrollbar-gutter:stable]">
+        <div className="py-2 sm:py-2.5 overflow-y-auto flex-1 min-h-0 pr-0.5 sm:pr-1 [scrollbar-gutter:auto]">
           {children}
         </div>
 
         {/* Fixed Footer if provided */}
         {footer && (
-          <div className="pt-2.5 sm:pt-3 border-t border-[var(--app-border-subtle)] flex-shrink-0">
+          <div className="pt-2 sm:pt-2.5 border-t border-[var(--app-border-subtle)] flex-shrink-0">
             {footer}
           </div>
         )}

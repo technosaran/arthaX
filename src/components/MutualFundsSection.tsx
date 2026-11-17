@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Coins,
   TrendingUp,
@@ -140,7 +140,7 @@ const AMC_COLORS = [
 export default function MutualFundsSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Holdings & Quotes State
   const [holdings, setHoldings] = useState<MutualFundHolding[]>([]);
@@ -150,6 +150,10 @@ export default function MutualFundsSection() {
 
   // UI state
   const [loading, setLoading] = useState(true);
+  const inFlightRef = useRef<boolean>(false);
+  const autoSyncedRef = useRef<boolean>(false);
+  const holdingsRef = useRef<MutualFundHolding[]>([]);
+  holdingsRef.current = holdings;
   const [refreshingNavs, setRefreshingNavs] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");
@@ -190,14 +194,14 @@ export default function MutualFundsSection() {
         if (json.quotes) {
           setQuotes((prev) => ({ ...prev, ...json.quotes }));
           if (notify) {
-            showToast("Updated", "Latest AMFI NAVs loaded successfully", "success");
+            showToast("AMFI NAVs Updated", "Latest mutual fund Net Asset Values loaded successfully.", "success");
           }
         }
       }
     } catch (err) {
       console.warn("[MF NAV] Batch fetch failed:", err);
       if (notify) {
-        showToast("Notice", "Could not refresh live NAVs. Using last recorded prices.", "info");
+        showToast("AMFI Notice", "Could not refresh live AMFI NAVs. Displaying last recorded valuations.", "warning");
       }
     } finally {
       setRefreshingNavs(false);
@@ -206,9 +210,12 @@ export default function MutualFundsSection() {
 
   // Fetch initial data: holdings, transactions, accounts
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
-      setLoading(true);
+      if (holdingsRef.current.length === 0) {
+        setLoading(true);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {};
       if (session?.access_token) {
@@ -237,29 +244,33 @@ export default function MutualFundsSection() {
       }
     } catch (err) {
       console.error("[Mutual Funds] Error loading portfolio:", err);
-      showToast("Error", "Failed to load mutual funds portfolio", "error");
+      showToast("Portfolio Load Failed", "Failed to load mutual funds portfolio.", "error");
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, supabase, showToast, fetchNavsForHoldings]);
 
   useEffect(() => {
     fetchData();
-    // Silent background auto-sync from Zerodha when session is active
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = {};
-        if (session?.access_token) {
-          headers["Authorization"] = `Bearer ${session.access_token}`;
-        }
-        const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
-        const json = await res.json();
-        if (json.success) {
-          fetchData();
-        }
-      } catch {}
-    })();
+    // Silent background auto-sync from Zerodha only once when session is active
+    if (!autoSyncedRef.current) {
+      autoSyncedRef.current = true;
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const headers: Record<string, string> = {};
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
+          const res = await fetch("/api/v1/integrations/zerodha/sync", { method: "POST", headers });
+          const json = await res.json();
+          if (json.success) {
+            fetchData();
+          }
+        } catch {}
+      })();
+    }
   }, [fetchData, supabase]);
 
   // Sync Coin DEMAT Mutual Funds directly from Zerodha Kite API
@@ -292,7 +303,7 @@ export default function MutualFundsSection() {
       await fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sync Zerodha mutual funds";
-      showToast("Sync Error", msg, "error");
+      showToast("Zerodha Coin Sync Failed", msg, "error");
     } finally {
       setSyncingZerodha(false);
     }

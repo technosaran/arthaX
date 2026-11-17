@@ -53,7 +53,13 @@ const AccountsSection = dynamic(() => import("@/components/AccountsSection"), {
 const StocksSection = dynamic(() => import("@/components/StocksSection"), {
   loading: TabLoadingFallback,
 });
+const BondsSection = dynamic(() => import("@/components/BondsSection"), {
+  loading: TabLoadingFallback,
+});
 const MutualFundsSection = dynamic(() => import("@/components/MutualFundsSection"), {
+  loading: TabLoadingFallback,
+});
+const GoldSilverSection = dynamic(() => import("@/components/GoldSilverSection"), {
   loading: TabLoadingFallback,
 });
 const FnoSection = dynamic(() => import("@/components/FnoSection"), {
@@ -84,7 +90,14 @@ const SettingsSection = dynamic(() => import("@/components/SettingsSection"), {
 export default function HomeClient() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (urlTab) return urlTab;
+    }
+    return "dashboard";
+  });
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       return window.innerWidth < 768;
@@ -93,18 +106,45 @@ export default function HomeClient() {
   });
 
   // Lazy-mount and keep visited tabs alive for 0ms instant switching without re-renders
-  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
-    dashboard: true,
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (urlTab) {
+        return { dashboard: true, [urlTab]: true };
+      }
+    }
+    return { dashboard: true };
   });
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+    setVisitedTabs((prev) => {
+      const next = { ...prev, [tab]: true };
+      if (tab === "profile") {
+        next.settings = true;
+      }
+      return next;
+    });
     // Auto-collapse sidebar on mobile screens when switching tabs
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setCollapsed(true);
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (urlTab) {
+        setActiveTab(urlTab);
+        setVisitedTabs((prev) => (prev[urlTab] ? prev : { ...prev, [urlTab]: true }));
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -170,9 +210,19 @@ export default function HomeClient() {
               <StocksSection />
             </div>
           )}
+          {visitedTabs.bonds && (
+            <div className={`h-full w-full ${activeTab === "bonds" ? "block" : "hidden"}`}>
+              <BondsSection />
+            </div>
+          )}
           {visitedTabs["mutual-funds"] && (
             <div className={`h-full w-full ${activeTab === "mutual-funds" ? "block" : "hidden"}`}>
               <MutualFundsSection />
+            </div>
+          )}
+          {visitedTabs["gold-silver"] && (
+            <div className={`h-full w-full ${activeTab === "gold-silver" ? "block" : "hidden"}`}>
+              <GoldSilverSection />
             </div>
           )}
           {visitedTabs.fno && (
@@ -210,9 +260,9 @@ export default function HomeClient() {
               <LedgerSection />
             </div>
           )}
-          {visitedTabs.settings && (
-            <div className={`h-full w-full ${activeTab === "settings" ? "block" : "hidden"}`}>
-              <SettingsSection />
+          {(visitedTabs.settings || visitedTabs.profile) && (
+            <div className={`h-full w-full ${activeTab === "settings" || activeTab === "profile" ? "block" : "hidden"}`}>
+              <SettingsSection initialTab={activeTab === "profile" ? "profile" : undefined} />
             </div>
           )}
         </div>

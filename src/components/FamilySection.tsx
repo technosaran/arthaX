@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Users,
   UserPlus,
@@ -28,7 +28,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { getFromLocalCache, saveToLocalCache, invalidateCacheKeys } from "@/utils/cacheClient";
+import { getFromLocalCache, saveToLocalCache, invalidateCacheKeys, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
 import BankLogo from "@/components/BankLogo";
@@ -157,6 +157,7 @@ export default function FamilySection() {
   const [historyMemberFilter, setHistoryMemberFilter] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(() => members.length === 0);
   const [submitting, setSubmitting] = useState(false);
+  const inFlightRef = useRef<boolean>(false);
 
   // Add / Edit Member Modal
   const [memberModalOpen, setMemberModalOpen] = useState(false);
@@ -187,7 +188,8 @@ export default function FamilySection() {
   // Fetch Family Members & Accounts
   // ==========================================
   const fetchAllData = useCallback(async () => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const supabase = createClient();
 
@@ -243,16 +245,14 @@ export default function FamilySection() {
       console.error("[FamilySection] Failed to fetch data:", err);
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, membersKey]);
 
   useEffect(() => {
     fetchAllData();
-  }, [fetchAllData]);
-
-  // Realtime subscription
-  useEffect(() => {
     if (!user) return;
+
     const supabase = createClient();
     const channel = supabase
       .channel("family_realtime_sync")
@@ -264,6 +264,21 @@ export default function FamilySection() {
       supabase.removeChannel(channel);
     };
   }, [user, fetchAllData]);
+
+  // Synchronize family data whenever financial data is updated in any tab
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchAllData();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchAllData]);
 
   // ==========================================
   // Month Stepper Constraints & Navigation
@@ -529,7 +544,7 @@ export default function FamilySection() {
     const notes = formData.get("notes")?.toString().trim() || null;
 
     if (!name) {
-      showToast("Please enter the family member's name", "error");
+      showToast("Name Required", "Please enter the family member's full name.", "warning");
       setSubmitting(false);
       return;
     }
@@ -553,7 +568,7 @@ export default function FamilySection() {
           .eq("user_id", user.id);
 
         if (error) throw error;
-        showToast("Family member updated successfully", "success");
+        showToast("Member Updated", `${name} (${relationship}) has been updated successfully.`, "success");
       } else {
         const { error } = await supabase.from("family_members").insert({
           user_id: user.id,
@@ -569,7 +584,7 @@ export default function FamilySection() {
         });
 
         if (error) throw error;
-        showToast("New family member added", "success");
+        showToast("Family Member Added", `${name} (${relationship}) has been enrolled in family tracking.`, "success");
       }
 
       setMemberModalOpen(false);
@@ -577,7 +592,7 @@ export default function FamilySection() {
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to save family member", "error");
+      showToast("Save Failed", "Could not save family member details. Please try again.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -591,11 +606,11 @@ export default function FamilySection() {
       const supabase = createClient();
       const { error } = await supabase.from("family_members").delete().eq("id", id).eq("user_id", user.id);
       if (error) throw error;
-      showToast(`${name} removed`, "success");
+      showToast("Member Removed", `${name} has been removed from family tracking.`, "info");
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to delete member", "error");
+      showToast("Removal Failed", `Could not remove ${name}. Please try again.`, "error");
     }
   };
 
@@ -607,7 +622,7 @@ export default function FamilySection() {
 
     const val = parseFloat(transferAmountInput) || 0;
     if (val <= 0) {
-      showToast("Please enter a valid transfer amount", "error");
+      showToast("Invalid Transfer Amount", "Please enter a transfer amount greater than ₹0.", "warning");
       setSubmitting(false);
       return;
     }
@@ -639,7 +654,7 @@ export default function FamilySection() {
 
       if (expError) throw expError;
 
-      showToast(`Recorded ${formatINR(val)} sent to ${transferMember.name}`, "success");
+      showToast("Transfer Logged", `Recorded ${formatINR(val)} sent to ${transferMember.name} and adjusted balances.`, "success");
 
       setTransferModalOpen(false);
       setTransferMember(null);
@@ -647,16 +662,12 @@ export default function FamilySection() {
       setTransferNotes("");
       setTransferAccountId("");
 
-      await invalidateCacheKeys([
-        membersKey,
-        getUserCacheKey(user.id, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(user.id, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(user.id, CACHE_KEYS.LEDGER),
-      ]);
+      await invalidateAllFinancialCache(user.id);
+      await invalidateCacheKeys([membersKey]);
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to record money transfer", "error");
+      showToast("Transfer Failed", "Could not record money transfer to family member.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -676,14 +687,14 @@ export default function FamilySection() {
         .eq("user_id", user.id);
 
       if (error) throw error;
-      showToast(`Spending cycle reset to ₹0 for ${resetMember.name}`, "success");
+      showToast("Cycle Reset", `Monthly spending cycle reset to ₹0 for ${resetMember.name}.`, "success");
 
       setResetModalOpen(false);
       setResetMember(null);
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to reset spending cycle", "error");
+      showToast("Reset Failed", "Could not reset family spending cycle.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -716,17 +727,13 @@ export default function FamilySection() {
         }
       }
 
-      showToast("Transfer Reversed", `${formatINR(itemAmount || 0)} refunded to your account.`, "success");
-      await invalidateCacheKeys([
-        membersKey,
-        getUserCacheKey(user.id, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(user.id, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(user.id, CACHE_KEYS.LEDGER),
-      ]);
+      showToast("Transfer Reversed", `${formatINR(itemAmount || 0)} refunded to your account balance.`, "success");
+      await invalidateAllFinancialCache(user.id);
+      await invalidateCacheKeys([membersKey]);
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to delete transfer record", "error");
+      showToast("Reversal Failed", "Could not reverse transfer record.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -1786,24 +1793,6 @@ export default function FamilySection() {
                 </label>
               ))}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input
-              label="Email (Optional)"
-              type="email"
-              name="email"
-              placeholder="name@example.com"
-              defaultValue={editingMember?.email || ""}
-              leftIcon={<Mail size={12} />}
-            />
-
-            <Input
-              label="Notes / Bank Details (Optional)"
-              name="notes"
-              placeholder="e.g. UPI ID or account info"
-              defaultValue={editingMember?.notes || ""}
-            />
           </div>
 
           <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">

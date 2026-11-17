@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Banknote, Pencil, RefreshCw, Trash2, TrendingUp } from "lucide-react";
+import { Banknote, RefreshCw, Trash2, TrendingUp, Plus, Minus } from "lucide-react";
 import BankLogo from "@/components/BankLogo";
 
 export interface AccountData {
@@ -424,6 +424,7 @@ export interface AppleWalletCardProps {
   isDemat?: boolean;
   isZerodha?: boolean;
   onEditCash?: (acc: AccountData) => void;
+  onAdjust?: (acc: AccountData, mode: "deposit" | "withdraw" | "adjust") => void;
   onSyncZerodha?: (acc: AccountData) => void;
   isSyncing?: boolean;
   onDelete?: (id: string) => void;
@@ -443,6 +444,7 @@ export default function AppleWalletCard({
   isDemat = false,
   isZerodha = false,
   onEditCash,
+  onAdjust,
   onSyncZerodha,
   isSyncing = false,
   onDelete,
@@ -614,29 +616,44 @@ export default function AppleWalletCard({
           </div>
         </div>
 
-        {/* Top Right Controls: Contactless Wave + Frosted Actions */}
-        <div className="flex items-center gap-2.5">
-          {isSelected && (
-            <span className="px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-mono font-bold tracking-wider bg-emerald-400 text-black shadow-md flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
-              FILTERED
-            </span>
+        {/* Top Right Controls: Quick Adjust + / - Buttons, Contactless Wave, Zerodha Sync, Delete */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Adjust Amount Buttons (+ / -): Excluded on Zerodha / Demat cards */}
+          {!computedIsZerodha && !computedIsDemat && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onAdjust) onAdjust(account, "withdraw");
+                  else onEditCash?.(account);
+                }}
+                title={`Decrease / Deduct / Withdraw (-)`}
+                aria-label={`Decrease amount on ${displayName}`}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-rose-500/25 active:scale-90 text-white/90 hover:text-rose-300 backdrop-blur-md border border-white/15 hover:border-rose-500/30 flex items-center justify-center transition-all shadow-sm cursor-pointer"
+              >
+                <Minus size={13} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onAdjust) onAdjust(account, "deposit");
+                  else onEditCash?.(account);
+                }}
+                title={`Increase / Deposit (+)`}
+                aria-label={`Increase amount on ${displayName}`}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-emerald-500/25 active:scale-90 text-white/90 hover:text-emerald-300 backdrop-blur-md border border-white/15 hover:border-emerald-500/30 flex items-center justify-center transition-all shadow-sm cursor-pointer"
+              >
+                <Plus size={13} strokeWidth={2.5} />
+              </button>
+            </div>
           )}
+
           {!isCash && !computedIsDemat && <ContactlessWave className="text-white/60 drop-shadow-sm" />}
 
-          {isCash ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditCash?.(account);
-              }}
-              title="Update Cash in Hand"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 active:scale-95 text-white backdrop-blur-md border border-white/15 transition-all shadow-sm cursor-pointer"
-            >
-              <Pencil size={11} />
-              <span>Edit</span>
-            </button>
-          ) : computedIsZerodha ? (
+          {/* Zerodha Sync (Brokerage Demat only) */}
+          {computedIsZerodha && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -644,16 +661,18 @@ export default function AppleWalletCard({
               }}
               title="Sync Zerodha Margins & Holdings"
               disabled={isSyncing}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 hover:bg-cyan-500/35 active:scale-95 text-cyan-300 backdrop-blur-md border border-cyan-500/30 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 hover:bg-cyan-500/35 active:scale-95 text-cyan-300 backdrop-blur-md border border-cyan-500/30 transition-all shadow-sm cursor-pointer disabled:opacity-50"
             >
               <RefreshCw size={11} className={isSyncing ? "animate-spin" : ""} />
               <span>{isSyncing ? "Syncing..." : "Sync"}</span>
             </button>
-          ) : (
+          )}
+
+          {!isCash && !computedIsZerodha && onDelete && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete?.(account.id);
+                onDelete(account.id);
               }}
               title={`Remove ${account.name}`}
               aria-label={`Remove ${account.name}`}

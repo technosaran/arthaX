@@ -34,63 +34,111 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = window.localStorage.getItem("arthax_cached_profile");
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return null;
-  });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const inFlightFetchRef = useRef<string | null>(null);
+  const profileFetchedForRef = useRef<string | null>(null);
 
-  const fetchProfile = useCallback(async (userId: string, defaultName?: string) => {
-    if (inFlightFetchRef.current === userId) return;
-    inFlightFetchRef.current = userId;
-
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("user_settings")
-        .select("name, theme, telegram_chat_id, telegram_username, telegram_link_token")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (data) {
-        const newProf: UserProfile = {
-          name: data.name || defaultName || "User",
-          theme: data.theme === "light" ? "light" : "dark",
-          telegram_chat_id: data.telegram_chat_id || null,
-          telegram_username: data.telegram_username || null,
-          telegram_link_token: data.telegram_link_token || null,
-        };
-        setProfile(newProf);
-        try {
-          window.localStorage.setItem("arthax_cached_profile", JSON.stringify(newProf));
-        } catch {}
-      } else if (!error) {
-        // Fallback upsert if profile record was not created
-        const nameToSet = defaultName || "User";
-        await supabase.from("user_settings").upsert({
-          id: userId,
-          name: nameToSet,
-          theme: "dark",
-        });
-        const newProf = { name: nameToSet, theme: "dark" };
-        setProfile(newProf);
-        try {
-          window.localStorage.setItem("arthax_cached_profile", JSON.stringify(newProf));
-        } catch {}
+  const updateUserSafely = useCallback((currentUser: User | null) => {
+    setUser((prev) => {
+      if (!prev && !currentUser) return null;
+      if (
+        prev &&
+        currentUser &&
+        prev.id === currentUser.id &&
+        prev.email === currentUser.email &&
+        prev.user_metadata?.avatar_url === currentUser.user_metadata?.avatar_url &&
+        prev.user_metadata?.full_name === currentUser.user_metadata?.full_name
+      ) {
+        return prev;
       }
-    } catch (err) {
-      console.warn("Failed to fetch user profile:", err);
-    } finally {
-      inFlightFetchRef.current = null;
-    }
+      return currentUser;
+    });
   }, []);
+
+  const updateProfileSafely = useCallback(
+    (updater: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {
+      setProfile((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (!prev && !next) return null;
+        if (
+          prev &&
+          next &&
+          prev.name === next.name &&
+          prev.theme === next.theme &&
+          prev.telegram_chat_id === next.telegram_chat_id &&
+          prev.telegram_username === next.telegram_username &&
+          prev.telegram_link_token === next.telegram_link_token
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const fetchProfile = useCallback(
+    async (userId: string, defaultName?: string, force = false) => {
+      if (!userId) return;
+      if (!force && (inFlightFetchRef.current === userId || profileFetchedForRef.current === userId)) {
+        return;
+      }
+      inFlightFetchRef.current = userId;
+
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("user_settings")
+          .select("name, theme, telegram_chat_id, telegram_username, telegram_link_token")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (data) {
+          const newProf: UserProfile = {
+            name: data.name || defaultName || "User",
+            theme: data.theme === "light" ? "light" : "dark",
+            telegram_chat_id: data.telegram_chat_id || null,
+            telegram_username: data.telegram_username || null,
+            telegram_link_token: data.telegram_link_token || null,
+          };
+          updateProfileSafely(newProf);
+          profileFetchedForRef.current = userId;
+          try {
+            window.localStorage.setItem(`arthax_cached_profile_${userId}`, JSON.stringify(newProf));
+          } catch {}
+        } else if (!error) {
+          // Fallback upsert if profile record was not created
+          const nameToSet = defaultName || "User";
+          await supabase.from("user_settings").upsert({
+            id: userId,
+            name: nameToSet,
+            theme: "dark",
+          });
+          const newProf = { name: nameToSet, theme: "dark" };
+          updateProfileSafely(newProf);
+          profileFetchedForRef.current = userId;
+          try {
+            window.localStorage.setItem(`arthax_cached_profile_${userId}`, JSON.stringify(newProf));
+          } catch {}
+        } else {
+          // Fallback in case of temporary query error so profile is never blank
+          if (defaultName) {
+            updateProfileSafely((prev) => prev || { name: defaultName, theme: "dark" });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch user profile:", err);
+        if (defaultName) {
+          updateProfileSafely((prev) => prev || { name: defaultName, theme: "dark" });
+        }
+      } finally {
+        inFlightFetchRef.current = null;
+      }
+    },
+    [updateProfileSafely]
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -98,13 +146,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 1. Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
+      updateUserSafely(currentUser);
       if (currentUser) {
+        try {
+          const cached = window.localStorage.getItem(`arthax_cached_profile_${currentUser.id}`);
+          if (cached) {
+            updateProfileSafely(JSON.parse(cached));
+          }
+        } catch {}
+
         const fallbackName =
           currentUser.user_metadata?.full_name ||
           currentUser.user_metadata?.name ||
           currentUser.email?.split("@")[0] ||
           "User";
+        updateProfileSafely((prev) => prev || { name: fallbackName, theme: "dark" });
         fetchProfile(currentUser.id, fallbackName);
       }
       setLoading(false);
@@ -115,22 +171,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
+      updateUserSafely(currentUser);
 
       if (currentUser) {
+        try {
+          const cached = window.localStorage.getItem(`arthax_cached_profile_${currentUser.id}`);
+          if (cached) {
+            updateProfileSafely(JSON.parse(cached));
+          }
+        } catch {}
+
         const fallbackName =
           currentUser.user_metadata?.full_name ||
           currentUser.user_metadata?.name ||
           currentUser.email?.split("@")[0] ||
           "User";
+        updateProfileSafely((prev) => prev || { name: fallbackName, theme: "dark" });
         fetchProfile(currentUser.id, fallbackName);
       } else {
-        setProfile(null);
+        profileFetchedForRef.current = null;
+        updateProfileSafely(null);
         clearLocalFinancialCache();
       }
 
       setLoading(false);
       if (event === "SIGNED_OUT") {
+        profileFetchedForRef.current = null;
         clearLocalFinancialCache();
         router.push("/login");
       }
@@ -139,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchProfile, router]);
+  }, [fetchProfile, router, updateUserSafely, updateProfileSafely]);
 
   // Real-time synchronization for user profile & settings across devices
   useEffect(() => {
@@ -158,12 +224,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (payload: any) => {
           if (payload.new) {
             setProfile((prev) => {
-              const updated = {
+              const updated: UserProfile = {
                 name: payload.new.name || prev?.name || "User",
                 theme: payload.new.theme === "light" ? "light" : "dark",
+                telegram_chat_id: payload.new.telegram_chat_id !== undefined ? payload.new.telegram_chat_id : (prev?.telegram_chat_id ?? null),
+                telegram_username: payload.new.telegram_username !== undefined ? payload.new.telegram_username : (prev?.telegram_username ?? null),
+                telegram_link_token: payload.new.telegram_link_token !== undefined ? payload.new.telegram_link_token : (prev?.telegram_link_token ?? null),
               };
               try {
-                window.localStorage.setItem("arthax_cached_profile", JSON.stringify(updated));
+                if (user?.id) {
+                  window.localStorage.setItem(`arthax_cached_profile_${user.id}`, JSON.stringify(updated));
+                }
               } catch {}
               return updated;
             });
@@ -188,7 +259,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      inFlightFetchRef.current = null;
+      profileFetchedForRef.current = null;
+      await fetchProfile(user.id, undefined, true);
     }
   };
 
@@ -199,7 +272,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         theme: updates.theme !== undefined ? updates.theme : (prev?.theme || "dark"),
       };
       try {
-        window.localStorage.setItem("arthax_cached_profile", JSON.stringify(merged));
+        if (user?.id) {
+          window.localStorage.setItem(`arthax_cached_profile_${user.id}`, JSON.stringify(merged));
+        }
       } catch {}
       return merged;
     });

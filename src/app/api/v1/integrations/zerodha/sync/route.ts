@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess(
       {
-        message: "Zerodha portfolio synced successfully across all 3 sections!",
+        message: "Zerodha portfolio synced successfully across all sections!",
         stocksSynced: result.stocksSynced,
+        bondsSynced: result.bondsSynced ?? 0,
         fnoSynced: result.fnoSynced,
         mfSynced: result.mfSynced,
         walletBalance: result.walletBalance ?? 0,

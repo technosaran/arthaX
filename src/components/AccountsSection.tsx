@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Plus,
   Loader2,
@@ -27,8 +27,9 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import BankLogo from "@/components/BankLogo";
 import AppleWalletCard from "@/components/AppleWalletCard";
+import AccountAdjustModal from "@/components/AccountAdjustModal";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Button } from "@/components/ui/Button";
@@ -94,6 +95,7 @@ export default function AccountsSection() {
   // History and Activity State (Account Section Data Only)
   const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
   const [historyLoading, setHistoryLoading] = useState<boolean>(initialHistory.length === 0);
+  const inFlightRef = useRef<boolean>(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "inflow" | "outflow">("all");
   const [historySearch, setHistorySearch] = useState("");
@@ -105,6 +107,11 @@ export default function AccountsSection() {
   const [cashBalanceInput, setCashBalanceInput] = useState("");
   const [savingCash, setSavingCash] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
+
+  // Account Adjustment & Deposit Modal state
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [adjustAccount, setAdjustAccount] = useState<Account | null>(null);
+  const [adjustInitialMode, setAdjustInitialMode] = useState<"deposit" | "withdraw" | "adjust">("deposit");
 
   // Form states for new accounts
   const [name, setName] = useState("");
@@ -155,7 +162,8 @@ export default function AccountsSection() {
   };
 
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user) return;
+    if (!user || inFlightRef.current) return;
+    inFlightRef.current = true;
     setErrorMsg(null);
 
     // 1. Instant Synchronous Check from Tier 1 & 2 Local Cache
@@ -291,6 +299,7 @@ export default function AccountsSection() {
     } finally {
       setLoading(false);
       setHistoryLoading(false);
+      inFlightRef.current = false;
     }
   }, [user, redisKey, redisTransfersKey]);
 
@@ -320,6 +329,21 @@ export default function AccountsSection() {
     };
   }, [user, fetchAccounts]);
 
+  // Synchronize accounts whenever another section modifies financial data
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      fetchAccounts(true);
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("arthax:financial_data_updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("arthax:financial_data_updated", handleDataUpdated);
+      }
+    };
+  }, [fetchAccounts]);
+
   const handleDeleteTransfer = async (transferId: string) => {
     if (!user || deletingTransferId) return;
 
@@ -339,11 +363,9 @@ export default function AccountsSection() {
           `Restored balances for ${res?.from_account || "source"} and ${res?.to_account || "destination"}.`,
           "success"
         );
-        await invalidateCacheKeys([
-          redisKey,
-          redisLedgerKey,
-          redisTransfersKey,
-        ]);
+        if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
         await fetchAccounts(true);
       }
     } catch (err: unknown) {
@@ -426,7 +448,18 @@ export default function AccountsSection() {
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !name.trim() || !balance) return;
+    if (!user) return;
+
+    if (!name.trim()) {
+      showToast("Account Name Required", "Please enter a descriptive name for your bank or account.", "warning");
+      return;
+    }
+
+    const parsedInitialBalance = parseFloat(balance);
+    if (!balance || isNaN(parsedInitialBalance)) {
+      showToast("Initial Balance Required", "Please enter a valid starting balance.", "warning");
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg(null);
@@ -438,14 +471,14 @@ export default function AccountsSection() {
         name: name.trim(),
         type,
         classification,
-        balance: parseFloat(balance) || 0,
+        balance: parsedInitialBalance || 0,
         last_four: lastFour.trim() || null,
       },
     ]);
 
     if (error) {
       setErrorMsg("Failed to add account. Please try again.");
-      showToast("Failed to Add Card", error.message || "Please check your inputs.", "error");
+      showToast("Account Link Failed", error.message || "Please check your inputs.", "error");
     } else {
       const addedName = name.trim();
       setName("");
@@ -453,12 +486,11 @@ export default function AccountsSection() {
       setLastFour("");
       setClassification("asset");
       setIsModalOpen(false);
-      showToast("Card Linked Successfully", `${addedName} is now active in your portfolio.`, "success");
+      showToast("Account Linked", `"${addedName}" has been successfully added to your portfolio.`, "success");
 
-      await invalidateCacheKeys([
-        redisKey,
-        redisLedgerKey,
-      ]);
+      if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
       await fetchAccounts(true);
     }
     setSubmitting(false);
@@ -469,11 +501,11 @@ export default function AccountsSection() {
     if (!user) return;
     const parsedAmount = parseFloat(transferAmount);
     if (!transferFromId || !transferToId || isNaN(parsedAmount) || parsedAmount <= 0) {
-      showToast("Invalid Transfer", "Please select source and destination accounts and a positive amount.", "error");
+      showToast("Invalid Transfer", "Please select source and destination accounts and enter an amount greater than ₹0.", "warning");
       return;
     }
     if (transferFromId === transferToId) {
-      showToast("Invalid Transfer", "Source and destination accounts must be distinct.", "error");
+      showToast("Invalid Transfer", "Source and destination accounts must be distinct.", "warning");
       return;
     }
 
@@ -496,11 +528,9 @@ export default function AccountsSection() {
         setIsTransferModalOpen(false);
         setTransferAmount("");
         setTransferNotes("");
-        await invalidateCacheKeys([
-          redisKey,
-          redisLedgerKey,
-          redisTransfersKey,
-        ]);
+        if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
         await fetchAccounts(true);
       }
     } catch (err: unknown) {
@@ -520,7 +550,7 @@ export default function AccountsSection() {
         isCashAccount(target)
           ? "Cash in Hand is a permanent built-in card and cannot be deleted."
           : "Zerodha Trading & Demat is an integrated account and cannot be deleted here.",
-        "info"
+        "warning"
       );
       return;
     }
@@ -537,17 +567,26 @@ export default function AccountsSection() {
       showToast("Delete Failed", "Could not remove the card.", "error");
     } else {
       showToast("Card Removed", `${target?.name || "Account"} has been unlinked.`, "info");
-      await invalidateCacheKeys([
-        redisKey,
-        redisLedgerKey,
-      ]);
+      if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
       await fetchAccounts(true);
     }
   };
 
+  const handleOpenAdjust = (acc: Account, mode: "deposit" | "withdraw" | "adjust" = "deposit") => {
+    setAdjustAccount(acc);
+    setAdjustInitialMode(mode);
+    setAdjustModalOpen(true);
+  };
+
+  const handleAdjustSuccess = async () => {
+    await invalidateAllFinancialCache(user?.id);
+    await fetchAccounts(true);
+  };
+
   const handleOpenEditCash = (cashAcc: Account) => {
-    setCashBalanceInput(cashAcc.balance.toString());
-    setIsEditingCash(true);
+    handleOpenAdjust(cashAcc, "adjust");
   };
 
   const handleSaveCashBalance = async (e: React.FormEvent) => {
@@ -555,7 +594,7 @@ export default function AccountsSection() {
     if (!user) return;
     const parsed = parseFloat(cashBalanceInput);
     if (isNaN(parsed) || parsed < 0) {
-      showToast("Invalid Amount", "Please enter a valid positive number for cash.", "error");
+      showToast("Invalid Amount", "Please enter a valid positive number for cash in hand.", "warning");
       return;
     }
 
@@ -574,14 +613,13 @@ export default function AccountsSection() {
       .eq("user_id", user.id);
 
     if (error) {
-      showToast("Update Failed", "Could not update cash balance.", "error");
+      showToast("Cash Update Failed", error.message || "Could not update cash balance.", "error");
     } else {
-      showToast("Cash Updated", `Cash in Hand updated to ${formatINR(parsed)}.`, "success");
+      showToast("Cash Balance Updated", `Cash in Hand updated to ${formatINR(parsed)}.`, "success");
       setIsEditingCash(false);
-      await invalidateCacheKeys([
-        redisKey,
-        redisLedgerKey,
-      ]);
+      if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
       await fetchAccounts(true);
     }
     setSavingCash(false);
@@ -617,7 +655,9 @@ export default function AccountsSection() {
         `Trading cash margin: ${formatINR(d.walletBalance ?? 0)}. Synced ${d.stocksSynced ?? 0} Stocks, ${d.fnoSynced ?? 0} F&O Positions.`,
         "success"
       );
-      await invalidateCacheKeys([redisKey, redisLedgerKey]);
+      if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
       await fetchAccounts(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sync Zerodha wallet";
@@ -836,6 +876,7 @@ export default function AccountsSection() {
                 totalValue={totalBalance}
                 segments={donutSegments}
                 formatter={formatINR}
+                align="end"
                 emptyMessage="No allocation data available."
                 emptySubMessage="Update Cash in Hand or link an account to view your breakdown."
                 icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
@@ -863,21 +904,6 @@ export default function AccountsSection() {
             },
           ]}
         />
-
-        {viewMode === "holdings" && (
-          <div className="flex items-center gap-2">
-            {selectedAccountId && (
-              <Button
-                size="xs"
-                variant="subtle"
-                icon={<X size={12} />}
-                onClick={() => setSelectedAccountId(null)}
-              >
-                Clear Filter ({accounts.find((a) => a.id === selectedAccountId)?.name})
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* HOLDINGS & ACCOUNTS GRID VIEW */}
@@ -916,14 +942,11 @@ export default function AccountsSection() {
                   isDemat={isDematAccount(acc)}
                   isZerodha={isZerodhaAccount(acc)}
                   onEditCash={handleOpenEditCash}
+                  onAdjust={handleOpenAdjust}
                   onSyncZerodha={handleSyncZerodha}
                   isSyncing={syncingZerodha}
                   onDelete={handleDeleteAccount}
                   formatCurrency={formatINR}
-                  isSelected={selectedAccountId === acc.id}
-                  onSelect={(card) => {
-                    setSelectedAccountId((prev) => (prev === card.id ? null : card.id));
-                  }}
                 />
               ))}
             </div>
@@ -1274,7 +1297,7 @@ export default function AccountsSection() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
             <Input
               label="Initial Balance (₹ INR) *"
               type="number"
@@ -1287,42 +1310,34 @@ export default function AccountsSection() {
               leftIcon={<span className="font-mono text-xs font-bold">₹</span>}
             />
 
-            <Input
-              label="Last 4 Digits (Optional)"
-              maxLength={4}
-              placeholder="e.g. 4021"
-              value={lastFour}
-              onChange={(e) => setLastFour(e.target.value.replace(/\D/g, ""))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] sm:text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1">
-              Account Classification
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setClassification("asset")}
-                className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
-                  classification === "asset"
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold shadow-xs"
-                    : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
-                }`}
-              >
-                Asset (Bank / Demat)
-              </button>
-              <button
-                type="button"
-                onClick={() => setClassification("liability")}
-                className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
-                  classification === "liability"
-                    ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold shadow-xs"
-                    : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
-                }`}
-              >
-                Liability (Credit / Loan)
-              </button>
+            <div>
+              <label className="block text-[11px] sm:text-xs font-semibold tracking-tight text-[var(--app-fg)] mb-1">
+                Classification
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setClassification("asset")}
+                  className={`py-1.5 px-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                    classification === "asset"
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold shadow-xs"
+                      : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
+                  }`}
+                >
+                  Asset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClassification("liability")}
+                  className={`py-1.5 px-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                    classification === "liability"
+                      ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold shadow-xs"
+                      : "border-[var(--app-border)] text-[var(--app-muted)] hover:bg-[var(--app-card-hover)]"
+                  }`}
+                >
+                  Liability
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1346,6 +1361,17 @@ export default function AccountsSection() {
           </div>
         </form>
       </Modal>
+
+      {/* POPUP MODAL: Account Adjust & Quick Deposit / Withdraw (+ / - / Calibrate) */}
+      <AccountAdjustModal
+        isOpen={adjustModalOpen}
+        onClose={() => setAdjustModalOpen(false)}
+        account={adjustAccount}
+        initialMode={adjustInitialMode}
+        accounts={accounts}
+        onSuccess={handleAdjustSuccess}
+        formatINR={formatINR}
+      />
 
       {/* POPUP MODAL: Edit Cash in Hand Balance */}
       <Modal
@@ -1448,13 +1474,6 @@ export default function AccountsSection() {
               required
             />
           </div>
-
-          <Input
-            label="Transfer Notes (Optional)"
-            placeholder="e.g. ATM withdrawal / Bill settlement"
-            value={transferNotes}
-            onChange={(e) => setTransferNotes(e.target.value)}
-          />
 
           <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[var(--app-border-subtle)]">
             <Button

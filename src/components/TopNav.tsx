@@ -33,6 +33,7 @@ export default function TopNav({
   const { showToast } = useToast();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPrivacyMasked, setIsPrivacyMasked] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Synchronize privacy mode from localStorage on mount
@@ -113,6 +114,11 @@ export default function TopNav({
   const cycleTheme = () => {
     const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
+    showToast(
+      nextTheme === "dark" ? "Dark Theme Activated" : "Light Theme Activated",
+      nextTheme === "dark" ? "Switched to deep dark workspace theme." : "Switched to clean daylight theme.",
+      "info"
+    );
   };
 
   return (
@@ -184,12 +190,13 @@ export default function TopNav({
             aria-label="Open profile menu"
             aria-expanded={isProfileOpen}
           >
-            {googleAvatarUrl ? (
+            {googleAvatarUrl && !avatarError ? (
               <img
                 src={googleAvatarUrl}
                 alt={displayName || "Google profile"}
                 className="w-full h-full object-cover rounded-full"
                 referrerPolicy="no-referrer"
+                onError={() => setAvatarError(true)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center font-bold text-xs font-mono uppercase bg-emerald-500/15 text-emerald-400">
@@ -211,19 +218,26 @@ export default function TopNav({
                 boxShadow: "var(--app-shadow)",
               }}
             >
-              {/* Identity Header */}
-              <div
-                className="flex items-center gap-3 pb-3 border-b border-[var(--app-border-subtle)]"
+              {/* Identity Header (Clickable to jump to Profile) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setActiveTab("profile");
+                }}
+                className="w-full flex items-center gap-3 pb-3 border-b border-[var(--app-border-subtle)] text-left hover:opacity-90 transition-opacity cursor-pointer group"
+                title="View Account Profile"
               >
                 <div
-                  className="w-10 h-10 rounded-full border border-[var(--app-border)] overflow-hidden flex-shrink-0 flex items-center justify-center"
+                  className="w-10 h-10 rounded-full border border-[var(--app-border)] overflow-hidden flex-shrink-0 flex items-center justify-center group-hover:border-[var(--app-accent)] transition-colors"
                 >
-                  {googleAvatarUrl ? (
+                  {googleAvatarUrl && !avatarError ? (
                     <img
                       src={googleAvatarUrl}
                       alt={displayName}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
+                      onError={() => setAvatarError(true)}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center font-bold text-sm bg-emerald-500/15 text-emerald-400">
@@ -233,7 +247,7 @@ export default function TopNav({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs truncate text-[var(--app-fg)]">
+                  <div className="font-bold text-xs truncate text-[var(--app-fg)] group-hover:text-[var(--app-accent)] transition-colors">
                     {displayName || "arthaX User"}
                   </div>
                   <div className="text-[11px] text-[var(--app-muted)] truncate">
@@ -246,7 +260,7 @@ export default function TopNav({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
 
               {/* Theme Selector Strip */}
               <div className="space-y-1.5">
@@ -292,6 +306,18 @@ export default function TopNav({
                   type="button"
                   onClick={() => {
                     setIsProfileOpen(false);
+                    setActiveTab("profile");
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-card-hover)] transition-colors cursor-pointer text-left text-[var(--app-fg)]"
+                >
+                  <User size={14} className="opacity-70 text-emerald-400" />
+                  <span>Account Profile</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
                     setActiveTab("settings");
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl hover:bg-[var(--app-card-hover)] transition-colors cursor-pointer text-left text-[var(--app-fg)]"
@@ -302,9 +328,10 @@ export default function TopNav({
 
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setIsProfileOpen(false);
-                    signOut();
+                    showToast("Signing Out", "Ending session and securing financial data...", "info");
+                    await signOut();
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
                 >
