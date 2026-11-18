@@ -203,8 +203,15 @@ export const POPULAR_BONDS: PopularBondPreset[] = [
 ];
 
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    presets: POPULAR_BONDS,
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      presets: POPULAR_BONDS,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    }
+  );
 }

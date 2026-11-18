@@ -1416,7 +1416,7 @@ export default function BondsSection() {
             </div>
             <ul className="text-xs text-[var(--app-muted)] space-y-2">
               <li className="p-2.5 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)]">
-                <strong className="text-[var(--app-fg)]">Listed Corporate Bonds & NCDs:</strong> Coupon interest is taxed at your income tax slab rate under "Income from Other Sources". TDS of 10% applies under Section 193.
+                <strong className="text-[var(--app-fg)]">Listed Corporate Bonds & NCDs:</strong> Coupon interest is taxed at your income tax slab rate under &quot;Income from Other Sources&quot;. TDS of 10% applies under Section 193.
               </li>
               <li className="p-2.5 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)]">
                 <strong className="text-[var(--app-fg)]">Tax-Free PSU Bonds:</strong> Coupon interest from designated bonds (NHAI, REC, PFC, IRFC) is 100% tax-free under Section 10(15)(iv)(h) with zero TDS.

@@ -147,8 +147,11 @@ export default function StocksSection() {
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef<boolean>(false);
   const autoSyncedRef = useRef<boolean>(false);
-  const holdingsRef = useRef<StockHolding[]>([]);
-  holdingsRef.current = holdings;
+  const holdingsRef = useRef<StockHolding[]>(holdings);
+
+  useEffect(() => {
+    holdingsRef.current = holdings;
+  }, [holdings]);
   const [refreshingQuotes, setRefreshingQuotes] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");

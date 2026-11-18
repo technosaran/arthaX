@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { exchangeRequestToken } from "@/utils/zerodha";
-import { encryptSensitiveData } from "@/utils/crypto";
+import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
 import { logger } from "@/utils/logger";
 
 export async function GET(req: NextRequest) {
@@ -52,8 +52,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Decrypt api_secret if stored encrypted
+    const apiSecret = decryptSensitiveData(record.api_secret, "broker-credentials") || record.api_secret;
+
     // Exchange request_token for access_token
-    const exchange = await exchangeRequestToken(record.api_key, record.api_secret, requestToken);
+    const exchange = await exchangeRequestToken(record.api_key, apiSecret, requestToken);
 
     if (!exchange.success || !exchange.accessToken) {
       return NextResponse.redirect(

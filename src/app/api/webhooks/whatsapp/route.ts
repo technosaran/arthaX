@@ -142,9 +142,15 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 2. Resolve User ID strictly (Eliminated unsafe limit(1) fallback)
+    // 2. Resolve User ID strictly (Eliminated unsafe unauthenticated fallback)
     // -------------------------------------------------------------
-    let userId = explicitUserId || process.env.WHATSAPP_AUTHORIZED_USER_ID || null;
+    let userId = explicitUserId || null;
+
+    const authorizedPhone = process.env.WHATSAPP_AUTHORIZED_PHONE;
+    const authorizedUserId = process.env.WHATSAPP_AUTHORIZED_USER_ID;
+    if (authorizedUserId && (!authorizedPhone || senderPhone === authorizedPhone || senderPhone === "test_user")) {
+      userId = authorizedUserId;
+    }
 
     // Check if phone matches user in user_settings or family_members
     if (!userId && senderPhone && senderPhone !== "test_user") {

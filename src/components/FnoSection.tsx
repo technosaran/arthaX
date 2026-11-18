@@ -101,8 +101,11 @@ export default function FnoSection() {
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef<boolean>(false);
   const autoSyncedRef = useRef<boolean>(false);
-  const positionsRef = useRef<FnoPosition[]>([]);
-  positionsRef.current = positions;
+  const positionsRef = useRef<FnoPosition[]>(positions);
+
+  useEffect(() => {
+    positionsRef.current = positions;
+  }, [positions]);
 
   // Filter & Search
   const [positionFilter, setPositionFilter] = useState<"all" | "open" | "closed">("open");

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     let query = supabaseAdmin
       .from("bond_transactions")
       .select("*, bond_holdings(name, isin, issuer_name, coupon_rate, platform)")
-      .or(`user_id.eq.${userId},user_id.eq.default_user`)
+      .eq("user_id", userId)
       .order("transaction_date", { ascending: false });
 
     if (holdingId) {

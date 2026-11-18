@@ -127,6 +127,17 @@ export default function InteractiveDonutChart({
     return "text-xs sm:text-sm tracking-tight";
   }, [activeSegmentFormatted]);
 
+  const alignmentClass = useMemo(() => {
+    if (variant === "compact") return "items-center gap-5";
+    if (align === "end") {
+      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center xl:justify-end gap-6 lg:gap-8";
+    }
+    if (align === "center") {
+      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-6 lg:gap-8";
+    }
+    return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-6 lg:gap-8";
+  }, [variant, align]);
+
   if (validSegments.length === 0 || totalValue <= 0) {
     return (
       <div className="h-48 flex flex-col items-center justify-center text-center p-6 text-xs opacity-60 w-full select-none">
@@ -145,17 +156,6 @@ export default function InteractiveDonutChart({
       </div>
     );
   }
-
-  const alignmentClass = useMemo(() => {
-    if (variant === "compact") return "items-center gap-5";
-    if (align === "end") {
-      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center xl:justify-end gap-6 lg:gap-8";
-    }
-    if (align === "center") {
-      return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-6 lg:gap-8";
-    }
-    return "sm:flex-row flex-wrap sm:flex-nowrap items-center justify-center lg:justify-start gap-6 lg:gap-8";
-  }, [variant, align]);
 
   return (
     <div

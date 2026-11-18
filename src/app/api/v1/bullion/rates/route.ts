@@ -228,7 +228,12 @@ export async function GET(req: NextRequest) {
         rates,
         cached: false,
       },
-      { headers: { "X-Request-Id": requestId } }
+      {
+        headers: {
+          "X-Request-Id": requestId,
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30",
+        },
+      }
     );
   } catch (err) {
     console.error("[Bullion Rates API] Failed to fetch live rates:", err);

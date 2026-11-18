@@ -146,11 +146,11 @@ export function maskAccountNumber(accountNumber: string | null | undefined): str
 
 /**
  * Constant-time string comparison preventing timing attacks.
+ * Pre-hashes with SHA-256 to guarantee fixed 32-byte buffers and prevent length-leakage.
  */
 export function constantTimeCompare(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }

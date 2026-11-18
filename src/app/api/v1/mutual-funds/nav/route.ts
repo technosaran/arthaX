@@ -132,7 +132,15 @@ export async function GET(req: NextRequest) {
         { status: 404, headers: { "X-Request-Id": requestId } }
       );
     }
-    return NextResponse.json({ success: true, quote }, { headers: { "X-Request-Id": requestId } });
+    return NextResponse.json(
+      { success: true, quote },
+      {
+        headers: {
+          "X-Request-Id": requestId,
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      }
+    );
   }
 
   // Batch scheme quotes
@@ -152,7 +160,15 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    return NextResponse.json({ success: true, quotes }, { headers: { "X-Request-Id": requestId } });
+    return NextResponse.json(
+      { success: true, quotes },
+      {
+        headers: {
+          "X-Request-Id": requestId,
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      }
+    );
   }
 
   return NextResponse.json(

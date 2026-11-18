@@ -82,15 +82,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const showToast: ToastFn = useMemo(() => {
-    const fn = (title: string, messageOrType?: string | ToastType, typeArg?: ToastType) =>
-      baseShowToast(title, messageOrType, typeArg);
-
-    fn.success = (title: string, message?: string) => baseShowToast(title, message, "success");
-    fn.error = (title: string, message?: string) => baseShowToast(title, message, "error");
-    fn.warning = (title: string, message?: string) => baseShowToast(title, message, "warning");
-    fn.info = (title: string, message?: string) => baseShowToast(title, message, "info");
-
-    return fn;
+    return Object.assign(
+      (title: string, messageOrType?: string | ToastType, typeArg?: ToastType) =>
+        baseShowToast(title, messageOrType, typeArg),
+      {
+        success: (title: string, message?: string) => baseShowToast(title, message, "success"),
+        error: (title: string, message?: string) => baseShowToast(title, message, "error"),
+        warning: (title: string, message?: string) => baseShowToast(title, message, "warning"),
+        info: (title: string, message?: string) => baseShowToast(title, message, "info"),
+      }
+    );
   }, [baseShowToast]);
 
   return (

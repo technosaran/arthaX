@@ -184,8 +184,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Parse symbols e.g. "RELIANCE:NSE,TCS:NSE,INFY:BSE" or simple "RELIANCE,TCS"
-  const rawPairs = symbolsParam.split(",").map((s) => s.trim()).filter(Boolean);
+  // Parse symbols e.g. "RELIANCE:NSE,TCS:NSE,INFY:BSE" or simple "RELIANCE,TCS" (capped to 50 symbols max)
+  const rawPairs = symbolsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 50);
   const parsedItems: { symbol: string; exchange: "NSE" | "BSE"; key: string }[] = [];
 
   for (const item of rawPairs) {

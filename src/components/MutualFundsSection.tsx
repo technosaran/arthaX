@@ -152,8 +152,11 @@ export default function MutualFundsSection() {
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef<boolean>(false);
   const autoSyncedRef = useRef<boolean>(false);
-  const holdingsRef = useRef<MutualFundHolding[]>([]);
-  holdingsRef.current = holdings;
+  const holdingsRef = useRef<MutualFundHolding[]>(holdings);
+
+  useEffect(() => {
+    holdingsRef.current = holdings;
+  }, [holdings]);
   const [refreshingNavs, setRefreshingNavs] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");

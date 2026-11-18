@@ -1030,7 +1030,7 @@ export default function BankLogo({
             alt={`${name} logo`}
             onError={handleImageError}
             draggable={false}
-            loading="eager"
+            loading="lazy"
             decoding="async"
             className="w-full h-full object-contain"
             style={{

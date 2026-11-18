@@ -72,18 +72,18 @@ export async function GET(req: NextRequest) {
       supabaseAdmin
         .from("bond_holdings")
         .select("*")
-        .or(`user_id.eq.${userId},user_id.eq.default_user`)
+        .eq("user_id", userId)
         .order("maturity_date", { ascending: true }),
       supabaseAdmin
         .from("bond_transactions")
         .select("*")
-        .or(`user_id.eq.${userId},user_id.eq.default_user`)
+        .eq("user_id", userId)
         .order("transaction_date", { ascending: false })
         .limit(100),
       supabaseAdmin
         .from("accounts")
         .select("id, name, type, balance, last_four")
-        .or(`user_id.eq.${userId},user_id.eq.default_user`),
+        .eq("user_id", userId),
     ]);
 
     if (holdingsRes.error) {

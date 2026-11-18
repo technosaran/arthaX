@@ -84,7 +84,12 @@ async function handleWipe(req: NextRequest) {
       await supabaseAdmin.from("family_emergency_vault").delete().eq("user_id", userId);
       await supabaseAdmin.from("family_members").delete().eq("user_id", userId);
 
-      // 2f. Financial audit logs, F&O derivatives, stocks & mutual funds
+      // 2f. Financial audit logs, F&O derivatives, stocks, mutual funds, bonds, bullion & integrations
+      await supabaseAdmin.from("bond_transactions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("bond_holdings").delete().eq("user_id", userId);
+      await supabaseAdmin.from("bullion_transactions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("bullion_holdings").delete().eq("user_id", userId);
+      await supabaseAdmin.from("zerodha_integrations").delete().eq("user_id", userId);
       await supabaseAdmin.from("mutual_fund_transactions").delete().eq("user_id", userId);
       await supabaseAdmin.from("mutual_fund_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("fno_trades").delete().eq("user_id", userId);
