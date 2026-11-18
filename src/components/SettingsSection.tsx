@@ -1803,31 +1803,32 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
 
         {/* TAB 2: STATEMENTS & DATA REPORTS */}
         {activeTab === "statements" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <Card className="p-6 sm:p-7 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--app-border-subtle)]">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
-                    <FileText size={16} />
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <Card className="p-4 sm:p-5 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--app-border-subtle)]">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
+                    <FileText size={15} />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight">Statements & Data Reports</h2>
-                    <p className="text-xs opacity-60">Generate formal PDF statements or download CSV datasets</p>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold tracking-tight text-[var(--app-fg)] truncate">Statements & Data Reports</h2>
+                    <p className="text-xs text-[var(--app-fg-muted)] truncate">Download formal PDF statements or raw CSV / JSON datasets</p>
                   </div>
                 </div>
 
-                <Badge variant="outline" className="font-mono self-start sm:self-auto">
+                <Badge variant="neutral" size="sm" className="font-mono flex-shrink-0">
                   {loadingCounts ? "Loading..." : `${counts.total} items recorded`}
                 </Badge>
               </div>
 
-              {/* 1-Click Master Export Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 1-Click Master Bulk Export Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <Button
-                  variant="outline"
-                  size="md"
-                  className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
-                  icon={exportingTarget === "master_pdf" ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                  icon={exportingTarget === "master_pdf" ? <Loader2 size={13} className="animate-spin text-rose-400" /> : <FileText size={13} className="text-rose-400" />}
                   disabled={exportingTarget !== null}
                   onClick={handleExportMasterPDF}
                 >
@@ -1835,110 +1836,65 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                 </Button>
 
                 <Button
-                  variant="primary"
-                  size="md"
-                  icon={exportingTarget === "all_json" ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  disabled={exportingTarget !== null}
-                  onClick={handleExportAllJSON}
-                >
-                  Backup All JSON
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="md"
-                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                  icon={exportingTarget === "all_csv" ? <Loader2 size={14} className="animate-spin" /> : <FolderDown size={14} />}
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                  icon={exportingTarget === "all_csv" ? <Loader2 size={13} className="animate-spin text-emerald-400" /> : <FolderDown size={13} className="text-emerald-400" />}
                   disabled={exportingTarget !== null}
                   onClick={handleExportAllCSVs}
                 >
                   All CSV Spreadsheets
                 </Button>
-              </div>
 
-              {/* Metrics Summary Strip */}
-              <div
-                className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] text-xs"
-              >
-                <div className="flex items-center gap-2 p-1.5">
-                  <Landmark size={14} className="opacity-60 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider opacity-60">Accounts</div>
-                    <div className="font-bold font-mono text-xs">{loadingCounts ? "..." : counts.accounts}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 p-1.5">
-                  <TrendingUp size={14} className="text-emerald-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 opacity-80">Income</div>
-                    <div className="font-bold font-mono text-xs text-emerald-400">{loadingCounts ? "..." : counts.income}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 p-1.5">
-                  <TrendingDown size={14} className="text-rose-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-rose-400 opacity-80">Expenses</div>
-                    <div className="font-bold font-mono text-xs text-rose-400">{loadingCounts ? "..." : counts.expenses}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 p-1.5">
-                  <Target size={14} className="text-amber-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-amber-400 opacity-80">Budgets</div>
-                    <div className="font-bold font-mono text-xs text-amber-400">{loadingCounts ? "..." : counts.budgets}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 p-1.5 col-span-2 sm:col-span-1">
-                  <Receipt size={14} className="text-sky-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-sky-400 opacity-80">Ledger</div>
-                    <div className="font-bold font-mono text-xs text-sky-400">{loadingCounts ? "..." : counts.ledger}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dedicated Dataset Export Matrix Table */}
-              <div className="space-y-3 pt-2">
-                <div className="text-xs font-mono uppercase tracking-wider opacity-60">
-                  Individual Dataset Statements
-                </div>
-
-                <div
-                  className="divide-y rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] overflow-hidden shadow-xs"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                  icon={exportingTarget === "all_json" ? <Loader2 size={13} className="animate-spin text-sky-400" /> : <Download size={13} className="text-sky-400" />}
+                  disabled={exportingTarget !== null}
+                  onClick={handleExportAllJSON}
                 >
+                  Backup All JSON
+                </Button>
+              </div>
+
+              {/* Individual Datasets Table */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[var(--app-fg-muted)] px-0.5">
+                  <span>Individual Datasets</span>
+                  <span className="hidden sm:inline">Exports</span>
+                </div>
+
+                <div className="divide-y divide-[var(--app-border-subtle)] rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] overflow-hidden">
                   {DATASET_ROWS.map((ds) => {
                     const Icon = ds.icon;
                     return (
                       <div
                         key={ds.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 sm:py-3.5 gap-3 hover:bg-[var(--app-card-hover)] transition-colors"
+                        className="flex items-center justify-between p-2.5 sm:px-3.5 sm:py-2.5 gap-3 hover:bg-[var(--app-card-hover)] transition-colors"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 ${ds.iconColor}`}>
-                            <Icon size={14} />
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-7 h-7 rounded-lg border flex items-center justify-center flex-shrink-0 ${ds.iconColor}`}>
+                            <Icon size={13} />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs tracking-tight truncate">{ds.name}</span>
-                              <Badge variant="neutral">
+                              <span className="font-semibold text-xs tracking-tight truncate text-[var(--app-fg)]">{ds.name}</span>
+                              <Badge variant="neutral" size="xs">
                                 {ds.count} {ds.count === 1 ? "row" : "rows"}
                               </Badge>
                             </div>
-                            <p className="text-[11px] opacity-60 truncate mt-0.5">{ds.desc}</p>
+                            <p className="text-[11px] text-[var(--app-fg-muted)] truncate hidden sm:block">{ds.desc}</p>
                           </div>
                         </div>
 
                         {/* Dual Action Buttons */}
-                        <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
-                            icon={exportingTarget === ds.pdfTarget ? <Loader2 size={12} className="animate-spin text-rose-400" /> : <FileText size={12} />}
+                            variant="secondary"
+                            size="xs"
+                            className="h-7 px-2.5 text-xs text-[var(--app-fg-muted)] hover:text-[var(--app-fg)]"
+                            icon={exportingTarget === ds.pdfTarget ? <Loader2 size={11} className="animate-spin text-rose-400" /> : <FileText size={11} className="text-rose-400" />}
                             disabled={exportingTarget !== null}
                             onClick={ds.pdfFn}
                           >
@@ -1946,10 +1902,10 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                           </Button>
 
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                            icon={exportingTarget === ds.csvTarget ? <Loader2 size={12} className="animate-spin text-emerald-400" /> : <FileSpreadsheet size={12} />}
+                            variant="secondary"
+                            size="xs"
+                            className="h-7 px-2.5 text-xs text-[var(--app-fg-muted)] hover:text-[var(--app-fg)]"
+                            icon={exportingTarget === ds.csvTarget ? <Loader2 size={11} className="animate-spin text-emerald-400" /> : <FileSpreadsheet size={11} className="text-emerald-400" />}
                             disabled={exportingTarget !== null}
                             onClick={ds.csvFn}
                           >
@@ -1962,7 +1918,6 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                 </div>
               </div>
             </Card>
-
           </div>
         )}
 
@@ -2189,6 +2144,8 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                     <Badge variant="emerald" dot>
                       Connected: {zerodhaStatus.userProfile?.user_name || zerodhaStatus.userProfile?.client_id || "Active Session"}
                     </Badge>
+                  ) : zerodhaStatus.autoLoginConfigured ? (
+                    <Badge variant="amber">Auto-Login Active</Badge>
                   ) : zerodhaStatus.configured ? (
                     <Badge variant="amber">Daily Login Required</Badge>
                   ) : (
@@ -2314,6 +2271,9 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold">Kite API Key</label>
                       <Input
+                        name="kite_api_key_custom"
+                        autoComplete="off"
+                        data-form-type="other"
                         placeholder="e.g. 24-character API Key"
                         value={zerodhaApiKey}
                         onChange={(e) => setZerodhaApiKey(e.target.value)}
@@ -2324,6 +2284,9 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                       <label className="text-xs font-semibold">Kite API Secret</label>
                       <Input
                         type="password"
+                        name="kite_api_secret_custom"
+                        autoComplete="new-password"
+                        data-form-type="other"
                         placeholder="e.g. 32-character API Secret"
                         value={zerodhaApiSecret}
                         onChange={(e) => setZerodhaApiSecret(e.target.value)}
