@@ -3,6 +3,12 @@ import { getBankDomain } from "@/utils/bankLogos";
 import { getKnownBankMark } from "@/components/BankLogo";
 import { getEntityDomain } from "@/utils/entityLogos";
 import { getAppleWalletTheme } from "@/components/AppleWalletCard";
+import {
+  normalizeCryptoSymbol,
+  getCryptoLogoSources,
+  getCryptoFallbackColor,
+  KNOWN_CRYPTO_BRANDS,
+} from "@/utils/cryptoLogos";
 
 describe("Bank and Entity Logo Resolvers", () => {
   describe("Bank Logo Matching", () => {
@@ -99,6 +105,65 @@ describe("Bank and Entity Logo Resolvers", () => {
 
       const iciciRupay = getAppleWalletTheme("ICICI Coral RuPay", "Credit");
       expect(iciciRupay.network).toBe("rupay");
+    });
+  });
+
+  describe("Cryptocurrency Logo & Symbol Normalization", () => {
+    it("normalizes spot cryptocurrency ticker symbols and identifies Binance Earn & wrapped assets", () => {
+      // Direct spot assets
+      expect(normalizeCryptoSymbol("BTC").cleanSymbol).toBe("BTC");
+      expect(normalizeCryptoSymbol("ETH").cleanSymbol).toBe("ETH");
+      expect(normalizeCryptoSymbol("sol").cleanSymbol).toBe("SOL");
+
+      // Binance Earn assets
+      const earnBtc = normalizeCryptoSymbol("LDBTC");
+      expect(earnBtc.cleanSymbol).toBe("BTC");
+      expect(earnBtc.isEarn).toBe(true);
+      expect(earnBtc.displaySymbol).toBe("LDBTC");
+
+      const earnUsdt = normalizeCryptoSymbol("LDUSDT");
+      expect(earnUsdt.cleanSymbol).toBe("USDT");
+      expect(earnUsdt.isEarn).toBe(true);
+
+      // Wrapped and pegged tokens
+      const wbtc = normalizeCryptoSymbol("WBTC");
+      expect(wbtc.cleanSymbol).toBe("BTC");
+      expect(wbtc.isWrapped).toBe(true);
+
+      const btcb = normalizeCryptoSymbol("BTCB");
+      expect(btcb.cleanSymbol).toBe("BTC");
+      expect(btcb.isWrapped).toBe(true);
+
+      // Trading pairs passed inadvertently
+      const pair = normalizeCryptoSymbol("BTCUSDT");
+      expect(pair.cleanSymbol).toBe("BTC");
+    });
+
+    it("generates multi-tier CDN fallbacks for crypto assets", () => {
+      const sources = getCryptoLogoSources("SOL");
+      expect(sources.length).toBeGreaterThanOrEqual(4);
+      expect(sources[0]).toContain("assets.coincap.io/assets/icons/sol@2x.png");
+      expect(sources[1]).toContain("spothq/cryptocurrency-icons@master/128/color/sol.png");
+      expect(sources[2]).toContain("spothq/cryptocurrency-icons@master/svg/color/sol.svg");
+      expect(sources[3]).toContain("trustwallet/assets/master/blockchains/binance/assets/SOL/logo.png");
+    });
+
+    it("has brand definitions with colors for major cryptocurrencies", () => {
+      expect(KNOWN_CRYPTO_BRANDS.BTC.name).toBe("Bitcoin");
+      expect(KNOWN_CRYPTO_BRANDS.BTC.color).toBe("#F7931A");
+
+      expect(KNOWN_CRYPTO_BRANDS.ETH.name).toBe("Ethereum");
+      expect(KNOWN_CRYPTO_BRANDS.ETH.color).toBe("#627EEA");
+
+      expect(KNOWN_CRYPTO_BRANDS.SOL.name).toBe("Solana");
+      expect(KNOWN_CRYPTO_BRANDS.BNB.name).toBe("BNB");
+      expect(KNOWN_CRYPTO_BRANDS.USDT.name).toBe("Tether USD");
+    });
+
+    it("provides deterministic styling for unknown / unlisted coins", () => {
+      const unknownFallback = getCryptoFallbackColor("CUSTOMCOIN");
+      expect(unknownFallback.bg).toBeDefined();
+      expect(unknownFallback.text).toBe("#FFFFFF");
     });
   });
 });

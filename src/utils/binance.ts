@@ -547,3 +547,884 @@ export function getExitedAssets(
 
   return results.sort((a, b) => b.totalRealizedUsd - a.totalRealizedUsd);
 }
+
+// ============================================================================
+// MARKET DEPTH, ORDER BOOK & LIQUIDITY
+// ============================================================================
+
+export interface BinanceDepthLevel {
+  price: number;
+  quantity: number;
+  total: number;
+}
+
+export interface BinanceDepthResponse {
+  lastUpdateId: number;
+  bids: [string, string][];
+  asks: [string, string][];
+}
+
+export interface CalculatedMarketDepth {
+  symbol: string;
+  lastUpdateId: number;
+  bids: BinanceDepthLevel[];
+  asks: BinanceDepthLevel[];
+  highestBid: number;
+  lowestAsk: number;
+  spread: number;
+  spreadPercent: number;
+  totalBidVolume: number;
+  totalAskVolume: number;
+  bidAskRatio: number;
+}
+
+/**
+ * Fetch Order Book Level 2 Depth from Binance.
+ */
+export async function fetchBinanceDepth(
+  symbol: string = "BTCUSDT",
+  limit: number = 20,
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: CalculatedMarketDepth; error?: string }> {
+  try {
+    const url = `${baseUrl}/api/v3/depth?symbol=${symbol.toUpperCase()}&limit=${limit}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(4000),
+      next: { revalidate: 3 },
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Binance Depth HTTP ${res.status}` };
+    }
+
+    const raw = (await res.json()) as BinanceDepthResponse;
+    const calculated = parseMarketDepth(symbol, raw);
+    return { success: true, data: calculated };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch Binance depth",
+    };
+  }
+}
+
+export function parseMarketDepth(symbol: string, raw: BinanceDepthResponse): CalculatedMarketDepth {
+  let totalBidVolume = 0;
+  const bids: BinanceDepthLevel[] = (raw.bids || []).map(([p, q]) => {
+    const price = parseFloat(p) || 0;
+    const quantity = parseFloat(q) || 0;
+    totalBidVolume += quantity;
+    return { price, quantity, total: totalBidVolume };
+  });
+
+  let totalAskVolume = 0;
+  const asks: BinanceDepthLevel[] = (raw.asks || []).map(([p, q]) => {
+    const price = parseFloat(p) || 0;
+    const quantity = parseFloat(q) || 0;
+    totalAskVolume += quantity;
+    return { price, quantity, total: totalAskVolume };
+  });
+
+  const highestBid = bids[0]?.price || 0;
+  const lowestAsk = asks[0]?.price || 0;
+  const spread = lowestAsk > 0 && highestBid > 0 ? lowestAsk - highestBid : 0;
+  const spreadPercent = lowestAsk > 0 ? (spread / lowestAsk) * 100 : 0;
+  const totalVolume = totalBidVolume + totalAskVolume;
+  const bidAskRatio = totalVolume > 0 ? (totalBidVolume / totalVolume) * 100 : 50;
+
+  return {
+    symbol,
+    lastUpdateId: raw.lastUpdateId || Date.now(),
+    bids,
+    asks,
+    highestBid,
+    lowestAsk,
+    spread: Math.round(spread * 10000) / 10000,
+    spreadPercent: Math.round(spreadPercent * 1000) / 1000,
+    totalBidVolume: Math.round(totalBidVolume * 1000) / 1000,
+    totalAskVolume: Math.round(totalAskVolume * 1000) / 1000,
+    bidAskRatio: Math.round(bidAskRatio * 10) / 10,
+  };
+}
+
+// ============================================================================
+// KLINES / CANDLESTICKS & OHLCV TECHNICAL DATA
+// ============================================================================
+
+export interface BinanceKline {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  closeTime: number;
+  quoteVolume: number;
+  tradesCount: number;
+  takerBuyBaseVolume?: number;
+  takerBuyQuoteVolume?: number;
+}
+
+/**
+ * Fetch Kline / Candlestick bars for a symbol and interval.
+ * Intervals: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
+ */
+export async function fetchBinanceKlines(
+  symbol: string = "BTCUSDT",
+  interval: string = "1h",
+  limit: number = 40,
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinanceKline[]; error?: string }> {
+  try {
+    const url = `${baseUrl}/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(4000),
+      next: { revalidate: 15 },
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Binance Klines HTTP ${res.status}` };
+    }
+
+    const rawList = (await res.json()) as (string | number)[][];
+    const klines: BinanceKline[] = rawList.map((item) => ({
+      openTime: Number(item[0]),
+      open: parseFloat(String(item[1])) || 0,
+      high: parseFloat(String(item[2])) || 0,
+      low: parseFloat(String(item[3])) || 0,
+      close: parseFloat(String(item[4])) || 0,
+      volume: parseFloat(String(item[5])) || 0,
+      closeTime: Number(item[6]),
+      quoteVolume: parseFloat(String(item[7])) || 0,
+      tradesCount: Number(item[8]) || 0,
+      takerBuyBaseVolume: parseFloat(String(item[9])) || 0,
+      takerBuyQuoteVolume: parseFloat(String(item[10])) || 0,
+    }));
+
+    return { success: true, data: klines };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch Binance klines",
+    };
+  }
+}
+
+// ============================================================================
+// RECENT PUBLIC MARKET TRADES (LIVE TAPE)
+// ============================================================================
+
+export interface BinancePublicTrade {
+  id: number;
+  price: number;
+  qty: number;
+  quoteQty: number;
+  time: number;
+  isBuyerMaker: boolean; // true = sell side taker; false = buy side taker
+}
+
+/**
+ * Fetch recent public market trades for a symbol.
+ */
+export async function fetchBinanceRecentTrades(
+  symbol: string = "BTCUSDT",
+  limit: number = 30,
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinancePublicTrade[]; error?: string }> {
+  try {
+    const url = `${baseUrl}/api/v3/trades?symbol=${symbol.toUpperCase()}&limit=${limit}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(4000),
+      next: { revalidate: 3 },
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Binance Trades HTTP ${res.status}` };
+    }
+
+    interface RawTrade {
+      id: number;
+      price: string;
+      qty: string;
+      quoteQty: string;
+      time: number;
+      isBuyerMaker: boolean;
+    }
+
+    const rawList = (await res.json()) as RawTrade[];
+    const parsed: BinancePublicTrade[] = rawList.map((t) => ({
+      id: t.id,
+      price: parseFloat(t.price) || 0,
+      qty: parseFloat(t.qty) || 0,
+      quoteQty: parseFloat(t.quoteQty) || 0,
+      time: t.time,
+      isBuyerMaker: Boolean(t.isBuyerMaker),
+    }));
+
+    return { success: true, data: parsed };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch Binance public trades",
+    };
+  }
+}
+
+// ============================================================================
+// BOOK TICKER & 5-MIN ROLLING AVERAGE PRICE
+// ============================================================================
+
+export interface BinanceBookTicker {
+  symbol: string;
+  bidPrice: number;
+  bidQty: number;
+  askPrice: number;
+  askQty: number;
+  spread: number;
+  spreadPercent: number;
+}
+
+export interface BinanceAvgPrice {
+  mins: number;
+  price: number;
+  closeTime?: number;
+}
+
+export async function fetchBinanceBookTicker(
+  symbol?: string,
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinanceBookTicker; error?: string }> {
+  try {
+    const url = `${baseUrl}/api/v3/ticker/bookTicker${symbol ? `?symbol=${symbol.toUpperCase()}` : ""}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Binance BookTicker HTTP ${res.status}` };
+    }
+
+    interface RawBook {
+      symbol: string;
+      bidPrice: string;
+      bidQty: string;
+      askPrice: string;
+      askQty: string;
+    }
+
+    const raw = (await res.json()) as RawBook;
+    const bidPrice = parseFloat(raw.bidPrice) || 0;
+    const bidQty = parseFloat(raw.bidQty) || 0;
+    const askPrice = parseFloat(raw.askPrice) || 0;
+    const askQty = parseFloat(raw.askQty) || 0;
+    const spread = askPrice > 0 && bidPrice > 0 ? askPrice - bidPrice : 0;
+    const spreadPercent = askPrice > 0 ? (spread / askPrice) * 100 : 0;
+
+    return {
+      success: true,
+      data: {
+        symbol: raw.symbol,
+        bidPrice,
+        bidQty,
+        askPrice,
+        askQty,
+        spread: Math.round(spread * 10000) / 10000,
+        spreadPercent: Math.round(spreadPercent * 1000) / 1000,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch book ticker",
+    };
+  }
+}
+
+export async function fetchBinanceAvgPrice(
+  symbol: string = "BTCUSDT",
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinanceAvgPrice; error?: string }> {
+  try {
+    const url = `${baseUrl}/api/v3/avgPrice?symbol=${symbol.toUpperCase()}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Binance AvgPrice HTTP ${res.status}` };
+    }
+
+    interface RawAvg {
+      mins: number;
+      price: string;
+      closeTime?: number;
+    }
+
+    const raw = (await res.json()) as RawAvg;
+    return {
+      success: true,
+      data: {
+        mins: raw.mins || 5,
+        price: parseFloat(raw.price) || 0,
+        closeTime: raw.closeTime,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch avg price",
+    };
+  }
+}
+
+// ============================================================================
+// SYSTEM STATUS & EXCHANGE INFO
+// ============================================================================
+
+export interface BinanceSystemStatus {
+  status: 0 | 1; // 0: Normal, 1: System Maintenance
+  msg: string;
+}
+
+export interface BinanceServerTime {
+  serverTime: number;
+  localTime: number;
+  clockDriftMs: number;
+}
+
+export interface BinanceSymbolFilter {
+  filterType: string;
+  minPrice?: string;
+  maxPrice?: string;
+  tickSize?: string;
+  minQty?: string;
+  maxQty?: string;
+  stepSize?: string;
+  minNotional?: string;
+}
+
+export interface BinanceSymbolInfo {
+  symbol: string;
+  status: string;
+  baseAsset: string;
+  quoteAsset: string;
+  filters: BinanceSymbolFilter[];
+  permissions: string[];
+}
+
+export async function fetchBinanceSystemStatus(
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinanceSystemStatus; error?: string }> {
+  try {
+    const url = `${baseUrl}/sapi/v1/system/status`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!res.ok) {
+      return { success: true, data: { status: 0, msg: "normal" } };
+    }
+
+    const data = (await res.json()) as BinanceSystemStatus;
+    return { success: true, data };
+  } catch {
+    return { success: true, data: { status: 0, msg: "normal" } };
+  }
+}
+
+export async function fetchBinanceTime(
+  baseUrl: string = "https://api.binance.com"
+): Promise<{ success: boolean; data?: BinanceServerTime; error?: string }> {
+  try {
+    const localBefore = Date.now();
+    const url = `${baseUrl}/api/v3/time`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "arthaX-Portfolio/1.0" },
+      signal: AbortSignal.timeout(3000),
+    });
+
+    const localAfter = Date.now();
+    const localMid = Math.round((localBefore + localAfter) / 2);
+
+    if (!res.ok) {
+      return {
+        success: true,
+        data: {
+          serverTime: localMid,
+          localTime: localMid,
+          clockDriftMs: 0,
+        },
+      };
+    }
+
+    const json = (await res.json()) as { serverTime: number };
+    const clockDriftMs = json.serverTime - localMid;
+
+    return {
+      success: true,
+      data: {
+        serverTime: json.serverTime,
+        localTime: localMid,
+        clockDriftMs,
+      },
+    };
+  } catch {
+    const now = Date.now();
+    return {
+      success: true,
+      data: {
+        serverTime: now,
+        localTime: now,
+        clockDriftMs: 0,
+      },
+    };
+  }
+}
+
+// ============================================================================
+// INSTANT CRYPTO SWAP / CONVERTER ESTIMATOR
+// ============================================================================
+
+export interface SwapQuoteResult {
+  fromAsset: string;
+  toAsset: string;
+  fromAmount: number;
+  toAmount: number;
+  executionPrice: number;
+  invertedPrice: number;
+  estimatedFeeUsd: number;
+  route: string;
+}
+
+export function calculateCryptoSwap(
+  fromAsset: string,
+  toAsset: string,
+  amount: number,
+  tickers: Record<string, BinanceTicker>
+): SwapQuoteResult {
+  if (amount <= 0 || fromAsset === toAsset) {
+    return {
+      fromAsset,
+      toAsset,
+      fromAmount: amount,
+      toAmount: amount,
+      executionPrice: 1,
+      invertedPrice: 1,
+      estimatedFeeUsd: 0,
+      route: "DIRECT",
+    };
+  }
+
+  const getPriceInUsd = (coin: string): number => {
+    if (STABLECOINS.has(coin)) return 1.0;
+    const usdtPair = `${coin}USDT`;
+    if (tickers[usdtPair]) return parseFloat(tickers[usdtPair].lastPrice) || 0;
+    const usdcPair = `${coin}USDC`;
+    if (tickers[usdcPair]) return parseFloat(tickers[usdcPair].lastPrice) || 0;
+    return 0;
+  };
+
+  const fromUsd = getPriceInUsd(fromAsset);
+  const toUsd = getPriceInUsd(toAsset);
+
+  if (fromUsd <= 0 || toUsd <= 0) {
+    return {
+      fromAsset,
+      toAsset,
+      fromAmount: amount,
+      toAmount: 0,
+      executionPrice: 0,
+      invertedPrice: 0,
+      estimatedFeeUsd: 0,
+      route: "UNAVAILABLE",
+    };
+  }
+
+  const totalUsd = amount * fromUsd;
+  const rawToAmount = totalUsd / toUsd;
+  // Apply standard Binance spot fee: 0.10%
+  const feePercent = 0.001;
+  const estimatedFeeUsd = totalUsd * feePercent;
+  const toAmount = rawToAmount * (1 - feePercent);
+  const executionPrice = fromUsd / toUsd;
+  const invertedPrice = executionPrice > 0 ? 1 / executionPrice : 0;
+
+  return {
+    fromAsset,
+    toAsset,
+    fromAmount: amount,
+    toAmount: Math.round(toAmount * 1000000) / 1000000,
+    executionPrice: Math.round(executionPrice * 1000000) / 1000000,
+    invertedPrice: Math.round(invertedPrice * 1000000) / 1000000,
+    estimatedFeeUsd: Math.round(estimatedFeeUsd * 100) / 100,
+    route: `${fromAsset} → USDT → ${toAsset}`,
+  };
+}
+
+// ============================================================================
+// DEMO DATA GENERATORS FOR RICH ZERO-CREDENTIAL SHOWCASE
+// ============================================================================
+
+export function getDemoMarketTickers(): Record<string, BinanceTicker> {
+  return {
+    BTCUSDT: {
+      symbol: "BTCUSDT",
+      lastPrice: "96420.50",
+      priceChangePercent: "4.82",
+      highPrice: "97850.00",
+      lowPrice: "91900.00",
+      volume: "38920.45",
+      quoteVolume: "3752600000.00",
+      weightedAvgPrice: "95800.20",
+      prevClosePrice: "91985.00",
+    },
+    ETHUSDT: {
+      symbol: "ETHUSDT",
+      lastPrice: "3480.25",
+      priceChangePercent: "3.45",
+      highPrice: "3550.00",
+      lowPrice: "3360.10",
+      volume: "245890.12",
+      quoteVolume: "855700000.00",
+      weightedAvgPrice: "3450.10",
+      prevClosePrice: "3364.20",
+    },
+    SOLUSDT: {
+      symbol: "SOLUSDT",
+      lastPrice: "214.80",
+      priceChangePercent: "7.92",
+      highPrice: "219.50",
+      lowPrice: "198.20",
+      volume: "4820190.00",
+      quoteVolume: "1035000000.00",
+      weightedAvgPrice: "208.50",
+      prevClosePrice: "199.03",
+    },
+    BNBUSDT: {
+      symbol: "BNBUSDT",
+      lastPrice: "652.40",
+      priceChangePercent: "2.18",
+      highPrice: "660.00",
+      lowPrice: "638.50",
+      volume: "612450.00",
+      quoteVolume: "399560000.00",
+      weightedAvgPrice: "648.20",
+      prevClosePrice: "638.48",
+    },
+    XRPUSDT: {
+      symbol: "XRPUSDT",
+      lastPrice: "1.4820",
+      priceChangePercent: "12.45",
+      highPrice: "1.5400",
+      lowPrice: "1.3100",
+      volume: "892004500.00",
+      quoteVolume: "1280000000.00",
+      weightedAvgPrice: "1.4250",
+      prevClosePrice: "1.3179",
+    },
+    DOGEUSDT: {
+      symbol: "DOGEUSDT",
+      lastPrice: "0.3845",
+      priceChangePercent: "-1.85",
+      highPrice: "0.4050",
+      lowPrice: "0.3720",
+      volume: "1420500900.00",
+      quoteVolume: "546000000.00",
+      weightedAvgPrice: "0.3890",
+      prevClosePrice: "0.3917",
+    },
+    AVAXUSDT: {
+      symbol: "AVAXUSDT",
+      lastPrice: "36.85",
+      priceChangePercent: "5.12",
+      highPrice: "37.90",
+      lowPrice: "34.80",
+      volume: "3540200.00",
+      quoteVolume: "130450000.00",
+      weightedAvgPrice: "36.20",
+      prevClosePrice: "35.05",
+    },
+    SUIUSDT: {
+      symbol: "SUIUSDT",
+      lastPrice: "3.42",
+      priceChangePercent: "9.60",
+      highPrice: "3.55",
+      lowPrice: "3.10",
+      volume: "89450200.00",
+      quoteVolume: "305900000.00",
+      weightedAvgPrice: "3.31",
+      prevClosePrice: "3.12",
+    },
+    LINKUSDT: {
+      symbol: "LINKUSDT",
+      lastPrice: "16.80",
+      priceChangePercent: "4.15",
+      highPrice: "17.20",
+      lowPrice: "16.10",
+      volume: "5890200.00",
+      quoteVolume: "98950000.00",
+      weightedAvgPrice: "16.55",
+      prevClosePrice: "16.13",
+    },
+    PEPEUSDT: {
+      symbol: "PEPEUSDT",
+      lastPrice: "0.0000214",
+      priceChangePercent: "-3.60",
+      highPrice: "0.0000230",
+      lowPrice: "0.0000205",
+      volume: "21500000000000.00",
+      quoteVolume: "460000000.00",
+      weightedAvgPrice: "0.0000218",
+      prevClosePrice: "0.0000222",
+    },
+    NEARUSDT: {
+      symbol: "NEARUSDT",
+      lastPrice: "6.85",
+      priceChangePercent: "6.20",
+      highPrice: "7.10",
+      lowPrice: "6.40",
+      volume: "18900400.00",
+      quoteVolume: "129460000.00",
+      weightedAvgPrice: "6.72",
+      prevClosePrice: "6.45",
+    },
+    ADAUSDT: {
+      symbol: "ADAUSDT",
+      lastPrice: "0.8420",
+      priceChangePercent: "3.80",
+      highPrice: "0.8750",
+      lowPrice: "0.8050",
+      volume: "285900400.00",
+      quoteVolume: "240720000.00",
+      weightedAvgPrice: "0.8350",
+      prevClosePrice: "0.8112",
+    },
+  };
+}
+
+export function getDemoDepth(symbol: string = "BTCUSDT", currentPrice: number = 96420.5): CalculatedMarketDepth {
+  const bids: BinanceDepthLevel[] = [];
+  const asks: BinanceDepthLevel[] = [];
+  let bidAccum = 0;
+  let askAccum = 0;
+
+  for (let i = 1; i <= 15; i++) {
+    const bidPrice = Math.round((currentPrice * (1 - i * 0.0006)) * 100) / 100;
+    const bidQty = Math.round((0.2 + Math.sin(i * 1.5) * 0.1 + i * 0.08) * 1000) / 1000;
+    bidAccum += bidQty;
+    bids.push({ price: bidPrice, quantity: bidQty, total: Math.round(bidAccum * 1000) / 1000 });
+
+    const askPrice = Math.round((currentPrice * (1 + i * 0.0006)) * 100) / 100;
+    const askQty = Math.round((0.18 + Math.cos(i * 1.4) * 0.09 + i * 0.075) * 1000) / 1000;
+    askAccum += askQty;
+    asks.push({ price: askPrice, quantity: askQty, total: Math.round(askAccum * 1000) / 1000 });
+  }
+
+  const highestBid = bids[0]?.price || currentPrice - 5;
+  const lowestAsk = asks[0]?.price || currentPrice + 5;
+  const spread = lowestAsk - highestBid;
+  const spreadPercent = (spread / lowestAsk) * 100;
+
+  return {
+    symbol,
+    lastUpdateId: Date.now(),
+    bids,
+    asks,
+    highestBid,
+    lowestAsk,
+    spread: Math.round(spread * 100) / 100,
+    spreadPercent: Math.round(spreadPercent * 1000) / 1000,
+    totalBidVolume: Math.round(bidAccum * 1000) / 1000,
+    totalAskVolume: Math.round(askAccum * 1000) / 1000,
+    bidAskRatio: Math.round((bidAccum / (bidAccum + askAccum)) * 1000) / 10,
+  };
+}
+
+export function getDemoKlines(symbol: string = "BTCUSDT", interval: string = "1h", limit: number = 36): BinanceKline[] {
+  const klines: BinanceKline[] = [];
+  const basePrice = symbol.includes("ETH")
+    ? 3480
+    : symbol.includes("SOL")
+    ? 214
+    : symbol.includes("BNB")
+    ? 652
+    : symbol.includes("XRP")
+    ? 1.48
+    : 96420;
+
+  const now = Date.now();
+  const stepMs = interval === "15m" ? 15 * 60 * 1000 : interval === "4h" ? 4 * 3600 * 1000 : interval === "1d" ? 24 * 3600 * 1000 : 3600 * 1000;
+
+  let current = basePrice * 0.94;
+
+  for (let i = limit; i >= 0; i--) {
+    const openTime = now - i * stepMs;
+    const drift = (Math.sin(i * 0.4) * 0.012 + (Math.random() - 0.45) * 0.015) * current;
+    const open = Math.round(current * 100) / 100;
+    const close = Math.round((current + drift) * 100) / 100;
+    const high = Math.round((Math.max(open, close) + Math.abs(drift) * (0.4 + Math.random() * 0.6)) * 100) / 100;
+    const low = Math.round((Math.min(open, close) - Math.abs(drift) * (0.4 + Math.random() * 0.6)) * 100) / 100;
+    const volume = Math.round((120 + Math.random() * 250) * 100) / 100;
+
+    klines.push({
+      openTime,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      closeTime: openTime + stepMs - 1,
+      quoteVolume: Math.round(volume * close),
+      tradesCount: Math.round(1800 + Math.random() * 2400),
+      takerBuyBaseVolume: Math.round(volume * 0.54 * 100) / 100,
+      takerBuyQuoteVolume: Math.round(volume * close * 0.54),
+    });
+
+    current = close;
+  }
+
+  return klines;
+}
+
+export function getDemoRecentTrades(symbol: string = "BTCUSDT", currentPrice: number = 96420): BinancePublicTrade[] {
+  const trades: BinancePublicTrade[] = [];
+  const now = Date.now();
+
+  for (let i = 0; i < 25; i++) {
+    const isBuyerMaker = i % 2 === 0;
+    const delta = (Math.random() - 0.48) * 8;
+    const price = Math.round((currentPrice + delta) * 100) / 100;
+    const qty = Math.round((0.02 + Math.random() * 0.85) * 10000) / 10000;
+    trades.push({
+      id: 59000000 + i,
+      price,
+      qty,
+      quoteQty: Math.round(price * qty * 100) / 100,
+      time: now - i * 1800 - Math.floor(Math.random() * 800),
+      isBuyerMaker,
+    });
+  }
+
+  return trades;
+}
+
+export function getDemoSpotAccount(): BinanceAccountResponse {
+  return {
+    makerCommission: 10, // 0.10%
+    takerCommission: 10, // 0.10%
+    buyerCommission: 0,
+    sellerCommission: 0,
+    canTrade: true,
+    canWithdraw: true,
+    canDeposit: true,
+    accountType: "SPOT",
+    balances: [
+      { asset: "BTC", free: "0.42850000", locked: "0.00000000" },
+      { asset: "ETH", free: "4.85000000", locked: "0.00000000" },
+      { asset: "SOL", free: "42.50000000", locked: "0.00000000" },
+      { asset: "BNB", free: "12.00000000", locked: "0.00000000" },
+      { asset: "SUI", free: "1500.00000000", locked: "0.00000000" },
+      { asset: "USDT", free: "12840.50000000", locked: "500.00000000" },
+      { asset: "USDC", free: "4500.00000000", locked: "0.00000000" },
+    ],
+    permissions: ["SPOT", "LEVERAGED", "TRD_GRP_002"],
+  };
+}
+
+export function getDemoTradeHistory(): CalculatedCryptoTrade[] {
+  return [
+    {
+      tradeId: 98101,
+      orderId: 441001,
+      symbol: "BTCUSDT",
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      side: "BUY",
+      price: 64200.0,
+      qty: 0.25,
+      quoteQty: 16050.0,
+      commission: 16.05,
+      commissionAsset: "USDT",
+      isBuyer: true,
+      isMaker: false,
+      executedAt: new Date(Date.now() - 38 * 24 * 3600 * 1000).toISOString(),
+    },
+    {
+      tradeId: 98102,
+      orderId: 441002,
+      symbol: "SOLUSDT",
+      baseAsset: "SOL",
+      quoteAsset: "USDT",
+      side: "BUY",
+      price: 135.5,
+      qty: 35.0,
+      quoteQty: 4742.5,
+      commission: 4.74,
+      commissionAsset: "USDT",
+      isBuyer: true,
+      isMaker: false,
+      executedAt: new Date(Date.now() - 25 * 24 * 3600 * 1000).toISOString(),
+    },
+    {
+      tradeId: 98103,
+      orderId: 441003,
+      symbol: "ETHUSDT",
+      baseAsset: "ETH",
+      quoteAsset: "USDT",
+      side: "BUY",
+      price: 2850.0,
+      qty: 3.0,
+      quoteQty: 8550.0,
+      commission: 8.55,
+      commissionAsset: "USDT",
+      isBuyer: true,
+      isMaker: true,
+      executedAt: new Date(Date.now() - 19 * 24 * 3600 * 1000).toISOString(),
+    },
+    {
+      tradeId: 98104,
+      orderId: 441004,
+      symbol: "AVAXUSDT",
+      baseAsset: "AVAX",
+      quoteAsset: "USDT",
+      side: "BUY",
+      price: 28.0,
+      qty: 150.0,
+      quoteQty: 4200.0,
+      commission: 4.2,
+      commissionAsset: "USDT",
+      isBuyer: true,
+      isMaker: false,
+      executedAt: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(),
+    },
+    {
+      tradeId: 98105,
+      orderId: 441005,
+      symbol: "AVAXUSDT",
+      baseAsset: "AVAX",
+      quoteAsset: "USDT",
+      side: "SELL",
+      price: 36.5,
+      qty: 150.0,
+      quoteQty: 5475.0,
+      commission: 5.48,
+      commissionAsset: "USDT",
+      isBuyer: false,
+      isMaker: true,
+      executedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+    },
+  ];
+}

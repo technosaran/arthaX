@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { QueryProvider } from "@/context/QueryProvider";
 import { siteConfig, generateStructuredData } from "@/config/seo";
 
 // FinTech Typography Stack (Zerodha Kite & Institutional FinTech Standard)
@@ -144,7 +145,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ThemeProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <QueryProvider>{children}</QueryProvider>
+            </ToastProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

@@ -27,7 +27,6 @@ import {
   BarChart3,
   List,
   LayoutGrid,
-  RotateCw,
   RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -42,6 +41,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import BankLogo from "@/components/BankLogo";
+import EntityLogo from "@/components/EntityLogo";
 
 export interface StockHolding {
   id: string;
@@ -313,10 +313,6 @@ export default function StocksSection() {
     }
   };
 
-  const handleRefreshQuotes = () => {
-    fetchQuotesForHoldings(holdings, true);
-  };
-
   // Portfolio Calculations
   const portfolioStats = useMemo(() => {
     let totalInvested = 0;
@@ -519,16 +515,6 @@ export default function StocksSection() {
         description="Indian markets (NSE & BSE) portfolio with real-time price updates auto-synced from Zerodha Kite"
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<RotateCw size={13} className={refreshingQuotes ? "animate-spin" : ""} />}
-              disabled={refreshingQuotes}
-              onClick={handleRefreshQuotes}
-              title="Refresh live market quotes"
-            >
-              Refresh Quotes
-            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -867,9 +853,12 @@ export default function StocksSection() {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
                               {/* Stock Avatar / Emblem */}
-                              <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-xs flex-shrink-0">
-                                {h.symbol.slice(0, 2)}
-                              </div>
+                              <EntityLogo
+                                name={h.company_name || h.symbol}
+                                category="Investment"
+                                size={32}
+                                className="rounded-xl flex-shrink-0"
+                              />
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-[var(--app-fg)] group-hover:text-sky-400 transition-colors">
@@ -1022,9 +1011,12 @@ export default function StocksSection() {
                     {/* Top Row: Symbol, Exchange & Actions */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-sm">
-                          {h.symbol.slice(0, 2)}
-                        </div>
+                        <EntityLogo
+                          name={h.company_name || h.symbol}
+                          category="Investment"
+                          size={40}
+                          className="rounded-xl flex-shrink-0"
+                        />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-base text-[var(--app-fg)]">

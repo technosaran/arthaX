@@ -9,12 +9,14 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "db:types": "supabase gen types typescript --project-id fvpfzbuoizzjwgekuhot > src/types/database.types.ts",
     "zerodha:sync": "npx tsx --env-file=.env.local scripts/zerodhaAutoSync.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^11.13.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
+    "@tanstack/react-query": "^5.108.1",
     "@upstash/redis": "^1.41.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^3.8.4",

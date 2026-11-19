@@ -57,4 +57,17 @@ describe("Crypto Navigation & Section Integration", () => {
     expect(cryptoSectionContent).not.toContain("<Modal");
     expect(cryptoSectionContent).not.toContain('"API Settings"');
   });
+
+  it("renders original crypto logos in Spot Holdings instead of raw text abbreviations", () => {
+    const cryptoSectionPath = path.resolve(process.cwd(), "src/components/CryptoSection.tsx");
+    const cryptoSectionContent = fs.readFileSync(cryptoSectionPath, "utf-8");
+
+    // Must import and use CryptoLogo
+    expect(cryptoSectionContent).toContain('import CryptoLogo from "@/components/CryptoLogo"');
+    expect(cryptoSectionContent).toContain("<CryptoLogo");
+    expect(cryptoSectionContent).toContain("symbol={asset.asset}");
+
+    // Spot holdings row should NOT use generic slice avatar
+    expect(cryptoSectionContent).not.toContain("{asset.asset.slice(0, 3)}");
+  });
 });

@@ -13,6 +13,7 @@ import {
   ArrowRight,
   PiggyBank,
   Clock,
+  Calculator,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -29,6 +30,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { TaxHarvestingModal } from "@/components/TaxHarvestingModal";
 
 interface AccountItem {
   id: string;
@@ -128,6 +130,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   });
   const [totalCryptoUsd, setTotalCryptoUsd] = useState<number>(0);
   const [cryptoHoldings, setCryptoHoldings] = useState<{ asset: string; total_value_usd: number }[]>([]);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState<boolean>(false);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialCache?.expenses || []);
   const [incomes, setIncomes] = useState<IncomeItem[]>(initialCache?.incomes || []);
@@ -623,6 +626,19 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <p className="text-xs sm:text-sm text-[var(--app-muted)] font-normal">
             Sovereign ledger overview, net worth telemetry, and real-time cash flow.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsTaxModalOpen(true)}
+            className="flex items-center gap-2 text-xs font-semibold border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shadow-sm"
+          >
+            <Calculator size={14} className="text-amber-400" />
+            <span>Tax & Harvesting</span>
+            <Badge variant="warning" size="sm">Budget &apos;24</Badge>
+          </Button>
         </div>
       </div>
 
@@ -1242,6 +1258,11 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           )}
         </div>
       </div>
+
+      <TaxHarvestingModal
+        isOpen={isTaxModalOpen}
+        onClose={() => setIsTaxModalOpen(false)}
+      />
     </main>
   );
 }

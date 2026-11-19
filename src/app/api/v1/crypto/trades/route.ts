@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
 import {
   CalculatedCryptoTrade,
   calculateTradeStats,
   getExitedAssets,
-  extractBaseAndQuote,
+  getDemoTradeHistory,
 } from "@/utils/binance";
 
 export async function GET(req: NextRequest) {
@@ -16,83 +17,85 @@ export async function GET(req: NextRequest) {
     return apiUnauthorized(authError || "Unauthorized", req);
   }
 
+  const rl = await rateLimit(`crypto:trades:${userId}`, 120, 60);
+  if (!rl.success) {
+    return apiError("Too many requests. Please slow down.", "RATE_LIMITED", 429, undefined, req);
+  }
+
   try {
     const { searchParams } = new URL(req.url);
-    const sideFilter = searchParams.get("side")?.toUpperCase(); // "BUY" or "SELL"
-    const symbolFilter = searchParams.get("symbol")?.toUpperCase();
-    const limit = Math.min(parseInt(searchParams.get("limit") || "200", 10), 500);
+    const useDemo = searchParams.get("demo") === "true";
 
-    // Fetch all user trades for stats and exited assets calculation
-    const { data: rawTrades, error: tradesErr } = await supabaseAdmin
+    // 1. Fetch trades from public.crypto_trades
+    const { data: rawTrades, error: dbErr } = await supabaseAdmin
       .from("crypto_trades")
       .select("*")
       .eq("user_id", userId)
-      .order("executed_at", { ascending: false })
-      .limit(limit);
+      .order("executed_at", { ascending: false });
 
-    if (tradesErr) {
-      return apiError(`Failed to fetch crypto trades: ${tradesErr.message}`, "DATABASE_ERROR", 500, undefined, req);
+    if (dbErr) {
+      console.warn("[Crypto Trades] DB fetch error:", dbErr.message);
     }
 
-    // Fetch user's current active crypto holdings
-    const { data: holdingsData } = await supabaseAdmin
+    // 2. Fetch current holdings to determine active vs exited positions
+    const { data: holdings } = await supabaseAdmin
       .from("crypto_holdings")
       .select("asset")
       .eq("user_id", userId);
 
-    const activeAssetsSet = new Set<string>((holdingsData || []).map((h) => h.asset.toUpperCase()));
+    const activeSet = new Set((holdings || []).map((h) => h.asset));
 
-    // Map DB records into CalculatedCryptoTrade models
-    const allTrades: CalculatedCryptoTrade[] = (rawTrades || []).map((r) => {
-      const { baseAsset, quoteAsset } = extractBaseAndQuote(r.symbol);
-      return {
-        tradeId: Number(r.trade_id),
-        orderId: Number(r.order_id),
-        symbol: r.symbol,
-        baseAsset,
-        quoteAsset,
-        side: r.side as "BUY" | "SELL",
-        price: Number(r.price),
-        qty: Number(r.qty),
-        quoteQty: Number(r.quote_qty),
-        commission: Number(r.commission),
-        commissionAsset: r.commission_asset,
-        isBuyer: Boolean(r.is_buyer),
-        isMaker: Boolean(r.is_maker),
-        executedAt: r.executed_at,
-      };
-    });
+    let trades: CalculatedCryptoTrade[] = [];
 
-    // Compute portfolio trade stats & completely exited assets
-    const stats = calculateTradeStats(allTrades);
-    const exitedAssets = getExitedAssets(allTrades, activeAssetsSet);
+    if (!useDemo && rawTrades && rawTrades.length > 0) {
+      trades = rawTrades.map((t) => {
+        const symbol = t.symbol || "";
+        const baseAsset = symbol.replace(/(USDT|USDC|FDUSD|BUSD|BTC|ETH|BNB)$/, "") || symbol;
+        const quoteAsset = symbol.slice(baseAsset.length) || "USDT";
 
-    // Filter trades if requested
-    let filteredTrades = allTrades;
-    if (sideFilter === "BUY" || sideFilter === "SELL") {
-      filteredTrades = filteredTrades.filter((t) => t.side === sideFilter);
+        return {
+          tradeId: Number(t.trade_id),
+          orderId: Number(t.order_id),
+          symbol: t.symbol,
+          baseAsset,
+          quoteAsset,
+          side: t.side as "BUY" | "SELL",
+          price: Number(t.price) || 0,
+          qty: Number(t.qty) || 0,
+          quoteQty: Number(t.quote_qty) || 0,
+          commission: Number(t.commission) || 0,
+          commissionAsset: t.commission_asset || "USDT",
+          isBuyer: Boolean(t.is_buyer),
+          isMaker: Boolean(t.is_maker),
+          executedAt: t.executed_at,
+        };
+      });
+    } else {
+      // Demo showcase trades for instant preview
+      trades = getDemoTradeHistory();
+      if (activeSet.size === 0) {
+        activeSet.add("BTC");
+        activeSet.add("ETH");
+        activeSet.add("SOL");
+      }
     }
-    if (symbolFilter) {
-      filteredTrades = filteredTrades.filter(
-        (t) =>
-          t.symbol.toUpperCase().includes(symbolFilter) ||
-          t.baseAsset.toUpperCase().includes(symbolFilter)
-      );
-    }
+
+    const stats = calculateTradeStats(trades);
+    const exitedAssets = getExitedAssets(trades, activeSet);
 
     return apiSuccess(
       {
-        trades: filteredTrades,
-        totalCount: allTrades.length,
+        trades,
         stats,
         exitedAssets,
+        isDemo: !rawTrades || rawTrades.length === 0 || useDemo,
       },
       undefined,
       req
     );
   } catch (err) {
     return apiError(
-      err instanceof Error ? err.message : "Error fetching crypto trades",
+      err instanceof Error ? err.message : "Internal error fetching crypto trade history",
       "SERVER_ERROR",
       500,
       undefined,
