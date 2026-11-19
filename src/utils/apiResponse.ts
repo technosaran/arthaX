@@ -11,7 +11,8 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "BAD_REQUEST"
   | "INTERNAL_SERVER_ERROR"
-  | "SERVICE_UNAVAILABLE";
+  | "SERVICE_UNAVAILABLE"
+  | (string & {});
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -50,10 +51,15 @@ export function extractRequestId(req?: Request | NextRequest): string {
 export function apiSuccess<T>(
   data: T,
   meta?: ApiResponse["meta"],
-  status: number = 200,
+  statusOrReq?: number | Request | NextRequest,
   req?: Request | NextRequest
 ): NextResponse<ApiResponse<T>> {
-  const requestId = extractRequestId(req);
+  const status = typeof statusOrReq === "number" ? statusOrReq : 200;
+  const effectiveReq = (statusOrReq && typeof statusOrReq === "object" ? statusOrReq : req) as
+    | Request
+    | NextRequest
+    | undefined;
+  const requestId = extractRequestId(effectiveReq);
   const payload: ApiResponse<T> = {
     success: true,
     data,

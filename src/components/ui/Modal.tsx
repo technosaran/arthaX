@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useId } from "react";
 import { X } from "lucide-react";
 
 export interface ModalProps {
@@ -25,6 +25,15 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  // Move focus to modal container on mount for screen readers & keyboard navigation (WCAG 2.4.3)
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -76,7 +85,10 @@ export const Modal: React.FC<ModalProps> = ({
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizeClasses[size]} rounded-2xl border p-3.5 sm:p-4.5 shadow-2xl z-10 transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[92vh] flex flex-col`}
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
+        className={`relative w-full ${sizeClasses[size]} rounded-2xl border p-3.5 sm:p-4.5 shadow-2xl z-10 transition-all duration-200 animate-in fade-in zoom-in-95 my-auto max-h-[92vh] flex flex-col outline-hidden`}
         style={{
           backgroundColor: "var(--app-card)",
           borderColor: "var(--app-border)",
@@ -89,12 +101,12 @@ export const Modal: React.FC<ModalProps> = ({
           <div className="flex items-start justify-between gap-3 pb-2 sm:pb-2.5 border-b border-[var(--app-border-subtle)] flex-shrink-0">
             <div className="min-w-0 pr-2">
               {title && (
-                <h2 className="text-sm sm:text-base font-bold tracking-tight text-[var(--app-fg)] truncate">
+                <h2 id={titleId} className="text-sm sm:text-base font-bold tracking-tight text-[var(--app-fg)] truncate">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="text-[11px] text-[var(--app-muted)] mt-0.5 leading-snug">
+                <p id={descriptionId} className="text-[11px] text-[var(--app-muted)] mt-0.5 leading-snug">
                   {description}
                 </p>
               )}

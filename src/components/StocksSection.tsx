@@ -517,18 +517,6 @@ export default function StocksSection() {
           </span>
         }
         description="Indian markets (NSE & BSE) portfolio with real-time price updates auto-synced from Zerodha Kite"
-        badge={
-          <div className="flex items-center gap-2">
-            <Badge variant="neutral">
-              {holdings.length} {holdings.length === 1 ? "Holding" : "Holdings"}
-            </Badge>
-            {zerodhaAccount && (
-              <Badge variant="success" className="font-mono">
-                Demat Wallet: {formatINR(Number(zerodhaAccount.balance) || 0)}
-              </Badge>
-            )}
-          </div>
-        }
         actions={
           <div className="flex items-center gap-2">
             <Button

@@ -6,9 +6,14 @@ import { rateLimit } from "@/utils/rateLimit";
 import {
   getZerodhaIntegration,
   exchangeRequestToken,
+  syncAllZerodhaSections,
 } from "@/utils/zerodha";
-import { getAutoLoginCredentials } from "@/utils/zerodhaAutoLogin";
+import {
+  getAutoLoginCredentials,
+  performZerodhaAutoLogin,
+} from "@/utils/zerodhaAutoLogin";
 import { encryptSensitiveData } from "@/utils/crypto";
+import { logger } from "@/utils/logger";
 import { z } from "zod";
 
 const SaveCredentialsSchema = z.object({
@@ -33,15 +38,59 @@ export async function GET(req: NextRequest) {
 
   try {
     const status = await getZerodhaIntegration(userId);
+    const autoCreds = getAutoLoginCredentials(status.integration, userId);
+
+    // If session expired today, but auto-login credentials are configured, auto-renew seamlessly
+    if (status.isTokenExpired && autoCreds) {
+      try {
+        logger.info(`[Zerodha] Expired token detected for user ${userId}. Attempting seamless JIT auto-login...`);
+        const loginRes = await performZerodhaAutoLogin(autoCreds);
+
+        if (loginRes.success && loginRes.accessToken) {
+          await supabaseAdmin
+            .from("zerodha_integrations")
+            .update({
+              access_token: encryptSensitiveData(loginRes.accessToken, "broker-credentials"),
+              public_token: encryptSensitiveData(loginRes.publicToken || null, "broker-credentials"),
+              request_token: encryptSensitiveData(loginRes.requestToken || null, "broker-credentials"),
+              token_generated_at: new Date().toISOString(),
+              user_profile: loginRes.profile || status.integration?.user_profile,
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+
+          // Update status in memory so user immediately sees active connection
+          status.isTokenExpired = false;
+          status.connected = true;
+          if (status.integration) {
+            status.integration.access_token = loginRes.accessToken;
+            status.integration.token_generated_at = new Date().toISOString();
+            if (loginRes.profile) {
+              status.integration.user_profile = loginRes.profile as any;
+            }
+          }
+
+          // Asynchronously trigger portfolio sync without blocking GET response
+          syncAllZerodhaSections(userId).catch((err) => {
+            logger.warn(`[Zerodha] Background portfolio sync failed after auto-login: ${err?.message || err}`);
+          });
+        } else {
+          logger.warn(`[Zerodha] Seamless auto-login failed: ${loginRes.error}`);
+        }
+      } catch (autoLoginErr: any) {
+        logger.warn(`[Zerodha] Seamless auto-login exception: ${autoLoginErr?.message || autoLoginErr}`);
+      }
+    }
 
     return apiSuccess(
       {
         configured: status.configured,
         connected: status.connected,
         isTokenExpired: status.isTokenExpired,
-        autoLoginConfigured: Boolean(getAutoLoginCredentials(status.integration, userId)),
-        autoLoginUserIdMasked: getAutoLoginCredentials(status.integration, userId)?.userId
-          ? `${getAutoLoginCredentials(status.integration, userId)!.userId.slice(0, 2)}••••`
+        autoLoginConfigured: Boolean(autoCreds),
+        autoLoginUserIdMasked: autoCreds?.userId
+          ? `${autoCreds.userId.slice(0, 2)}••••`
           : null,
         apiKeyMasked: status.integration?.api_key
           ? `${status.integration.api_key.slice(0, 3)}••••${status.integration.api_key.slice(-3)}`

@@ -579,33 +579,26 @@ export default function GoldSilverSection() {
         title="Physical Gold & Silver"
         description="Real-time valuation of your physical bullion, coins, bars, and hallmarked jewelry with live spot rates."
         icon={<Gem size={26} className="text-amber-400" />}
-        badge={
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Live Spot Feed</span>
-          </div>
-        }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
+              icon={<RefreshCw size={14} className={refreshingRates ? "animate-spin text-amber-400" : ""} />}
               onClick={() => fetchRates(true)}
               disabled={refreshingRates}
-              className="gap-1.5"
             >
-              <RefreshCw size={14} className={refreshingRates ? "animate-spin text-amber-400" : ""} />
-              <span>Refresh Rates</span>
+              Refresh Rates
             </Button>
 
             <Button
               variant="primary"
               size="sm"
+              icon={<Plus size={15} />}
               onClick={() => openAddModal("GOLD")}
-              className="gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-md shadow-amber-500/20"
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-md shadow-amber-500/20"
             >
-              <Plus size={15} />
-              <span>Add Metal Asset</span>
+              Add Metal Asset
             </Button>
           </div>
         }
@@ -977,18 +970,18 @@ export default function GoldSilverSection() {
                   <Button
                     variant="primary"
                     size="sm"
+                    icon={<Plus size={14} />}
                     onClick={() => openAddModal("GOLD")}
                     className="bg-amber-500 hover:bg-amber-600 text-white"
                   >
-                    <Plus size={14} className="mr-1.5" />
                     Add Gold Asset
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    icon={<Plus size={14} />}
                     onClick={() => openAddModal("SILVER")}
                   >
-                    <Plus size={14} className="mr-1.5" />
                     Add Silver Asset
                   </Button>
                 </div>

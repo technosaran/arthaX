@@ -65,6 +65,9 @@ const GoldSilverSection = dynamic(() => import("@/components/GoldSilverSection")
 const FnoSection = dynamic(() => import("@/components/FnoSection"), {
   loading: TabLoadingFallback,
 });
+const CryptoSection = dynamic(() => import("@/components/CryptoSection"), {
+  loading: TabLoadingFallback,
+});
 const IncomeSection = dynamic(() => import("@/components/IncomeSection"), {
   loading: TabLoadingFallback,
 });
@@ -177,6 +180,11 @@ export default function HomeClient() {
       className="flex h-screen w-full overflow-hidden transition-colors"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
+      {/* Accessible Skip Link for Keyboard Navigation (WCAG 2.4.1) */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Modern Responsive Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -195,8 +203,12 @@ export default function HomeClient() {
           setCollapsed={setCollapsed}
         />
 
-        {/* Content Viewport */}
-        <div className="flex-1 h-full overflow-hidden relative w-full min-w-0">
+        {/* Content Viewport Landmark */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 h-full overflow-hidden relative w-full min-w-0 outline-hidden"
+        >
           <div className={`h-full w-full ${activeTab === "dashboard" ? "block" : "hidden"}`}>
             <DashboardSection onNavigate={handleTabChange} />
           </div>
@@ -228,6 +240,11 @@ export default function HomeClient() {
           {visitedTabs.fno && (
             <div className={`h-full w-full ${activeTab === "fno" ? "block" : "hidden"}`}>
               <FnoSection />
+            </div>
+          )}
+          {visitedTabs.crypto && (
+            <div className={`h-full w-full ${activeTab === "crypto" ? "block" : "hidden"}`}>
+              <CryptoSection onNavigate={handleTabChange} />
             </div>
           )}
           {visitedTabs.income && (
@@ -262,10 +279,10 @@ export default function HomeClient() {
           )}
           {(visitedTabs.settings || visitedTabs.profile) && (
             <div className={`h-full w-full ${activeTab === "settings" || activeTab === "profile" ? "block" : "hidden"}`}>
-              <SettingsSection initialTab={activeTab === "profile" ? "profile" : undefined} />
+              <SettingsSection initialTab={activeTab === "profile" ? "profile" : "statements"} />
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

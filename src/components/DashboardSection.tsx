@@ -4,8 +4,6 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import {
   PieChart as PieChartIcon,
   Plus,
-  ArrowUpRight,
-  ArrowDownLeft,
   ArrowLeftRight,
   Target,
   TrendingUp,
@@ -15,14 +13,6 @@ import {
   ArrowRight,
   PiggyBank,
   Clock,
-  Sparkles,
-  Activity,
-  ShieldCheck,
-  CreditCard,
-  Wallet,
-  Zap,
-  Coins,
-  Gem,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -129,6 +119,15 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
   const [name, setName] = useState<string>(profile?.name || initialCache?.name || "");
   const [netWorth, setNetWorth] = useState<number>(initialCache?.netWorth || 0);
+  const [currencyView, setCurrencyView] = useState<"INR" | "USD">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("arthax_networth_currency");
+      if (saved === "USD" || saved === "INR") return saved;
+    }
+    return "INR";
+  });
+  const [totalCryptoUsd, setTotalCryptoUsd] = useState<number>(0);
+  const [cryptoHoldings, setCryptoHoldings] = useState<{ asset: string; total_value_usd: number }[]>([]);
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialCache?.expenses || []);
   const [incomes, setIncomes] = useState<IncomeItem[]>(initialCache?.incomes || []);
@@ -158,6 +157,15 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     }).format(val);
   }, []);
 
+  // Currency Formatter (USD)
+  const formatUSD = useCallback((val: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(val);
+  }, []);
+
   const fetchDashboardData = useCallback(async () => {
     if (!user || inFlightRef.current) return;
     inFlightRef.current = true;
@@ -165,8 +173,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     try {
       const supabase = createClient();
 
-      // Parallel concurrent burst: accounts, expenses, income, transfers
-      const [accountsRes, expensesRes, incomeRes, transfersRes] = await Promise.all([
+      // Parallel concurrent burst: accounts, expenses, income, transfers, crypto_holdings
+      const [accountsRes, expensesRes, incomeRes, transfersRes, cryptoRes] = await Promise.all([
         supabase
           .from("accounts")
           .select("id, name, type, balance, last_four, classification")
@@ -189,12 +197,20 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           .eq("user_id", user.id)
           .order("transfer_date", { ascending: false })
           .limit(25),
+        supabase
+          .from("crypto_holdings")
+          .select("asset, total_value_usd")
+          .eq("user_id", user.id),
       ]);
 
       // 1. Resolve user display name
+      const rawProfileName = profile?.name?.trim();
+      const validProfileName =
+        rawProfileName && rawProfileName.toLowerCase() !== "user" ? rawProfileName : null;
       const resolvedName =
-        profile?.name ||
+        validProfileName ||
         user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
         user.email?.split("@")[0] ||
         "User";
       setName((prev) => (prev === resolvedName ? prev : resolvedName));
@@ -231,6 +247,20 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
       setAccounts(mapped);
       setNetWorth(total);
+
+      // Resolve Crypto Holdings USD Valuation
+      let cryptoUsdTotal = 0;
+      let cryptoList: { asset: string; total_value_usd: number }[] = [];
+      if (cryptoRes?.data && cryptoRes.data.length > 0) {
+        cryptoList = cryptoRes.data.map((c: any) => ({
+          asset: c.asset,
+          total_value_usd: Number(c.total_value_usd) || 0,
+        }));
+        cryptoUsdTotal = cryptoList.reduce((acc, curr) => acc + curr.total_value_usd, 0);
+      }
+      setCryptoHoldings(cryptoList);
+      setTotalCryptoUsd(cryptoUsdTotal);
+
       if (expensesRes.data) {
         setExpenses((expensesRes.data as ExpenseItem[]).filter((e) => !isFamilyTransfer(e)));
       }
@@ -291,6 +321,11 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "income", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crypto_holdings", filter: `user_id=eq.${user.id}` },
         () => fetchDashboardData()
       )
       .on(
@@ -383,11 +418,25 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       .reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
   }, [accounts]);
 
+  // Currency-Specific Independent Values (No conversion applied)
+  const displayedNetWorth = useMemo(() => {
+    return currencyView === "USD" ? totalCryptoUsd : netWorth;
+  }, [currencyView, totalCryptoUsd, netWorth]);
+
+  const displayedAssets = useMemo(() => {
+    return currencyView === "USD" ? totalCryptoUsd : totalAssets;
+  }, [currencyView, totalCryptoUsd, totalAssets]);
+
+  const displayedLiabilities = useMemo(() => {
+    return currencyView === "USD" ? 0 : totalLiabilities;
+  }, [currencyView, totalLiabilities]);
+
   // Formatted Net Worth (omitting trailing .00 for whole numbers to ensure crisp elegance & avoid truncation)
   const formattedNetWorth = useMemo(() => {
-    const formatted = formatCurrency(netWorth);
+    const formatted =
+      currencyView === "USD" ? formatUSD(displayedNetWorth) : formatCurrency(displayedNetWorth);
     return formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
-  }, [formatCurrency, netWorth]);
+  }, [currencyView, formatUSD, formatCurrency, displayedNetWorth]);
 
   // Dynamic Net Worth font sizing based on string length to guarantee zero overflow
   const netWorthFontSize = useMemo(() => {
@@ -450,6 +499,31 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         color: chartPalette[index % chartPalette.length],
       }));
   }, [typeMap, chartPalette]);
+
+  const cryptoDonutSegments: DonutSegment[] = useMemo(() => {
+    const sorted = [...cryptoHoldings].sort((a, b) => b.total_value_usd - a.total_value_usd);
+    const top5 = sorted.slice(0, 5);
+    const others = sorted.slice(5);
+
+    const segments: DonutSegment[] = top5.map((c, i) => ({
+      label: c.asset,
+      value: c.total_value_usd,
+      color: chartPalette[i % chartPalette.length],
+      subtitle: formatUSD(c.total_value_usd),
+    }));
+
+    if (others.length > 0) {
+      const othersTotal = others.reduce((acc, curr) => acc + curr.total_value_usd, 0);
+      segments.push({
+        label: "Others",
+        value: othersTotal,
+        color: "#6B7280",
+        subtitle: formatUSD(othersTotal),
+      });
+    }
+
+    return segments;
+  }, [cryptoHoldings, chartPalette, formatUSD]);
 
   // Top Expense Categories this Month
   const topExpenseCategories = useMemo(() => {
@@ -571,24 +645,69 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center relative z-10">
             {/* Left Column: Total Net Worth Summary */}
             <div className="xl:col-span-5 space-y-5 min-w-0">
-              {/* Top Label & Recorded Balances Indicator */}
-              <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
-                <span className="font-semibold text-[var(--app-fg)]">
-                  Total Net Worth
-                </span>
-                {totalLiabilities > 0 && (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
-                    <span className="text-[var(--app-muted)]">Assets − Liabilities</span>
-                  </>
-                )}
+              {/* Top Label & Segmented Currency View Toggle */}
+              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-[var(--app-fg)]">
+                    Total Net Worth
+                  </span>
+                  {currencyView === "INR" ? (
+                    totalLiabilities > 0 && (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                        <span className="text-[var(--app-muted)]">Assets − Liabilities</span>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
+                      <span className="text-[var(--app-muted)]">Crypto (Binance)</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Independent Currency View Toggle: [ ₹ INR | $ USD ] (No conversion) */}
+                <div className="flex items-center p-0.5 rounded-lg bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-xs font-mono select-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrencyView("INR");
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("arthax_networth_currency", "INR");
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      currencyView === "INR"
+                        ? "bg-[var(--app-card-elevated)] text-emerald-400 border border-[var(--app-border)] shadow-xs"
+                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                    }`}
+                  >
+                    ₹ INR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrencyView("USD");
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("arthax_networth_currency", "USD");
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      currencyView === "USD"
+                        ? "bg-[var(--app-card-elevated)] text-amber-400 border border-[var(--app-border)] shadow-xs"
+                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                    }`}
+                  >
+                    $ USD
+                  </button>
+                </div>
               </div>
 
               {/* Massive Metric Amount with Dynamic Sizing & Overflow Protection */}
               <div className="space-y-1 min-w-0">
                 <div
                   className={`${netWorthFontSize} font-extrabold tracking-tight font-mono text-[var(--app-fg)] tabular-nums truncate`}
-                  title={formatCurrency(netWorth)}
+                  title={currencyView === "USD" ? formatUSD(displayedNetWorth) : formatCurrency(displayedNetWorth)}
                 >
                   {loading ? (
                     <Skeleton className="h-14 w-64 rounded-xl" />
@@ -600,7 +719,39 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
               {/* Asset & Liability Quick Badges */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                {totalLiabilities > 0 ? (
+                {currencyView === "USD" ? (
+                  <>
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
+                        Crypto Assets (USD)
+                      </div>
+                      <div
+                        className="text-sm sm:text-base font-bold font-mono text-amber-400 mt-0.5 tabular-nums truncate"
+                        title={formatUSD(displayedAssets)}
+                      >
+                        {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatUSD(displayedAssets)}
+                      </div>
+                    </div>
+
+                    <div
+                      className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
+                      style={{ backgroundColor: "var(--app-card-subtle)" }}
+                    >
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
+                        USD Liabilities
+                      </div>
+                      <div
+                        className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums truncate"
+                        title={formatUSD(displayedLiabilities)}
+                      >
+                        {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatUSD(displayedLiabilities)}
+                      </div>
+                    </div>
+                  </>
+                ) : totalLiabilities > 0 ? (
                   <>
                     <div
                       className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] transition-colors min-w-0"
@@ -670,13 +821,26 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
               {/* Sub-Badges Pill Row */}
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                <Badge variant="success" dot={true}>
-                  {liquidPct}% Liquid Assets
-                </Badge>
-                {totalLiabilities > 0 && totalAssets > 0 && (
-                  <Badge variant="danger">
-                    {Math.round((totalLiabilities / totalAssets) * 100)}% Debt-to-Asset Ratio
-                  </Badge>
+                {currencyView === "INR" ? (
+                  <>
+                    <Badge variant="success" dot={true}>
+                      {liquidPct}% Liquid Assets
+                    </Badge>
+                    {totalLiabilities > 0 && totalAssets > 0 && (
+                      <Badge variant="danger">
+                        {Math.round((totalLiabilities / totalAssets) * 100)}% Debt-to-Asset Ratio
+                      </Badge>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="neutral" dot={true}>
+                      {cryptoHoldings.length} {cryptoHoldings.length === 1 ? "Asset" : "Assets"} in Spot
+                    </Badge>
+                    <Badge variant="neutral">
+                      Binance Auto-Sync
+                    </Badge>
+                  </>
                 )}
               </div>
             </div>
@@ -691,14 +855,14 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 </div>
               ) : (
                 <InteractiveDonutChart
-                  title="Portfolio Asset Allocation"
-                  totalLabel="Total Assets"
-                  totalValue={totalAssets > 0 ? totalAssets : netWorth}
-                  segments={donutSegments}
-                  formatter={formatCurrency}
+                  title={currencyView === "USD" ? "Binance Crypto Allocation" : "Portfolio Asset Allocation"}
+                  totalLabel={currencyView === "USD" ? "Crypto Assets (USD)" : "Total Assets"}
+                  totalValue={currencyView === "USD" ? displayedAssets : (totalAssets > 0 ? totalAssets : netWorth)}
+                  segments={currencyView === "USD" ? cryptoDonutSegments : donutSegments}
+                  formatter={currencyView === "USD" ? formatUSD : formatCurrency}
                   align="end"
-                  emptyMessage="No asset allocation data available."
-                  emptySubMessage="Add bank accounts or cash in hand to see your portfolio breakdown."
+                  emptyMessage={currencyView === "USD" ? "No cryptocurrency holdings found." : "No asset allocation data available."}
+                  emptySubMessage={currencyView === "USD" ? "Sync Binance in the Crypto tab to see your coin breakdown." : "Add bank accounts or cash in hand to see your portfolio breakdown."}
                   icon={<PieChartIcon size={24} className="opacity-50 text-[var(--app-accent)]" />}
                 />
               )}
@@ -768,109 +932,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             />
           </div>
         )}
-
-        {/* QUICK ACTIONS COMMAND BAR */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
-          <button
-            type="button"
-            onClick={() => onNavigate?.("stocks")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-orange-500/40 hover:bg-orange-500/10 fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <TrendingUp size={15} className="text-orange-400" />
-            <span>Stocks</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("mutual-funds")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-emerald-500/40 hover:bg-emerald-500/10 fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <Coins size={15} className="text-emerald-400" />
-            <span>Mutual Funds</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("gold-silver")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-amber-500/40 hover:bg-amber-500/10 fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <Gem size={15} className="text-amber-400" />
-            <span>Gold & Silver</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("bonds")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-sky-500/40 hover:bg-sky-500/10 fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <ShieldCheck size={15} className="text-sky-400" />
-            <span>Bonds</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("fno")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-amber-500/40 hover:bg-amber-500/10 fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <Zap size={15} className="text-amber-400" />
-            <span>F&O Derivatives</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("accounts")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <Plus size={15} className="text-[var(--app-accent)]" />
-            <span>Add Account</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("expenses")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <ArrowUpRight size={15} className="text-rose-400" />
-            <span>Add Expense</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("income")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <ArrowDownLeft size={15} className="text-emerald-400" />
-            <span>Add Income</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("accounts")}
-            className="rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <ArrowLeftRight size={15} className="text-sky-400" />
-            <span>Transfer Funds</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate?.("budgets")}
-            className="col-span-2 sm:col-span-1 rounded-xl border border-[var(--app-border)] p-3.5 transition-all text-xs font-semibold text-[var(--app-fg)] flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 hover:border-[var(--app-border-hover)] hover:bg-[var(--app-card-hover)] fintech-focus"
-            style={{ backgroundColor: "var(--app-card)" }}
-          >
-            <Target size={15} className="text-amber-400" />
-            <span>Category Budgets</span>
-          </button>
-        </div>
 
         {/* TWO COLUMN ANALYTICS & INSIGHTS GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">

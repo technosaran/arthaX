@@ -727,11 +727,6 @@ export default function AccountsSection() {
       <PageHeader
         title="Accounts & Holdings"
         description="Bank accounts, credit cards, brokerage balances, and physical cash reserves."
-        badge={
-          <Badge variant="neutral">
-            {accounts.length} {accounts.length === 1 ? "Holding" : "Holdings"}
-          </Badge>
-        }
         actions={
           <>
             <Button

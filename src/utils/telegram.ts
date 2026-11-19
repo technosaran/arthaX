@@ -7,6 +7,14 @@ export interface SendTelegramMessageOptions {
   replyMarkup?: Record<string, unknown>;
 }
 
+export interface SendTelegramPhotoOptions {
+  chatId: string | number;
+  photo: string;
+  caption?: string;
+  parseMode?: "HTML" | "Markdown" | "MarkdownV2";
+  replyMarkup?: Record<string, unknown>;
+}
+
 export interface TelegramApiResponse<T = unknown> {
   ok: boolean;
   result?: T;
@@ -109,6 +117,88 @@ export async function sendTelegramMessage({
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : "Network error contacting Telegram API";
     console.error("[Telegram API] Request failed:", errMsg);
+    return { success: false, error: errMsg };
+  }
+}
+
+/**
+ * Sends a photo or visual chart via Telegram Bot API with optional HTML caption and buttons.
+ */
+export async function sendTelegramPhoto({
+  chatId,
+  photo,
+  caption,
+  parseMode = "HTML",
+  replyMarkup,
+}: SendTelegramPhotoOptions): Promise<{
+  success: boolean;
+  messageId?: number;
+  error?: string;
+  raw?: unknown;
+}> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!token) {
+    console.warn("[Telegram API] TELEGRAM_BOT_TOKEN is not configured in environment variables.");
+    return {
+      success: false,
+      error: "TELEGRAM_BOT_TOKEN is not configured in environment variables.",
+    };
+  }
+
+  const cleanChatId = String(chatId).trim();
+  if (!cleanChatId) {
+    return { success: false, error: "Invalid or empty Telegram chatId." };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+    const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+    const payload: Record<string, unknown> = {
+      chat_id: cleanChatId,
+      photo,
+      parse_mode: parseMode,
+    };
+
+    if (caption) {
+      payload.caption = caption;
+    }
+
+    if (replyMarkup) {
+      payload.reply_markup = replyMarkup;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    clearTimeout(timeoutId);
+
+    const data = (await response.json()) as TelegramApiResponse<{ message_id: number }>;
+
+    if (!response.ok || !data.ok) {
+      console.warn("[Telegram API] sendPhoto failed:", data);
+      return {
+        success: false,
+        error: data.description || `HTTP ${response.status}: Failed to send photo to Telegram`,
+        raw: data,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: data.result?.message_id,
+      raw: data,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : "Network error contacting Telegram API";
+    console.error("[Telegram API] Photo request failed:", errMsg);
     return { success: false, error: errMsg };
   }
 }
@@ -220,12 +310,19 @@ export async function setTelegramBotCommands(): Promise<{ success: boolean; desc
   const commands = [
     { command: "balance", description: "View accounts & liquid balances" },
     { command: "summary", description: "Today & monthly spending summary" },
-    { command: "recent", description: "Last 5 recorded expenses" },
+    { command: "chart", description: "Visual spending breakdown chart" },
+    { command: "portfolio", description: "Total Net Worth & asset overview" },
+    { command: "stocks", description: "Indian stock portfolio & P&L" },
+    { command: "quote", description: "Live stock quote (e.g. /quote RELIANCE)" },
+    { command: "mf", description: "Mutual funds & SIP summary" },
+    { command: "bullion", description: "Physical gold & silver holdings" },
     { command: "budget", description: "Category budgets & progress bars" },
+    { command: "setbudget", description: "Set budget (e.g. /setbudget Food 5000)" },
+    { command: "recent", description: "Last 5 recorded transactions" },
     { command: "undo", description: "Cancel last recorded transaction" },
-    { command: "status", description: "Check connection & workspace status" },
+    { command: "status", description: "Check connection & sync status" },
     { command: "ai", description: "Ask financial advice via Gemini AI" },
-    { command: "help", description: "Full bot guide & examples" },
+    { command: "help", description: "Full bot guide, voice & photo examples" },
     { command: "unlink", description: "Disconnect this Telegram chat" },
   ];
 
@@ -510,17 +607,26 @@ export function formatWelcomeMessage({
   if (isLinked) {
     return (
       `👋 <b>Welcome back, ${escapeTelegramHtml(userName || "Friend")}!</b>\n\n` +
-      `Your Telegram is linked to your <b>arthaX</b> account${botDisplay}. You can log expenses right from this chat.\n\n` +
+      `Your Telegram is linked to your <b>arthaX</b> account${botDisplay}. You can perform all financial actions right from this chat:\n\n` +
+      `🎙️ <b>Voice &amp; Audio:</b> Send a voice note to log transactions, check balances, or ask advice!\n` +
+      `📸 <b>Receipts &amp; Bills:</b> Send a photo of any receipt, bill, or UPI payment screenshot to scan &amp; record.\n\n` +
       `<b>Quick Examples:</b>\n` +
       `• <code>Dinner 500 HDFC</code>\n` +
+      `• <code>Salary 85000 HDFC</code>\n` +
+      `• <code>Transfer 5000 from HDFC to Cash</code>\n` +
       `• <code>Petrol 1200 Cash</code>\n` +
       `• <code>Groceries 450 SBI</code>\n` +
       `• <code>Uber 320</code>\n` +
       `• Or forward/copy-paste any bank debit SMS!\n\n` +
       `<b>Available Commands:</b>\n` +
       `• /balance - View accounts & balances\n` +
-      `• /recent - View last 5 expenses\n` +
       `• /summary - View today & monthly totals\n` +
+      `• /chart - Visual spending breakdown chart\n` +
+      `• /portfolio - Total Net Worth & investments\n` +
+      `• /stocks - Indian stock portfolio & P&L\n` +
+      `• /quote &lt;symbol&gt; - Live stock quotes (e.g. /quote RELIANCE)\n` +
+      `• /recent - View last 5 expenses\n` +
+      `• /budget - Category budgets & progress\n` +
       `• /help - Full command guide\n` +
       `• /unlink - Disconnect this Telegram chat`
     );
@@ -535,7 +641,7 @@ export function formatWelcomeMessage({
     `1. Open arthaX on web &gt; <b>Settings &gt; Integrations &gt; Telegram</b>\n` +
     `2. Copy your 6-character Link Code\n` +
     `3. Reply here with: ${tokenSnippet}\n\n` +
-    `<i>Once linked, all your natural messages and copied bank SMS alerts will be categorized and recorded automatically!</i>`
+    `<i>Once linked, all your natural messages, voice notes, photos, and copied bank SMS alerts will be categorized and recorded automatically!</i>`
   );
 }
 
@@ -543,6 +649,17 @@ export function formatHelpMessage(botUsername?: string): string {
   const botTag = botUsername ? `(@${botUsername}) ` : "";
   return (
     `🤖 <b>arthaX Telegram Bot Guide ${botTag}</b>\n\n` +
+    `🎙️ <b>Voice Actions (Speak to Bot):</b>\n` +
+    `• <i>"Logged 450 for lunch with HDFC"</i>\n` +
+    `• <i>"Received 75000 salary in SBI"</i>\n` +
+    `• <i>"What is my bank balance?"</i>\n` +
+    `• <i>"Show my spending chart"</i>\n` +
+    `• <i>"What is my total net worth?"</i>\n` +
+    `• <i>"How is my stock portfolio doing?"</i>\n\n` +
+    `📸 <b>Receipts &amp; Screenshots:</b>\n` +
+    `• Send photos of restaurant receipts, fuel slips, or grocery bills\n` +
+    `• Send UPI payment screenshots (GPay, PhonePe, Paytm, BHIM)\n` +
+    `• AI extracts merchant, amount, category, and logs it automatically!\n\n` +
     `<b>Natural Expense Logging:</b>\n` +
     `• <code>Dinner 650 HDFC</code>\n` +
     `• <code>Petrol 1200 Cash</code>\n` +
@@ -559,10 +676,19 @@ export function formatHelpMessage(botUsername?: string): string {
     `<b>Commands:</b>\n` +
     `• /balance - View accounts & liquid portfolio\n` +
     `• /budget - Category budgets & progress bars\n` +
+    `• /setbudget &lt;category&gt; &lt;amount&gt; - Set monthly budget limit\n` +
     `• /summary - Today & monthly income/spending\n` +
+    `• /chart - Visual spending breakdown chart image\n` +
+    `• /portfolio - Total Net Worth & investments\n` +
+    `• /stocks - Indian stock portfolio & P&L\n` +
+    `• /quote &lt;symbol&gt; - Live stock quote (e.g. /quote RELIANCE)\n` +
+    `• /addstock &lt;sym&gt; &lt;qty&gt; &lt;price&gt; - Record stock purchase\n` +
+    `• /mf - Mutual fund portfolio & SIP summary\n` +
+    `• /bullion - Physical gold & silver holdings\n` +
     `• /recent - Last 5 recorded transactions\n` +
     `• /undo - Cancel your last recorded transaction\n` +
     `• /ai &lt;query&gt; - Financial advice via Gemini AI\n` +
+    `• /status - Check sync & connection status\n` +
     `• /link &lt;token&gt; - Pair your Telegram account\n` +
     `• /unlink - Disconnect this chat\n\n` +
     `<i>Each user's data is strictly partitioned by their unique Telegram Chat ID and protected with PostgreSQL Row-Level Security.</i>`
@@ -734,6 +860,297 @@ export function formatStatusMessage({
   );
 }
 
+export function formatPortfolioOverview({
+  accountsTotal,
+  stocksTotal,
+  mfTotal,
+  bullionTotal,
+  netWorth,
+  userName,
+}: {
+  accountsTotal: number;
+  stocksTotal: number;
+  mfTotal: number;
+  bullionTotal: number;
+  netWorth: number;
+  userName?: string;
+}): string {
+  const greeting = userName ? ` (${escapeTelegramHtml(userName)})` : "";
+  return (
+    `💼 <b>Total Net Worth &amp; Portfolio${greeting}</b>\n\n` +
+    `🏦 <b>Bank &amp; Cash Accounts:</b> ${formatCurrencyINR(accountsTotal)}\n` +
+    `💹 <b>Indian Equities (Stocks):</b> ${formatCurrencyINR(stocksTotal)}\n` +
+    `📊 <b>Mutual Funds &amp; SIPs:</b> ${formatCurrencyINR(mfTotal)}\n` +
+    `🪙 <b>Bullion (Gold &amp; Silver):</b> ${formatCurrencyINR(bullionTotal)}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `💎 <b>Total Net Worth:</b>\n` +
+    `<b>${formatCurrencyINR(netWorth)}</b>\n\n` +
+    `<i>⚡ Real-time consolidated valuation across all assets</i>`
+  );
+}
+
+export function formatStocksSummary({
+  holdings,
+  totalInvested,
+  totalCurrent,
+  totalPnl,
+  totalPnlPercent,
+}: {
+  holdings: Array<{
+    symbol: string;
+    exchange: string;
+    quantity: number;
+    avg_buy_price: number;
+    current_price?: number;
+    pnl?: number;
+    pnl_percent?: number;
+  }>;
+  totalInvested: number;
+  totalCurrent: number;
+  totalPnl: number;
+  totalPnlPercent: number;
+}): string {
+  if (!holdings || holdings.length === 0) {
+    return (
+      `💹 <b>Indian Stock Holdings:</b>\n\n` +
+      `<i>No stock holdings recorded yet.</i>\n\n` +
+      `Add stocks with <code>/addstock &lt;SYMBOL&gt; &lt;QTY&gt; &lt;PRICE&gt;</code> or connect Zerodha in Settings!`
+    );
+  }
+
+  const pnlSign = totalPnl >= 0 ? "+" : "";
+  const pnlEmoji = totalPnl >= 0 ? "🟢" : "🔴";
+
+  const rows = holdings.slice(0, 8).map((h) => {
+    const curPriceStr = h.current_price ? ` @ ${formatCurrencyINR(h.current_price)}` : "";
+    const pnlStr = h.pnl !== undefined
+      ? ` (${h.pnl >= 0 ? "+" : ""}${formatCurrencyINR(h.pnl)})`
+      : "";
+    return `• <b>${escapeTelegramHtml(h.symbol)}</b> (${h.quantity} shares)${curPriceStr}\n` +
+      `  Avg: ${formatCurrencyINR(h.avg_buy_price)}${pnlStr}`;
+  });
+
+  return (
+    `💹 <b>Indian Stock Portfolio:</b>\n\n` +
+    rows.join("\n\n") +
+    `\n\n━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 <b>Invested:</b> ${formatCurrencyINR(totalInvested)}\n` +
+    (totalCurrent > 0 ? `📈 <b>Current Value:</b> ${formatCurrencyINR(totalCurrent)}\n` : "") +
+    `${pnlEmoji} <b>Total P&amp;L:</b> ${pnlSign}${formatCurrencyINR(totalPnl)} (${pnlSign}${totalPnlPercent.toFixed(2)}%)\n\n` +
+    `<i>⚡ Use /quote &lt;SYMBOL&gt; for live stock quotes</i>`
+  );
+}
+
+export function formatStockQuote(quote: {
+  symbol: string;
+  exchange: string;
+  companyName?: string;
+  currentPrice: number;
+  previousClose?: number;
+  change: number;
+  changePercent: number;
+  dayHigh?: number;
+  dayLow?: number;
+}): string {
+  const isPositive = quote.change >= 0;
+  const pnlSign = isPositive ? "+" : "";
+  const pnlEmoji = isPositive ? "🟢" : "🔴";
+
+  return (
+    `📈 <b>${escapeTelegramHtml(quote.companyName || quote.symbol)}</b> (<code>${escapeTelegramHtml(quote.symbol)}:${escapeTelegramHtml(quote.exchange)}</code>)\n\n` +
+    `💵 <b>LTP:</b> ${formatCurrencyINR(quote.currentPrice)}\n` +
+    `${pnlEmoji} <b>Change:</b> ${pnlSign}${formatCurrencyINR(quote.change)} (${pnlSign}${quote.changePercent.toFixed(2)}%)\n` +
+    (quote.dayHigh && quote.dayLow
+      ? `📊 <b>Range:</b> ${formatCurrencyINR(quote.dayLow)} - ${formatCurrencyINR(quote.dayHigh)}\n`
+      : "") +
+    (quote.previousClose ? `⏮️ <b>Prev Close:</b> ${formatCurrencyINR(quote.previousClose)}\n\n` : "\n") +
+    `<i>⚡ Real-time market feed from NSE/BSE</i>`
+  );
+}
+
+export function formatMutualFundsSummary({
+  holdings,
+  totalInvested,
+  totalCurrent,
+  totalPnl,
+}: {
+  holdings: Array<{
+    scheme_name: string;
+    units: number;
+    avg_nav: number;
+    current_nav?: number;
+    invested_amount: number;
+    is_sip_active?: boolean;
+    sip_amount?: number;
+  }>;
+  totalInvested: number;
+  totalCurrent: number;
+  totalPnl: number;
+}): string {
+  if (!holdings || holdings.length === 0) {
+    return (
+      `📊 <b>Mutual Funds Portfolio:</b>\n\n` +
+      `<i>No mutual fund holdings found.</i>\n\n` +
+      `Import your Zerodha Coin or CAS statement in arthaX &gt; Mutual Funds.`
+    );
+  }
+
+  const pnlSign = totalPnl >= 0 ? "+" : "";
+  const pnlEmoji = totalPnl >= 0 ? "🟢" : "🔴";
+  const pnlPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+
+  const rows = holdings.slice(0, 6).map((mf) => {
+    const sipTag = mf.is_sip_active ? ` <i>[SIP: ${formatCurrencyINR(Number(mf.sip_amount) || 0)}]</i>` : "";
+    const navVal = (mf.current_nav || mf.avg_nav) * mf.units;
+    return `• <b>${escapeTelegramHtml(mf.scheme_name.slice(0, 35))}...</b>${sipTag}\n` +
+      `  Units: ${mf.units.toFixed(2)} | Invested: ${formatCurrencyINR(mf.invested_amount)} | Value: ${formatCurrencyINR(navVal)}`;
+  });
+
+  return (
+    `📊 <b>Mutual Funds Portfolio:</b>\n\n` +
+    rows.join("\n\n") +
+    `\n\n━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 <b>Invested:</b> ${formatCurrencyINR(totalInvested)}\n` +
+    `📈 <b>Current Value:</b> ${formatCurrencyINR(totalCurrent)}\n` +
+    `${pnlEmoji} <b>Total P&amp;L:</b> ${pnlSign}${formatCurrencyINR(totalPnl)} (${pnlSign}${pnlPercent.toFixed(2)}%)\n\n` +
+    `<i>⚡ Daily updated AMFI NAV valuation</i>`
+  );
+}
+
+export function formatBullionSummary({
+  goldGrams,
+  goldValue,
+  silverGrams,
+  silverValue,
+  totalValue,
+}: {
+  goldGrams: number;
+  goldValue: number;
+  silverGrams: number;
+  silverValue: number;
+  totalValue: number;
+}): string {
+  if (goldGrams === 0 && silverGrams === 0) {
+    return (
+      `🪙 <b>Bullion &amp; Precious Metals:</b>\n\n` +
+      `<i>No gold or silver holdings recorded yet.</i>\n\n` +
+      `Track your coins, bars, and jewelry in arthaX &gt; Bullion Tracker!`
+    );
+  }
+
+  return (
+    `🪙 <b>Physical Bullion Portfolio:</b>\n\n` +
+    `🟡 <b>Gold Holdings:</b> ${goldGrams.toFixed(2)} grams (~${formatCurrencyINR(goldValue)})\n` +
+    `⚪ <b>Silver Holdings:</b> ${silverGrams.toFixed(2)} grams (~${formatCurrencyINR(silverValue)})\n\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `💎 <b>Total Bullion Valuation:</b> ${formatCurrencyINR(totalValue)}\n\n` +
+    `<i>⚡ Valued with live 24K Gold and 999 Silver bullion rates</i>`
+  );
+}
+
+export function formatBudgetSetConfirmation({
+  category,
+  amount,
+  monthName,
+}: {
+  category: string;
+  amount: number;
+  monthName: string;
+}): string {
+  return (
+    `🎯 <b>Budget Set Successfully!</b>\n\n` +
+    `🏷️ <b>Category:</b> ${escapeTelegramHtml(category)}\n` +
+    `💰 <b>Monthly Limit:</b> ${formatCurrencyINR(amount)}\n` +
+    `📅 <b>Period:</b> ${escapeTelegramHtml(monthName)}\n\n` +
+    `<i>⚡ Monitored real-time against your logged expenses</i>`
+  );
+}
+
+export function formatStockAddConfirmation({
+  symbol,
+  quantity,
+  price,
+  exchange,
+}: {
+  symbol: string;
+  quantity: number;
+  price: number;
+  exchange: string;
+}): string {
+  return (
+    `💹 <b>Stock Holding Recorded!</b>\n\n` +
+    `📌 <b>Symbol:</b> <code>${escapeTelegramHtml(symbol)}:${escapeTelegramHtml(exchange)}</code>\n` +
+    `🔢 <b>Quantity:</b> ${quantity} shares\n` +
+    `💵 <b>Buy Price:</b> ${formatCurrencyINR(price)}\n` +
+    `💰 <b>Total Value:</b> ${formatCurrencyINR(quantity * price)}\n\n` +
+    `<i>⚡ Synced directly with your arthaX portfolio</i>`
+  );
+}
+
+export function getQuickChartSpendingUrl({
+  categories,
+  amounts,
+  title = "Monthly Spending",
+}: {
+  categories: string[];
+  amounts: number[];
+  title?: string;
+}): string {
+  if (!categories.length || !amounts.length) {
+    return "";
+  }
+
+  const colors = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#ec4899",
+    "#06b6d4",
+    "#14b8a6",
+    "#f97316",
+    "#6366f1",
+  ];
+
+  const chartConfig = {
+    type: "doughnut",
+    data: {
+      labels: categories.slice(0, 8),
+      datasets: [
+        {
+          data: amounts.slice(0, 8),
+          backgroundColor: colors.slice(0, Math.min(categories.length, 8)),
+          borderColor: "#18181b",
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            color: "#e4e4e7",
+            font: { size: 12, family: "sans-serif" },
+            padding: 12,
+          },
+        },
+        title: {
+          display: true,
+          text: title,
+          color: "#f4f4f5",
+          font: { size: 16, weight: "bold", family: "sans-serif" },
+          padding: { top: 10, bottom: 15 },
+        },
+      },
+    },
+  };
+
+  const encoded = encodeURIComponent(JSON.stringify(chartConfig));
+  return `https://quickchart.io/chart?c=${encoded}&w=500&h=350&bkg=%2309090b`;
+}
+
 // -------------------------------------------------------------
 // Interactive Inline Keyboards
 // -------------------------------------------------------------
@@ -743,15 +1160,22 @@ export function getStandardInlineKeyboard(webUrl: string = "https://arthax.verce
     inline_keyboard: [
       [
         { text: "💳 Balances", callback_data: "action:balance" },
-        { text: "🎯 Budgets", callback_data: "action:budget" },
-      ],
-      [
         { text: "📊 Summary", callback_data: "action:summary" },
-        { text: "📜 Recent", callback_data: "action:recent" },
       ],
       [
+        { text: "🎯 Budgets", callback_data: "action:budget" },
+        { text: "📈 Chart", callback_data: "action:chart" },
+      ],
+      [
+        { text: "💼 Portfolio", callback_data: "action:portfolio" },
+        { text: "💹 Stocks", callback_data: "action:stocks" },
+      ],
+      [
+        { text: "📜 Recent", callback_data: "action:recent" },
         { text: "⚡ Status", callback_data: "action:status" },
-        { text: "🌐 Open arthaX", url: webUrl },
+      ],
+      [
+        { text: "🌐 Open arthaX Dashboard", url: webUrl },
       ],
     ],
   };

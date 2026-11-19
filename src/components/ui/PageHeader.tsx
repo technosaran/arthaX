@@ -6,7 +6,6 @@ export interface PageHeaderProps {
   title: React.ReactNode;
   description?: React.ReactNode;
   icon?: React.ReactNode;
-  badge?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
 }
@@ -15,7 +14,6 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   description,
   icon,
-  badge,
   actions,
   className = "",
 }) => {
@@ -29,7 +27,6 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             {icon && <span className="flex-shrink-0">{icon}</span>}
             {title}
           </h1>
-          {badge && <div className="flex-shrink-0">{badge}</div>}
         </div>
         {description && (
           <p className="text-xs sm:text-sm text-[var(--app-muted)] font-normal max-w-2xl">

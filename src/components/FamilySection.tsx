@@ -24,6 +24,7 @@ import {
   Search,
   ShieldCheck,
   Calendar,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -469,6 +470,22 @@ export default function FamilySection() {
     [members, getMemberSpendingForMonth]
   );
 
+  const totalPendingAllowance = useMemo(() => {
+    return members.reduce((sum, m) => {
+      const allowance = Number(m.monthly_allowance) || 0;
+      const spent = getMemberSpendingForMonth(m);
+      return sum + Math.max(0, allowance - spent);
+    }, 0);
+  }, [members, getMemberSpendingForMonth]);
+
+  const pendingMembersCount = useMemo(() => {
+    return members.filter((m) => {
+      const allowance = Number(m.monthly_allowance) || 0;
+      const spent = getMemberSpendingForMonth(m);
+      return allowance > 0 && spent < allowance;
+    }).length;
+  }, [members, getMemberSpendingForMonth]);
+
   // Charts
   const donutSegments: DonutSegment[] = useMemo(() => {
     if (members.length === 0) return [];
@@ -768,11 +785,6 @@ export default function FamilySection() {
       <PageHeader
         title="Family Money Tracker"
         description="Track monthly allowances, financial support, and money sent to family members."
-        badge={
-          <Badge variant="emerald" dot>
-            Support & Transfers
-          </Badge>
-        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Month Stepper */}
@@ -848,11 +860,17 @@ export default function FamilySection() {
       {/* 4 KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
-          title="Family Members"
-          value={`${members.length} Members`}
-          subtitle={`${members.filter((m) => m.relationship === "Parent").length} Parents • ${members.filter((m) => m.relationship === "Spouse").length} Spouse • ${members.filter((m) => m.relationship === "Child").length} Children`}
-          icon={<Users size={16} />}
-          iconColor="emerald"
+          title={isAllTime ? "Annual Commitment" : "Pending Support"}
+          value={isAllTime ? formatINR(totalMonthlyAllowance * 12) : formatINR(totalPendingAllowance)}
+          subtitle={
+            isAllTime
+              ? "Projected 12-month commitment"
+              : totalPendingAllowance <= 0
+              ? "All allowances fulfilled ✓"
+              : `${pendingMembersCount} of ${members.length} member${pendingMembersCount !== 1 ? "s" : ""} awaiting support`
+          }
+          icon={isAllTime ? <Calendar size={16} /> : <Clock size={16} />}
+          iconColor={isAllTime ? "sky" : totalPendingAllowance <= 0 ? "emerald" : "amber"}
         />
 
         <StatCard
@@ -870,7 +888,11 @@ export default function FamilySection() {
         <StatCard
           title="Monthly Support Target"
           value={formatINR(totalMonthlyAllowance)}
-          subtitle={remainingBudget <= 0 ? "Target Met ✓" : `${formatINR(remainingBudget)} Remaining (${overallPercent}%)`}
+          subtitle={
+            remainingBudget <= 0
+              ? "Target Met ✓"
+              : `${overallPercent}% funded • ${formatINR(remainingBudget)} to target`
+          }
           icon={<Coins size={16} />}
           iconColor="amber"
           progress={{
@@ -1464,33 +1486,30 @@ export default function FamilySection() {
                                   variant="ghost"
                                   size="icon-sm"
                                   title="Edit Member"
+                                  icon={<Pencil size={12} />}
                                   onClick={() => {
                                     setEditingMember(member);
                                     setMemberModalOpen(true);
                                   }}
-                                >
-                                  <Pencil size={12} />
-                                </Button>
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
                                   title="Reset spending cycle"
+                                  icon={<RotateCcw size={12} />}
                                   onClick={() => {
                                     setResetMember(member);
                                     setResetModalOpen(true);
                                   }}
-                                >
-                                  <RotateCcw size={12} />
-                                </Button>
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
                                   title="Remove Member"
                                   className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                  icon={<Trash2 size={12} />}
                                   onClick={() => handleDeleteMember(member.id, member.name)}
-                                >
-                                  <Trash2 size={12} />
-                                </Button>
+                                />
                               </div>
                             </td>
                           </tr>
@@ -1707,10 +1726,9 @@ export default function FamilySection() {
                                 size="icon-sm"
                                 title="Reverse transfer record"
                                 className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                icon={<Trash2 size={12} />}
                                 onClick={() => handleDeleteTransfer(item.id, item.title, item.amount)}
-                              >
-                                <Trash2 size={12} />
-                              </Button>
+                              />
                             </td>
                           </tr>
                         );

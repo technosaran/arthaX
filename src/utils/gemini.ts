@@ -19,7 +19,25 @@ export interface GeminiMultimodalOptions {
 }
 
 export interface ParsedFinancialAI {
-  intent: "expense" | "income" | "transfer" | "balance_query" | "spending_query" | "undo" | "advice" | "ambiguous" | "unknown";
+  intent:
+    | "expense"
+    | "income"
+    | "transfer"
+    | "balance_query"
+    | "spending_query"
+    | "budget_query"
+    | "set_budget"
+    | "stocks_query"
+    | "quote_query"
+    | "mf_query"
+    | "bullion_query"
+    | "portfolio_query"
+    | "chart_query"
+    | "add_stock"
+    | "undo"
+    | "advice"
+    | "ambiguous"
+    | "unknown";
   amount?: number;
   title?: string;
   category?: string;
@@ -30,6 +48,10 @@ export interface ParsedFinancialAI {
   transcribedText?: string;
   adviceResponse?: string;
   confidence: number;
+  symbol?: string;
+  quantity?: number;
+  price?: number;
+  exchange?: "NSE" | "BSE";
 }
 
 const SYSTEM_INSTRUCTION = `You are ArthaX AI, an elite, highly intelligent personal finance assistant embedded in the arthaX Telegram Bot.
@@ -42,21 +64,31 @@ Formatting Rules:
 • <code>Dinner 500 HDFC</code>
 • <code>Petrol 1200 Cash</code>
 • <code>Uber 320</code>
-• Or by forwarding/copying any official bank debit SMS.
+• Or by sending a voice note or photo of any receipt/bill.
 4. Always be helpful, financially prudent, and encouraging. Never invent inaccurate financial figures.`;
 
-const PARSER_SYSTEM_INSTRUCTION = `You are ArthaX AI, an elite financial parser and intelligence engine.
-Analyze the user's input (which may be natural text, a voice audio recording, or a photo of a receipt/invoice/bill) and extract the financial intent into structured JSON.
+const PARSER_SYSTEM_INSTRUCTION = `You are ArthaX AI, an elite financial parser, multimodal speech transcriber, and intelligence engine.
+Analyze the user's input (which may be natural text, a voice audio recording, a photo of a receipt/invoice/bill, a UPI payment screenshot, or an investment screenshot) and extract the financial intent into structured JSON.
 
 Allowed intent values:
-- "expense": A purchase, payment, bill, debit SMS, or expense (e.g. "Dinner 500", "Spent 150 on coffee", "Paid electricity 1200").
-- "income": Money received, salary, freelance, dividend, credit (e.g. "Salary 85000", "Received 5000 from client").
+- "expense": A purchase, payment, restaurant/grocery bill, debit SMS, or expense (e.g. "Dinner 500", "Spent 150 on coffee", receipt photos, UPI sent payment screenshots).
+- "income": Money received, salary, freelance, dividend, credit SMS, or received payment screenshot (e.g. "Salary 85000", "Received 5000 from client", "UPI received 1200").
 - "transfer": Moving money between user's own accounts (e.g. "Transfer 5000 HDFC to Cash", "Move 2000 from SBI to ICICI").
-- "balance_query": Inquiring about bank balance, net worth, or money in account (e.g. "How much in ICICI?", "What is my balance?").
-- "spending_query": Inquiring about spending history (e.g. "How much did I spend today?", "What did I spend this week?").
+- "balance_query": Inquiring about bank balance, liquid cash, or account balances (e.g. "How much in ICICI?", "What is my balance?", "Check accounts").
+- "spending_query": Inquiring about spending history (e.g. "How much did I spend today?", "What did I spend this week?", "Monthly spending").
+- "chart_query": Asking for a visual spending breakdown, chart, or graph (e.g. "Show my spending chart", "Generate pie chart", "/chart").
+- "budget_query": Inquiring about budgets, category limits, or progress bars (e.g. "How are my budgets?", "Show budget").
+- "set_budget": Setting or updating a monthly budget for a category (e.g. "Set food budget to 8000", "/setbudget Shopping 5000", "Limit dining to 10k").
+- "portfolio_query": Asking for total net worth or overall portfolio overview (e.g. "What is my net worth?", "Portfolio summary", "Total assets").
+- "stocks_query": Checking stock holdings, equity portfolio, or stock performance (e.g. "Show my stocks", "My stock portfolio", "How are my shares?").
+- "quote_query": Inquiring about the live price or quote of a specific stock ticker (e.g. "Price of Reliance", "/quote TCS", "What is Tata Motors trading at?").
+- "add_stock": Recording a stock buy transaction (e.g. "Bought 10 shares of RELIANCE at 2400", "/addstock INFY 5 1850").
+- "mf_query": Checking mutual fund holdings, SIPs, or mutual fund portfolio (e.g. "My mutual funds", "Check SIPs").
+- "bullion_query": Checking physical gold or silver holdings and rates (e.g. "How much gold do I have?", "Check silver holdings", "Bullion value").
 - "undo": Asking to undo, delete, or cancel the last transaction (e.g. "Undo", "Cancel last", "Delete that expense").
-- "advice": Financial question, general advice, or affordability inquiry (e.g. "Can I afford dinner?", "How can I save more?").
+- "advice": Financial question, general advice, savings advice, or affordability inquiry (e.g. "Can I afford dinner?", "How can I save more?").
 - "ambiguous": The user only provided a standalone number or very vague input without merchant or purpose (e.g. "623", "500").
+- "unknown": Unrecognized query.
 
 Standard Categories:
 - Food & Dining
@@ -79,13 +111,29 @@ Standard Categories:
 - Other & Contingency
 
 Rules:
-1. If sending money to a family member (Mom, Dad, Wife, Mother, Father, Child, Sister, Brother, Son, Daughter), set isFamilyTransfer: true and category: "Family & Child Care".
-2. For receipts/bills: Extract total amount, merchant/shop name, and best category.
-3. For voice audio: Transcribe speech into transcribedText, and parse the financial intent.
-4. For advice/queries: Provide a helpful, concise HTML answer in adviceResponse.
-5. Return JSON ONLY with keys: intent, amount, title, category, accountQuery, fromAccountQuery, toAccountQuery, isFamilyTransfer, transcribedText, adviceResponse, confidence.`;
+1. Multimodal Audio (Voice notes):
+   - Always accurately transcribe speech into "transcribedText".
+   - Determine the user's intent from the spoken words (could be expense, income, transfer, balance_query, spending_query, chart_query, budget_query, set_budget, portfolio_query, stocks_query, quote_query, add_stock, mf_query, bullion_query, undo, or advice).
+2. Multimodal Photos (Receipts, Bills, Screenshots):
+   - For Receipts/Bills: Extract merchant name (title), total payable amount (amount), and appropriate category. Set intent: "expense".
+   - For UPI Payment Screenshots (GPay, PhonePe, Paytm, BHIM):
+     - If "Paid to" or "Sent to" or debit: intent: "expense", title: recipient name, amount: transaction amount, category: appropriate category based on merchant, accountQuery: bank name/last four digits if visible.
+     - If "Received from" or credited: intent: "income", title: sender name, amount: transaction amount, category: "Payment Received", accountQuery: bank name if visible.
+   - For Stock/Investment Screenshots: Extract symbol, quantity, and price if an order/holding is visible, or set intent: "stocks_query".
+3. For Advice: Provide a helpful, concise HTML answer in adviceResponse.
+4. For Stocks: If stock ticker/symbol is mentioned, set "symbol" (uppercase e.g. "RELIANCE", "TCS", "INFY"), "exchange": "NSE" (or "BSE" if mentioned).
+5. For Set Budget: Extract "category" and "amount".
+6. Return JSON ONLY with keys: intent, amount, title, category, accountQuery, fromAccountQuery, toAccountQuery, isFamilyTransfer, transcribedText, adviceResponse, confidence, symbol, quantity, price, exchange.`;
 
-const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"];
+const GEMINI_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-flash-latest",
+  "gemini-2.5-flash-lite",
+  "gemini-flash-lite-latest",
+  "gemini-3.5-flash-lite",
+];
 
 /**
  * Calls Google Gemini Generative Language API using fast flash models.
@@ -185,9 +233,9 @@ export async function parseFinancialInputWithGemini({
 
   let promptInstruction = "";
   if (mediaBase64 && mediaMimeType?.startsWith("image/")) {
-    promptInstruction = `Examine this receipt or bill photo. Extract the total payable amount, merchant name, category, and date. ${text ? `User note: "${text}"` : ""}`;
+    promptInstruction = `Examine this photo (receipt, bill, invoice, UPI payment screenshot, or investment screenshot). Extract the financial details, whether money was paid (expense), received (income), or invested (stocks/mf). ${text ? `User note: "${text}"` : ""}`;
   } else if (mediaBase64 && (mediaMimeType?.startsWith("audio/") || mediaMimeType === "application/octet-stream")) {
-    promptInstruction = `Listen to this voice message. Transcribe it, and extract the financial transaction or question.`;
+    promptInstruction = `Listen to this voice message. Transcribe it into transcribedText, and identify the user's financial intent (expense, income, transfer, balance, spending, chart, budget, portfolio, stocks, quote, or advice).`;
   } else {
     promptInstruction = `Parse this financial input: "${text || ""}"`;
   }

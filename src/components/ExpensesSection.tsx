@@ -682,11 +682,6 @@ export default function ExpensesSection() {
       <PageHeader
         title="Expenses & Outflows"
         description="Daily expenditures, category burn rates, and historical spending trajectory."
-        badge={
-          <Badge variant="danger">
-            {displayedExpenses.length} Records • {isAllTime ? "All Time" : monthDisplayTitle}
-          </Badge>
-        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Month Stepper */}

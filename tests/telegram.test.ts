@@ -7,6 +7,7 @@ import {
   formatIncomeConfirmation,
   formatTransferConfirmation,
   formatBudgetSummary,
+  formatBudgetSetConfirmation,
   formatUndoConfirmation,
   formatBalanceSummary,
   formatRecentExpenses,
@@ -14,6 +15,14 @@ import {
   formatWelcomeMessage,
   formatHelpMessage,
   formatStatusMessage,
+  formatPortfolioOverview,
+  formatStocksSummary,
+  formatStockQuote,
+  formatStockAddConfirmation,
+  formatMutualFundsSummary,
+  formatBullionSummary,
+  getQuickChartSpendingUrl,
+  sendTelegramPhoto,
   extractTelegramLinkCandidate,
   normalizeLinkTokenCandidates,
   getStandardInlineKeyboard,
@@ -416,6 +425,257 @@ describe("Telegram Integration Suite", () => {
       expect(resolveTenant("chat_alice_123")).toBe("user_alice");
       expect(resolveTenant("chat_bob_456")).toBe("user_bob");
       expect(resolveTenant("chat_stranger_999")).toBeNull();
+    });
+  });
+
+  describe("Multi-Asset Portfolio & Investments Formatters", () => {
+    it("formats comprehensive net worth portfolio overview accurately", () => {
+      const overview = formatPortfolioOverview({
+        accountsTotal: 125000,
+        stocksTotal: 340000,
+        mfTotal: 210000,
+        bullionTotal: 185000,
+        netWorth: 860000,
+        userName: "Saran",
+      });
+
+      expect(overview).toContain("Total Net Worth &amp; Portfolio (Saran)");
+      expect(overview).toContain("Bank &amp; Cash Accounts:</b> ₹1,25,000.00");
+      expect(overview).toContain("Indian Equities (Stocks):</b> ₹3,40,000.00");
+      expect(overview).toContain("Mutual Funds &amp; SIPs:</b> ₹2,10,000.00");
+      expect(overview).toContain("Bullion (Gold &amp; Silver):</b> ₹1,85,000.00");
+      expect(overview).toContain("8,60,000.00");
+    });
+
+    it("formats Indian stock holdings summary and calculates P&L", () => {
+      const holdings = [
+        { symbol: "RELIANCE", exchange: "NSE", quantity: 15, avg_buy_price: 2450, current_price: 2600, pnl: 2250, pnl_percent: 6.12 },
+        { symbol: "TCS", exchange: "NSE", quantity: 10, avg_buy_price: 3500, current_price: 3650, pnl: 1500, pnl_percent: 4.29 },
+      ];
+
+      const res = formatStocksSummary({
+        holdings,
+        totalInvested: 71750,
+        totalCurrent: 75500,
+        totalPnl: 3750,
+        totalPnlPercent: 5.23,
+      });
+
+      expect(res).toContain("Indian Stock Portfolio");
+      expect(res).toContain("RELIANCE");
+      expect(res).toContain("15 shares");
+      expect(res).toContain("TCS");
+      expect(res).toContain("71,750.00");
+      expect(res).toContain("75,500.00");
+      expect(res).toContain("+₹3,750.00");
+    });
+
+    it("formats empty stock holdings gracefully with instructions", () => {
+      const res = formatStocksSummary({
+        holdings: [],
+        totalInvested: 0,
+        totalCurrent: 0,
+        totalPnl: 0,
+        totalPnlPercent: 0,
+      });
+
+      expect(res).toContain("No stock holdings recorded yet");
+      expect(res).toContain("/addstock");
+    });
+
+    it("formats real-time live stock quotes with range and day changes", () => {
+      const quote = formatStockQuote({
+        symbol: "INFY",
+        exchange: "NSE",
+        companyName: "Infosys Limited",
+        currentPrice: 1845.5,
+        previousClose: 1820.0,
+        change: 25.5,
+        changePercent: 1.4,
+        dayHigh: 1860.0,
+        dayLow: 1815.0,
+      });
+
+      expect(quote).toContain("Infosys Limited");
+      expect(quote).toContain("INFY:NSE");
+      expect(quote).toContain("1,845.50");
+      expect(quote).toContain("+₹25.50");
+      expect(quote).toContain("+1.40%");
+      expect(quote).toContain("1,815.00 - ₹1,860.00");
+    });
+
+    it("formats stock purchase confirmation message", () => {
+      const res = formatStockAddConfirmation({
+        symbol: "TATAMOTORS",
+        quantity: 25,
+        price: 840,
+        exchange: "NSE",
+      });
+
+      expect(res).toContain("Stock Holding Recorded!");
+      expect(res).toContain("TATAMOTORS:NSE");
+      expect(res).toContain("25 shares");
+      expect(res).toContain("840.00");
+      expect(res).toContain("21,000.00");
+    });
+
+    it("formats mutual funds portfolio with SIP status and NAV values", () => {
+      const holdings = [
+        {
+          scheme_name: "Parag Parikh Flexi Cap Fund Direct Growth",
+          units: 145.23,
+          avg_nav: 68.5,
+          current_nav: 78.2,
+          invested_amount: 9948,
+          is_sip_active: true,
+          sip_amount: 5000,
+        },
+      ];
+
+      const res = formatMutualFundsSummary({
+        holdings,
+        totalInvested: 9948,
+        totalCurrent: 11357,
+        totalPnl: 1409,
+      });
+
+      expect(res).toContain("Mutual Funds Portfolio");
+      expect(res).toContain("Parag Parikh Flexi Cap");
+      expect(res).toContain("SIP: ₹5,000.00");
+      expect(res).toContain("9,948.00");
+      expect(res).toContain("11,357.00");
+    });
+
+    it("formats physical bullion portfolio with gold & silver metrics", () => {
+      const res = formatBullionSummary({
+        goldGrams: 24.5,
+        goldValue: 196000,
+        silverGrams: 500,
+        silverValue: 47500,
+        totalValue: 243500,
+      });
+
+      expect(res).toContain("Physical Bullion Portfolio");
+      expect(res).toContain("24.50 grams");
+      expect(res).toContain("1,96,000.00");
+      expect(res).toContain("500.00 grams");
+      expect(res).toContain("47,500.00");
+      expect(res).toContain("2,43,500.00");
+    });
+
+    it("formats budget set confirmation accurately", () => {
+      const res = formatBudgetSetConfirmation({
+        category: "Food & Dining",
+        amount: 8000,
+        monthName: "November 2026",
+      });
+
+      expect(res).toContain("Budget Set Successfully!");
+      expect(res).toContain("Food &amp; Dining");
+      expect(res).toContain("8,000.00");
+      expect(res).toContain("November 2026");
+    });
+  });
+
+  describe("Visual Chart Generation & Photo API", () => {
+    it("generates QuickChart dark-mode donut chart URL with category breakdown", () => {
+      const categories = ["Food & Dining", "Transport & Fuel", "Shopping"];
+      const amounts = [12000, 4500, 8000];
+
+      const chartUrl = getQuickChartSpendingUrl({
+        categories,
+        amounts,
+        title: "November 2026 Spending",
+      });
+
+      expect(chartUrl).toContain("https://quickchart.io/chart?c=");
+      expect(chartUrl).toContain("w=500&h=350&bkg=%2309090b");
+
+      const encoded = chartUrl.split("?c=")[1].split("&")[0];
+      const decodedJson = decodeURIComponent(encoded);
+      expect(decodedJson).toContain("doughnut");
+      expect(decodedJson).toContain("Food & Dining");
+      expect(decodedJson).toContain("Transport & Fuel");
+      expect(decodedJson).toContain("12000");
+    });
+
+    it("returns empty string when categories or amounts are empty", () => {
+      expect(getQuickChartSpendingUrl({ categories: [], amounts: [] })).toBe("");
+    });
+
+    it("handles sendTelegramPhoto without crash when token is not configured", async () => {
+      const res = await sendTelegramPhoto({
+        chatId: "12345",
+        photo: "https://quickchart.io/sample.png",
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.error).toBeDefined();
+    });
+
+    it("expands standard inline keyboard with 8 interactive quick buttons and web link", () => {
+      const keyboard = getStandardInlineKeyboard("https://arthax.vercel.app");
+      expect(keyboard.inline_keyboard.length).toBe(5);
+
+      const allCallbackData = keyboard.inline_keyboard
+        .flat()
+        .map((btn) => ("callback_data" in btn ? btn.callback_data : null))
+        .filter(Boolean);
+
+      expect(allCallbackData).toContain("action:balance");
+      expect(allCallbackData).toContain("action:summary");
+      expect(allCallbackData).toContain("action:budget");
+      expect(allCallbackData).toContain("action:chart");
+      expect(allCallbackData).toContain("action:portfolio");
+      expect(allCallbackData).toContain("action:stocks");
+      expect(allCallbackData).toContain("action:recent");
+      expect(allCallbackData).toContain("action:status");
+    });
+  });
+
+  describe("Slash Commands & Voice Actions Parsing", () => {
+    it("identifies all new financial commands", () => {
+      const isCmd = (text: string) => text.trim().startsWith("/");
+      expect(isCmd("/chart")).toBe(true);
+      expect(isCmd("/portfolio")).toBe(true);
+      expect(isCmd("/networth")).toBe(true);
+      expect(isCmd("/stocks")).toBe(true);
+      expect(isCmd("/quote RELIANCE")).toBe(true);
+      expect(isCmd("/addstock TCS 5 3600")).toBe(true);
+      expect(isCmd("/mf")).toBe(true);
+      expect(isCmd("/bullion")).toBe(true);
+      expect(isCmd("/setbudget Food 8000")).toBe(true);
+    });
+
+    it("parses setbudget command with category and amount", () => {
+      const input = "/setbudget Food 8000";
+      const clean = input.replace(/^\/setbudget\s*/i, "").trim();
+      const match = clean.match(/^([a-zA-Z\s&]+?)\s*(?:to|=)?\s*(?:rs\.?|inr|₹)?\s*([0-9]+(?:\.[0-9]+)?)$/i);
+
+      expect(match).not.toBeNull();
+      expect(match![1].trim()).toBe("Food");
+      expect(parseFloat(match![2])).toBe(8000);
+    });
+
+    it("parses natural set budget phrase e.g. set budget for Groceries to 12000", () => {
+      const input = "set budget for Groceries to 12000";
+      const clean = input.replace(/^set\s+budget\s*(?:for)?\s*/i, "").trim();
+      const match = clean.match(/^([a-zA-Z\s&]+?)\s*(?:to|=)?\s*(?:rs\.?|inr|₹)?\s*([0-9]+(?:\.[0-9]+)?)$/i);
+
+      expect(match).not.toBeNull();
+      expect(match![1].trim()).toBe("Groceries");
+      expect(parseFloat(match![2])).toBe(12000);
+    });
+
+    it("parses addstock command with symbol, quantity, price, and exchange", () => {
+      const input = "/addstock INFY 10 1850 NSE";
+      const match = input.match(/^\/addstock\s+([a-zA-Z0-9_.]+)\s+([0-9.]+)\s+([0-9.]+)(?:\s+(NSE|BSE))?$/i);
+
+      expect(match).not.toBeNull();
+      expect(match![1]).toBe("INFY");
+      expect(parseFloat(match![2])).toBe(10);
+      expect(parseFloat(match![3])).toBe(1850);
+      expect(match![4]).toBe("NSE");
     });
   });
 });

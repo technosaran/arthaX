@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { siteConfig, generateStructuredData } from "@/config/seo";
 
 // FinTech Typography Stack (Zerodha Kite & Institutional FinTech Standard)
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -18,9 +19,61 @@ const inter = Inter({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#07080c" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  colorScheme: "dark light",
+};
+
 export const metadata: Metadata = {
-  title: "arthaX — Personal Finance & Wealth Management",
-  description: "Intelligent personal finance, cashflow & ledger management",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.title,
+    template: siteConfig.titleTemplate,
+  },
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  keywords: siteConfig.keywords,
+  authors: [{ name: siteConfig.author, url: siteConfig.url }],
+  creator: siteConfig.creator,
+  publisher: siteConfig.publisher,
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: siteConfig.url,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    siteName: siteConfig.name,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.title,
+    description: siteConfig.description,
+    creator: "@arthaX",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: [
       { url: "/icon.png", sizes: "32x32", type: "image/png" },
@@ -34,6 +87,7 @@ export const metadata: Metadata = {
   verification: {
     google: "google464ae241c4013b59",
   },
+  category: "finance",
 };
 
 export default function RootLayout({
@@ -52,6 +106,12 @@ export default function RootLayout({
         <link
           rel="dns-prefetch"
           href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ytqqzeemkzhifbtthanh.supabase.co"}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(generateStructuredData()),
+          }}
         />
         <script
           dangerouslySetInnerHTML={{

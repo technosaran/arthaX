@@ -92,9 +92,9 @@ function getIndianMarketStatus(): IndianMarketStatus {
   }
 }
 
-async function fetchQuoteFromProvider(
+export async function fetchStockQuote(
   symbol: string,
-  exchange: "NSE" | "BSE"
+  exchange: "NSE" | "BSE" = "NSE"
 ): Promise<StockQuote | null> {
   const cleanSymbol = symbol.trim().toUpperCase().replace(/\.(NS|BO)$/, "");
   const suffix = exchange === "BSE" ? ".BO" : ".NS";
@@ -237,7 +237,7 @@ export async function GET(req: NextRequest) {
   // Fetch uncached symbols in parallel
   if (symbolsToFetch.length > 0) {
     const fetchPromises = symbolsToFetch.map(async (item) => {
-      const quote = await fetchQuoteFromProvider(item.symbol, item.exchange);
+      const quote = await fetchStockQuote(item.symbol, item.exchange);
       if (quote) {
         quotesMap[item.key] = quote;
 

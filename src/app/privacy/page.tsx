@@ -1,13 +1,16 @@
 import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ShieldCheck, Lock, EyeOff, UserCheck, ArrowLeft, Mail } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 
-export const metadata = {
-  title: "Privacy Policy — arthaX",
-  description: "Privacy policy and personal data protection principles for arthaX Personal Finance.",
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Privacy policy, zero-knowledge encryption, and personal data protection principles for arthaX.",
+  alternates: {
+    canonical: "/privacy",
+  },
 };
 
 export default function PrivacyPolicyPage() {
@@ -21,9 +24,6 @@ export default function PrivacyPolicyPage() {
         <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
           <div className="flex items-center gap-3">
             <Logo size={36} showText={true} />
-            <Badge variant="emerald" dot>
-              Privacy Policy
-            </Badge>
           </div>
           <Link
             href="/login"

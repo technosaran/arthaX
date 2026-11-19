@@ -35,6 +35,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ) => {
     const generatedId = useId();
     const selectId = id || generatedId;
+    const errorId = `${selectId}-error`;
+    const helperId = `${selectId}-helper`;
+    const ariaDescribedBy = error
+      ? errorId
+      : helperText
+      ? helperId
+      : props["aria-describedby"];
 
     return (
       <div className="w-full space-y-1 text-left">
@@ -58,6 +65,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ref={ref}
             id={selectId}
             disabled={disabled}
+            aria-invalid={error ? true : props["aria-invalid"]}
+            aria-describedby={ariaDescribedBy}
             className={`w-full appearance-none rounded-xl border px-3 py-1.5 sm:py-2 pr-8 text-xs font-medium transition-all duration-150 outline-hidden cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               leftIcon ? "pl-8.5" : ""
             } ${
@@ -90,11 +99,18 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         </div>
 
         {error ? (
-          <p className="text-[10px] sm:text-[11px] text-rose-400 font-medium tracking-tight">
+          <p
+            id={errorId}
+            role="alert"
+            className="text-[10px] sm:text-[11px] text-rose-400 font-medium tracking-tight"
+          >
             {error}
           </p>
         ) : helperText ? (
-          <p className="text-[10px] sm:text-[11px] text-[var(--app-muted)] font-normal">
+          <p
+            id={helperId}
+            className="text-[10px] sm:text-[11px] text-[var(--app-muted)] font-normal"
+          >
             {helperText}
           </p>
         ) : null}

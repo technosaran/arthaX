@@ -96,7 +96,7 @@ export const Badge: React.FC<BadgeProps> = ({
       {...props}
     >
       {dot && <span className={`w-1.5 h-1.5 rounded-full ${current.dotColor} flex-shrink-0`} />}
-      <span>{children}</span>
+      {children}
     </span>
   );
 };

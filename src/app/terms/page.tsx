@@ -1,13 +1,16 @@
 import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 
-export const metadata = {
-  title: "Terms of Service — arthaX",
-  description: "Terms of service and acceptable usage guidelines for arthaX Personal Finance.",
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "Terms of service and acceptable usage guidelines for the arthaX platform.",
+  alternates: {
+    canonical: "/terms",
+  },
 };
 
 export default function TermsPage() {
@@ -21,9 +24,6 @@ export default function TermsPage() {
         <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
           <div className="flex items-center gap-3">
             <Logo size={36} showText={true} />
-            <Badge variant="emerald" dot>
-              Terms of Service
-            </Badge>
           </div>
           <Link
             href="/login"

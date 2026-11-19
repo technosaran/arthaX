@@ -1,0 +1,40 @@
+name: Zerodha Daily Portfolio Auto-Sync
+
+on:
+  schedule:
+    # 03:00 UTC is 08:30 AM IST (Monday through Friday)
+    - cron: '0 3 * * 1-5'
+    # Optional weekend run for portfolio NAV & cash balance at 08:30 AM IST
+    - cron: '0 3 * * 0,6'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  zerodha-daily-sync:
+    name: Zerodha Kite Headless Auto-Login & Portfolio Sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Zerodha Automated Headless Login & Portfolio Sync
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ZERODHA_API_KEY: ${{ secrets.ZERODHA_API_KEY }}
+          ZERODHA_API_SECRET: ${{ secrets.ZERODHA_API_SECRET }}
+          ZERODHA_USER_ID: ${{ secrets.ZERODHA_USER_ID }}
+          ZERODHA_PASSWORD: ${{ secrets.ZERODHA_PASSWORD }}
+          ZERODHA_TOTP_SECRET: ${{ secrets.ZERODHA_TOTP_SECRET }}
+          ZERODHA_AUTHORIZED_USER_ID: ${{ secrets.ZERODHA_AUTHORIZED_USER_ID }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+        run: npx tsx scripts/zerodhaAutoSync.ts

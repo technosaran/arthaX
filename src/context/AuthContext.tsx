@@ -49,7 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         prev.id === currentUser.id &&
         prev.email === currentUser.email &&
         prev.user_metadata?.avatar_url === currentUser.user_metadata?.avatar_url &&
-        prev.user_metadata?.full_name === currentUser.user_metadata?.full_name
+        prev.user_metadata?.picture === currentUser.user_metadata?.picture &&
+        prev.user_metadata?.full_name === currentUser.user_metadata?.full_name &&
+        prev.user_metadata?.name === currentUser.user_metadata?.name
       ) {
         return prev;
       }
@@ -96,8 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (data) {
+          const rawName = data.name?.trim();
+          const isPlaceholder = !rawName || rawName.toLowerCase() === "user";
+          const resolvedName = !isPlaceholder
+            ? rawName
+            : (defaultName && defaultName.toLowerCase() !== "user" ? defaultName : (rawName || "User"));
+
           const newProf: UserProfile = {
-            name: data.name || defaultName || "User",
+            name: resolvedName,
             theme: data.theme === "light" ? "light" : "dark",
             telegram_chat_id: data.telegram_chat_id || null,
             telegram_username: data.telegram_username || null,
@@ -108,6 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             window.localStorage.setItem(`arthax_cached_profile_${userId}`, JSON.stringify(newProf));
           } catch {}
+
+          // Auto-heal: If database had placeholder 'User' and we have an authentic name, persist it
+          if (isPlaceholder && defaultName && defaultName.toLowerCase() !== "user") {
+            supabase.from("user_settings").update({ name: defaultName }).eq("id", userId).then(() => {});
+          }
         } else if (!error) {
           // Fallback upsert if profile record was not created
           const nameToSet = defaultName || "User";

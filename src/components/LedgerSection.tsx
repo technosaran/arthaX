@@ -572,11 +572,6 @@ export default function LedgerSection() {
       <PageHeader
         title="General Ledger"
         description="Double-entry statements, passbooks, and chronologically reconciled running balances."
-        badge={
-          <Badge variant="amber" dot>
-            Double-Entry
-          </Badge>
-        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Month Stepper */}
@@ -894,10 +889,9 @@ export default function LedgerSection() {
                             size="icon-sm"
                             title="Delete and reverse balance"
                             className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                            icon={<Trash2 size={13} />}
                             onClick={(e) => promptDeleteEntry(entry, e)}
-                          >
-                            <Trash2 size={13} />
-                          </Button>
+                          />
                         </div>
                       </td>
                     </tr>

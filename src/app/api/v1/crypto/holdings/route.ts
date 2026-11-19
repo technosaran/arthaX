@@ -1,0 +1,89 @@
+import { NextRequest } from "next/server";
+import { getAuthenticatedUser } from "@/utils/auth";
+import { supabaseAdmin } from "@/utils/supabase/admin";
+import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
+import { fetchBinance24hrTickers, calculateCryptoValuations } from "@/utils/binance";
+
+export async function GET(req: NextRequest) {
+  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+
+  if (!user || !userId) {
+    return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  const rl = await rateLimit(`crypto:holdings:${userId}`, 120, 60);
+  if (!rl.success) {
+    return apiError("Too many requests. Please slow down.", "RATE_LIMITED", 429, undefined, req);
+  }
+
+  try {
+    // 1. Fetch Integration status & stored holdings concurrently
+    const [intRes, holdingsRes] = await Promise.all([
+      supabaseAdmin
+        .from("binance_integrations")
+        .select("is_active, last_synced_at, sync_error")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("crypto_holdings")
+        .select("asset, name, free_amount, locked_amount, total_quantity, current_price_usd, total_value_usd, change_24h, last_synced_at")
+        .eq("user_id", userId)
+        .order("total_value_usd", { ascending: false }),
+    ]);
+
+    const isConnected = Boolean(intRes.data?.is_active);
+    const lastSyncedAt = intRes.data?.last_synced_at || null;
+    const syncError = intRes.data?.sync_error || null;
+    const rawHoldings = holdingsRes.data || [];
+
+    if (rawHoldings.length === 0) {
+      return apiSuccess(
+        {
+          isBinanceConnected: isConnected,
+          lastSyncedAt,
+          syncError,
+          totalPortfolioUsd: 0,
+          netChange24hUsd: 0,
+          netChange24hPercent: 0,
+          assetsCount: 0,
+          assets: [],
+        },
+        undefined,
+        req
+      );
+    }
+
+    // 2. Fetch fresh 24h tickers to recalculate live USD valuation on the fly
+    const tickersRes = await fetchBinance24hrTickers();
+    const tickers = tickersRes.success && tickersRes.data ? tickersRes.data : {};
+
+    const balances = rawHoldings.map((h) => ({
+      asset: h.asset,
+      free: Number(h.free_amount) || 0,
+      locked: Number(h.locked_amount) || 0,
+      total: Number(h.total_quantity) || 0,
+    }));
+
+    const portfolio = calculateCryptoValuations(balances, tickers);
+
+    return apiSuccess(
+      {
+        isBinanceConnected: isConnected,
+        lastSyncedAt,
+        syncError,
+        ...portfolio,
+      },
+      undefined,
+      req
+    );
+  } catch (err) {
+    return apiError(
+      err instanceof Error ? err.message : "Internal error fetching crypto holdings",
+      "SERVER_ERROR",
+      500,
+      undefined,
+      req
+    );
+  }
+}

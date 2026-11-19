@@ -600,11 +600,6 @@ export default function IncomeSection() {
       <PageHeader
         title="Income & Inflows"
         description="Salaries, freelance payouts, dividends, business revenue, and recurring streams."
-        badge={
-          <Badge variant="success">
-            {displayedIncomes.length} Inflows • {isAllTime ? "All Time" : monthDisplayTitle}
-          </Badge>
-        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Month Stepper */}

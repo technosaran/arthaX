@@ -546,18 +546,6 @@ export default function BondsSection() {
           </span>
         }
         description="Automated portfolio for Corporate Bonds, NCDs, SGBs & Sovereign G-Secs synced from your Zerodha Demat account"
-        badge={
-          <div className="flex items-center gap-2">
-            <Badge variant="neutral" className="font-mono">
-              {holdings.length} {holdings.length === 1 ? "Bond" : "Bonds"}
-            </Badge>
-            {zerodhaDematAccount && (
-              <Badge variant="success" className="font-mono">
-                Demat Wallet: {formatINR(Number(zerodhaDematAccount.balance) || 0)}
-              </Badge>
-            )}
-          </div>
-        }
         actions={
           <div className="flex items-center gap-2">
             <Button

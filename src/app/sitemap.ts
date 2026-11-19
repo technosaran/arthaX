@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { getBaseUrl } from "@/config/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://arthax.vercel.app";
+  const baseUrl = getBaseUrl();
   const now = new Date();
 
   return [

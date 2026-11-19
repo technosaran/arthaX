@@ -37,6 +37,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "*.googleusercontent.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: "https", hostname: "unavatar.io" },
+      { protocol: "https", hostname: "img.logo.dev" },
+      { protocol: "https", hostname: "*.gravatar.com" },
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {

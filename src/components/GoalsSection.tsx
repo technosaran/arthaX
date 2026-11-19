@@ -561,19 +561,14 @@ export default function GoalsSection() {
         title="Financial Goals & Milestones"
         icon={<Trophy className="text-amber-400" size={24} />}
         description="Set targets, track savings velocity, and achieve personal & family milestones."
-        badge={
-          <Badge variant="accent" className="font-mono text-xs">
-            {stats.completedCount}/{stats.totalCount} Achieved
-          </Badge>
-        }
         actions={
           <Button
             variant="primary"
+            size="sm"
+            icon={<Plus size={15} />}
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl shadow-xs cursor-pointer font-semibold text-xs sm:text-sm"
           >
-            <Plus size={16} />
-            <span>Create Goal</span>
+            Create Goal
           </Button>
         }
       />
@@ -703,8 +698,8 @@ export default function GoalsSection() {
               : "Create your first goal to visualize target amounts, track savings velocity, and hit key life milestones."
           }
           action={
-            <Button variant="primary" onClick={openCreateModal} className="mt-3 cursor-pointer">
-              <Plus size={16} className="mr-1.5" /> Create Goal
+            <Button variant="primary" size="sm" icon={<Plus size={15} />} onClick={openCreateModal} className="mt-3 cursor-pointer">
+              Create Goal
             </Button>
           }
         />
@@ -889,10 +884,11 @@ export default function GoalsSection() {
                     <Button
                       variant="primary"
                       size="sm"
+                      icon={<Plus size={14} />}
                       onClick={() => openDepositModal(goal, "add")}
-                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-xl cursor-pointer font-semibold shadow-xs"
+                      className="cursor-pointer font-semibold shadow-xs"
                     >
-                      <Plus size={14} /> Add Funds
+                      Add Funds
                     </Button>
                     {goal.current_amount > 0 && (
                       <Button
@@ -1054,11 +1050,9 @@ export default function GoalsSection() {
             <Button
               type="submit"
               variant="primary"
-              disabled={submitting}
-              className="flex items-center gap-1.5 cursor-pointer"
+              loading={submitting}
             >
-              {submitting && <Loader2 size={16} className="animate-spin" />}
-              <span>{editingGoal ? "Save Changes" : "Create Goal"}</span>
+              {editingGoal ? "Save Changes" : "Create Goal"}
             </Button>
           </div>
         </form>
@@ -1161,11 +1155,9 @@ export default function GoalsSection() {
             <Button
               type="submit"
               variant="primary"
-              disabled={submitting}
-              className="flex items-center gap-1.5 cursor-pointer"
+              loading={submitting}
             >
-              {submitting && <Loader2 size={16} className="animate-spin" />}
-              <span>{depositType === "add" ? "Confirm Deposit" : "Confirm Withdrawal"}</span>
+              {depositType === "add" ? "Confirm Deposit" : "Confirm Withdrawal"}
             </Button>
           </div>
         </form>
@@ -1191,11 +1183,9 @@ export default function GoalsSection() {
           <Button
             variant="danger"
             onClick={() => deleteConfirmationId && handleDeleteGoal(deleteConfirmationId)}
-            disabled={submitting}
-            className="flex items-center gap-1.5 cursor-pointer"
+            loading={submitting}
           >
-            {submitting && <Loader2 size={16} className="animate-spin" />}
-            <span>Delete Permanently</span>
+            Delete Permanently
           </Button>
         </div>
       </Modal>

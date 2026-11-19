@@ -615,11 +615,6 @@ export default function BudgetsSection() {
       <PageHeader
         title="Category Budgets & Controls"
         description="Establish spending ceilings, detect unbudgeted leaks, and enforce month-over-month fiscal discipline."
-        badge={
-          <Badge variant="amber">
-            {filterCounts.active} Active / {allCategoryCards.length} Categories
-          </Badge>
-        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Month Stepper */}
@@ -1165,10 +1160,9 @@ export default function BudgetsSection() {
                           <button
                             type="button"
                             onClick={() => setDrillDownCategory(item)}
-                            className="text-[10px] font-mono text-[var(--app-muted)] hover:text-[var(--app-accent)] flex items-center gap-1 transition-colors cursor-pointer"
+                            className="text-[10px] font-mono text-[var(--app-muted)] hover:text-[var(--app-accent)] transition-colors cursor-pointer"
                           >
-                            <span>{item.expenseCount} {item.expenseCount === 1 ? "expense" : "expenses"}</span>
-                            {item.expenseCount > 0 && <Eye size={10} />}
+                            {item.expenseCount} {item.expenseCount === 1 ? "expense" : "expenses"}
                           </button>
                         </div>
                       </div>
@@ -1283,10 +1277,9 @@ export default function BudgetsSection() {
                           <button
                             type="button"
                             onClick={() => setDrillDownCategory(item)}
-                            className="text-[10px] font-mono text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            className="text-[10px] font-mono text-amber-400 hover:underline cursor-pointer"
                           >
-                            <span>{item.expenseCount} {item.expenseCount === 1 ? "expense" : "expenses"}</span>
-                            <Eye size={10} />
+                            {item.expenseCount} {item.expenseCount === 1 ? "expense" : "expenses"}
                           </button>
                         ) : (
                           <span className="text-[10px] font-mono text-[var(--app-muted)] block truncate">

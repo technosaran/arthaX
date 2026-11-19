@@ -28,6 +28,7 @@ import {
   Mail,
   Calendar,
   KeyRound,
+  Bitcoin,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -113,7 +114,7 @@ interface ZerodhaStatus {
   loginUrl: string | null;
 }
 
-export default function SettingsSection({ initialTab = "profile" }: SettingsSectionProps = {}) {
+export default function SettingsSection({ initialTab }: SettingsSectionProps = {}) {
   const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
   const { theme } = useTheme();
   const { showToast } = useToast();
@@ -130,7 +131,7 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
         return sectionParam;
       }
     }
-    return initialTab;
+    return initialTab || "profile";
   });
   const [greetingName, setGreetingName] = useState(profile?.name || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -204,6 +205,27 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [autoLoggingInZerodha, setAutoLoggingInZerodha] = useState(false);
 
+  // Binance Spot Integration State
+  const [binanceStatus, setBinanceStatus] = useState<{
+    connected: boolean;
+    lastSyncedAt: string | null;
+    syncError: string | null;
+    assetsCount: number;
+    totalPortfolioUsd: number;
+  }>({
+    connected: false,
+    lastSyncedAt: null,
+    syncError: null,
+    assetsCount: 0,
+    totalPortfolioUsd: 0,
+  });
+  const [loadingBinance, setLoadingBinance] = useState(false);
+  const [binanceApiKey, setBinanceApiKey] = useState("");
+  const [binanceApiSecret, setBinanceApiSecret] = useState("");
+  const [savingBinance, setSavingBinance] = useState(false);
+  const [syncingBinance, setSyncingBinance] = useState(false);
+  const inFlightBinanceRef = useRef(false);
+
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -229,18 +251,47 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
   }, [greetingName]);
   const isDirtyRef = useRef(false);
 
-  const googleAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
-  const isGoogleUser = !!googleAvatarUrl || user?.app_metadata?.provider === "google" || user?.identities?.some((i) => i.provider === "google");
+  const rawProfileName = profile?.name?.trim();
+  const validProfileName =
+    rawProfileName && rawProfileName.toLowerCase() !== "user" ? rawProfileName : null;
+
+  const isGoogleUser =
+    user?.app_metadata?.provider === "google" ||
+    user?.app_metadata?.providers?.includes("google") ||
+    user?.identities?.some((i) => i.provider === "google") ||
+    user?.user_metadata?.iss === "https://accounts.google.com" ||
+    Boolean(user?.user_metadata?.avatar_url?.includes("googleusercontent.com"));
+
+  const googleAvatarUrl =
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    user?.identities?.find((i) => i.provider === "google")?.identity_data?.avatar_url ||
+    user?.identities?.find((i) => i.provider === "google")?.identity_data?.picture ||
+    (user?.email && !isGoogleUser
+      ? `https://unavatar.io/${encodeURIComponent(user.email)}?fallback=false`
+      : null) ||
+    null;
+
+  // Reset avatar error when avatar URL updates
+  useEffect(() => {
+    setAvatarError(false);
+  }, [googleAvatarUrl]);
 
   const initials = useMemo(() => {
-    const source = greetingName || profile?.name || user?.user_metadata?.full_name || user?.email || "";
+    const source =
+      greetingName ||
+      validProfileName ||
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.name ||
+      user?.email ||
+      "";
     if (!source) return "U";
     const parts = source.trim().split(" ");
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
     return source.substring(0, 2).toUpperCase();
-  }, [greetingName, profile?.name, user]);
+  }, [greetingName, validProfileName, user]);
 
   const timeGreeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -252,9 +303,16 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
   // Sync greetingName when profile arrives from AuthContext
   useEffect(() => {
     if (profile?.name && !isDirtyRef.current) {
-      setGreetingName(profile.name);
+      const pName = profile.name.trim();
+      if (pName.toLowerCase() !== "user") {
+        setGreetingName(pName);
+      } else if (user?.user_metadata?.full_name) {
+        setGreetingName(user.user_metadata.full_name);
+      } else if (user?.user_metadata?.name) {
+        setGreetingName(user.user_metadata.name);
+      }
     }
-  }, [profile?.name]);
+  }, [profile?.name, user]);
 
   // Fetch telemetry counts from Supabase
   const refreshCounts = useCallback(async () => {
@@ -370,6 +428,32 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
     }
   }, [zerodhaCacheKey]);
 
+  const fetchBinanceStatus = useCallback(async (showLoading = false) => {
+    if (inFlightBinanceRef.current) return;
+    inFlightBinanceRef.current = true;
+    if (showLoading) setLoadingBinance(true);
+    try {
+      const res = await fetch("/api/v1/crypto/holdings");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setBinanceStatus({
+            connected: Boolean(json.data.isBinanceConnected),
+            lastSyncedAt: json.data.lastSyncedAt || null,
+            syncError: json.data.syncError || null,
+            assetsCount: json.data.assetsCount || 0,
+            totalPortfolioUsd: json.data.totalPortfolioUsd || 0,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Binance status:", err);
+    } finally {
+      inFlightBinanceRef.current = false;
+      setLoadingBinance(false);
+    }
+  }, []);
+
   useEffect(() => {
     refreshCounts();
 
@@ -406,8 +490,9 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
     if (activeTab !== "integrations") {
       fetchTelegramStatus(false);
       fetchZerodhaStatus(false);
+      fetchBinanceStatus(false);
     }
-  }, [fetchTelegramStatus, fetchZerodhaStatus, activeTab]);
+  }, [fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, activeTab]);
 
   // Sync profile telegram changes if profile arrives after mount
   useEffect(() => {
@@ -432,10 +517,12 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
     if (activeTab === "integrations") {
       fetchTelegramStatus(false);
       fetchZerodhaStatus(false);
+      fetchBinanceStatus(false);
 
       const onFocus = () => {
         fetchTelegramStatus(false);
         fetchZerodhaStatus(false);
+        fetchBinanceStatus(false);
       };
       window.addEventListener("focus", onFocus);
 
@@ -649,6 +736,87 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
       }
     } catch (err: any) {
       showToast("Disconnect Failed", "Failed to disconnect Zerodha credentials.", "error");
+    }
+  };
+
+  const handleSaveBinance = async () => {
+    if (!binanceApiKey.trim() || !binanceApiSecret.trim()) {
+      showToast("Missing Fields", "Please enter both Binance API Key and Secret.", "error");
+      return;
+    }
+    setSavingBinance(true);
+    try {
+      const res = await fetch("/api/v1/crypto/binance/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: binanceApiKey.trim(),
+          apiSecret: binanceApiSecret.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showToast("Binance Connection Error", json.error?.message || "Invalid API Key or Secret.", "error");
+        return;
+      }
+      showToast("Binance Connected!", "Credentials verified and saved. Syncing spot balances...", "success");
+      setBinanceApiKey("");
+      setBinanceApiSecret("");
+      await handleSyncBinance();
+    } catch (err: any) {
+      showToast("Connection Error", err?.message || "Error connecting to Binance", "error");
+    } finally {
+      setSavingBinance(false);
+    }
+  };
+
+  const handleSyncBinance = async () => {
+    setSyncingBinance(true);
+    try {
+      const res = await fetch("/api/v1/crypto/binance/sync", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showToast("Binance Sync Failed", json.error?.message || "Failed to sync Binance spot wallet.", "error");
+        return;
+      }
+      showToast(
+        "Binance Synced Successfully",
+        `Updated ${json.data.assetsCount} spot assets ($${Number(json.data.totalPortfolioUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`,
+        "success"
+      );
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
+      }
+      await fetchBinanceStatus();
+    } catch (err: any) {
+      showToast("Sync Error", err?.message || "Error syncing Binance", "error");
+    } finally {
+      setSyncingBinance(false);
+    }
+  };
+
+  const handleDisconnectBinance = async () => {
+    if (!window.confirm("Are you sure you want to disconnect Binance? Your stored credentials will be removed.")) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/v1/crypto/binance/disconnect", { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        showToast("Binance Disconnected", "Credentials removed.", "info");
+        setBinanceStatus({
+          connected: false,
+          lastSyncedAt: null,
+          syncError: null,
+          assetsCount: 0,
+          totalPortfolioUsd: 0,
+        });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
+        }
+      }
+    } catch (err: any) {
+      showToast("Disconnect Error", "Failed to disconnect Binance.", "error");
     }
   };
 
@@ -1513,11 +1681,6 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
         <PageHeader
           title="Settings"
           description="Personalize your workspace identity, export statements, and manage account security."
-          badge={
-            <Badge variant="violet" dot>
-              Preferences & Vault
-            </Badge>
-          }
         />
 
         {/* SUB-NAV TABS */}
@@ -1622,7 +1785,7 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm tracking-tight truncate">
-                        {greetingName.trim() || profile?.name || "arthaX User"}
+                        {greetingName.trim() || validProfileName || user?.user_metadata?.full_name || user?.user_metadata?.name || "arthaX User"}
                       </span>
                       <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
                     </div>
@@ -1686,16 +1849,10 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                     loading={saveStatus === "saving"}
                     disabled={!greetingName.trim()}
                     onClick={() => handleSaveName()}
+                    icon={saveStatus === "saved" ? <Check size={13} className="text-emerald-400" /> : undefined}
                     className="min-w-[120px]"
                   >
-                    {saveStatus === "saved" ? (
-                      <>
-                        <Check size={13} className="text-emerald-400" />
-                        <span>Saved</span>
-                      </>
-                    ) : (
-                      <span>Save Name</span>
-                    )}
+                    {saveStatus === "saved" ? "Saved" : "Save Name"}
                   </Button>
                 </div>
 
@@ -2180,14 +2337,6 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                           <span> • Last Synced: <span className="font-mono">{new Date(zerodhaStatus.lastSyncAt).toLocaleTimeString()}</span></span>
                         )}
                       </p>
-                      {zerodhaStatus.lastSyncSummary && (
-                        <p className="text-[11px] text-emerald-400/90 font-mono">
-                          Last Sync: {zerodhaStatus.lastSyncSummary.stocks_synced || 0} Stocks, {zerodhaStatus.lastSyncSummary.fno_synced || 0} F&amp;O Positions, {zerodhaStatus.lastSyncSummary.mf_synced || 0} Mutual Funds
-                          {zerodhaStatus.lastSyncSummary.wallet_balance !== undefined && (
-                            <span> • Wallet Cash: ₹{zerodhaStatus.lastSyncSummary.wallet_balance}</span>
-                          )}
-                        </p>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -2223,18 +2372,18 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                           <Badge variant="success" size="sm">Hands-Free</Badge>
                         </div>
                         <p className="opacity-70 text-[11px]">
-                          Auto-login is configured for user {zerodhaStatus.autoLoginUserIdMasked || "Kite"}. Your portfolio automatically syncs every day without manual login.
+                          Auto-login is configured for user {zerodhaStatus.autoLoginUserIdMasked || "Kite"}. Your session automatically renews daily at 8:30 AM IST and on page load without manual button clicks.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
-                          variant="primary"
+                          variant="outline"
                           size="sm"
                           disabled={autoLoggingInZerodha}
                           onClick={handleAutoLoginZerodha}
                           icon={<RefreshCw size={12} className={autoLoggingInZerodha ? "animate-spin" : ""} />}
                         >
-                          {autoLoggingInZerodha ? "Logging In..." : "Run Auto-Login Now"}
+                          {autoLoggingInZerodha ? "Logging In..." : "Force Sync Now"}
                         </Button>
                       </div>
                     </div>
@@ -2351,6 +2500,154 @@ export default function SettingsSection({ initialTab = "profile" }: SettingsSect
                     <p className="text-[10px] opacity-60">
                       Once added, ArthaX computes the 6-digit 2FA code programmatically and syncs your portfolio silently every morning with zero clicks.
                     </p>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* BINANCE SPOT INTEGRATION CARD */}
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/25 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <Bitcoin size={22} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold tracking-tight">Binance Spot Integration</h2>
+                      <Badge variant="warning" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/30">
+                        Crypto Wallet (Auto-Sync)
+                      </Badge>
+                    </div>
+                    <p className="text-xs opacity-60">
+                      Auto-sync spot coin balances, real-time USD valuation, and portfolio allocations
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {loadingBinance ? (
+                    <Badge variant="neutral" className="opacity-75 animate-pulse flex items-center gap-1.5 text-[10px]">
+                      <Loader2 size={11} className="animate-spin text-amber-400" />
+                      <span>Checking...</span>
+                    </Badge>
+                  ) : binanceStatus.connected ? (
+                    <Badge variant="emerald" dot>
+                      Connected: Binance Spot ({binanceStatus.assetsCount} {binanceStatus.assetsCount === 1 ? "Coin" : "Coins"})
+                    </Badge>
+                  ) : (
+                    <Badge variant="neutral">Not Linked</Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Status or Configuration */}
+              {binanceStatus.connected ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                      <div>
+                        <div className="font-semibold text-[var(--app-foreground)] flex items-center gap-2">
+                          <CheckCircle2 size={15} className="text-emerald-400" />
+                          <span>Active Binance Spot Connection</span>
+                        </div>
+                        <p className="text-[11px] opacity-60 mt-0.5">
+                          {binanceStatus.lastSyncedAt
+                            ? `Last synchronized: ${new Date(binanceStatus.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+                            : "Never synced"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={syncingBinance}
+                          onClick={handleSyncBinance}
+                          className="gap-2 text-xs"
+                        >
+                          <RefreshCw size={13} className={syncingBinance ? "animate-spin text-amber-400" : ""} />
+                          <span>{syncingBinance ? "Syncing..." : "Sync Now"}</span>
+                        </Button>
+
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={handleDisconnectBinance}
+                          className="text-xs"
+                        >
+                          Disconnect
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Setup Instructions */}
+                  <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs space-y-2 text-amber-200">
+                    <div className="font-semibold flex items-center gap-1.5 text-amber-400">
+                      <KeyRound size={14} />
+                      <span>How to generate a Read-Only Binance API Key:</span>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 text-[11px] opacity-90 pl-1 leading-relaxed">
+                      <li>Log in to Binance and navigate to <strong>Profile &rarr; API Management</strong>.</li>
+                      <li>Click <strong>Create API</strong> and choose <strong>System generated</strong>.</li>
+                      <li>Label it (e.g. <code>arthaX</code>) and finish 2FA.</li>
+                      <li>Under API Restrictions, ensure <strong>ONLY &quot;Enable Reading&quot;</strong> is checked.</li>
+                      <li>Leave Spot Trading, Margin, and Withdrawals <strong>UNCHECKED</strong> for zero risk.</li>
+                    </ol>
+                  </div>
+
+                  {/* Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                        Binance API Key
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Paste your 64-character Binance API Key"
+                        value={binanceApiKey}
+                        onChange={(e) => setBinanceApiKey(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                        Binance API Secret
+                      </label>
+                      <Input
+                        type="password"
+                        placeholder="Paste your Binance API Secret"
+                        value={binanceApiSecret}
+                        onChange={(e) => setBinanceApiSecret(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={savingBinance || !binanceApiKey.trim() || !binanceApiSecret.trim()}
+                      onClick={handleSaveBinance}
+                      className="gap-2"
+                    >
+                      {savingBinance ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin text-amber-400" />
+                          <span>Verifying &amp; Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bitcoin size={14} />
+                          <span>Connect Binance</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               )}

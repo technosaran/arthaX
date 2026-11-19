@@ -1,5 +1,7 @@
 import { parseExpenseMessage, matchAccount, AccountSummary, ParsedExpense } from "./expenseParser";
 
+export type { AccountSummary };
+
 export interface ParsedIncome {
   amount: number;
   title: string;

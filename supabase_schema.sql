@@ -1555,3 +1555,87 @@ CREATE POLICY "Users can view own bullion transactions" ON public.bullion_transa
 CREATE POLICY "Users can insert own bullion transactions" ON public.bullion_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
 CREATE POLICY "Users can update own bullion transactions" ON public.bullion_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
 CREATE POLICY "Users can delete own bullion transactions" ON public.bullion_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+
+-- ----------------------------------------------------------------------------
+-- 11. CRYPTOCURRENCY & BINANCE INTEGRATION
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.binance_integrations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL UNIQUE,
+  api_key text NOT NULL,
+  api_secret text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  auto_sync boolean NOT NULL DEFAULT true,
+  last_synced_at timestamptz NULL,
+  sync_error text NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_binance_integrations_user ON public.binance_integrations(user_id);
+ALTER TABLE public.binance_integrations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own binance integration" ON public.binance_integrations FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own binance integration" ON public.binance_integrations FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own binance integration" ON public.binance_integrations FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own binance integration" ON public.binance_integrations FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+CREATE TABLE IF NOT EXISTS public.crypto_holdings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  asset text NOT NULL,
+  name text NOT NULL DEFAULT '',
+  free_amount numeric(28, 8) NOT NULL DEFAULT 0 CHECK (free_amount >= 0),
+  locked_amount numeric(28, 8) NOT NULL DEFAULT 0 CHECK (locked_amount >= 0),
+  total_quantity numeric(28, 8) NOT NULL DEFAULT 0 CHECK (total_quantity >= 0),
+  current_price_usd numeric(18, 4) NOT NULL DEFAULT 0 CHECK (current_price_usd >= 0),
+  total_value_usd numeric(18, 4) NOT NULL DEFAULT 0 CHECK (total_value_usd >= 0),
+  change_24h numeric(8, 2) NOT NULL DEFAULT 0,
+  last_synced_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_crypto_user_asset UNIQUE (user_id, asset)
+);
+
+CREATE INDEX IF NOT EXISTS idx_crypto_holdings_user ON public.crypto_holdings(user_id);
+CREATE INDEX IF NOT EXISTS idx_crypto_holdings_asset ON public.crypto_holdings(asset);
+ALTER TABLE public.crypto_holdings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own crypto holdings" ON public.crypto_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own crypto holdings" ON public.crypto_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own crypto holdings" ON public.crypto_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own crypto holdings" ON public.crypto_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+
+
+-- ==============================================================================
+-- BINANCE EXECUTED TRADES & SELL ORDER HISTORY
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.crypto_trades (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL DEFAULT coalesce(auth.uid()::text, 'default_user'),
+  trade_id bigint NOT NULL,
+  order_id bigint NOT NULL,
+  symbol text NOT NULL,
+  side text NOT NULL CHECK (side IN ('BUY', 'SELL')),
+  price numeric(28, 8) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  qty numeric(28, 8) NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  quote_qty numeric(28, 8) NOT NULL DEFAULT 0 CHECK (quote_qty >= 0),
+  commission numeric(28, 8) NOT NULL DEFAULT 0,
+  commission_asset text NOT NULL DEFAULT 'USDT',
+  is_buyer boolean NOT NULL,
+  is_maker boolean NOT NULL DEFAULT false,
+  executed_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT uq_crypto_user_trade UNIQUE (user_id, trade_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_crypto_trades_user_sym ON public.crypto_trades(user_id, symbol);
+CREATE INDEX IF NOT EXISTS idx_crypto_trades_user_time ON public.crypto_trades(user_id, executed_at DESC);
+ALTER TABLE public.crypto_trades ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own crypto trades" ON public.crypto_trades FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can insert own crypto trades" ON public.crypto_trades FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can update own crypto trades" ON public.crypto_trades FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can delete own crypto trades" ON public.crypto_trades FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');

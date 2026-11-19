@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
@@ -253,6 +252,7 @@ export default function LoginClient() {
         provider: "google",
         options: {
           redirectTo: `${origin}/auth/callback?next=/`,
+          scopes: "email profile openid",
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -307,9 +307,6 @@ export default function LoginClient() {
             {/* Header Brand */}
             <div className="flex items-center gap-3">
               <Logo size={42} showText={true} />
-              <Badge variant="emerald" dot>
-                Personal Finance
-              </Badge>
             </div>
 
             {/* Headline */}

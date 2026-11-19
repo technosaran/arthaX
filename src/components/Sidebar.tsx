@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   Landmark,
@@ -15,15 +15,21 @@ import {
   Coins,
   Gem,
   ShieldCheck,
+  Bitcoin,
   ChevronLeft,
   ChevronRight,
   LogOut,
   X,
   Trophy,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { useTheme, ThemeMode } from "@/context/ThemeContext";
 
 interface SidebarProps {
   activeTab: string;
@@ -48,6 +54,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance" },
   { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance" },
   { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
+  { id: "crypto", label: "Crypto", icon: Bitcoin, group: "finance" },
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
   { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
@@ -65,7 +72,53 @@ export default function Sidebar({
 }: SidebarProps) {
   const { signOut } = useAuth();
   const { showToast } = useToast();
+  const { theme, setTheme } = useTheme();
+
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const [isPrivacyMasked, setIsPrivacyMasked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("arthax_privacy_mode") === "true";
+      if (saved) {
+        setIsPrivacyMasked(true);
+      }
+    }
+  }, []);
+
+  const togglePrivacyMask = useCallback(() => {
+    const root = document.documentElement;
+    const isMasked = root.classList.toggle("privacy-masked");
+    setIsPrivacyMasked(isMasked);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("arthax_privacy_mode", isMasked ? "true" : "false");
+    }
+    if (isMasked) {
+      showToast(
+        "Privacy Mode Enabled",
+        "Sensitive financial figures and balances are now blurred for discretion.",
+        "info"
+      );
+    } else {
+      showToast(
+        "Privacy Mode Disabled",
+        "Financial figures and balances are now visible.",
+        "info"
+      );
+    }
+  }, [showToast]);
+
+  const cycleTheme = useCallback(() => {
+    const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    showToast(
+      nextTheme === "dark" ? "Dark Theme Activated" : "Light Theme Activated",
+      nextTheme === "dark"
+        ? "Switched to deep dark workspace theme."
+        : "Switched to clean daylight theme.",
+      "info"
+    );
+  }, [theme, setTheme, showToast]);
 
   const handleTabSelect = (tabId: string) => {
     setActiveTab(tabId);
@@ -96,6 +149,7 @@ export default function Sidebar({
               : "text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)] border border-transparent"
           }`}
           aria-current={isSelected ? "page" : undefined}
+          aria-label={collapsed ? item.label : undefined}
         >
           {/* Active Accent Bar on Left */}
           {isSelected && !collapsed && (
@@ -195,7 +249,10 @@ export default function Sidebar({
         </div>
 
         {/* Navigation Groups */}
-        <nav className="flex-1 px-2 py-3.5 space-y-4 overflow-y-auto">
+        <nav
+          aria-label="Financial Suite Navigation"
+          className="flex-1 px-2 py-3.5 space-y-4 overflow-y-auto"
+        >
           {/* Group 1: FINANCE */}
           <div>
             {!collapsed && (
@@ -221,12 +278,86 @@ export default function Sidebar({
           </div>
         </nav>
 
-        {/* Footer / User Session Control */}
+        {/* Footer / Utilities & Session Control */}
         <div
-          className={`p-2 border-t border-[var(--app-border)] flex-shrink-0 space-y-2 ${
+          className={`p-2 border-t border-[var(--app-border)] flex-shrink-0 space-y-1.5 ${
             collapsed ? "flex flex-col items-center" : ""
           }`}
         >
+          {/* Micro Workspace Utilities (Theme, Privacy) */}
+          {!collapsed ? (
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)]">
+              {/* Theme Toggle */}
+              <button
+                type="button"
+                onClick={cycleTheme}
+                className="flex items-center justify-center py-1.5 rounded-lg hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] transition-all cursor-pointer"
+                title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+                aria-label="Toggle visual theme"
+              >
+                {theme === "dark" ? (
+                  <Moon size={14} className="text-sky-400" />
+                ) : (
+                  <Sun size={14} className="text-amber-500" />
+                )}
+              </button>
+
+              {/* Privacy Mask */}
+              <button
+                type="button"
+                onClick={togglePrivacyMask}
+                className={`flex items-center justify-center py-1.5 rounded-lg transition-all cursor-pointer ${
+                  isPrivacyMasked
+                    ? "text-emerald-400 bg-emerald-500/15"
+                    : "text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)]"
+                }`}
+                title={isPrivacyMasked ? "Reveal Balances" : "Hide Balances (Privacy Mode)"}
+                aria-label="Toggle privacy mode"
+              >
+                {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={cycleTheme}
+                onMouseEnter={() => setHoveredItemId("theme-collapsed")}
+                onMouseLeave={() => setHoveredItemId(null)}
+                className="w-8 h-8 rounded-xl border border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] flex items-center justify-center cursor-pointer transition-all"
+                title="Toggle Theme"
+              >
+                {theme === "dark" ? <Moon size={14} className="text-sky-400" /> : <Sun size={14} className="text-amber-500" />}
+              </button>
+              {hoveredItemId === "theme-collapsed" && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl">
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={togglePrivacyMask}
+                onMouseEnter={() => setHoveredItemId("privacy-collapsed")}
+                onMouseLeave={() => setHoveredItemId(null)}
+                className={`w-8 h-8 rounded-xl border flex items-center justify-center cursor-pointer transition-all ${
+                  isPrivacyMasked
+                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
+                    : "border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)]"
+                }`}
+                title="Privacy Mode"
+              >
+                {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+              {hoveredItemId === "privacy-collapsed" && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl">
+                  {isPrivacyMasked ? "Reveal Balances" : "Hide Balances"}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sign Out Button */}
           <div className="relative w-full">
             <button
               type="button"
@@ -239,12 +370,12 @@ export default function Sidebar({
               }}
               onMouseEnter={() => setHoveredItemId("signout")}
               onMouseLeave={() => setHoveredItemId(null)}
-              className={`group flex items-center w-full rounded-xl px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer border border-transparent text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 fintech-focus ${
-                collapsed ? "justify-center px-2 py-2.5" : "gap-2.5"
+              className={`group flex items-center w-full rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all duration-150 cursor-pointer border border-transparent text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30 fintech-focus ${
+                collapsed ? "justify-center px-2 py-2" : "gap-2"
               }`}
               aria-label="Sign out of arthaX"
             >
-              <LogOut size={16} className="flex-shrink-0 transition-transform duration-150 group-hover:-translate-x-0.5" />
+              <LogOut size={15} className="flex-shrink-0 transition-transform duration-150 group-hover:-translate-x-0.5" />
               {!collapsed && <span className="truncate text-xs">Sign Out</span>}
             </button>
 
@@ -255,6 +386,7 @@ export default function Sidebar({
             )}
           </div>
 
+          {/* Expand Sidebar Icon Button */}
           {collapsed && (
             <button
               type="button"

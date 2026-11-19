@@ -94,6 +94,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        type={props.type || "button"}
         disabled={isDisabled}
         className={`${baseStyles} ${sizeStyles[size]} ${variantConf.className} ${className}`}
         style={{ ...variantConf.defaultStyle, ...style }}
@@ -104,7 +105,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ) : (
           effectiveIcon && <span className="flex-shrink-0">{effectiveIcon}</span>
         )}
-        {children && <span>{children}</span>}
+        {children}
         {!loading && iconRight && <span className="flex-shrink-0">{iconRight}</span>}
       </button>
     );
