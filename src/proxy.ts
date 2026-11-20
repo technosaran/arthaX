@@ -39,10 +39,10 @@ export async function proxy(request: NextRequest) {
   // Content Security Policy (CSP)
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://*.google.com https://img.logo.dev https://unavatar.io https://t3.gstatic.com https://*.gravatar.com https://secure.gravatar.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://*.google.com https://img.logo.dev https://unavatar.io https://t3.gstatic.com https://*.gravatar.com https://secure.gravatar.com https://cdn.jsdelivr.net",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.upstash.io https://api.kite.trade https://*.googleapis.com https://accounts.google.com",
     "object-src 'none'",
     "frame-ancestors 'none'",

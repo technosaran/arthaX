@@ -15,6 +15,12 @@ const AUTH_TAG_LENGTH = 16; // 128-bit authentication tag
  * from the environment master key or service key with domain separation.
  */
 function getDerivedKey(salt: string = "arthax-credential-salt", info: string = "broker-credentials"): Buffer {
+  if (process.env.NODE_ENV === "production" && !process.env.ENCRYPTION_MASTER_KEY) {
+    console.warn(
+      "[Crypto Security Warning] ENCRYPTION_MASTER_KEY is not defined in production. Falling back to service role credentials. Set ENCRYPTION_MASTER_KEY for zero-trust isolation."
+    );
+  }
+
   const masterSecret =
     process.env.ENCRYPTION_MASTER_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||

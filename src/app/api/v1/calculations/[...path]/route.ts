@@ -22,6 +22,12 @@ export async function GET(
   const subPath = path ? path.join("/") : "";
   const { search } = new URL(req.url);
 
+  const internalKey =
+    process.env.INTERNAL_SERVICE_KEY ||
+    process.env.CRON_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+
   try {
     const targetUrl = `${PYTHON_SERVICE_URL}/api/py/calculations/${subPath}${search}`;
     const res = await fetch(targetUrl, {
@@ -30,6 +36,7 @@ export async function GET(
         Accept: "application/json",
         "X-Request-Id": requestId,
         "X-User-Id": userId,
+        ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
       },
     });
 
@@ -77,6 +84,12 @@ export async function POST(
     body.user_id = userId;
 
     const targetUrl = `${PYTHON_SERVICE_URL}/api/py/calculations/${subPath}`;
+    const internalKey =
+      process.env.INTERNAL_SERVICE_KEY ||
+      process.env.CRON_SECRET ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      "";
+
     const res = await fetch(targetUrl, {
       method: "POST",
       headers: {
@@ -84,6 +97,7 @@ export async function POST(
         Accept: "application/json",
         "X-Request-Id": requestId,
         "X-User-Id": userId,
+        ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
       },
       body: JSON.stringify(body),
     });

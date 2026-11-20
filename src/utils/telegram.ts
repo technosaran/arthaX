@@ -379,9 +379,13 @@ export function verifyTelegramSecret(
   incomingSecret: string | null,
   configuredSecret?: string
 ): boolean {
-  const secret = configuredSecret || process.env.TELEGRAM_WEBHOOK_SECRET;
+  const secret = configuredSecret !== undefined ? configuredSecret : process.env.TELEGRAM_WEBHOOK_SECRET;
   if (!secret) {
-    // If no secret configured in environment, allow webhook through (useful for local dev/testing)
+    if (process.env.NODE_ENV === "production") {
+      console.error("[Telegram Security] TELEGRAM_WEBHOOK_SECRET is not configured in production. Rejecting incoming webhook.");
+      return false;
+    }
+    // If no secret configured in environment during development/testing, allow webhook through
     return true;
   }
   if (!incomingSecret) {

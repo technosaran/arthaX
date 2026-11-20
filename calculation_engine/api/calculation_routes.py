@@ -5,7 +5,7 @@ health status, validation metrics dashboard, and audit history.
 """
 
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from ..modules.expense_engine import ExpenseEngine
@@ -169,10 +169,15 @@ def get_history(
     type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
+    x_user_id: Optional[str] = Header(None),
 ):
     """
-    Returns immutable calculation audit trail records.
+    Returns immutable calculation audit trail records scoped strictly to the requesting user.
     """
+    effective_user_id = x_user_id or user_id
+    if x_user_id and user_id and x_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot query another user's calculation history.")
+
     return {
-        "history": get_calculation_history(limit=limit, calculation_type=type, status=status, user_id=user_id)
+        "history": get_calculation_history(limit=limit, calculation_type=type, status=status, user_id=effective_user_id)
     }

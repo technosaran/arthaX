@@ -628,9 +628,9 @@ if BASE_DIR not in sys.path:
 
 try:
     from calculation_engine.api.calculation_routes import router as calculation_router
-    app.include_router(calculation_router, prefix="/api")
-    app.include_router(calculation_router, prefix="/api/py")
-    app.include_router(calculation_router, prefix="")
+    app.include_router(calculation_router, prefix="/api", dependencies=[Depends(verify_auth_dependency)])
+    app.include_router(calculation_router, prefix="/api/py", dependencies=[Depends(verify_auth_dependency)])
+    app.include_router(calculation_router, prefix="", dependencies=[Depends(verify_auth_dependency)])
 except Exception as err:
     print(f"Warning: Calculation engine router mounting error: {err}")
 

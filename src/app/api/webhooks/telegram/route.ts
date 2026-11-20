@@ -238,47 +238,27 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 3. Pairing & Linking Commands (/link, /start, loose tokens, email, or TELEGRAM_AUTHORIZED_USER_ID)
+    // 3. Pairing & Linking Commands (/link or link tokens generated from dashboard)
     // -------------------------------------------------------------
     const linkCandidate = extractTelegramLinkCandidate(rawText);
 
-    if (linkCandidate || (!userId && (rawText.startsWith("/start") || rawText === "start"))) {
+    if (linkCandidate) {
       let matchedUserId: string | null = null;
       let matchedUserName: string = "User";
 
-      if (linkCandidate) {
-        const tokenCandidates = normalizeLinkTokenCandidates(linkCandidate);
+      const tokenCandidates = normalizeLinkTokenCandidates(linkCandidate);
 
-        // A. Match strictly by secure Link Token in user_settings (Prevents Account Takeover)
-        const { data: targetUser } = await supabaseAdmin
-          .from("user_settings")
-          .select("id, name, telegram_link_token")
-          .in("telegram_link_token", tokenCandidates)
-          .limit(1)
-          .maybeSingle();
+      // Match strictly by secure Link Token in user_settings (Prevents Account Takeover)
+      const { data: targetUser } = await supabaseAdmin
+        .from("user_settings")
+        .select("id, name, telegram_link_token")
+        .in("telegram_link_token", tokenCandidates)
+        .limit(1)
+        .maybeSingle();
 
-        if (targetUser?.id) {
-          matchedUserId = targetUser.id;
-          matchedUserName = targetUser.name || "User";
-        }
-      }
-
-      // Single-User / Owner Fallback via TELEGRAM_AUTHORIZED_USER_ID on /start
-      if (!matchedUserId && !userId && (rawText === "/start" || rawText === "start")) {
-        const authUserId = process.env.TELEGRAM_AUTHORIZED_USER_ID;
-        if (authUserId) {
-          const { data: authUser } = await supabaseAdmin
-            .from("user_settings")
-            .select("id, name")
-            .eq("id", authUserId)
-            .limit(1)
-            .maybeSingle();
-
-          if (authUser?.id) {
-            matchedUserId = authUser.id;
-            matchedUserName = authUser.name || "Owner";
-          }
-        }
+      if (targetUser?.id) {
+        matchedUserId = targetUser.id;
+        matchedUserName = targetUser.name || "User";
       }
 
       if (matchedUserId) {

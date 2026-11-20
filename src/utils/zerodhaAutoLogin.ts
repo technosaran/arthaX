@@ -128,26 +128,15 @@ export function getAutoLoginCredentials(
     .map((id) => id.trim())
     .filter(Boolean);
 
-  // If authorized user IDs are specified, ensure unauthorized users cannot use the env credentials
+  // Ensure server environment broker credentials are strictly restricted to authorized account owners
   if (
-    authorizedUserIds.length > 0 &&
-    currentUserId &&
-    currentUserId !== "default_user" &&
-    !authorizedUserIds.includes(currentUserId)
-  ) {
-    logger.warn(`[Zerodha Security] Unauthorized user ${currentUserId} attempted to use owner Zerodha credentials.`);
-    return null;
-  }
-
-  // In production, require explicit authorizedUserId pairing to prevent cross-tenant credential exposure
-  if (
-    process.env.NODE_ENV === "production" &&
-    authorizedUserIds.length === 0 &&
     currentUserId &&
     currentUserId !== "default_user"
   ) {
-    logger.warn(`[Zerodha Security] No ZERODHA_AUTHORIZED_USER_ID configured. Denying tenant access to server credentials.`);
-    return null;
+    if (authorizedUserIds.length === 0 || !authorizedUserIds.includes(currentUserId)) {
+      logger.warn(`[Zerodha Security] Unauthorized user ${currentUserId} attempted to use owner Zerodha credentials.`);
+      return null;
+    }
   }
 
   const userId = (process.env.ZERODHA_USER_ID || "").trim();

@@ -1464,10 +1464,10 @@ CREATE TABLE IF NOT EXISTS public.bond_holdings (
 CREATE INDEX IF NOT EXISTS idx_bond_holdings_user ON public.bond_holdings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bond_holdings_isin ON public.bond_holdings(isin);
 ALTER TABLE public.bond_holdings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own bond holdings" ON public.bond_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own bond holdings" ON public.bond_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own bond holdings" ON public.bond_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own bond holdings" ON public.bond_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own bond holdings" ON public.bond_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own bond holdings" ON public.bond_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own bond holdings" ON public.bond_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own bond holdings" ON public.bond_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 CREATE TABLE IF NOT EXISTS public.bond_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1488,10 +1488,10 @@ CREATE TABLE IF NOT EXISTS public.bond_transactions (
 CREATE INDEX IF NOT EXISTS idx_bond_transactions_user ON public.bond_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_bond_transactions_holding ON public.bond_transactions(holding_id);
 ALTER TABLE public.bond_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own bond transactions" ON public.bond_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own bond transactions" ON public.bond_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own bond transactions" ON public.bond_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own bond transactions" ON public.bond_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own bond transactions" ON public.bond_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own bond transactions" ON public.bond_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own bond transactions" ON public.bond_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own bond transactions" ON public.bond_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 
 -- ----------------------------------------------------------------------------
@@ -1546,15 +1546,15 @@ CREATE INDEX IF NOT EXISTS idx_bullion_transactions_holding ON public.bullion_tr
 ALTER TABLE public.bullion_holdings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bullion_transactions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own bullion holdings" ON public.bullion_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own bullion holdings" ON public.bullion_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own bullion holdings" ON public.bullion_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own bullion holdings" ON public.bullion_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own bullion holdings" ON public.bullion_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own bullion holdings" ON public.bullion_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own bullion holdings" ON public.bullion_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own bullion holdings" ON public.bullion_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
-CREATE POLICY "Users can view own bullion transactions" ON public.bullion_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own bullion transactions" ON public.bullion_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own bullion transactions" ON public.bullion_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own bullion transactions" ON public.bullion_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own bullion transactions" ON public.bullion_transactions FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own bullion transactions" ON public.bullion_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own bullion transactions" ON public.bullion_transactions FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own bullion transactions" ON public.bullion_transactions FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 
 -- ----------------------------------------------------------------------------
@@ -1577,10 +1577,10 @@ CREATE TABLE IF NOT EXISTS public.binance_integrations (
 CREATE INDEX IF NOT EXISTS idx_binance_integrations_user ON public.binance_integrations(user_id);
 ALTER TABLE public.binance_integrations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own binance integration" ON public.binance_integrations FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own binance integration" ON public.binance_integrations FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own binance integration" ON public.binance_integrations FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own binance integration" ON public.binance_integrations FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own binance integration" ON public.binance_integrations FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own binance integration" ON public.binance_integrations FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own binance integration" ON public.binance_integrations FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own binance integration" ON public.binance_integrations FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 CREATE TABLE IF NOT EXISTS public.crypto_holdings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1603,10 +1603,10 @@ CREATE INDEX IF NOT EXISTS idx_crypto_holdings_user ON public.crypto_holdings(us
 CREATE INDEX IF NOT EXISTS idx_crypto_holdings_asset ON public.crypto_holdings(asset);
 ALTER TABLE public.crypto_holdings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own crypto holdings" ON public.crypto_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own crypto holdings" ON public.crypto_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own crypto holdings" ON public.crypto_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own crypto holdings" ON public.crypto_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own crypto holdings" ON public.crypto_holdings FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own crypto holdings" ON public.crypto_holdings FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own crypto holdings" ON public.crypto_holdings FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own crypto holdings" ON public.crypto_holdings FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 
 -- ==============================================================================
@@ -1635,7 +1635,7 @@ CREATE INDEX IF NOT EXISTS idx_crypto_trades_user_sym ON public.crypto_trades(us
 CREATE INDEX IF NOT EXISTS idx_crypto_trades_user_time ON public.crypto_trades(user_id, executed_at DESC);
 ALTER TABLE public.crypto_trades ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own crypto trades" ON public.crypto_trades FOR SELECT TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can insert own crypto trades" ON public.crypto_trades FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can update own crypto trades" ON public.crypto_trades FOR UPDATE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user') WITH CHECK (auth.uid()::text = user_id OR user_id = 'default_user');
-CREATE POLICY "Users can delete own crypto trades" ON public.crypto_trades FOR DELETE TO authenticated USING (auth.uid()::text = user_id OR user_id = 'default_user');
+CREATE POLICY "Users can view own crypto trades" ON public.crypto_trades FOR SELECT TO authenticated USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert own crypto trades" ON public.crypto_trades FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update own crypto trades" ON public.crypto_trades FOR UPDATE TO authenticated USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can delete own crypto trades" ON public.crypto_trades FOR DELETE TO authenticated USING (auth.uid()::text = user_id);

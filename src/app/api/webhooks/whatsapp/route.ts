@@ -148,7 +148,8 @@ export async function POST(req: NextRequest) {
 
     const authorizedPhone = process.env.WHATSAPP_AUTHORIZED_PHONE;
     const authorizedUserId = process.env.WHATSAPP_AUTHORIZED_USER_ID;
-    if (authorizedUserId && (!authorizedPhone || senderPhone === authorizedPhone || senderPhone === "test_user")) {
+    const isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
+    if (authorizedUserId && ((authorizedPhone && senderPhone === authorizedPhone) || (isTest && senderPhone === "test_user"))) {
       userId = authorizedUserId;
     }
 

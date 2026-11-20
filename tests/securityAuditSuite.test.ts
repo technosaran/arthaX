@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { getUserCacheKey } from "@/utils/redis";
 import { encryptSensitiveData, decryptSensitiveData, constantTimeCompare } from "@/utils/crypto";
 import { rateLimit } from "@/utils/rateLimit";
+import { getAutoLoginCredentials } from "../src/utils/zerodhaAutoLogin";
 import fs from "fs";
 import path from "path";
 
@@ -375,16 +376,71 @@ describe("ArthaX Enterprise Security Audit Test Suite (Phases 1-10)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Criterion 17: File & Payload Boundary Protection (Anti-DoS)
+  // Criterion 18: Telegram Account Takeover /start Fallback Elimination
   // -------------------------------------------------------------------------
-  describe("Criterion 17: Import Payload Boundary Protection", () => {
-    it("enforces maximum row limits on mutual funds and holdings imports", () => {
-      const maxAllowedRows = 500;
-      const smallCsvLines = new Array(50).fill("row,data,10,20");
-      const oversizedCsvLines = new Array(1500).fill("row,data,10,20");
+  describe("Criterion 18: Telegram Account Takeover /start Fallback Elimination", () => {
+    it("ensures Telegram webhook route does not allow unauthenticated /start to bind authorized user", () => {
+      const webhookPath = path.resolve(process.cwd(), "src/app/api/webhooks/telegram/route.ts");
+      const content = fs.readFileSync(webhookPath, "utf-8");
 
-      expect(smallCsvLines.length <= maxAllowedRows).toBe(true);
-      expect(oversizedCsvLines.length <= maxAllowedRows).toBe(false);
+      // Verify that TELEGRAM_AUTHORIZED_USER_ID fallback binding on /start is completely eradicated
+      expect(content).not.toMatch(/TELEGRAM_AUTHORIZED_USER_ID[\s\S]*?matchedUserId\s*=\s*authUserId/);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 19: Strict Tenant-Owner Isolation for Broker Auto-Login
+  // -------------------------------------------------------------------------
+  describe("Criterion 19: Strict Tenant-Owner Isolation for Broker Auto-Login", () => {
+    it("denies access to environment broker credentials if user is not in ZERODHA_AUTHORIZED_USER_ID", () => {
+      const originalEnv = process.env;
+      process.env = { ...originalEnv, ZERODHA_USER_ID: "KITE01", ZERODHA_PASSWORD: "pw", ZERODHA_TOTP_SECRET: "SECRET" };
+      delete process.env.ZERODHA_AUTHORIZED_USER_ID;
+
+      // In any environment without authorized user list, tenant must be rejected
+      const result = getAutoLoginCredentials(null, "unauthorized-user-uuid");
+      expect(result).toBeNull();
+
+      process.env = originalEnv;
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 20: Elimination of Insecure 'default_user' Policy Bypass
+  // -------------------------------------------------------------------------
+  describe("Criterion 20: Elimination of Insecure default_user Policy Bypass", () => {
+    it("verifies that no RLS policy in supabase_schema.sql permits default_user bypass", () => {
+      const schemaPath = path.resolve(process.cwd(), "supabase_schema.sql");
+      const content = fs.readFileSync(schemaPath, "utf-8");
+
+      // Policies must not have "OR user_id = 'default_user'"
+      expect(content).not.toMatch(/CREATE\s+POLICY[\s\S]*?OR\s+user_id\s*=\s*'default_user'/i);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 21: WhatsApp Impersonation Prevention
+  // -------------------------------------------------------------------------
+  describe("Criterion 21: WhatsApp Authorized Phone Guard", () => {
+    it("ensures whatsapp route does not map callers when WHATSAPP_AUTHORIZED_PHONE is empty", () => {
+      const whatsappRoutePath = path.resolve(process.cwd(), "src/app/api/webhooks/whatsapp/route.ts");
+      const content = fs.readFileSync(whatsappRoutePath, "utf-8");
+
+      expect(content).not.toContain("!authorizedPhone || senderPhone === authorizedPhone");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 22: Hardened Content Security Policy Script Restrictions
+  // -------------------------------------------------------------------------
+  describe("Criterion 22: Hardened Content Security Policy Script Restrictions", () => {
+    it("ensures proxy.ts does not allow public CDN in script-src", () => {
+      const proxyPath = path.resolve(process.cwd(), "src/proxy.ts");
+      const content = fs.readFileSync(proxyPath, "utf-8");
+
+      const scriptSrcLine = content.split("\n").find((l) => l.includes("script-src"));
+      expect(scriptSrcLine).toBeDefined();
+      expect(scriptSrcLine).not.toContain("https://cdn.jsdelivr.net");
     });
   });
 });

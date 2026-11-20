@@ -51,11 +51,6 @@ export async function GET(req: Request) {
   const isTelegramConfigured = Boolean(process.env.TELEGRAM_BOT_TOKEN);
   checks.telegram = {
     status: isTelegramConfigured ? "healthy" : "disabled",
-    details: {
-      bot_username: process.env.TELEGRAM_BOT_USERNAME || "Artha_X_bot",
-      has_webhook_secret: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
-      has_authorized_user: Boolean(process.env.TELEGRAM_AUTHORIZED_USER_ID),
-    },
   };
 
   // 4. Gemini Generative AI Readiness

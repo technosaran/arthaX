@@ -23,7 +23,11 @@ interface ShortcutRequestBody {
 export async function POST(req: NextRequest) {
   try {
     // 0. Anti-Brute Force Rate Limiting
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const clientIp =
+      req.headers.get("x-real-ip") ||
+      (forwardedFor ? forwardedFor.split(",").pop()?.trim() : null) ||
+      "anonymous";
     const ipLimit = await rateLimit(`shortcuts_ip:${clientIp}`, 30, 60);
     if (!ipLimit.success) {
       return NextResponse.json(
