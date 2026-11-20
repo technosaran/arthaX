@@ -13,7 +13,6 @@ import {
   ArrowRight,
   PiggyBank,
   Clock,
-  Calculator,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -30,7 +29,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
-import { TaxHarvestingModal } from "@/components/TaxHarvestingModal";
 
 interface AccountItem {
   id: string;
@@ -130,7 +128,14 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   });
   const [totalCryptoUsd, setTotalCryptoUsd] = useState<number>(0);
   const [cryptoHoldings, setCryptoHoldings] = useState<{ asset: string; total_value_usd: number }[]>([]);
-  const [isTaxModalOpen, setIsTaxModalOpen] = useState<boolean>(false);
+  const [investmentsBreakdown, setInvestmentsBreakdown] = useState<{
+    stocks: number;
+    mutualFunds: number;
+    bonds: number;
+    bullion: number;
+    cryptoInr: number;
+    total: number;
+  }>({ stocks: 0, mutualFunds: 0, bonds: 0, bullion: 0, cryptoInr: 0, total: 0 });
   const [accounts, setAccounts] = useState<AccountItem[]>(initialCache?.accounts || []);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialCache?.expenses || []);
   const [incomes, setIncomes] = useState<IncomeItem[]>(initialCache?.incomes || []);
@@ -176,21 +181,31 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     try {
       const supabase = createClient();
 
-      // Parallel concurrent burst: accounts, expenses, income, transfers, crypto_holdings
-      const [accountsRes, expensesRes, incomeRes, transfersRes, cryptoRes] = await Promise.all([
+      // Parallel concurrent burst: accounts, expenses, income, transfers, crypto, stocks, mutual funds, bonds, bullion
+      const [
+        accountsRes,
+        expensesRes,
+        incomeRes,
+        transfersRes,
+        cryptoRes,
+        stocksRes,
+        mfRes,
+        bondsRes,
+        bullionRes,
+      ] = await Promise.all([
         supabase
           .from("accounts")
           .select("id, name, type, balance, last_four, classification")
           .eq("user_id", user.id),
         supabase
           .from("expenses")
-          .select("id, title, amount, category, account_id, expense_date, notes, tags, created_at")
+          .select("id, title, amount, category, account_id, expense_date, notes, tags, created_at, transaction_type, transfer_id")
           .eq("user_id", user.id)
           .order("expense_date", { ascending: false })
           .limit(100),
         supabase
           .from("income")
-          .select("id, title, amount, category, account_id, received_date, created_at")
+          .select("id, title, amount, category, account_id, received_date, created_at, transaction_type, transfer_id")
           .eq("user_id", user.id)
           .order("received_date", { ascending: false })
           .limit(100),
@@ -203,6 +218,22 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         supabase
           .from("crypto_holdings")
           .select("asset, total_value_usd")
+          .eq("user_id", user.id),
+        supabase
+          .from("stock_holdings")
+          .select("quantity, avg_buy_price")
+          .eq("user_id", user.id),
+        supabase
+          .from("mutual_fund_holdings")
+          .select("units, current_nav, avg_nav, invested_amount")
+          .eq("user_id", user.id),
+        supabase
+          .from("bond_holdings")
+          .select("quantity, avg_buy_price, invested_amount, current_price, face_value")
+          .eq("user_id", user.id),
+        supabase
+          .from("bullion_holdings")
+          .select("metal, weight_grams, total_buy_price")
           .eq("user_id", user.id),
       ]);
 
@@ -218,7 +249,53 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         "User";
       setName((prev) => (prev === resolvedName ? prev : resolvedName));
 
-      // 2. Resolve accounts and accurate net worth (Assets - Liabilities)
+      // Resolve Crypto Holdings USD Valuation
+      let cryptoUsdTotal = 0;
+      let cryptoList: { asset: string; total_value_usd: number }[] = [];
+      if (cryptoRes?.data && cryptoRes.data.length > 0) {
+        cryptoList = cryptoRes.data.map((c: any) => ({
+          asset: c.asset,
+          total_value_usd: Number(c.total_value_usd) || 0,
+        }));
+        cryptoUsdTotal = cryptoList.reduce((acc, curr) => acc + curr.total_value_usd, 0);
+      }
+      setCryptoHoldings(cryptoList);
+      setTotalCryptoUsd(cryptoUsdTotal);
+
+      // Investment Valuations
+      const stocksTotal = (stocksRes?.data || []).reduce(
+        (sum: number, s: any) => sum + (Number(s.quantity) || 0) * (Number(s.avg_buy_price) || 0),
+        0
+      );
+      const mfTotal = (mfRes?.data || []).reduce((sum: number, m: any) => {
+        const inv = Number(m.invested_amount) || 0;
+        if (inv > 0) return sum + inv;
+        const nav = Number(m.current_nav) || Number(m.avg_nav) || 0;
+        return sum + (Number(m.units) || 0) * nav;
+      }, 0);
+      const bondsTotal = (bondsRes?.data || []).reduce((sum: number, b: any) => {
+        const inv = Number(b.invested_amount) || 0;
+        if (inv > 0) return sum + inv;
+        const p = Number(b.current_price) || Number(b.avg_buy_price) || Number(b.face_value) || 1000;
+        return sum + (Number(b.quantity) || 0) * p;
+      }, 0);
+      const bullionTotal = (bullionRes?.data || []).reduce(
+        (sum: number, bul: any) => sum + (Number(bul.total_buy_price) || 0),
+        0
+      );
+      const cryptoInr = cryptoUsdTotal * 84.5;
+      const totalInvestments = stocksTotal + mfTotal + bondsTotal + bullionTotal + cryptoInr;
+
+      setInvestmentsBreakdown({
+        stocks: stocksTotal,
+        mutualFunds: mfTotal,
+        bonds: bondsTotal,
+        bullion: bullionTotal,
+        cryptoInr,
+        total: totalInvestments,
+      });
+
+      // 2. Resolve accounts and accurate net worth (Total Assets - Total Liabilities)
       let mapped: AccountItem[] = [];
       let total = 0;
       if (accountsRes.data && accountsRes.data.length > 0) {
@@ -237,32 +314,21 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               : "asset"),
         }));
 
-        const totalAssets = mapped
+        const totalAccountAssets = mapped
           .filter((a) => a.classification !== "liability")
           .reduce((acc, curr) => acc + curr.balance, 0);
 
         const totalLiabilities = mapped
           .filter((a) => a.classification === "liability")
-          .reduce((acc, curr) => acc + curr.balance, 0);
+          .reduce((acc, curr) => acc + Math.abs(curr.balance), 0);
 
-        total = totalAssets - totalLiabilities;
+        total = totalAccountAssets + totalInvestments - totalLiabilities;
+      } else {
+        total = totalInvestments;
       }
 
       setAccounts(mapped);
       setNetWorth(total);
-
-      // Resolve Crypto Holdings USD Valuation
-      let cryptoUsdTotal = 0;
-      let cryptoList: { asset: string; total_value_usd: number }[] = [];
-      if (cryptoRes?.data && cryptoRes.data.length > 0) {
-        cryptoList = cryptoRes.data.map((c: any) => ({
-          asset: c.asset,
-          total_value_usd: Number(c.total_value_usd) || 0,
-        }));
-        cryptoUsdTotal = cryptoList.reduce((acc, curr) => acc + curr.total_value_usd, 0);
-      }
-      setCryptoHoldings(cryptoList);
-      setTotalCryptoUsd(cryptoUsdTotal);
 
       if (expensesRes.data) {
         setExpenses((expensesRes.data as ExpenseItem[]).filter((e) => !isFamilyTransfer(e)));
@@ -410,10 +476,11 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
   // Asset Totals
   const totalAssets = useMemo(() => {
-    return accounts
+    const liquidAssets = accounts
       .filter((a) => a.classification !== "liability")
       .reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
-  }, [accounts]);
+    return liquidAssets + (investmentsBreakdown?.total || 0);
+  }, [accounts, investmentsBreakdown]);
 
   const totalLiabilities = useMemo(() => {
     return accounts
@@ -484,14 +551,32 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
   // Group portfolio assets by type for Donut Chart
   const typeMap = useMemo(() => {
-    return accounts
+    const map = accounts
       .filter((a) => a.classification !== "liability")
       .reduce((acc, curr) => {
         const key = curr.type || curr.name || "Other";
         acc[key] = (acc[key] || 0) + curr.balance;
         return acc;
       }, {} as Record<string, number>);
-  }, [accounts]);
+
+    if (investmentsBreakdown?.stocks && investmentsBreakdown.stocks > 0) {
+      map["Stocks"] = (map["Stocks"] || 0) + investmentsBreakdown.stocks;
+    }
+    if (investmentsBreakdown?.mutualFunds && investmentsBreakdown.mutualFunds > 0) {
+      map["Mutual Funds"] = (map["Mutual Funds"] || 0) + investmentsBreakdown.mutualFunds;
+    }
+    if (investmentsBreakdown?.bonds && investmentsBreakdown.bonds > 0) {
+      map["Bonds"] = (map["Bonds"] || 0) + investmentsBreakdown.bonds;
+    }
+    if (investmentsBreakdown?.bullion && investmentsBreakdown.bullion > 0) {
+      map["Gold & Silver"] = (map["Gold & Silver"] || 0) + investmentsBreakdown.bullion;
+    }
+    if (investmentsBreakdown?.cryptoInr && investmentsBreakdown.cryptoInr > 0) {
+      map["Crypto"] = (map["Crypto"] || 0) + investmentsBreakdown.cryptoInr;
+    }
+
+    return map;
+  }, [accounts, investmentsBreakdown]);
 
   const donutSegments: DonutSegment[] = useMemo(() => {
     return Object.entries(typeMap)
@@ -626,19 +711,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <p className="text-xs sm:text-sm text-[var(--app-muted)] font-normal">
             Sovereign ledger overview, net worth telemetry, and real-time cash flow.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsTaxModalOpen(true)}
-            className="flex items-center gap-2 text-xs font-semibold border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shadow-sm"
-          >
-            <Calculator size={14} className="text-amber-400" />
-            <span>Tax & Harvesting</span>
-            <Badge variant="warning" size="sm">Budget &apos;24</Badge>
-          </Button>
         </div>
       </div>
 
@@ -876,6 +948,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                   totalValue={currencyView === "USD" ? displayedAssets : (totalAssets > 0 ? totalAssets : netWorth)}
                   segments={currencyView === "USD" ? cryptoDonutSegments : donutSegments}
                   formatter={currencyView === "USD" ? formatUSD : formatCurrency}
+                  unitLabel={currencyView === "USD" ? "Coin" : "Class"}
                   align="end"
                   emptyMessage={currencyView === "USD" ? "No cryptocurrency holdings found." : "No asset allocation data available."}
                   emptySubMessage={currencyView === "USD" ? "Sync Binance in the Crypto tab to see your coin breakdown." : "Add bank accounts or cash in hand to see your portfolio breakdown."}
@@ -1258,11 +1331,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           )}
         </div>
       </div>
-
-      <TaxHarvestingModal
-        isOpen={isTaxModalOpen}
-        onClose={() => setIsTaxModalOpen(false)}
-      />
     </main>
   );
 }

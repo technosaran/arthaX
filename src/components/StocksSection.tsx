@@ -1148,6 +1148,7 @@ export default function StocksSection() {
                 totalValue={portfolioStats.totalCurrentValue}
                 segments={sectorSegments}
                 formatter={formatINR}
+                unitLabel="Sector"
                 emptyMessage="No stocks logged"
                 emptySubMessage="Add your stock holdings to see sector diversification"
               />
@@ -1171,6 +1172,7 @@ export default function StocksSection() {
                 totalValue={portfolioStats.totalCurrentValue}
                 segments={stockWeightSegments}
                 formatter={formatINR}
+                unitLabel="Stock"
                 emptyMessage="No stocks logged"
                 emptySubMessage="Log stock positions to analyze concentration risk"
               />

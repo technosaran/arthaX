@@ -75,29 +75,22 @@ describe("Binance Market Intelligence & Showcase Engine", () => {
     expect(quote.estimatedFeeUsd).toBe(0);
   });
 
-  it("generates realistic demo market tickers, depth, and candlestick bars", () => {
+  it("returns clean zero-state fallbacks without fake/mock data", () => {
     const tickers = getDemoMarketTickers();
-    expect(tickers["BTCUSDT"]).toBeDefined();
-    expect(parseFloat(tickers["BTCUSDT"].lastPrice)).toBeGreaterThan(0);
-    expect(tickers["ETHUSDT"]).toBeDefined();
+    expect(tickers).toEqual({});
 
     const depth = getDemoDepth("BTCUSDT", 96000);
-    expect(depth.bids.length).toBeGreaterThan(0);
-    expect(depth.asks.length).toBeGreaterThan(0);
-    expect(depth.spread).toBeGreaterThanOrEqual(0);
+    expect(depth.bids).toHaveLength(0);
+    expect(depth.asks).toHaveLength(0);
+    expect(depth.spread).toBe(0);
 
     const klines = getDemoKlines("BTCUSDT", "1h", 20);
-    expect(klines).toHaveLength(21);
-    expect(klines[0].open).toBeGreaterThan(0);
-    expect(klines[0].high).toBeGreaterThanOrEqual(klines[0].low);
+    expect(klines).toHaveLength(0);
 
     const trades = getDemoRecentTrades("BTCUSDT", 96000);
-    expect(trades.length).toBeGreaterThan(0);
-    expect(trades[0].price).toBeGreaterThan(0);
+    expect(trades).toHaveLength(0);
 
     const account = getDemoSpotAccount();
-    expect(account.canTrade).toBe(true);
-    expect(account.makerCommission).toBe(10);
-    expect(account.balances.length).toBeGreaterThan(0);
+    expect(account.balances).toHaveLength(0);
   });
 });

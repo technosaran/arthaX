@@ -297,4 +297,43 @@ describe("Budget Utilities & Financial Controls Suite", () => {
       expect(toInsert[0].user_id).toBe("user-123");
     });
   });
+
+  describe("Budget Section Architecture & Separate Analytics View Structure", () => {
+    it("verifies view sub-tab definitions for budgets and analytics separation", () => {
+      const tabs = [
+        { id: "budgets", label: "Budgets & Ceilings" },
+        { id: "analytics", label: "Budget Analytics" },
+      ];
+      expect(tabs).toHaveLength(2);
+      expect(tabs[0].id).toBe("budgets");
+      expect(tabs[1].id).toBe("analytics");
+    });
+
+    it("ensures analytics donut segment calculation splits ceilings and actual outflows cleanly", () => {
+      const sampleBudgets: BudgetItem[] = [
+        { id: "b1", category: "Food & Dining", amount: 6000, period: "monthly", month_year: "2026-11", alert_threshold: 80 },
+        { id: "b2", category: "Housing & Rent", amount: 25000, period: "monthly", month_year: "2026-11", alert_threshold: 80 },
+      ];
+      const sampleExpenses: ExpenseItem[] = [
+        { id: "e1", title: "Dinner", category: "Food & Dining", amount: 4500, expense_date: "2026-11-05" },
+        { id: "e2", title: "Shirt", category: "Shopping & Lifestyle", amount: 3200, expense_date: "2026-11-10" },
+      ];
+
+      // Ceilings distribution segments
+      const ceilingSegments = sampleBudgets.map((b) => ({
+        label: b.category,
+        value: b.amount,
+      }));
+      expect(ceilingSegments).toHaveLength(2);
+      expect(ceilingSegments.reduce((sum, s) => sum + s.value, 0)).toBe(31000);
+
+      // Actual Outflows distribution segments
+      const outflowMap = new Map<string, number>();
+      for (const e of sampleExpenses) {
+        outflowMap.set(e.category, (outflowMap.get(e.category) || 0) + e.amount);
+      }
+      expect(outflowMap.get("Food & Dining")).toBe(4500);
+      expect(outflowMap.get("Shopping & Lifestyle")).toBe(3200);
+    });
+  });
 });

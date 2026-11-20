@@ -86,6 +86,9 @@ const FamilySection = dynamic(() => import("@/components/FamilySection"), {
 const LedgerSection = dynamic(() => import("@/components/LedgerSection"), {
   loading: TabLoadingFallback,
 });
+const TaxSection = dynamic(() => import("@/components/TaxSection"), {
+  loading: TabLoadingFallback,
+});
 const SettingsSection = dynamic(() => import("@/components/SettingsSection"), {
   loading: TabLoadingFallback,
 });
@@ -114,7 +117,12 @@ export default function HomeClient() {
       const params = new URLSearchParams(window.location.search);
       const urlTab = params.get("tab");
       if (urlTab) {
-        return { dashboard: true, [urlTab]: true };
+        const initialVisited: Record<string, boolean> = { dashboard: true, [urlTab]: true };
+        if (urlTab === "tax" || urlTab === "tax-harvesting") {
+          initialVisited.tax = true;
+          initialVisited["tax-harvesting"] = true;
+        }
+        return initialVisited;
       }
     }
     return { dashboard: true };
@@ -126,6 +134,10 @@ export default function HomeClient() {
       const next = { ...prev, [tab]: true };
       if (tab === "profile") {
         next.settings = true;
+      }
+      if (tab === "tax" || tab === "tax-harvesting") {
+        next.tax = true;
+        next["tax-harvesting"] = true;
       }
       return next;
     });
@@ -275,6 +287,14 @@ export default function HomeClient() {
           {visitedTabs.ledger && (
             <div className={`h-full w-full ${activeTab === "ledger" ? "block" : "hidden"}`}>
               <LedgerSection />
+            </div>
+          )}
+          {(visitedTabs.tax || visitedTabs["tax-harvesting"]) && (
+            <div className={`h-full w-full ${activeTab === "tax" || activeTab === "tax-harvesting" ? "block" : "hidden"}`}>
+              <TaxSection
+                initialTab={activeTab === "tax" ? "overview" : "harvesting"}
+                onNavigate={handleTabChange}
+              />
             </div>
           )}
           {(visitedTabs.settings || visitedTabs.profile) && (

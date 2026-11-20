@@ -96,7 +96,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   // Loading & syncing states
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Search & filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,10 +242,10 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   }, []);
 
   // Fetch holdings from API
-  const fetchHoldings = useCallback(async (demo = false, isInitial = false) => {
+  const fetchHoldings = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
-      const url = demo ? "/api/v1/crypto/holdings?demo=true" : "/api/v1/crypto/holdings";
+      const url = "/api/v1/crypto/holdings";
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
@@ -279,9 +278,9 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   }, [selectedSymbol, klineInterval]);
 
   // Fetch Trades data
-  const fetchTrades = useCallback(async (demo = false) => {
+  const fetchTrades = useCallback(async () => {
     try {
-      const url = demo ? "/api/v1/crypto/trades?demo=true" : "/api/v1/crypto/trades";
+      const url = "/api/v1/crypto/trades";
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Trades HTTP error ${res.status}`);
       const json = await res.json();
@@ -295,26 +294,11 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
 
   useEffect(() => {
     if (user) {
-      fetchHoldings(isDemoMode, true);
+      fetchHoldings(true);
       fetchMarket(selectedSymbol, klineInterval);
-      fetchTrades(isDemoMode);
+      fetchTrades();
     }
-  }, [user, isDemoMode, fetchHoldings, fetchMarket, fetchTrades, selectedSymbol, klineInterval]);
-
-  // Handle demo mode toggle
-  const handleToggleDemoMode = () => {
-    const nextMode = !isDemoMode;
-    setIsDemoMode(nextMode);
-    fetchHoldings(nextMode, true);
-    fetchTrades(nextMode);
-    showToast(
-      nextMode ? "Demo Showcase Activated" : "Real Portfolio View",
-      nextMode
-        ? "Displaying simulated Binance spot assets & trade history showcase."
-        : "Switched back to your personal Binance account portfolio.",
-      "info"
-    );
-  };
+  }, [user, fetchHoldings, fetchMarket, fetchTrades, selectedSymbol, klineInterval]);
 
   // Sync Binance portfolio
   const handleSyncBinance = async () => {
@@ -452,64 +436,26 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
       {/* Page Header */}
       <PageHeader
         title="Binance Sovereign Intelligence"
-        description="Comprehensive showcase of all Binance API capabilities: live spot wallets, Level-2 depth, OHLCV klines, public tape, swaps & telemetry."
+        description="Comprehensive analysis of all Binance API capabilities: live spot wallets, Level-2 depth, OHLCV klines, public tape, swaps & telemetry."
         icon={<Bitcoin size={28} className="text-amber-400" />}
         actions={
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Demo Showcase Toggle Button */}
+          portfolio.isBinanceConnected ? (
             <Button
-              variant={isDemoMode ? "primary" : "secondary"}
+              variant="secondary"
               size="sm"
-              onClick={handleToggleDemoMode}
+              onClick={handleSyncBinance}
+              disabled={syncing}
               className="gap-2"
             >
-              <Sparkles size={14} className={isDemoMode ? "text-amber-300" : ""} />
-              <span>{isDemoMode ? "Exit Demo" : "Explore Demo"}</span>
+              <RefreshCw size={14} className={syncing ? "animate-spin text-amber-400" : ""} />
+              <span>{syncing ? "Syncing..." : "Sync Now"}</span>
             </Button>
-
-            {portfolio.isBinanceConnected && !isDemoMode && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSyncBinance}
-                disabled={syncing}
-                className="gap-2"
-              >
-                <RefreshCw size={14} className={syncing ? "animate-spin text-amber-400" : ""} />
-                <span>{syncing ? "Syncing..." : "Sync Now"}</span>
-              </Button>
-            )}
-
-            <Button
-              variant={portfolio.isBinanceConnected ? "ghost" : "primary"}
-              size="sm"
-              onClick={navigateToBinanceSettings}
-              className="gap-2"
-            >
-              <Key size={14} />
-              <span>{portfolio.isBinanceConnected ? "Manage API Keys" : "Connect Binance"}</span>
-            </Button>
-          </div>
+          ) : undefined
         }
       />
 
-      {/* Demo Banner Notification */}
-      {isDemoMode && (
-        <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-amber-400 flex-shrink-0" />
-            <span>
-              <strong>Demo Showcase Active:</strong> Showcasing simulated spot holdings, permissions, and trade histories alongside live Binance order book and kline feeds.
-            </span>
-          </div>
-          <Button variant="ghost" size="xs" onClick={handleToggleDemoMode}>
-            Switch to Live
-          </Button>
-        </div>
-      )}
-
       {/* Sync error alert if present */}
-      {portfolio.syncError && !isDemoMode && (
+      {portfolio.syncError && (
         <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertCircle size={16} className="text-rose-400 flex-shrink-0" />
@@ -687,9 +633,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
           icon={<ShieldCheck size={18} />}
           iconColor="sky"
           subtitle={
-            isDemoMode ? (
-              <span className="text-amber-400 font-medium">Demo Showcase Mode</span>
-            ) : portfolio.isBinanceConnected ? (
+            portfolio.isBinanceConnected ? (
               <span className="text-emerald-400 font-medium">Auto-sync active (Read-only)</span>
             ) : (
               <span className="text-amber-400 font-medium">Click Connect to sync</span>
@@ -759,7 +703,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
                     <p className="text-xs text-[var(--app-muted)] max-w-sm mx-auto">
                       {portfolio.isBinanceConnected
                         ? "Your Binance spot wallet currently has no non-zero asset balances."
-                        : "Provide your read-only Binance API credentials or toggle Demo mode to preview all features."}
+                        : "Provide your read-only Binance API credentials to preview all features."}
                     </p>
                   </div>
                   {!portfolio.isBinanceConnected && (
@@ -772,10 +716,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
                       >
                         <Key size={14} />
                         <span>Connect Binance API</span>
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={handleToggleDemoMode}>
-                        <Sparkles size={14} />
-                        <span>Explore Demo</span>
                       </Button>
                     </div>
                   )}

@@ -56,6 +56,7 @@ describe("Crypto Navigation & Section Integration", () => {
     expect(cryptoSectionContent).not.toContain("Enterprise Binance Protection");
     expect(cryptoSectionContent).not.toContain("<Modal");
     expect(cryptoSectionContent).not.toContain('"API Settings"');
+    expect(cryptoSectionContent).not.toContain("Manage API Keys");
   });
 
   it("renders original crypto logos in Spot Holdings instead of raw text abbreviations", () => {

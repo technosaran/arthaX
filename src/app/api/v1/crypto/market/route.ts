@@ -11,10 +11,6 @@ import {
   fetchBinanceAvgPrice,
   fetchBinanceSystemStatus,
   fetchBinanceTime,
-  getDemoMarketTickers,
-  getDemoDepth,
-  getDemoKlines,
-  getDemoRecentTrades,
   BinanceTicker,
   getCoinName,
 } from "@/utils/binance";
@@ -36,33 +32,25 @@ export async function GET(req: NextRequest) {
     const symbolParam = (searchParams.get("symbol") || "BTCUSDT").toUpperCase();
     const intervalParam = searchParams.get("interval") || "1h";
 
-    // 1. Fetch 24h Tickers (Live with Demo Fallback)
+    // 1. Fetch 24h Tickers (Live Binance public market rates)
     const tickersRes = await fetchBinance24hrTickers();
     const tickersMap: Record<string, BinanceTicker> =
       tickersRes.success && tickersRes.data && Object.keys(tickersRes.data).length > 0
         ? tickersRes.data
-        : getDemoMarketTickers();
-
-    // Ensure requested symbol is available
-    if (!tickersMap[symbolParam]) {
-      const demoTickers = getDemoMarketTickers();
-      if (demoTickers[symbolParam]) {
-        tickersMap[symbolParam] = demoTickers[symbolParam];
-      }
-    }
+        : {};
 
     // Selected symbol ticker
-    const currentTicker = tickersMap[symbolParam] || tickersMap["BTCUSDT"] || {
+    const currentTicker = tickersMap[symbolParam] || {
       symbol: symbolParam,
-      lastPrice: "96420.50",
-      priceChangePercent: "4.82",
-      highPrice: "97850.00",
-      lowPrice: "91900.00",
-      volume: "38920.45",
-      quoteVolume: "3752600000.00",
+      lastPrice: "0.00",
+      priceChangePercent: "0.00",
+      highPrice: "0.00",
+      lowPrice: "0.00",
+      volume: "0.00",
+      quoteVolume: "0.00",
     };
 
-    const currentPriceNum = parseFloat(currentTicker.lastPrice) || 96420.5;
+    const currentPriceNum = parseFloat(currentTicker.lastPrice) || 0;
 
     // 2. Fetch Terminal Sub-data Concurrently (Depth, Klines, Recent Trades, Avg Price, Book Ticker, System Status, Server Time)
     const [depthRes, klinesRes, tradesRes, avgPriceRes, bookTickerRes, systemRes, timeRes] =
@@ -76,21 +64,33 @@ export async function GET(req: NextRequest) {
         fetchBinanceTime(),
       ]);
 
-    // Use live or fallback depth
+    // Live or empty depth
     const depth =
-      depthRes.success && depthRes.data ? depthRes.data : getDemoDepth(symbolParam, currentPriceNum);
+      depthRes.success && depthRes.data
+        ? depthRes.data
+        : {
+            symbol: symbolParam,
+            bids: [],
+            asks: [],
+            spread: 0,
+            spreadPercent: 0,
+            highestBid: 0,
+            lowestAsk: 0,
+            totalBidVolume: 0,
+            totalAskVolume: 0,
+          };
 
-    // Use live or fallback klines
+    // Live or empty klines
     const klines =
       klinesRes.success && klinesRes.data && klinesRes.data.length > 0
         ? klinesRes.data
-        : getDemoKlines(symbolParam, intervalParam, 36);
+        : [];
 
-    // Use live or fallback recent trades
+    // Live or empty recent trades
     const recentTrades =
       tradesRes.success && tradesRes.data && tradesRes.data.length > 0
         ? tradesRes.data
-        : getDemoRecentTrades(symbolParam, currentPriceNum);
+        : [];
 
     // Book ticker
     const bookTicker =

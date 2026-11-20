@@ -135,10 +135,10 @@ export async function GET(req: NextRequest) {
       fetchTicker("SILVERBEES.NS"), // Nippon India ETF Silver BeES (NSE)
     ]);
 
-    // Baseline fallback rates if network fails entirely
-    const usdinr = inrForex?.regularMarketPrice || 93.46;
-    const goldUsd = goldComex?.regularMarketPrice || 3865.0;
-    const silverUsd = silverComex?.regularMarketPrice || 47.50;
+    // Realistic market baseline rates if external market API is momentarily unreachable
+    const usdinr = inrForex?.regularMarketPrice || 85.50;
+    const goldUsd = goldComex?.regularMarketPrice || 2680.0;
+    const silverUsd = silverComex?.regularMarketPrice || 31.50;
 
     // Convert COMEX USD/oz to INR per gram
     // Raw import parity = (Price_USD * USDINR) / 31.1034768
@@ -251,26 +251,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Default emergency fallback
+    // Default emergency baseline based on calibrated domestic market rates
     const fallbackRates: BullionRates = {
-      gold24kPerGram: 11000,
-      gold22kPerGram: 10083,
-      gold18kPerGram: 8250,
-      gold14kPerGram: 6417,
-      silver999PerGram: 160,
-      silver925PerGram: 148,
-      goldChange24h: 35,
-      goldChangePercent24h: 0.32,
-      silverChange24h: 1.2,
-      silverChangePercent24h: 0.75,
-      goldToSilverRatio: 68.75,
-      usdinr: 93.46,
-      goldUsdPerOz: 3865,
-      silverUsdPerOz: 47.5,
-      dayHighGold24k: 11100,
-      dayLowGold24k: 10920,
-      dayHighSilver999: 162.5,
-      dayLowSilver999: 158.0,
+      gold24kPerGram: 7920,
+      gold22kPerGram: 7260,
+      gold18kPerGram: 5940,
+      gold14kPerGram: 4620,
+      silver999PerGram: 95.25,
+      silver925PerGram: 88.10,
+      goldChange24h: 15.0,
+      goldChangePercent24h: 0.19,
+      silverChange24h: 0.40,
+      silverChangePercent24h: 0.42,
+      goldToSilverRatio: 83.15,
+      usdinr: 85.50,
+      goldUsdPerOz: 2680,
+      silverUsdPerOz: 31.5,
+      dayHighGold24k: 7980,
+      dayLowGold24k: 7870,
+      dayHighSilver999: 96.5,
+      dayLowSilver999: 94.2,
       lastUpdated: new Date().toISOString(),
       isStale: true,
       marketStatus: getBullionMarketStatus(),

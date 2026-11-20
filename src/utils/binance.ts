@@ -1075,356 +1075,52 @@ export function calculateCryptoSwap(
 }
 
 // ============================================================================
-// DEMO DATA GENERATORS FOR RICH ZERO-CREDENTIAL SHOWCASE
+// EMPTY FALLBACK GENERATORS (NO FAKE / MOCK DATA)
 // ============================================================================
 
 export function getDemoMarketTickers(): Record<string, BinanceTicker> {
-  return {
-    BTCUSDT: {
-      symbol: "BTCUSDT",
-      lastPrice: "96420.50",
-      priceChangePercent: "4.82",
-      highPrice: "97850.00",
-      lowPrice: "91900.00",
-      volume: "38920.45",
-      quoteVolume: "3752600000.00",
-      weightedAvgPrice: "95800.20",
-      prevClosePrice: "91985.00",
-    },
-    ETHUSDT: {
-      symbol: "ETHUSDT",
-      lastPrice: "3480.25",
-      priceChangePercent: "3.45",
-      highPrice: "3550.00",
-      lowPrice: "3360.10",
-      volume: "245890.12",
-      quoteVolume: "855700000.00",
-      weightedAvgPrice: "3450.10",
-      prevClosePrice: "3364.20",
-    },
-    SOLUSDT: {
-      symbol: "SOLUSDT",
-      lastPrice: "214.80",
-      priceChangePercent: "7.92",
-      highPrice: "219.50",
-      lowPrice: "198.20",
-      volume: "4820190.00",
-      quoteVolume: "1035000000.00",
-      weightedAvgPrice: "208.50",
-      prevClosePrice: "199.03",
-    },
-    BNBUSDT: {
-      symbol: "BNBUSDT",
-      lastPrice: "652.40",
-      priceChangePercent: "2.18",
-      highPrice: "660.00",
-      lowPrice: "638.50",
-      volume: "612450.00",
-      quoteVolume: "399560000.00",
-      weightedAvgPrice: "648.20",
-      prevClosePrice: "638.48",
-    },
-    XRPUSDT: {
-      symbol: "XRPUSDT",
-      lastPrice: "1.4820",
-      priceChangePercent: "12.45",
-      highPrice: "1.5400",
-      lowPrice: "1.3100",
-      volume: "892004500.00",
-      quoteVolume: "1280000000.00",
-      weightedAvgPrice: "1.4250",
-      prevClosePrice: "1.3179",
-    },
-    DOGEUSDT: {
-      symbol: "DOGEUSDT",
-      lastPrice: "0.3845",
-      priceChangePercent: "-1.85",
-      highPrice: "0.4050",
-      lowPrice: "0.3720",
-      volume: "1420500900.00",
-      quoteVolume: "546000000.00",
-      weightedAvgPrice: "0.3890",
-      prevClosePrice: "0.3917",
-    },
-    AVAXUSDT: {
-      symbol: "AVAXUSDT",
-      lastPrice: "36.85",
-      priceChangePercent: "5.12",
-      highPrice: "37.90",
-      lowPrice: "34.80",
-      volume: "3540200.00",
-      quoteVolume: "130450000.00",
-      weightedAvgPrice: "36.20",
-      prevClosePrice: "35.05",
-    },
-    SUIUSDT: {
-      symbol: "SUIUSDT",
-      lastPrice: "3.42",
-      priceChangePercent: "9.60",
-      highPrice: "3.55",
-      lowPrice: "3.10",
-      volume: "89450200.00",
-      quoteVolume: "305900000.00",
-      weightedAvgPrice: "3.31",
-      prevClosePrice: "3.12",
-    },
-    LINKUSDT: {
-      symbol: "LINKUSDT",
-      lastPrice: "16.80",
-      priceChangePercent: "4.15",
-      highPrice: "17.20",
-      lowPrice: "16.10",
-      volume: "5890200.00",
-      quoteVolume: "98950000.00",
-      weightedAvgPrice: "16.55",
-      prevClosePrice: "16.13",
-    },
-    PEPEUSDT: {
-      symbol: "PEPEUSDT",
-      lastPrice: "0.0000214",
-      priceChangePercent: "-3.60",
-      highPrice: "0.0000230",
-      lowPrice: "0.0000205",
-      volume: "21500000000000.00",
-      quoteVolume: "460000000.00",
-      weightedAvgPrice: "0.0000218",
-      prevClosePrice: "0.0000222",
-    },
-    NEARUSDT: {
-      symbol: "NEARUSDT",
-      lastPrice: "6.85",
-      priceChangePercent: "6.20",
-      highPrice: "7.10",
-      lowPrice: "6.40",
-      volume: "18900400.00",
-      quoteVolume: "129460000.00",
-      weightedAvgPrice: "6.72",
-      prevClosePrice: "6.45",
-    },
-    ADAUSDT: {
-      symbol: "ADAUSDT",
-      lastPrice: "0.8420",
-      priceChangePercent: "3.80",
-      highPrice: "0.8750",
-      lowPrice: "0.8050",
-      volume: "285900400.00",
-      quoteVolume: "240720000.00",
-      weightedAvgPrice: "0.8350",
-      prevClosePrice: "0.8112",
-    },
-  };
+  return {};
 }
 
-export function getDemoDepth(symbol: string = "BTCUSDT", currentPrice: number = 96420.5): CalculatedMarketDepth {
-  const bids: BinanceDepthLevel[] = [];
-  const asks: BinanceDepthLevel[] = [];
-  let bidAccum = 0;
-  let askAccum = 0;
-
-  for (let i = 1; i <= 15; i++) {
-    const bidPrice = Math.round((currentPrice * (1 - i * 0.0006)) * 100) / 100;
-    const bidQty = Math.round((0.2 + Math.sin(i * 1.5) * 0.1 + i * 0.08) * 1000) / 1000;
-    bidAccum += bidQty;
-    bids.push({ price: bidPrice, quantity: bidQty, total: Math.round(bidAccum * 1000) / 1000 });
-
-    const askPrice = Math.round((currentPrice * (1 + i * 0.0006)) * 100) / 100;
-    const askQty = Math.round((0.18 + Math.cos(i * 1.4) * 0.09 + i * 0.075) * 1000) / 1000;
-    askAccum += askQty;
-    asks.push({ price: askPrice, quantity: askQty, total: Math.round(askAccum * 1000) / 1000 });
-  }
-
-  const highestBid = bids[0]?.price || currentPrice - 5;
-  const lowestAsk = asks[0]?.price || currentPrice + 5;
-  const spread = lowestAsk - highestBid;
-  const spreadPercent = (spread / lowestAsk) * 100;
-
+export function getDemoDepth(symbol: string = "BTCUSDT", currentPrice: number = 0): CalculatedMarketDepth {
   return {
     symbol,
     lastUpdateId: Date.now(),
-    bids,
-    asks,
-    highestBid,
-    lowestAsk,
-    spread: Math.round(spread * 100) / 100,
-    spreadPercent: Math.round(spreadPercent * 1000) / 1000,
-    totalBidVolume: Math.round(bidAccum * 1000) / 1000,
-    totalAskVolume: Math.round(askAccum * 1000) / 1000,
-    bidAskRatio: Math.round((bidAccum / (bidAccum + askAccum)) * 1000) / 10,
+    bids: [],
+    asks: [],
+    highestBid: currentPrice,
+    lowestAsk: currentPrice,
+    spread: 0,
+    spreadPercent: 0,
+    totalBidVolume: 0,
+    totalAskVolume: 0,
+    bidAskRatio: 0,
   };
 }
 
 export function getDemoKlines(symbol: string = "BTCUSDT", interval: string = "1h", limit: number = 36): BinanceKline[] {
-  const klines: BinanceKline[] = [];
-  const basePrice = symbol.includes("ETH")
-    ? 3480
-    : symbol.includes("SOL")
-    ? 214
-    : symbol.includes("BNB")
-    ? 652
-    : symbol.includes("XRP")
-    ? 1.48
-    : 96420;
-
-  const now = Date.now();
-  const stepMs = interval === "15m" ? 15 * 60 * 1000 : interval === "4h" ? 4 * 3600 * 1000 : interval === "1d" ? 24 * 3600 * 1000 : 3600 * 1000;
-
-  let current = basePrice * 0.94;
-
-  for (let i = limit; i >= 0; i--) {
-    const openTime = now - i * stepMs;
-    const drift = (Math.sin(i * 0.4) * 0.012 + (Math.random() - 0.45) * 0.015) * current;
-    const open = Math.round(current * 100) / 100;
-    const close = Math.round((current + drift) * 100) / 100;
-    const high = Math.round((Math.max(open, close) + Math.abs(drift) * (0.4 + Math.random() * 0.6)) * 100) / 100;
-    const low = Math.round((Math.min(open, close) - Math.abs(drift) * (0.4 + Math.random() * 0.6)) * 100) / 100;
-    const volume = Math.round((120 + Math.random() * 250) * 100) / 100;
-
-    klines.push({
-      openTime,
-      open,
-      high,
-      low,
-      close,
-      volume,
-      closeTime: openTime + stepMs - 1,
-      quoteVolume: Math.round(volume * close),
-      tradesCount: Math.round(1800 + Math.random() * 2400),
-      takerBuyBaseVolume: Math.round(volume * 0.54 * 100) / 100,
-      takerBuyQuoteVolume: Math.round(volume * close * 0.54),
-    });
-
-    current = close;
-  }
-
-  return klines;
+  return [];
 }
 
-export function getDemoRecentTrades(symbol: string = "BTCUSDT", currentPrice: number = 96420): BinancePublicTrade[] {
-  const trades: BinancePublicTrade[] = [];
-  const now = Date.now();
-
-  for (let i = 0; i < 25; i++) {
-    const isBuyerMaker = i % 2 === 0;
-    const delta = (Math.random() - 0.48) * 8;
-    const price = Math.round((currentPrice + delta) * 100) / 100;
-    const qty = Math.round((0.02 + Math.random() * 0.85) * 10000) / 10000;
-    trades.push({
-      id: 59000000 + i,
-      price,
-      qty,
-      quoteQty: Math.round(price * qty * 100) / 100,
-      time: now - i * 1800 - Math.floor(Math.random() * 800),
-      isBuyerMaker,
-    });
-  }
-
-  return trades;
+export function getDemoRecentTrades(symbol: string = "BTCUSDT", currentPrice: number = 0): BinancePublicTrade[] {
+  return [];
 }
 
 export function getDemoSpotAccount(): BinanceAccountResponse {
   return {
-    makerCommission: 10, // 0.10%
-    takerCommission: 10, // 0.10%
+    makerCommission: 0,
+    takerCommission: 0,
     buyerCommission: 0,
     sellerCommission: 0,
     canTrade: true,
     canWithdraw: true,
     canDeposit: true,
     accountType: "SPOT",
-    balances: [
-      { asset: "BTC", free: "0.42850000", locked: "0.00000000" },
-      { asset: "ETH", free: "4.85000000", locked: "0.00000000" },
-      { asset: "SOL", free: "42.50000000", locked: "0.00000000" },
-      { asset: "BNB", free: "12.00000000", locked: "0.00000000" },
-      { asset: "SUI", free: "1500.00000000", locked: "0.00000000" },
-      { asset: "USDT", free: "12840.50000000", locked: "500.00000000" },
-      { asset: "USDC", free: "4500.00000000", locked: "0.00000000" },
-    ],
-    permissions: ["SPOT", "LEVERAGED", "TRD_GRP_002"],
+    balances: [],
+    permissions: ["SPOT"],
   };
 }
 
 export function getDemoTradeHistory(): CalculatedCryptoTrade[] {
-  return [
-    {
-      tradeId: 98101,
-      orderId: 441001,
-      symbol: "BTCUSDT",
-      baseAsset: "BTC",
-      quoteAsset: "USDT",
-      side: "BUY",
-      price: 64200.0,
-      qty: 0.25,
-      quoteQty: 16050.0,
-      commission: 16.05,
-      commissionAsset: "USDT",
-      isBuyer: true,
-      isMaker: false,
-      executedAt: new Date(Date.now() - 38 * 24 * 3600 * 1000).toISOString(),
-    },
-    {
-      tradeId: 98102,
-      orderId: 441002,
-      symbol: "SOLUSDT",
-      baseAsset: "SOL",
-      quoteAsset: "USDT",
-      side: "BUY",
-      price: 135.5,
-      qty: 35.0,
-      quoteQty: 4742.5,
-      commission: 4.74,
-      commissionAsset: "USDT",
-      isBuyer: true,
-      isMaker: false,
-      executedAt: new Date(Date.now() - 25 * 24 * 3600 * 1000).toISOString(),
-    },
-    {
-      tradeId: 98103,
-      orderId: 441003,
-      symbol: "ETHUSDT",
-      baseAsset: "ETH",
-      quoteAsset: "USDT",
-      side: "BUY",
-      price: 2850.0,
-      qty: 3.0,
-      quoteQty: 8550.0,
-      commission: 8.55,
-      commissionAsset: "USDT",
-      isBuyer: true,
-      isMaker: true,
-      executedAt: new Date(Date.now() - 19 * 24 * 3600 * 1000).toISOString(),
-    },
-    {
-      tradeId: 98104,
-      orderId: 441004,
-      symbol: "AVAXUSDT",
-      baseAsset: "AVAX",
-      quoteAsset: "USDT",
-      side: "BUY",
-      price: 28.0,
-      qty: 150.0,
-      quoteQty: 4200.0,
-      commission: 4.2,
-      commissionAsset: "USDT",
-      isBuyer: true,
-      isMaker: false,
-      executedAt: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(),
-    },
-    {
-      tradeId: 98105,
-      orderId: 441005,
-      symbol: "AVAXUSDT",
-      baseAsset: "AVAX",
-      quoteAsset: "USDT",
-      side: "SELL",
-      price: 36.5,
-      qty: 150.0,
-      quoteQty: 5475.0,
-      commission: 5.48,
-      commissionAsset: "USDT",
-      isBuyer: false,
-      isMaker: true,
-      executedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-    },
-  ];
+  return [];
 }

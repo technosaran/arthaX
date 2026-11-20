@@ -25,6 +25,8 @@ import {
   Moon,
   Eye,
   EyeOff,
+  ReceiptIndianRupee,
+  Sparkles,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
@@ -42,25 +44,37 @@ interface NavItemDef {
   id: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  tag?: string;
-  group: "finance" | "system";
+  group: "finance" | "tax" | "system";
 }
 
 const NAV_ITEMS: NavItemDef[] = [
+  // Overview
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "finance" },
   { id: "accounts", label: "Accounts", icon: Landmark, group: "finance" },
-  { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
-  { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance" },
-  { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance" },
-  { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance" },
-  { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
-  { id: "crypto", label: "Crypto", icon: Bitcoin, group: "finance" },
+
+  // Cash Flow
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
   { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
+  { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance" },
+
+  // Investments
+  { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
+  { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance" },
+  { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance" },
+  { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance" },
+  { id: "crypto", label: "Crypto", icon: Bitcoin, group: "finance" },
+  { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
+
+  // Planning
   { id: "goals", label: "Goals", icon: Trophy, group: "finance" },
   { id: "family", label: "Family", icon: Users, group: "finance" },
-  { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance" },
+
+  // Tax & Harvesting
+  { id: "tax", label: "Tax Overview", icon: ReceiptIndianRupee, group: "tax" },
+  { id: "tax-harvesting", label: "Tax Harvesting", icon: Sparkles, group: "tax" },
+
+  // Workspace
   { id: "settings", label: "Settings", icon: Settings, group: "system" },
 ];
 
@@ -128,6 +142,15 @@ export default function Sidebar({
   };
 
   const financeItems = NAV_ITEMS.filter((item) => item.group === "finance");
+  const overviewItems = NAV_ITEMS.filter((item) => ["dashboard", "accounts"].includes(item.id));
+  const cashFlowItems = NAV_ITEMS.filter((item) =>
+    ["income", "expenses", "budgets", "ledger"].includes(item.id)
+  );
+  const investmentItems = NAV_ITEMS.filter((item) =>
+    ["stocks", "mutual-funds", "bonds", "gold-silver", "crypto", "fno"].includes(item.id)
+  );
+  const planningItems = NAV_ITEMS.filter((item) => ["goals", "family"].includes(item.id));
+  const taxItems = NAV_ITEMS.filter((item) => item.group === "tax");
   const systemItems = NAV_ITEMS.filter((item) => item.group === "system");
 
   const renderNavButton = (item: NavItemDef) => {
@@ -142,7 +165,7 @@ export default function Sidebar({
           onMouseEnter={() => setHoveredItemId(item.id)}
           onMouseLeave={() => setHoveredItemId(null)}
           className={`group relative flex items-center w-full rounded-xl transition-all duration-150 cursor-pointer fintech-focus ${
-            collapsed ? "justify-center px-2 py-2.5" : "px-2.5 py-2 gap-2.5"
+            collapsed ? "justify-center px-2 py-2" : "px-2.5 py-1.5 gap-2.5"
           } ${
             isSelected
               ? "bg-[var(--app-card-elevated)] text-[var(--app-fg)] font-semibold border border-[var(--app-border)] shadow-xs"
@@ -170,11 +193,6 @@ export default function Sidebar({
               <span className="truncate tracking-tight text-xs sm:text-[13px] flex-1 text-left">
                 {item.label}
               </span>
-              {item.tag && !isSelected && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                  {item.tag}
-                </span>
-              )}
               {isSelected && (
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)] flex-shrink-0 shadow-[0_0_6px_var(--app-accent)]" />
               )}
@@ -248,31 +266,89 @@ export default function Sidebar({
           )}
         </div>
 
-        {/* Navigation Groups */}
+        {/* Navigation Sections */}
         <nav
           aria-label="Financial Suite Navigation"
-          className="flex-1 px-2 py-3.5 space-y-4 overflow-y-auto"
+          className="flex-1 px-2 py-2.5 space-y-3 overflow-y-auto"
         >
-          {/* Group 1: FINANCE */}
+          {/* Section 1: OVERVIEW */}
           <div>
             {!collapsed && (
-              <div className="px-2.5 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
-                Financial Suite
+              <div className="px-2.5 pb-1 pt-0.5 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+                Overview
               </div>
             )}
-            <div className="space-y-1">
-              {financeItems.map(renderNavButton)}
+            <div className="space-y-0.5">
+              {overviewItems.map(renderNavButton)}
             </div>
           </div>
 
-          {/* Group 2: SYSTEM */}
+          {/* Section 2: CASH FLOW */}
           <div>
-            {!collapsed && (
-              <div className="px-2.5 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+            {!collapsed ? (
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+                Cash Flow
+              </div>
+            ) : (
+              <div className="my-1.5 mx-2 border-t border-[var(--app-border-subtle)] opacity-40" />
+            )}
+            <div className="space-y-0.5">
+              {cashFlowItems.map(renderNavButton)}
+            </div>
+          </div>
+
+          {/* Section 3: INVESTMENTS */}
+          <div>
+            {!collapsed ? (
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+                Investments
+              </div>
+            ) : (
+              <div className="my-1.5 mx-2 border-t border-[var(--app-border-subtle)] opacity-40" />
+            )}
+            <div className="space-y-0.5">
+              {investmentItems.map(renderNavButton)}
+            </div>
+          </div>
+
+          {/* Section 4: PLANNING */}
+          <div>
+            {!collapsed ? (
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+                Planning
+              </div>
+            ) : (
+              <div className="my-1.5 mx-2 border-t border-[var(--app-border-subtle)] opacity-40" />
+            )}
+            <div className="space-y-0.5">
+              {planningItems.map(renderNavButton)}
+            </div>
+          </div>
+
+          {/* Section 5: TAX & HARVESTING */}
+          <div>
+            {!collapsed ? (
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
+                Tax & Harvesting
+              </div>
+            ) : (
+              <div className="my-1.5 mx-2 border-t border-[var(--app-border-subtle)] opacity-40" />
+            )}
+            <div className="space-y-0.5">
+              {taxItems.map(renderNavButton)}
+            </div>
+          </div>
+
+          {/* Section 6: WORKSPACE */}
+          <div>
+            {!collapsed ? (
+              <div className="px-2.5 pb-1 pt-1 text-[10px] font-mono uppercase tracking-wider text-[var(--app-muted)] font-bold opacity-75">
                 Workspace
               </div>
+            ) : (
+              <div className="my-1.5 mx-2 border-t border-[var(--app-border-subtle)] opacity-40" />
             )}
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {systemItems.map(renderNavButton)}
             </div>
           </div>

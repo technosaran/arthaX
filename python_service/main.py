@@ -592,3 +592,20 @@ def detect_anomalies(payload: AnomalyDetectionRequest, auth=Depends(verify_auth_
 @app.post("/analytics/tax")
 def calculate_cgt_and_harvesting(payload: TaxAnalysisRequest, auth=Depends(verify_auth_dependency)):
     return calculate_cgt_and_harvesting_logic(payload)
+
+# ---------------------------------------------------------------------------
+# Mount ArthaX Financial Calculation Engine (AFCE)
+# ---------------------------------------------------------------------------
+import sys
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+try:
+    from calculation_engine.api.calculation_routes import router as calculation_router
+    app.include_router(calculation_router, prefix="/api")
+    app.include_router(calculation_router, prefix="/api/py")
+    app.include_router(calculation_router, prefix="")
+except Exception as err:
+    print(f"Warning: Calculation engine router mounting error: {err}")
+

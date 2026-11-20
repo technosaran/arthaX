@@ -718,29 +718,54 @@ export async function POST(req: NextRequest) {
       /^(?:portfolio|net worth|my net worth|total assets|wealth summary)$/i.test(rawText.trim());
 
     if (isPortfolioQuery) {
-      const [accountsRes, stocksRes, mfRes, bullionRes] = await Promise.all([
-        supabaseAdmin.from("accounts").select("balance").eq("user_id", userId),
+      const [accountsRes, stocksRes, mfRes, bondsRes, bullionRes, cryptoRes] = await Promise.all([
+        supabaseAdmin.from("accounts").select("balance, type, classification").eq("user_id", userId),
         supabaseAdmin.from("stock_holdings").select("quantity, avg_buy_price").eq("user_id", userId),
         supabaseAdmin.from("mutual_fund_holdings").select("invested_amount, units, current_nav, avg_nav").eq("user_id", userId),
+        supabaseAdmin.from("bond_holdings").select("quantity, avg_buy_price, invested_amount, current_price, face_value").eq("user_id", userId),
         supabaseAdmin.from("bullion_holdings").select("total_buy_price, weight_grams, metal").eq("user_id", userId),
+        supabaseAdmin.from("crypto_holdings").select("total_value_usd").eq("user_id", userId),
       ]);
 
-      const accountsTotal = (accountsRes.data || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+      let liquidAssets = 0;
+      let liabilitiesTotal = 0;
+      (accountsRes.data || []).forEach((a) => {
+        const bal = Number(a.balance) || 0;
+        const isLiab = a.classification === "liability" || /credit|loan/i.test(a.type || "");
+        if (isLiab) {
+          liabilitiesTotal += Math.abs(bal);
+        } else {
+          liquidAssets += bal;
+        }
+      });
+
       const stocksTotal = (stocksRes.data || []).reduce((sum, s) => sum + (Number(s.quantity) * Number(s.avg_buy_price) || 0), 0);
       const mfTotal = (mfRes.data || []).reduce((sum, m) => {
         const val = (Number(m.current_nav) || Number(m.avg_nav) || 0) * Number(m.units);
         return sum + (val > 0 ? val : Number(m.invested_amount) || 0);
       }, 0);
+      const bondsTotal = (bondsRes.data || []).reduce((sum, b) => {
+        const inv = Number(b.invested_amount) || 0;
+        if (inv > 0) return sum + inv;
+        const p = Number(b.current_price) || Number(b.avg_buy_price) || Number(b.face_value) || 1000;
+        return sum + (Number(b.quantity) || 0) * p;
+      }, 0);
       const bullionTotal = (bullionRes.data || []).reduce((sum, b) => sum + (Number(b.total_buy_price) || 0), 0);
-      const netWorth = accountsTotal + stocksTotal + mfTotal + bullionTotal;
+      const cryptoTotal = (cryptoRes.data || []).reduce((sum, c) => sum + (Number(c.total_value_usd) || 0) * 84.5, 0);
+
+      const totalAssets = liquidAssets + stocksTotal + mfTotal + bondsTotal + bullionTotal + cryptoTotal;
+      const netWorth = totalAssets - liabilitiesTotal;
 
       await sendTelegramMessage({
         chatId,
         text: `${voicePrefix}${formatPortfolioOverview({
-          accountsTotal,
+          accountsTotal: liquidAssets,
           stocksTotal,
           mfTotal,
           bullionTotal,
+          bondsTotal,
+          cryptoTotal,
+          liabilitiesTotal,
           netWorth,
           userName,
         })}`,

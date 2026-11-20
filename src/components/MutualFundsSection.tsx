@@ -1133,6 +1133,7 @@ export default function MutualFundsSection() {
               totalValue={portfolioStats.totalCurrentValue}
               segments={categorySegments}
               formatter={formatINR}
+              unitLabel="Category"
               emptyMessage="No funds logged"
               emptySubMessage="Add mutual fund investments to view diversification"
             />
@@ -1148,6 +1149,7 @@ export default function MutualFundsSection() {
               totalValue={portfolioStats.totalCurrentValue}
               segments={amcSegments}
               formatter={formatINR}
+              unitLabel="Fund House"
               emptyMessage="No funds logged"
               emptySubMessage="Log funds to view concentration across Indian AMCs"
             />

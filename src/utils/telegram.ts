@@ -865,6 +865,9 @@ export function formatPortfolioOverview({
   stocksTotal,
   mfTotal,
   bullionTotal,
+  bondsTotal = 0,
+  cryptoTotal = 0,
+  liabilitiesTotal = 0,
   netWorth,
   userName,
 }: {
@@ -872,21 +875,37 @@ export function formatPortfolioOverview({
   stocksTotal: number;
   mfTotal: number;
   bullionTotal: number;
+  bondsTotal?: number;
+  cryptoTotal?: number;
+  liabilitiesTotal?: number;
   netWorth: number;
   userName?: string;
 }): string {
   const greeting = userName ? ` (${escapeTelegramHtml(userName)})` : "";
-  return (
+  let text =
     `💼 <b>Total Net Worth &amp; Portfolio${greeting}</b>\n\n` +
     `🏦 <b>Bank &amp; Cash Accounts:</b> ${formatCurrencyINR(accountsTotal)}\n` +
     `💹 <b>Indian Equities (Stocks):</b> ${formatCurrencyINR(stocksTotal)}\n` +
     `📊 <b>Mutual Funds &amp; SIPs:</b> ${formatCurrencyINR(mfTotal)}\n` +
-    `🪙 <b>Bullion (Gold &amp; Silver):</b> ${formatCurrencyINR(bullionTotal)}\n\n` +
+    `🪙 <b>Bullion (Gold &amp; Silver):</b> ${formatCurrencyINR(bullionTotal)}\n`;
+
+  if (bondsTotal > 0) {
+    text += `🛡️ <b>Bonds &amp; Sovereign Debt:</b> ${formatCurrencyINR(bondsTotal)}\n`;
+  }
+  if (cryptoTotal > 0) {
+    text += `⚡ <b>Crypto Assets:</b> ${formatCurrencyINR(cryptoTotal)}\n`;
+  }
+  if (liabilitiesTotal > 0) {
+    text += `💳 <b>Total Liabilities:</b> -${formatCurrencyINR(liabilitiesTotal)}\n`;
+  }
+
+  text +=
     `━━━━━━━━━━━━━━━━━━━\n` +
     `💎 <b>Total Net Worth:</b>\n` +
     `<b>${formatCurrencyINR(netWorth)}</b>\n\n` +
-    `<i>⚡ Real-time consolidated valuation across all assets</i>`
-  );
+    `<i>⚡ Real-time consolidated valuation across all assets</i>`;
+
+  return text;
 }
 
 export function formatStocksSummary({

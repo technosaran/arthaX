@@ -7,7 +7,6 @@ import {
   CalculatedCryptoTrade,
   calculateTradeStats,
   getExitedAssets,
-  getDemoTradeHistory,
 } from "@/utils/binance";
 
 export async function GET(req: NextRequest) {
@@ -23,9 +22,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const useDemo = searchParams.get("demo") === "true";
-
     // 1. Fetch trades from public.crypto_trades
     const { data: rawTrades, error: dbErr } = await supabaseAdmin
       .from("crypto_trades")
@@ -47,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     let trades: CalculatedCryptoTrade[] = [];
 
-    if (!useDemo && rawTrades && rawTrades.length > 0) {
+    if (rawTrades && rawTrades.length > 0) {
       trades = rawTrades.map((t) => {
         const symbol = t.symbol || "";
         const baseAsset = symbol.replace(/(USDT|USDC|FDUSD|BUSD|BTC|ETH|BNB)$/, "") || symbol;
@@ -70,14 +66,6 @@ export async function GET(req: NextRequest) {
           executedAt: t.executed_at,
         };
       });
-    } else {
-      // Demo showcase trades for instant preview
-      trades = getDemoTradeHistory();
-      if (activeSet.size === 0) {
-        activeSet.add("BTC");
-        activeSet.add("ETH");
-        activeSet.add("SOL");
-      }
     }
 
     const stats = calculateTradeStats(trades);
@@ -88,7 +76,7 @@ export async function GET(req: NextRequest) {
         trades,
         stats,
         exitedAssets,
-        isDemo: !rawTrades || rawTrades.length === 0 || useDemo,
+        isDemo: false,
       },
       undefined,
       req

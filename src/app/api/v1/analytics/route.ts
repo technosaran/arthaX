@@ -95,15 +95,25 @@ export async function GET(req: NextRequest) {
     const isCurrentMonth = targetMonth === getCurrentMonthYear();
     const currentDay = isCurrentMonth ? now.getDate() : lastDayNum;
 
-    // Parallel fetch: Accounts, Monthly Expenses, Monthly Income, Budgets
-    const [accountsRes, expensesRes, incomeRes, budgetsRes] = await Promise.all([
+    // Parallel fetch: Accounts, Monthly Expenses, Monthly Income, Budgets, and Investments
+    const [
+      accountsRes,
+      expensesRes,
+      incomeRes,
+      budgetsRes,
+      stocksRes,
+      mfRes,
+      bondsRes,
+      bullionRes,
+      cryptoRes,
+    ] = await Promise.all([
       supabaseAdmin
         .from("accounts")
         .select("id, name, type, classification, balance, last_four")
         .eq("user_id", userId),
       supabaseAdmin
         .from("expenses")
-        .select("id, amount, category, expense_date")
+        .select("id, amount, category, expense_date, title, notes")
         .eq("user_id", userId)
         .gte("expense_date", monthStart)
         .lte("expense_date", monthEnd),
@@ -117,6 +127,26 @@ export async function GET(req: NextRequest) {
         .from("budgets")
         .select("category, amount")
         .eq("user_id", userId),
+      supabaseAdmin
+        .from("stock_holdings")
+        .select("quantity, avg_buy_price")
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("mutual_fund_holdings")
+        .select("units, current_nav, avg_nav, invested_amount")
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("bond_holdings")
+        .select("quantity, avg_buy_price, invested_amount, current_price, face_value")
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("bullion_holdings")
+        .select("metal, weight_grams, total_buy_price")
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("crypto_holdings")
+        .select("asset, total_value_usd")
+        .eq("user_id", userId),
     ]);
 
     if (accountsRes.error) throw accountsRes.error;
@@ -126,7 +156,7 @@ export async function GET(req: NextRequest) {
 
     // 1. Portfolio calculations
     const rawAccounts = accountsRes.data || [];
-    let totalAssets = 0;
+    let liquidAssets = 0;
     let totalLiabilities = 0;
 
     const mappedAccounts = rawAccounts.map((a) => {
@@ -135,7 +165,7 @@ export async function GET(req: NextRequest) {
       if (isLiab) {
         totalLiabilities += Math.abs(bal);
       } else {
-        totalAssets += bal;
+        liquidAssets += bal;
       }
       return {
         id: a.id,
@@ -147,10 +177,62 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // Investments valuation
+    let investmentsTotal = 0;
+    if (stocksRes?.data) {
+      investmentsTotal += stocksRes.data.reduce(
+        (sum, s) => sum + (Number(s.quantity) || 0) * (Number(s.avg_buy_price) || 0),
+        0
+      );
+    }
+    if (mfRes?.data) {
+      investmentsTotal += mfRes.data.reduce((sum, m) => {
+        const inv = Number(m.invested_amount) || 0;
+        if (inv > 0) return sum + inv;
+        const nav = Number(m.current_nav) || Number(m.avg_nav) || 0;
+        return sum + (Number(m.units) || 0) * nav;
+      }, 0);
+    }
+    if (bondsRes?.data) {
+      investmentsTotal += bondsRes.data.reduce((sum, b) => {
+        const inv = Number(b.invested_amount) || 0;
+        if (inv > 0) return sum + inv;
+        const p = Number(b.current_price) || Number(b.avg_buy_price) || Number(b.face_value) || 1000;
+        return sum + (Number(b.quantity) || 0) * p;
+      }, 0);
+    }
+    if (bullionRes?.data) {
+      investmentsTotal += bullionRes.data.reduce(
+        (sum, bul) => sum + (Number(bul.total_buy_price) || 0),
+        0
+      );
+    }
+    if (cryptoRes?.data) {
+      const cryptoUsd = cryptoRes.data.reduce(
+        (sum, c) => sum + (Number(c.total_value_usd) || 0),
+        0
+      );
+      investmentsTotal += cryptoUsd * 84.5;
+    }
+
+    const totalAssets = liquidAssets + investmentsTotal;
     const netWorth = totalAssets - totalLiabilities;
 
-    // 2. Cash flow calculations
-    const rawExpenses = expensesRes.data || [];
+    // 2. Cash flow calculations (excluding internal transfers / family transfers from spending)
+    const isTransferOrFamily = (e: any): boolean => {
+      const cat = (e.category || "").toLowerCase();
+      const title = (e.title || "").toLowerCase();
+      const notes = (e.notes || "").toLowerCase();
+      if (cat.includes("family") && (title.includes("sent") || notes.includes("family transfer"))) {
+        return true;
+      }
+      if (cat === "transfer" || title.startsWith("transfer to") || title.startsWith("transfer from")) {
+        return true;
+      }
+      return false;
+    };
+
+    const rawExpenses = (expensesRes.data || []).filter((e) => !isTransferOrFamily(e));
     const rawIncome = incomeRes.data || [];
 
     const totalExpense = rawExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);

@@ -18,7 +18,6 @@ import {
   AlertCircle,
   HelpCircle,
   Clock,
-  Sparkles,
   ArrowRightLeft,
   X,
   Target,
@@ -32,7 +31,6 @@ import {
   Wallet,
   Receipt,
   FileText,
-  Landmark,
   BadgePercent,
   Copy,
   Info,
@@ -155,7 +153,7 @@ export default function BondsSection() {
   const [copiedIsin, setCopiedIsin] = useState<string | null>(null);
 
   // Filters & Tabs
-  const [activeTab, setActiveTab] = useState<"holdings" | "calendar" | "analytics" | "transactions" | "knowledge">("holdings");
+  const [activeTab, setActiveTab] = useState<"holdings" | "calendar" | "analytics" | "transactions">("holdings");
   const [displayMode, setDisplayMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -719,19 +717,6 @@ export default function BondsSection() {
             <History size={13} />
             Transactions ({transactions.length})
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("knowledge")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === "knowledge"
-                ? "bg-[var(--app-card-elevated)] text-[var(--app-fg)] border border-[var(--app-border)] shadow-xs"
-                : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-            }`}
-          >
-            <Sparkles size={13} className="text-amber-400" />
-            Demat & Tax Guide
-          </button>
         </div>
 
         {activeTab === "holdings" && (
@@ -1246,6 +1231,7 @@ export default function BondsSection() {
               totalValue={stats.totalCurrentValue}
               segments={typeDonutSegments}
               formatter={formatINR}
+              unitLabel="Type"
             />
           </div>
 
@@ -1260,6 +1246,7 @@ export default function BondsSection() {
               totalValue={stats.totalCurrentValue}
               segments={ratingDonutSegments}
               formatter={formatINR}
+              unitLabel="Rating"
             />
           </div>
 
@@ -1373,51 +1360,7 @@ export default function BondsSection() {
         </div>
       )}
 
-      {/* 9. TAB 5: DEMAT & TAX GUIDE */}
-      {activeTab === "knowledge" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-6 space-y-3">
-            <div className="flex items-center gap-2 text-sky-400">
-              <Landmark size={18} />
-              <h3 className="font-bold text-sm text-[var(--app-fg)]">How IndiaBonds & GoldenPi Settle into Zerodha</h3>
-            </div>
-            <p className="text-xs text-[var(--app-muted)] leading-relaxed">
-              When investing in bonds or debentures via SEBI-regulated Online Bond Platform Providers (OBPP) like IndiaBonds or GoldenPi:
-            </p>
-            <ul className="text-xs text-[var(--app-muted)] space-y-1.5 list-disc pl-4">
-              <li>
-                You link your existing <strong>Zerodha Demat Account</strong> (CDSL DP ID: <code>12081600</code>).
-              </li>
-              <li>
-                Trade clearing and settlement occurs via Indian clearing corporations (ICCL / NSCCL).
-              </li>
-              <li>
-                All units are credited directly to your CDSL Zerodha Demat and reflected in your Kite portfolio automatically.
-              </li>
-            </ul>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-6 space-y-3">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <BadgePercent size={18} />
-              <h3 className="font-bold text-sm text-[var(--app-fg)]">Taxation on Bond Interest in India</h3>
-            </div>
-            <ul className="text-xs text-[var(--app-muted)] space-y-2">
-              <li className="p-2.5 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)]">
-                <strong className="text-[var(--app-fg)]">Listed Corporate Bonds & NCDs:</strong> Coupon interest is taxed at your income tax slab rate under &quot;Income from Other Sources&quot;. TDS of 10% applies under Section 193.
-              </li>
-              <li className="p-2.5 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)]">
-                <strong className="text-[var(--app-fg)]">Tax-Free PSU Bonds:</strong> Coupon interest from designated bonds (NHAI, REC, PFC, IRFC) is 100% tax-free under Section 10(15)(iv)(h) with zero TDS.
-              </li>
-              <li className="p-2.5 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)]">
-                <strong className="text-[var(--app-fg)]">Sovereign Gold Bonds (SGB):</strong> 2.50% annual interest is taxable at slab rate. Capital gains on redemption upon maturity are 100% tax-free.
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* 10. LIGHTWEIGHT MODAL: LOG COUPON INTEREST CREDITED */}
+      {/* 9. LIGHTWEIGHT MODAL: LOG COUPON INTEREST CREDITED */}
       <Modal
         isOpen={isCouponModalOpen}
         onClose={() => setIsCouponModalOpen(false)}

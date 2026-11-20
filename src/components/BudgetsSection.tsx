@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   ArrowUpDown,
   Filter,
+  BarChart3,
 } from "lucide-react";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
@@ -93,7 +95,7 @@ export default function BudgetsSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<BudgetFilterMode>("ALL");
   const [sortMode, setSortMode] = useState<BudgetSortMode>("RISK");
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [activeTab, setActiveTab] = useState<"budgets" | "analytics">("budgets");
   const [analyticsTab, setAnalyticsTab] = useState<"BUDGET" | "SPENT">("BUDGET");
 
   // Modals state
@@ -674,12 +676,13 @@ export default function BudgetsSection() {
               </Button>
             )}
 
-            {/* Toggle Analytics Chart */}
+            {/* Toggle Analytics Section */}
             <Button
               size="sm"
-              variant={showAnalytics ? "primary" : "secondary"}
+              variant={activeTab === "analytics" ? "primary" : "secondary"}
               icon={<PieChart size={13} />}
-              onClick={() => setShowAnalytics(!showAnalytics)}
+              onClick={() => setActiveTab(activeTab === "analytics" ? "budgets" : "analytics")}
+              title={activeTab === "analytics" ? "Switch to Budgets View" : "Switch to Budget Analytics"}
             >
               Analytics
             </Button>
@@ -784,7 +787,62 @@ export default function BudgetsSection() {
         </div>
       )}
 
-      {/* MONTH BURN PACE PROGRESS BAR */}
+      {/* 3. VIEW SUB-TABS: BUDGETS & CEILINGS vs BUDGET ANALYTICS */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-3 border-b border-[var(--app-border)]">
+        <SegmentedControl
+          value={activeTab}
+          onChange={(val) => setActiveTab(val as "budgets" | "analytics")}
+          options={[
+            {
+              value: "budgets",
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <Target size={14} />
+                  <span>Budgets & Ceilings</span>
+                  <Badge variant="neutral" className="ml-1">
+                    {filterCounts.active}
+                  </Badge>
+                </span>
+              ),
+            },
+            {
+              value: "analytics",
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <PieChart size={14} />
+                  <span>Budget Analytics</span>
+                  {filterCounts.over > 0 && (
+                    <Badge variant="danger" className="ml-1">
+                      {filterCounts.over} over
+                    </Badge>
+                  )}
+                </span>
+              ),
+            },
+          ]}
+        />
+
+        <div className="text-xs font-mono text-[var(--app-muted)] flex items-center gap-2">
+          {activeTab === "budgets" ? (
+            <span>Showing {displayedCards.length} of {allCategoryCards.length} categories</span>
+          ) : (
+            <span>
+              {monthDisplayTitle} • {filterCounts.over > 0 ? (
+                <span className="text-rose-400 font-bold">{filterCounts.over} ceilings exceeded</span>
+              ) : (
+                <span className="text-emerald-400 font-bold">All ceilings healthy</span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* 4. SECTION 1: BUDGETS & CEILINGS VIEW                         */}
+      {/* ============================================================ */}
+      {activeTab === "budgets" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* MONTH BURN PACE PROGRESS BAR */}
       <div
         className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 sm:p-5 mb-6 shadow-xs"
       >
@@ -891,132 +949,7 @@ export default function BudgetsSection() {
         </div>
       )}
 
-      {/* TOGGLEABLE VISUAL ANALYTICS & DISTRIBUTION PANEL */}
-      {showAnalytics && (
-        <div className="mb-6 p-5 sm:p-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] shadow-xs animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-[var(--app-border-subtle)]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                <PieChart size={16} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-[var(--app-fg)]">Budget Allocation & Outflows Analysis</h3>
-                <p className="text-xs text-[var(--app-muted)]">Visual distribution of monthly ceilings and realized expenditures</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setAnalyticsTab("BUDGET")}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  analyticsTab === "BUDGET"
-                    ? "bg-[var(--app-accent)] text-black font-bold shadow-xs"
-                    : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                }`}
-              >
-                Ceilings ({formatINR(totalBudgeted)})
-              </button>
-              <button
-                type="button"
-                onClick={() => setAnalyticsTab("SPENT")}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  analyticsTab === "SPENT"
-                    ? "bg-[var(--app-accent)] text-black font-bold shadow-xs"
-                    : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                }`}
-              >
-                Actual Spend ({formatINR(totalMonthExpenses)})
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            {/* Donut Chart */}
-            <div className="lg:col-span-5 flex justify-center">
-              <InteractiveDonutChart
-                title={analyticsTab === "BUDGET" ? "Budget Distribution" : "Actual Spending Split"}
-                totalLabel={analyticsTab === "BUDGET" ? "Total Budget Cap" : "Total Outflows"}
-                totalValue={analyticsTab === "BUDGET" ? totalBudgeted : totalMonthExpenses}
-                segments={donutSegments}
-                formatter={formatINR}
-                centerColor={analyticsTab === "BUDGET" ? "#F59E0B" : "#F43F5E"}
-                size={180}
-              />
-            </div>
-
-            {/* Comparison Metrics Breakdown */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Total Cap</span>
-                  <span className="text-sm font-bold text-amber-400">{formatINR(totalBudgeted)}</span>
-                </div>
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Budgeted Spend</span>
-                  <span className="text-sm font-bold text-rose-400">{formatINR(totalSpentInBudgetedCategories)}</span>
-                </div>
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Unbudgeted Spend</span>
-                  <span className="text-sm font-bold text-amber-400">{formatINR(totalUnbudgeted)}</span>
-                </div>
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Total Outflows</span>
-                  <span className="text-sm font-bold text-[var(--app-fg)]">{formatINR(totalMonthExpenses)}</span>
-                </div>
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Remaining Cushion</span>
-                  <span className={`text-sm font-bold ${totalRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {totalRemaining >= 0 ? formatINR(totalRemaining) : `-${formatINR(Math.abs(totalRemaining))}`}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
-                  <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Overrun Categories</span>
-                  <span className="text-sm font-bold text-rose-400">{filterCounts.over} of {filterCounts.active}</span>
-                </div>
-              </div>
-
-              {/* Top Burned Categories */}
-              <div>
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--app-muted)] block mb-2 font-mono">
-                  Top Active Ceilings by Utilization
-                </span>
-                <div className="space-y-2">
-                  {allCategoryCards
-                    .filter((c) => c.isBudgeted)
-                    .sort((a, b) => b.percentUsed - a.percentUsed)
-                    .slice(0, 4)
-                    .map((item) => (
-                      <div key={item.category} className="text-xs font-mono">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[var(--app-fg)] truncate max-w-[180px]">{item.category}</span>
-                          <span className="text-[var(--app-muted)]">
-                            {formatINR(item.spentAmount)} / {formatINR(item.budgetAmount)} ({item.percentUsed.toFixed(0)}%)
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${Math.min(100, item.percentUsed)}%`,
-                              backgroundColor: item.isOverBudget
-                                ? "#f43f5e"
-                                : item.isWarning
-                                ? "#F59E0B"
-                                : "#10b981",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* FILTER, SEARCH & SORT TOOLBAR */}
+          {/* FILTER, SEARCH & SORT TOOLBAR */}
       <div
         className="p-3 sm:p-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] mb-6 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs"
       >
@@ -1339,6 +1272,453 @@ export default function BudgetsSection() {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  )}
+
+      {/* ============================================================ */}
+      {/* 5. SECTION 2: DEDICATED BUDGET ANALYTICS                      */}
+      {/* ============================================================ */}
+      {activeTab === "analytics" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* TOP ANALYTICS HEADER & DISTRIBUTION CARD */}
+          <div className="p-5 sm:p-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-[var(--app-border-subtle)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <PieChart size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-[var(--app-fg)]">
+                    Budget Allocation & Outflows Analysis
+                  </h3>
+                  <p className="text-xs text-[var(--app-muted)]">
+                    Visual distribution of monthly ceilings and realized expenditures for {monthDisplayTitle}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mode Switcher: Ceilings vs Actual Spend */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsTab("BUDGET")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer font-semibold ${
+                    analyticsTab === "BUDGET"
+                      ? "bg-[var(--app-accent)] text-black font-bold shadow-xs"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                  }`}
+                >
+                  Ceilings ({formatINR(totalBudgeted)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnalyticsTab("SPENT")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer font-semibold ${
+                    analyticsTab === "SPENT"
+                      ? "bg-[var(--app-accent)] text-black font-bold shadow-xs"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                  }`}
+                >
+                  Actual Outflows ({formatINR(totalMonthExpenses)})
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              {/* Donut Chart */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center">
+                <InteractiveDonutChart
+                  title={analyticsTab === "BUDGET" ? "Budget Distribution" : "Actual Spending Split"}
+                  totalLabel={analyticsTab === "BUDGET" ? "Total Budget Cap" : "Total Outflows"}
+                  totalValue={analyticsTab === "BUDGET" ? totalBudgeted : totalMonthExpenses}
+                  segments={donutSegments}
+                  formatter={formatINR}
+                  centerColor={analyticsTab === "BUDGET" ? "#F59E0B" : "#F43F5E"}
+                  size={190}
+                />
+                {/* Top Segments Legend Pills */}
+                {donutSegments.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4 max-w-sm">
+                    {donutSegments.slice(0, 5).map((seg) => {
+                      const total = analyticsTab === "BUDGET" ? totalBudgeted : totalMonthExpenses;
+                      const pct = total > 0 ? ((seg.value / total) * 100).toFixed(0) : 0;
+                      return (
+                        <div
+                          key={seg.label}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-mono border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: seg.color }}
+                          />
+                          <span className="text-[var(--app-fg)] truncate max-w-[90px]">{seg.label}</span>
+                          <span className="text-[var(--app-muted)] font-bold">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Comparison Metrics Breakdown */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Total Cap</span>
+                    <span className="text-sm font-bold text-amber-400">{formatINR(totalBudgeted)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Budgeted Spend</span>
+                    <span className="text-sm font-bold text-rose-400">{formatINR(totalSpentInBudgetedCategories)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Unbudgeted Spend</span>
+                    <span className="text-sm font-bold text-amber-400">{formatINR(totalUnbudgeted)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Total Outflows</span>
+                    <span className="text-sm font-bold text-[var(--app-fg)]">{formatINR(totalMonthExpenses)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Remaining Cushion</span>
+                    <span className={`text-sm font-bold ${totalRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {totalRemaining >= 0 ? formatINR(totalRemaining) : `-${formatINR(Math.abs(totalRemaining))}`}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
+                    <span className="text-[10px] uppercase text-[var(--app-muted)] block mb-1">Overrun Categories</span>
+                    <span className="text-sm font-bold text-rose-400">{filterCounts.over} of {filterCounts.active}</span>
+                  </div>
+                </div>
+
+                {/* Top Burned Categories */}
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--app-muted)] block mb-2 font-mono">
+                    Top Active Ceilings by Utilization
+                  </span>
+                  <div className="space-y-2">
+                    {allCategoryCards
+                      .filter((c) => c.isBudgeted)
+                      .sort((a, b) => b.percentUsed - a.percentUsed)
+                      .slice(0, 5)
+                      .map((item) => (
+                        <div key={item.category} className="text-xs font-mono">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[var(--app-fg)] truncate max-w-[180px] font-semibold">{item.category}</span>
+                            <span className="text-[var(--app-muted)]">
+                              {formatINR(item.spentAmount)} / {formatINR(item.budgetAmount)}{" "}
+                              <strong
+                                className={
+                                  item.isOverBudget
+                                    ? "text-rose-400"
+                                    : item.isWarning
+                                    ? "text-amber-400"
+                                    : "text-emerald-400"
+                                }
+                              >
+                                ({item.percentUsed.toFixed(0)}%)
+                              </strong>
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.min(100, item.percentUsed)}%`,
+                                backgroundColor: item.isOverBudget
+                                  ? "#f43f5e"
+                                  : item.isWarning
+                                  ? "#F59E0B"
+                                  : "#10b981",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* MONTH BURN PACE & VELOCITY PROJECTION CARD */}
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-5 sm:p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--app-muted)]">
+                  Overall Budget Burn Pace & Trajectory
+                </span>
+                <Badge
+                  variant={
+                    overallPercentUsed > 100
+                      ? "danger"
+                      : overallPercentUsed > 80
+                      ? "warning"
+                      : "success"
+                  }
+                >
+                  {overallPercentUsed.toFixed(1)}% consumed
+                </Badge>
+              </div>
+
+              <div className="text-[11px] text-[var(--app-muted)]">
+                Projected Outflow:{" "}
+                <strong className="font-bold font-mono text-[var(--app-fg)]">
+                  {formatINR(paceMetrics.projectedSpend)}
+                </strong>
+                {totalBudgeted > 0 && (
+                  <span
+                    className={
+                      paceMetrics.projectedDiff >= 0
+                        ? "text-emerald-400 ml-1.5 font-bold"
+                        : "text-rose-400 ml-1.5 font-bold"
+                    }
+                  >
+                    ({paceMetrics.projectedDiff >= 0
+                      ? `~${formatINR(paceMetrics.projectedDiff)} safe buffer`
+                      : `~${formatINR(Math.abs(paceMetrics.projectedDiff))} overrun`})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="w-full h-2.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, overallPercentUsed)}%`,
+                  backgroundColor:
+                    overallPercentUsed > 100
+                      ? "#f43f5e"
+                      : overallPercentUsed > 80
+                      ? "#F59E0B"
+                      : "#10b981",
+                }}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-[var(--app-muted)] pt-2 border-t border-[var(--app-border-subtle)]">
+              <span>Safe Daily Run-Rate: <strong className="text-emerald-400">{paceMetrics.dailyAllowance > 0 ? formatINR(paceMetrics.dailyAllowance) : "₹0"}/day</strong></span>
+              <span>Month Trajectory: <strong className="text-[var(--app-fg)]">{monthDisplayTitle}</strong></span>
+              <span>Active Ceilings: <strong className="text-[var(--app-fg)]">{filterCounts.active}</strong></span>
+            </div>
+          </div>
+
+          {/* COMPREHENSIVE CATEGORY SPENDING & HEALTH ANALYSIS TABLE */}
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-5 sm:p-6 shadow-xs overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-[var(--app-border-subtle)]">
+              <div>
+                <h4 className="text-sm font-bold text-[var(--app-fg)]">Category Utilization & Risk Breakdown</h4>
+                <p className="text-xs text-[var(--app-muted)]">Complete view of budget ceilings, realized spend, and buffer variance</p>
+              </div>
+              <span className="text-xs font-mono text-[var(--app-muted)]">
+                {allCategoryCards.filter((c) => c.isBudgeted || c.spentAmount > 0).length} tracked categories
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-[var(--app-border-subtle)] text-[var(--app-muted)] text-left uppercase text-[10px] tracking-wider">
+                    <th className="pb-2.5 font-semibold">Category</th>
+                    <th className="pb-2.5 font-semibold">Budget Cap</th>
+                    <th className="pb-2.5 font-semibold">Actual Spend</th>
+                    <th className="pb-2.5 font-semibold">Remaining Cushion</th>
+                    <th className="pb-2.5 font-semibold min-w-[140px]">Utilization</th>
+                    <th className="pb-2.5 font-semibold text-center">Status</th>
+                    <th className="pb-2.5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border-subtle)]">
+                  {allCategoryCards
+                    .filter((c) => c.isBudgeted || c.spentAmount > 0)
+                    .sort((a, b) => {
+                      if (a.isOverBudget && !b.isOverBudget) return -1;
+                      if (!a.isOverBudget && b.isOverBudget) return 1;
+                      return b.percentUsed - a.percentUsed;
+                    })
+                    .map((item) => {
+                      const Icon = item.IconComponent;
+                      return (
+                        <tr
+                          key={item.category}
+                          className="hover:bg-[var(--app-card-hover)] transition-colors group"
+                        >
+                          {/* Category Name */}
+                          <td className="py-3 pr-3">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{
+                                  backgroundColor: `${item.color}15`,
+                                  color: item.color,
+                                }}
+                              >
+                                <Icon size={13} />
+                              </div>
+                              <span className="font-semibold text-[var(--app-fg)] truncate max-w-[140px] sm:max-w-none">
+                                {item.category}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Budget Cap */}
+                          <td className="py-3 pr-3 tabular-nums">
+                            {item.isBudgeted ? (
+                              <span className="font-semibold text-[var(--app-fg)]">
+                                {formatINR(item.budgetAmount)}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--app-muted)] italic">Uncapped</span>
+                            )}
+                          </td>
+
+                          {/* Actual Spend */}
+                          <td className="py-3 pr-3 tabular-nums font-semibold text-rose-400">
+                            {formatINR(item.spentAmount)}
+                          </td>
+
+                          {/* Remaining Cushion */}
+                          <td className="py-3 pr-3 tabular-nums font-semibold">
+                            {item.isBudgeted ? (
+                              <span className={item.remainingAmount >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                                {item.remainingAmount >= 0
+                                  ? formatINR(item.remainingAmount)
+                                  : `-${formatINR(Math.abs(item.remainingAmount))}`}
+                              </span>
+                            ) : (
+                              <span className="text-amber-400">Unbudgeted</span>
+                            )}
+                          </td>
+
+                          {/* Utilization Bar */}
+                          <td className="py-3 pr-3">
+                            {item.isBudgeted ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span
+                                    className={
+                                      item.isOverBudget
+                                        ? "text-rose-400 font-bold"
+                                        : item.isWarning
+                                        ? "text-amber-400 font-bold"
+                                        : "text-[var(--app-muted)]"
+                                    }
+                                  >
+                                    {item.percentUsed.toFixed(0)}%
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 rounded-full bg-[var(--app-track-bg)] overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${Math.min(100, item.percentUsed)}%`,
+                                      backgroundColor: item.isOverBudget
+                                        ? "#f43f5e"
+                                        : item.isWarning
+                                        ? "#F59E0B"
+                                        : "#10b981",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-[var(--app-muted)]">—</span>
+                            )}
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="py-3 pr-3 text-center">
+                            {item.isOverBudget ? (
+                              <Badge variant="danger">Overrun</Badge>
+                            ) : item.isWarning ? (
+                              <Badge variant="warning">Warning</Badge>
+                            ) : item.isBudgeted ? (
+                              <Badge variant="success">On Track</Badge>
+                            ) : (
+                              <Badge variant="amber">Unbudgeted</Badge>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {item.expenseCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDrillDownCategory(item)}
+                                  className="px-2 py-1 rounded-md text-[10px] font-semibold border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:border-[var(--app-border)] transition-all cursor-pointer flex items-center gap-1"
+                                  title="Inspect individual transaction outflows"
+                                >
+                                  <Eye size={11} />
+                                  <span>View ({item.expenseCount})</span>
+                                </button>
+                              )}
+                              {!item.isBudgeted && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleOpenAddModal(
+                                      item.category,
+                                      Math.ceil(item.spentAmount / 1000) * 1000 || item.meta.defaultAmount
+                                    )
+                                  }
+                                  className="px-2 py-1 rounded-md text-[10px] font-semibold bg-[var(--app-accent)] text-black hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
+                                >
+                                  <Plus size={11} />
+                                  <span>Set Limit</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* UNBUDGETED OUTFLOWS LEAKS CARD IN ANALYTICS */}
+          {totalUnbudgeted > 0 && (
+            <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 shadow-xs">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-[var(--app-fg)]">
+                        Unbudgeted Spending Leaks ({formatINR(totalUnbudgeted)})
+                      </h4>
+                      <Badge variant="amber">{unbudgetedCategories.length} categories uncapped</Badge>
+                    </div>
+                    <p className="text-xs text-[var(--app-muted)] mt-1">
+                      These categories incurred spending during {monthDisplayTitle} without a defined limit. Adding ceilings prevents cash leaks.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {unbudgetedCategories.map((cat) => (
+                    <button
+                      key={cat.name}
+                      type="button"
+                      onClick={() => handleOpenAddModal(cat.name, Math.ceil(cat.total / 1000) * 1000 || 3000)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-amber-500/30 bg-[var(--app-card)] text-[var(--app-fg)] hover:border-amber-400 hover:bg-[var(--app-card-hover)] transition-all cursor-pointer font-mono shadow-xs"
+                    >
+                      <span className="truncate max-w-[120px]">{cat.name}:</span>
+                      <strong className="text-amber-400">{formatINR(cat.total)}</strong>
+                      <span className="text-[10px] text-[var(--app-accent)] font-semibold underline ml-1">+ Set Limit</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -6,9 +6,8 @@ import { rateLimit } from "@/utils/rateLimit";
 import {
   fetchBinance24hrTickers,
   calculateCryptoValuations,
-  getDemoMarketTickers,
-  getDemoSpotAccount,
   parseBinanceBalances,
+  BinanceTicker,
 } from "@/utils/binance";
 
 export async function GET(req: NextRequest) {
@@ -24,9 +23,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const useDemo = searchParams.get("demo") === "true";
-
     // 1. Fetch Integration status & stored holdings concurrently
     const [intRes, holdingsRes] = await Promise.all([
       supabaseAdmin
@@ -46,41 +42,12 @@ export async function GET(req: NextRequest) {
     const syncError = intRes.data?.sync_error || null;
     const rawHoldings = holdingsRes.data || [];
 
-    // Tickers with fallback
+    // Tickers from live Binance API
     const tickersRes = await fetchBinance24hrTickers();
-    const tickers =
+    const tickers: Record<string, BinanceTicker> =
       tickersRes.success && tickersRes.data && Object.keys(tickersRes.data).length > 0
         ? tickersRes.data
-        : getDemoMarketTickers();
-
-    if (useDemo || (rawHoldings.length === 0 && searchParams.get("showcase") === "true")) {
-      const demoAccount = getDemoSpotAccount();
-      const demoBalances = parseBinanceBalances(demoAccount.balances);
-      const demoPortfolio = calculateCryptoValuations(demoBalances, tickers);
-
-      return apiSuccess(
-        {
-          isBinanceConnected: isConnected,
-          lastSyncedAt: lastSyncedAt || new Date().toISOString(),
-          syncError,
-          isDemo: true,
-          accountType: demoAccount.accountType,
-          permissions: demoAccount.permissions,
-          commissions: {
-            maker: demoAccount.makerCommission / 100, // 0.10%
-            taker: demoAccount.takerCommission / 100,
-            buyer: demoAccount.buyerCommission,
-            seller: demoAccount.sellerCommission,
-          },
-          canTrade: demoAccount.canTrade,
-          canWithdraw: demoAccount.canWithdraw,
-          canDeposit: demoAccount.canDeposit,
-          ...demoPortfolio,
-        },
-        undefined,
-        req
-      );
-    }
+        : {};
 
     if (rawHoldings.length === 0) {
       return apiSuccess(
