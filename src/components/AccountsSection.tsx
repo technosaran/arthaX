@@ -24,7 +24,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
-import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 import BankLogo from "@/components/BankLogo";
 import AppleWalletCard from "@/components/AppleWalletCard";
 import AccountAdjustModal from "@/components/AccountAdjustModal";

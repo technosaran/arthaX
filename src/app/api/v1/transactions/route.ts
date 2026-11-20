@@ -19,6 +19,15 @@ const TransactionSchema = z.object({
   tags: z.array(z.string()).default([]),
 });
 
+function getMonthBounds(monthStr: string): { start: string; nextMonthStart: string } {
+  const [yearStr, monthNumStr] = monthStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const m = parseInt(monthNumStr, 10);
+  const start = `${monthStr}-01`;
+  const nextMonthStart = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, "0")}-01`;
+  return { start, nextMonthStart };
+}
+
 export async function GET(req: NextRequest) {
   const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
@@ -58,13 +67,17 @@ export async function GET(req: NextRequest) {
         .order("expense_date", { ascending: false });
 
       if (month && /^\d{4}-\d{2}$/.test(month)) {
-        expQuery = expQuery.gte("expense_date", `${month}-01`).lte("expense_date", `${month}-31`);
+        const { start, nextMonthStart } = getMonthBounds(month);
+        expQuery = expQuery.gte("expense_date", start).lt("expense_date", nextMonthStart);
       }
       if (accountId) expQuery = expQuery.eq("account_id", accountId);
       if (category) expQuery = expQuery.eq("category", category);
       if (search) expQuery = expQuery.ilike("title", `%${search}%`);
 
-      expensesPromise = expQuery.range(offset, offset + limit - 1) as unknown as Promise<SupabaseListResult>;
+      // For unified streams, query from 0 to offset + limit - 1 so globally sorted pagination is correct
+      const queryStart = type === "all" ? 0 : offset;
+      const queryEnd = type === "all" ? offset + limit - 1 : offset + limit - 1;
+      expensesPromise = expQuery.range(queryStart, queryEnd) as unknown as Promise<SupabaseListResult>;
     }
 
     if (type === "all" || type === "income") {
@@ -75,13 +88,16 @@ export async function GET(req: NextRequest) {
         .order("received_date", { ascending: false });
 
       if (month && /^\d{4}-\d{2}$/.test(month)) {
-        incQuery = incQuery.gte("received_date", `${month}-01`).lte("received_date", `${month}-31`);
+        const { start, nextMonthStart } = getMonthBounds(month);
+        incQuery = incQuery.gte("received_date", start).lt("received_date", nextMonthStart);
       }
       if (accountId) incQuery = incQuery.eq("account_id", accountId);
       if (category) incQuery = incQuery.eq("category", category);
       if (search) incQuery = incQuery.ilike("title", `%${search}%`);
 
-      incomePromise = incQuery.range(offset, offset + limit - 1) as unknown as Promise<SupabaseListResult>;
+      const queryStart = type === "all" ? 0 : offset;
+      const queryEnd = type === "all" ? offset + limit - 1 : offset + limit - 1;
+      incomePromise = incQuery.range(queryStart, queryEnd) as unknown as Promise<SupabaseListResult>;
     }
 
     const [expRes, incRes] = await Promise.all([expensesPromise, incomePromise]);
@@ -104,8 +120,10 @@ export async function GET(req: NextRequest) {
 
     unifiedList.sort((a, b) => new Date(String(b.date)).getTime() - new Date(String(a.date)).getTime());
 
+    const paginatedItems = type === "all" ? unifiedList.slice(offset, offset + limit) : unifiedList;
+
     return apiSuccess(
-      unifiedList.slice(0, limit),
+      paginatedItems,
       {
         page,
         limit,

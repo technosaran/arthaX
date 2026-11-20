@@ -6,8 +6,14 @@ Ensures strictly validated, sanitized, and typed inputs.
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, field_validator
-from .precision import to_decimal, quantize_currency, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from .precision import (
+    to_decimal,
+    parse_monetary_decimal,
+    quantize_currency,
+    DEFAULT_CURRENCY,
+    SUPPORTED_CURRENCIES,
+)
 from .exceptions import InvalidFinancialDataError
 
 
@@ -29,7 +35,7 @@ def parse_iso_date(d_str: Union[str, date, datetime, None]) -> Optional[date]:
         return d_str
     if isinstance(d_str, datetime):
         return d_str.date()
-    
+
     clean = str(d_str).strip()[:10]
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
         try:
@@ -41,11 +47,12 @@ def parse_iso_date(d_str: Union[str, date, datetime, None]) -> Optional[date]:
 
 class BaseFinancialItem(BaseModel):
     """Base class providing Decimal conversion and dictionary extraction."""
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class TransactionRecord(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: Optional[str] = None
     title: str = Field(..., max_length=255)
     amount: Decimal = Field(default=Decimal("0.00"))
@@ -61,7 +68,9 @@ class TransactionRecord(BaseModel):
     @field_validator("amount", mode="before")
     @classmethod
     def parse_amount(cls, v):
-        return to_decimal(v)
+        if v is None:
+            return Decimal("0.00")
+        return parse_monetary_decimal(v)
 
     @field_validator("currency", mode="before")
     @classmethod
@@ -70,6 +79,8 @@ class TransactionRecord(BaseModel):
 
 
 class AccountRecord(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: str
     name: str
     type: str
@@ -81,10 +92,14 @@ class AccountRecord(BaseModel):
     @field_validator("balance", mode="before")
     @classmethod
     def parse_balance(cls, v):
-        return to_decimal(v)
+        if v is None:
+            return Decimal("0.00")
+        return parse_monetary_decimal(v)
 
 
 class BudgetRecord(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: Optional[str] = None
     category: str
     amount: Decimal = Field(default=Decimal("0.00"))
@@ -95,10 +110,14 @@ class BudgetRecord(BaseModel):
     @field_validator("amount", mode="before")
     @classmethod
     def parse_amount(cls, v):
-        return to_decimal(v)
+        if v is None:
+            return Decimal("0.00")
+        return parse_monetary_decimal(v)
 
 
 class HoldingRecord(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: Optional[str] = None
     symbol_or_name: str
     asset_class: str  # stock, mutual_fund, bond, gold, silver, crypto
@@ -113,4 +132,6 @@ class HoldingRecord(BaseModel):
     @field_validator("quantity", "avg_purchase_price", "current_price", "invested_amount", "current_value", mode="before")
     @classmethod
     def parse_decimals(cls, v):
-        return to_decimal(v)
+        if v is None:
+            return Decimal("0.00")
+        return parse_monetary_decimal(v)

@@ -107,10 +107,11 @@ class ExpenseEngine(BaseCalculator):
         target_year_expenses = Decimal("0.00")
 
         for tx in spending_txs:
-            amt = to_decimal(tx.get("amount", 0))
-            if amt <= Decimal("0"):
+            amt_raw = to_decimal(tx.get("amount", 0))
+            if amt_raw == Decimal("0"):
                 continue
 
+            amt = abs(amt_raw)
             d_val = tx.get("transaction_date") or tx.get("expense_date")
             parsed_d = parse_iso_date(d_val)
             date_str = parsed_d.isoformat() if parsed_d else date.today().isoformat()
@@ -124,7 +125,11 @@ class ExpenseEngine(BaseCalculator):
             cat = str(tx.get("category") or "Other").strip()
             tx_type = str(tx.get("transaction_type") or "expense").lower()
 
-            is_refund = tx_type in ("refund", "refund_payout", "reversal") or "refund" in tx.get("title", "").lower()
+            is_refund = (
+                amt_raw < Decimal("0")
+                or tx_type in ("refund", "refund_payout", "reversal")
+                or "refund" in str(tx.get("title", "")).lower()
+            )
 
             if is_refund:
                 total_refunds += amt
@@ -134,6 +139,12 @@ class ExpenseEngine(BaseCalculator):
                 monthly_totals[month_key] -= amt
                 year_key = date_str[:4]
                 yearly_totals[year_key] -= amt
+
+                if target_month and date_str.startswith(target_month):
+                    target_month_expenses -= amt
+
+                if target_year and date_str.startswith(str(target_year)):
+                    target_year_expenses -= amt
             else:
                 total_gross_expense += amt
                 category_totals[cat] += amt

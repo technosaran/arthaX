@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
         .eq("user_id", userId),
       supabaseAdmin
         .from("stock_holdings")
-        .select("quantity, avg_buy_price")
+        .select("quantity, avg_buy_price, current_price")
         .eq("user_id", userId),
       supabaseAdmin
         .from("mutual_fund_holdings")
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
         .eq("user_id", userId),
       supabaseAdmin
         .from("bullion_holdings")
-        .select("metal, weight_grams, total_buy_price")
+        .select("metal, weight_grams, total_buy_price, current_rate_per_gram")
         .eq("user_id", userId),
       supabaseAdmin
         .from("crypto_holdings")
@@ -177,35 +177,34 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Investments valuation
+    // Investments valuation (Accurate Real-Time Market Valuation)
     let investmentsTotal = 0;
     if (stocksRes?.data) {
       investmentsTotal += stocksRes.data.reduce(
-        (sum, s) => sum + (Number(s.quantity) || 0) * (Number(s.avg_buy_price) || 0),
+        (sum, s) => sum + (Number(s.quantity) || 0) * (Number(s.current_price) || Number(s.avg_buy_price) || 0),
         0
       );
     }
     if (mfRes?.data) {
       investmentsTotal += mfRes.data.reduce((sum, m) => {
-        const inv = Number(m.invested_amount) || 0;
-        if (inv > 0) return sum + inv;
-        const nav = Number(m.current_nav) || Number(m.avg_nav) || 0;
-        return sum + (Number(m.units) || 0) * nav;
+        const currentNav = Number(m.current_nav) || Number(m.avg_nav) || 0;
+        const currentVal = (Number(m.units) || 0) * currentNav;
+        return sum + (currentVal > 0 ? currentVal : (Number(m.invested_amount) || 0));
       }, 0);
     }
     if (bondsRes?.data) {
       investmentsTotal += bondsRes.data.reduce((sum, b) => {
-        const inv = Number(b.invested_amount) || 0;
-        if (inv > 0) return sum + inv;
         const p = Number(b.current_price) || Number(b.avg_buy_price) || Number(b.face_value) || 1000;
-        return sum + (Number(b.quantity) || 0) * p;
+        const val = (Number(b.quantity) || 0) * p;
+        return sum + (val > 0 ? val : (Number(b.invested_amount) || 0));
       }, 0);
     }
     if (bullionRes?.data) {
-      investmentsTotal += bullionRes.data.reduce(
-        (sum, bul) => sum + (Number(bul.total_buy_price) || 0),
-        0
-      );
+      investmentsTotal += bullionRes.data.reduce((sum, bul) => {
+        const marketRate = Number(bul.current_rate_per_gram) || 0;
+        const marketVal = (Number(bul.weight_grams) || 0) * marketRate;
+        return sum + (marketVal > 0 ? marketVal : (Number(bul.total_buy_price) || 0));
+      }, 0);
     }
     if (cryptoRes?.data) {
       const cryptoUsd = cryptoRes.data.reduce(

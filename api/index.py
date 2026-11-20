@@ -133,7 +133,7 @@ def verify_auth_dependency(
 # ---------------------------------------------------------------------------
 class RunwayRequest(BaseModel):
     liquid_cash: float = Field(..., ge=0, le=1e12, description="Total liquid assets in bank accounts and cash")
-    monthly_expenses: List[float] = Field(..., min_items=1, max_items=120, description="List of monthly total expenses")
+    monthly_expenses: List[float] = Field(..., min_length=1, max_length=120, description="List of monthly total expenses")
 
 class MonteCarloMetrics(BaseModel):
     p10_conservative_months: float
@@ -169,7 +169,7 @@ class TransactionItem(BaseModel):
 
 class AnomalyDetectionRequest(BaseModel):
     transactions: List[Union[TransactionItem, dict]] = Field(
-        ..., min_items=1, max_items=1000, description="Transactions to analyze for spending anomalies"
+        ..., min_length=1, max_length=1000, description="Transactions to analyze for spending anomalies"
     )
 
 class RealizedTradeInput(BaseModel):

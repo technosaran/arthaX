@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { clearLocalFinancialCache } from "@/utils/cacheClient";
+import { clearAllQueryCaches } from "@/context/QueryProvider";
 
 interface UserProfile {
   name: string;
@@ -264,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     const supabase = createClient();
     clearLocalFinancialCache();
+    clearAllQueryCaches();
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);

@@ -1,4 +1,4 @@
-import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 
 /**
  * Ultra-Fast Multi-Tier Hybrid Cache for arthaX

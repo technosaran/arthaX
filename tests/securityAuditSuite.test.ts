@@ -443,4 +443,30 @@ describe("ArthaX Enterprise Security Audit Test Suite (Phases 1-10)", () => {
       expect(scriptSrcLine).not.toContain("https://cdn.jsdelivr.net");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Criterion 23: Master Wipe BOLA Authorization Prevention
+  // -------------------------------------------------------------------------
+  describe("Criterion 23: Master Wipe BOLA Protection & Full Cascade", () => {
+    it("ensures latest migration 20261121000000 validates caller ownership on fn_wipe_user_data", () => {
+      const migrationPath = path.resolve(process.cwd(), "supabase/migrations/20261121000000_secure_master_wipe_and_integrity.sql");
+      const content = fs.readFileSync(migrationPath, "utf-8");
+
+      expect(content).toContain("auth.uid()::text <> p_user_id");
+      expect(content).toContain("DELETE FROM public.crypto_trades");
+      expect(content).toContain("DELETE FROM public.crypto_holdings");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 24: Logout Cache Clearance
+  // -------------------------------------------------------------------------
+  describe("Criterion 24: Query Cache Purge on SignOut", () => {
+    it("exports clearAllQueryCaches function to prevent cross-user data leakage", async () => {
+      const { clearAllQueryCaches } = await import("@/context/QueryProvider");
+      expect(typeof clearAllQueryCaches).toBe("function");
+      // Must execute cleanly without error
+      expect(() => clearAllQueryCaches()).not.toThrow();
+    });
+  });
 });

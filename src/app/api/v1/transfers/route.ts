@@ -45,7 +45,12 @@ export async function GET(req: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (month && /^\d{4}-\d{2}$/.test(month)) {
-      query = query.gte("transfer_date", `${month}-01`).lte("transfer_date", `${month}-31`);
+      const [yearStr, monthNumStr] = month.split("-");
+      const year = parseInt(yearStr, 10);
+      const m = parseInt(monthNumStr, 10);
+      const start = `${month}-01`;
+      const nextMonthStart = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, "0")}-01`;
+      query = query.gte("transfer_date", start).lt("transfer_date", nextMonthStart);
     }
 
     const { data, count, error } = await query;

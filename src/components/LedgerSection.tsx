@@ -24,7 +24,7 @@ import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
-import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import { CACHE_KEYS, getUserCacheKey } from "@/utils/cacheKeys";
 import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,

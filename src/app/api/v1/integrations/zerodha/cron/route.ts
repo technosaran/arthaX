@@ -5,6 +5,7 @@ import { constantTimeCompare } from "@/utils/crypto";
 import { getZerodhaIntegration, syncAllZerodhaSections } from "@/utils/zerodha";
 import { performZerodhaAutoLogin, getAutoLoginCredentials } from "@/utils/zerodhaAutoLogin";
 import { encryptSensitiveData } from "@/utils/crypto";
+import { checkAndSetIdempotency } from "@/utils/rateLimit";
 
 async function handleZerodhaCron(req: NextRequest) {
   // 1. Authenticate Job Invoker (Strict CRON_SECRET constant-time validation)
@@ -24,17 +25,40 @@ async function handleZerodhaCron(req: NextRequest) {
     }
   }
 
+  // 2. Distributed lock to prevent concurrent cron / action execution collisions
+  if (!isTest) {
+    const lockAcquired = await checkAndSetIdempotency("zerodha_cron_lock", 300);
+    if (!lockAcquired) {
+      logger.info("[Zerodha Cron] Sync already in progress or recently executed. Skipping redundant run.", "ZerodhaCron");
+      return NextResponse.json({
+        status: "skipped",
+        message: "Sync already in progress or recently completed",
+        timestamp: new Date().toISOString(),
+        results: [],
+      }, { status: 200 });
+    }
+  }
+
   logger.info(`[Zerodha Cron] Initiating automated scheduled sync at ${new Date().toISOString()}`, "ZerodhaCron");
 
   const rawTargetUserId =
     process.env.ZERODHA_AUTHORIZED_USER_ID ||
-    process.env.DEFAULT_SYNC_USER_ID ||
-    "default_user";
+    process.env.DEFAULT_SYNC_USER_ID;
+
+  if (!rawTargetUserId || rawTargetUserId === "default_user") {
+    logger.info("[Zerodha Cron] No valid ZERODHA_AUTHORIZED_USER_ID configured. Skipping cron sync.", "ZerodhaCron");
+    return NextResponse.json({
+      status: "skipped",
+      message: "No authorized user configured for auto-sync",
+      timestamp: new Date().toISOString(),
+      results: [],
+    }, { status: 200 });
+  }
 
   const targetUserIds = rawTargetUserId
     .split(",")
     .map((u) => u.trim())
-    .filter(Boolean);
+    .filter((u) => u && u !== "default_user");
 
   const results: Array<{
     userId: string;

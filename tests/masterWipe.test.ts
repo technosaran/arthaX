@@ -90,4 +90,30 @@ describe("Master Wipe Data Suite", () => {
       expect(wipedAccounts[0].name).toBe("Cash in Hand");
     });
   });
+
+  describe("Database Migration Security Gate Verification", () => {
+    it("verifies the latest migration enforces caller auth check and covers crypto & integrations", async () => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const migrationFile = path.resolve(
+        process.cwd(),
+        "supabase/migrations/20261121000000_secure_master_wipe_and_integrity.sql"
+      );
+      expect(fs.existsSync(migrationFile)).toBe(true);
+
+      const sqlContent = fs.readFileSync(migrationFile, "utf-8");
+
+      // Verify BOLA authorization check exists
+      expect(sqlContent).toContain("auth.uid()::text <> p_user_id");
+      expect(sqlContent).toContain("Access denied: caller is not authorized");
+
+      // Verify comprehensive table coverage
+      expect(sqlContent).toContain("DELETE FROM public.crypto_trades");
+      expect(sqlContent).toContain("DELETE FROM public.crypto_holdings");
+      expect(sqlContent).toContain("DELETE FROM public.binance_integrations");
+      expect(sqlContent).toContain("DELETE FROM public.zerodha_integrations");
+      expect(sqlContent).toContain("DELETE FROM public.bullion_transactions");
+      expect(sqlContent).toContain("DELETE FROM public.bond_transactions");
+    });
+  });
 });

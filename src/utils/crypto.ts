@@ -14,14 +14,13 @@ const AUTH_TAG_LENGTH = 16; // 128-bit authentication tag
  * Derives a deterministic 256-bit AES encryption key using HKDF (RFC 5869)
  * from the environment master key or service key with domain separation.
  */
-function getDerivedKey(salt: string = "arthax-credential-salt", info: string = "broker-credentials"): Buffer {
-  if (process.env.NODE_ENV === "production" && !process.env.ENCRYPTION_MASTER_KEY) {
-    console.warn(
-      "[Crypto Security Warning] ENCRYPTION_MASTER_KEY is not defined in production. Falling back to service role credentials. Set ENCRYPTION_MASTER_KEY for zero-trust isolation."
-    );
-  }
-
+function getDerivedKey(
+  salt: string = "arthax-credential-salt",
+  info: string = "broker-credentials",
+  customSecret?: string
+): Buffer {
   const masterSecret =
+    customSecret ||
     process.env.ENCRYPTION_MASTER_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
@@ -112,13 +111,27 @@ export function decryptSensitiveData(
     }
 
     const key = getDerivedKey("arthax-credential-salt", context);
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, { authTagLength: AUTH_TAG_LENGTH });
-    decipher.setAuthTag(authTag);
-
-    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
-    decrypted += decipher.final("utf8");
-
-    return decrypted;
+    try {
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, { authTagLength: AUTH_TAG_LENGTH });
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encryptedHex, "hex", "utf8");
+      decrypted += decipher.final("utf8");
+      return decrypted;
+    } catch (primaryErr) {
+      // Safe migration fallback: if master key fails, attempt legacy derivation from SUPABASE_SERVICE_ROLE_KEY
+      const fallbackSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (fallbackSecret && process.env.ENCRYPTION_MASTER_KEY && fallbackSecret !== process.env.ENCRYPTION_MASTER_KEY) {
+        try {
+          const fallbackKey = getDerivedKey("arthax-credential-salt", context, fallbackSecret);
+          const fallbackDecipher = crypto.createDecipheriv("aes-256-gcm", fallbackKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+          fallbackDecipher.setAuthTag(authTag);
+          let decrypted = fallbackDecipher.update(encryptedHex, "hex", "utf8");
+          decrypted += fallbackDecipher.final("utf8");
+          return decrypted;
+        } catch {}
+      }
+      throw primaryErr;
+    }
   } catch (err) {
     throw new Error(
       `[Crypto Security] Decryption authentication verification failed: ${

@@ -50,9 +50,20 @@ class BudgetEngine(BaseCalculator):
                 continue
 
             cat = str(exp.get("category") or "Other").strip()
-            amt = to_decimal(exp.get("amount", 0))
-            if amt > Decimal("0"):
-                category_spending[cat] += amt
+            amt_raw = to_decimal(exp.get("amount", 0))
+            if amt_raw == Decimal("0"):
+                continue
+
+            is_refund = (
+                amt_raw < Decimal("0")
+                or tx_type in ("refund", "refund_payout", "reversal")
+                or "refund" in str(exp.get("title", "")).lower()
+            )
+
+            if is_refund:
+                category_spending[cat] -= abs(amt_raw)
+            else:
+                category_spending[cat] += abs(amt_raw)
                 category_expense_counts[cat] += 1
 
         # 2. Evaluate each budgeted category

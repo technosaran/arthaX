@@ -33,7 +33,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";

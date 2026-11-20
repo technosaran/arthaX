@@ -5,6 +5,7 @@ Supports liquid accounts, cash, stocks, mutual funds, bonds, bullion, crypto,
 loans, credit cards, and avoids double-counting transfers.
 """
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
@@ -95,12 +96,15 @@ class NetWorthEngine(BaseCalculator):
         # 2. Stocks Valuation
         stocks_valuation = Decimal("0.00")
         stocks_invested = Decimal("0.00")
+        unpriced_stocks_count = 0
         for s in stocks:
             qty = to_decimal(s.get("quantity", 0))
             cur_price = to_decimal(s.get("current_price", 0))
             avg_price = to_decimal(s.get("avg_buy_price", 0))
             if cur_price <= Decimal("0"):
                 cur_price = avg_price
+                if qty > Decimal("0"):
+                    unpriced_stocks_count += 1
 
             val = qty * cur_price
             inv = qty * avg_price
@@ -110,12 +114,15 @@ class NetWorthEngine(BaseCalculator):
         # 3. Mutual Funds Valuation
         mf_valuation = Decimal("0.00")
         mf_invested = Decimal("0.00")
+        unpriced_mf_count = 0
         for m in mutual_funds:
             units = to_decimal(m.get("units", 0))
             cur_nav = to_decimal(m.get("current_nav", 0))
             avg_nav = to_decimal(m.get("avg_nav", 0))
             if cur_nav <= Decimal("0"):
                 cur_nav = avg_nav
+                if units > Decimal("0"):
+                    unpriced_mf_count += 1
 
             val = units * cur_nav
             inv = to_decimal(m.get("invested_amount", 0))
@@ -128,6 +135,7 @@ class NetWorthEngine(BaseCalculator):
         # 4. Bonds Valuation
         bonds_valuation = Decimal("0.00")
         bonds_invested = Decimal("0.00")
+        unpriced_bonds_count = 0
         for b in bonds:
             qty = to_decimal(b.get("quantity", 1))
             cur_price = to_decimal(b.get("current_price", 0))
@@ -135,6 +143,8 @@ class NetWorthEngine(BaseCalculator):
             buy_price = to_decimal(b.get("avg_buy_price", face))
             if cur_price <= Decimal("0"):
                 cur_price = buy_price
+                if qty > Decimal("0"):
+                    unpriced_bonds_count += 1
 
             val = qty * cur_price
             inv = to_decimal(b.get("invested_amount", 0))
@@ -148,13 +158,19 @@ class NetWorthEngine(BaseCalculator):
         gold_valuation = Decimal("0.00")
         silver_valuation = Decimal("0.00")
         bullion_invested = Decimal("0.00")
+        unpriced_bullion_count = 0
         for bul in bullion:
             metal = str(bul.get("metal") or "GOLD").upper()
             weight = to_decimal(bul.get("weight_grams", 0))
             rate = to_decimal(bul.get("current_rate_per_gram", 0))
             inv = to_decimal(bul.get("total_buy_price", 0))
 
-            val = weight * rate
+            if rate <= Decimal("0") and weight > Decimal("0"):
+                unpriced_bullion_count += 1
+                val = inv
+            else:
+                val = weight * rate
+
             bullion_invested += inv
 
             if metal == "GOLD":
@@ -166,11 +182,14 @@ class NetWorthEngine(BaseCalculator):
 
         # 6. Cryptocurrency Valuation
         crypto_usd_valuation = Decimal("0.00")
+        unpriced_crypto_count = 0
         for c in crypto:
             val_usd = to_decimal(c.get("total_value_usd", 0))
             if val_usd <= Decimal("0"):
                 qty = to_decimal(c.get("total_quantity", 0))
                 p_usd = to_decimal(c.get("current_price_usd", 0))
+                if p_usd <= Decimal("0") and qty > Decimal("0"):
+                    unpriced_crypto_count += 1
                 val_usd = qty * p_usd
             crypto_usd_valuation += val_usd
 
@@ -230,6 +249,28 @@ class NetWorthEngine(BaseCalculator):
         # Debt to Asset ratio
         debt_to_asset_ratio = safe_percentage(total_liabilities, total_assets) if total_assets > Decimal("0") else Decimal("0.00")
 
+        total_unpriced = (
+            unpriced_stocks_count
+            + unpriced_mf_count
+            + unpriced_bonds_count
+            + unpriced_bullion_count
+            + unpriced_crypto_count
+        )
+
+        valuation_metadata = {
+            "pricing_fidelity": "FULL_MARKET" if total_unpriced == 0 else "PARTIAL_FALLBACK",
+            "unpriced_holdings_count": total_unpriced,
+            "unpriced_details": {
+                "stocks": unpriced_stocks_count,
+                "mutual_funds": unpriced_mf_count,
+                "bonds": unpriced_bonds_count,
+                "bullion": unpriced_bullion_count,
+                "crypto": unpriced_crypto_count,
+            },
+            "usd_inr_exchange_rate": str(usd_inr_rate),
+            "valuation_timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
         return {
             "currency": preferred_currency,
             "net_worth": str(quantize_currency(net_worth)),
@@ -243,4 +284,5 @@ class NetWorthEngine(BaseCalculator):
             "liquidity_percentage": float(liquidity_percentage),
             "debt_to_asset_ratio_percent": float(debt_to_asset_ratio),
             "is_solvent": net_worth >= Decimal("0.00"),
+            "valuation_metadata": valuation_metadata,
         }

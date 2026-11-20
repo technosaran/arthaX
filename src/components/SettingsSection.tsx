@@ -48,7 +48,7 @@ import {
   exportMasterPortfolioPDF,
 } from "@/utils/pdfExport";
 import { invalidateCacheKeys, getFromLocalCache, saveToLocalCache } from "@/utils/cacheClient";
-import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import { CACHE_KEYS, getUserCacheKey } from "@/utils/cacheKeys";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -57,6 +57,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
+import AutomationHub from "@/components/AutomationHub";
 
 // Utility function to escape CSV values according to RFC 4180
 function escapeCSV(val: unknown): string {
@@ -124,9 +125,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   const { theme } = useTheme();
   const { showToast } = useToast();
 
-  const userId = user?.id || "default_user";
-  const zerodhaCacheKey = useMemo(() => getUserCacheKey(userId, CACHE_KEYS.ZERODHA), [userId]);
-  const telegramCacheKey = useMemo(() => getUserCacheKey(userId, CACHE_KEYS.TELEGRAM), [userId]);
+  const userId = user?.id || "";
+  const zerodhaCacheKey = useMemo(() => (userId ? getUserCacheKey(userId, CACHE_KEYS.ZERODHA) : ""), [userId]);
+  const telegramCacheKey = useMemo(() => (userId ? getUserCacheKey(userId, CACHE_KEYS.TELEGRAM) : ""), [userId]);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
     if (typeof window !== "undefined") {
@@ -152,7 +153,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
   // Telegram Integration State - hydrated instantly from cache to prevent empty state flash
   const [telegramData, setTelegramData] = useState<TelegramData>(() => {
-    const cached = getFromLocalCache<TelegramData>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.TELEGRAM));
+    const cached = user?.id ? getFromLocalCache<TelegramData>(getUserCacheKey(user.id, CACHE_KEYS.TELEGRAM)) : null;
     if (cached) {
       return {
         ...cached,
@@ -170,7 +171,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     };
   });
   const [loadingTelegram, setLoadingTelegram] = useState<boolean>(() => {
-    const cached = getFromLocalCache<TelegramData>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.TELEGRAM));
+    const cached = user?.id ? getFromLocalCache<TelegramData>(getUserCacheKey(user.id, CACHE_KEYS.TELEGRAM)) : null;
     if (cached) return false;
     if (profile?.telegram_chat_id) return false;
     return true;
@@ -180,7 +181,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
   // Zerodha Kite Integration State - hydrated instantly from cache to prevent empty state flash
   const [zerodhaStatus, setZerodhaStatus] = useState<ZerodhaStatus>(() => {
-    const cached = getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.ZERODHA));
+    const cached = user?.id ? getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user.id, CACHE_KEYS.ZERODHA)) : null;
     if (cached) {
       return cached;
     }
@@ -200,7 +201,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     };
   });
   const [loadingZerodha, setLoadingZerodha] = useState<boolean>(() => {
-    const cached = getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user?.id || "default_user", CACHE_KEYS.ZERODHA));
+    const cached = user?.id ? getFromLocalCache<ZerodhaStatus>(getUserCacheKey(user.id, CACHE_KEYS.ZERODHA)) : null;
     return !cached;
   });
   const [zerodhaApiKey, setZerodhaApiKey] = useState("");
@@ -2036,7 +2037,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   </span>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-mono opacity-80 truncate select-all">
-                      {user?.id || "default_user"}
+                      {user?.id || "—"}
                     </span>
                     <button
                       type="button"
@@ -2055,7 +2056,10 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
         {/* TAB 2: STATEMENTS & DATA REPORTS */}
         {activeTab === "statements" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Live Automated Ingestion & Statement Hub */}
+            <AutomationHub />
+
             <Card className="p-4 sm:p-5 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--app-border-subtle)]">

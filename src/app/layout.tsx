@@ -143,13 +143,15 @@ export default function RootLayout({
           "--font-mono": "var(--font-inter)",
         } as React.CSSProperties}
       >
-        <AuthProvider>
-          <ThemeProvider>
-            <ToastProvider>
-              <QueryProvider>{children}</QueryProvider>
-            </ToastProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

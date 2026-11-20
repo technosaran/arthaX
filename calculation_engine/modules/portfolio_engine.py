@@ -168,13 +168,19 @@ class PortfolioEngine(BaseCalculator):
 
         holding_summaries = []
 
+        unpriced_holdings_count = 0
+
         # 1. Holdings Valuation & Weighted Average Buy Price
         for h in holdings:
             qty = to_decimal(h.get("quantity", 0))
             avg_p = to_decimal(h.get("avg_price", 0))
             cur_p = to_decimal(h.get("current_price", 0))
+            is_price_fallback = False
             if cur_p <= Decimal("0"):
                 cur_p = avg_p
+                if qty > Decimal("0"):
+                    is_price_fallback = True
+                    unpriced_holdings_count += 1
 
             inv = to_decimal(h.get("invested_amount", 0))
             if inv <= Decimal("0"):
@@ -202,6 +208,7 @@ class PortfolioEngine(BaseCalculator):
                 "current_value": str(quantize_currency(val)),
                 "unrealized_pnl": str(quantize_currency(unrealized)),
                 "return_percent": float(ret_pct),
+                "is_price_fallback": is_price_fallback,
             })
 
         final_portfolio_value = to_decimal(current_valuation_in) if current_valuation_in is not None else computed_current_value
@@ -260,6 +267,7 @@ class PortfolioEngine(BaseCalculator):
             "cagr_percent": float(cagr_rate * Decimal("100")) if cagr_rate is not None else None,
             "xirr_percent": float(xirr_rate * Decimal("100")) if xirr_rate is not None else None,
             "holdings_count": len(holdings),
+            "unpriced_holdings_count": unpriced_holdings_count,
             "holdings": holding_summaries,
             "cash_flows_count": len(cash_flows),
         }

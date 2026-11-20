@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 import { getFromLocalCache, saveToCache } from "@/utils/cacheClient";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import EntityLogo from "@/components/EntityLogo";

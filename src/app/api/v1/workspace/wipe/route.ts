@@ -84,12 +84,15 @@ async function handleWipe(req: NextRequest) {
       await supabaseAdmin.from("family_emergency_vault").delete().eq("user_id", userId);
       await supabaseAdmin.from("family_members").delete().eq("user_id", userId);
 
-      // 2f. Financial audit logs, F&O derivatives, stocks, mutual funds, bonds, bullion & integrations
+      // 2f. Financial audit logs, F&O derivatives, stocks, mutual funds, bonds, bullion, crypto & integrations
       await supabaseAdmin.from("bond_transactions").delete().eq("user_id", userId);
       await supabaseAdmin.from("bond_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("bullion_transactions").delete().eq("user_id", userId);
       await supabaseAdmin.from("bullion_holdings").delete().eq("user_id", userId);
+      await supabaseAdmin.from("crypto_trades").delete().eq("user_id", userId);
+      await supabaseAdmin.from("crypto_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("zerodha_integrations").delete().eq("user_id", userId);
+      await supabaseAdmin.from("binance_integrations").delete().eq("user_id", userId);
       await supabaseAdmin.from("mutual_fund_transactions").delete().eq("user_id", userId);
       await supabaseAdmin.from("mutual_fund_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("fno_trades").delete().eq("user_id", userId);
@@ -97,6 +100,18 @@ async function handleWipe(req: NextRequest) {
       await supabaseAdmin.from("stock_transactions").delete().eq("user_id", userId);
       await supabaseAdmin.from("stock_holdings").delete().eq("user_id", userId);
       await supabaseAdmin.from("financial_audit_logs").delete().eq("user_id", userId);
+
+      // 2g. Reset external telegram integration on user_settings
+      await supabaseAdmin
+        .from("user_settings")
+        .update({
+          telegram_chat_id: null,
+          telegram_username: null,
+          telegram_link_token: null,
+          telegram_linked_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
 
       // 2g. Accounts: preserve/seed Cash in Hand with 0.00 balance
       const { data: accounts } = await supabaseAdmin
@@ -145,6 +160,15 @@ async function handleWipe(req: NextRequest) {
         getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
         getUserCacheKey(userId, CACHE_KEYS.FAMILY_MEMBERS),
         getUserCacheKey(userId, CACHE_KEYS.FAMILY_RESPONSIBILITIES),
+        getUserCacheKey(userId, CACHE_KEYS.STOCKS),
+        getUserCacheKey(userId, CACHE_KEYS.MUTUAL_FUNDS),
+        getUserCacheKey(userId, CACHE_KEYS.BONDS),
+        getUserCacheKey(userId, CACHE_KEYS.BULLION),
+        getUserCacheKey(userId, CACHE_KEYS.GOALS),
+        getUserCacheKey(userId, CACHE_KEYS.ZERODHA),
+        getUserCacheKey(userId, CACHE_KEYS.TELEGRAM),
+        getUserCacheKey(userId, "crypto"),
+        getUserCacheKey(userId, "fno"),
         "arthax:cache:accounts",
         "arthax:cache:ledger",
         "arthax:cache:portfolio",

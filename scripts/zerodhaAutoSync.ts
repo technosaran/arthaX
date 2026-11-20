@@ -23,13 +23,17 @@ async function main() {
 
   const rawTargetUserId =
     process.env.ZERODHA_AUTHORIZED_USER_ID ||
-    process.env.DEFAULT_SYNC_USER_ID ||
-    "default_user";
+    process.env.DEFAULT_SYNC_USER_ID;
+
+  if (!rawTargetUserId || rawTargetUserId === "default_user") {
+    console.log("ℹ️ No valid ZERODHA_AUTHORIZED_USER_ID configured in environment. Skipping sync.");
+    return;
+  }
 
   const targetUserIds = rawTargetUserId
     .split(",")
     .map((u) => u.trim())
-    .filter(Boolean);
+    .filter((u) => u && u !== "default_user");
 
   for (const targetUserId of targetUserIds) {
     console.log(`\n-------------------------------------------------`);

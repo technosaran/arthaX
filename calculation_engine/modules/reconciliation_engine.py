@@ -24,11 +24,11 @@ class ReconciliationEngine(BaseCalculator):
     def calculate(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Inputs:
-            accounts: List of account records [{ id, name, balance, classification }]
+            accounts: List of account records [{ id, name, balance, opening_balance, classification }]
             expenses: List of expenses [{ id, amount, category, account_id, transaction_type }]
             income: List of income [{ id, amount, category, account_id, transaction_type }]
             transfers: List of transfers [{ id, from_account_id, to_account_id, amount }]
-            holdings: Optional list of holdings
+            holdings: Optional list of holdings [{ id, quantity, current_price, avg_price }]
             reported_net_worth: Optional net worth figure reported by client/dashboard
             currency: Preferred currency
         """
@@ -43,6 +43,8 @@ class ReconciliationEngine(BaseCalculator):
         discrepancies = []
         warnings = []
         checks_performed = 0
+
+        account_ids = {str(acc.get("id")) for acc in accounts if acc.get("id")}
 
         # ---------------------------------------------------------------------
         # Check 1: Duplicate Transaction Detection
@@ -114,7 +116,55 @@ class ReconciliationEngine(BaseCalculator):
             })
 
         # ---------------------------------------------------------------------
-        # Check 3: Account Balance vs Transaction Flow Reconciliation
+        # Check 3: Transfer Integrity & Orphaned Reference Detection
+        # ---------------------------------------------------------------------
+        checks_performed += 1
+        for tr in transfers:
+            tr_id = tr.get("id") or "unknown"
+            from_id = str(tr.get("from_account_id") or "")
+            to_id = str(tr.get("to_account_id") or "")
+            amt = to_decimal(tr.get("amount", 0))
+
+            if amt <= Decimal("0.00"):
+                discrepancies.append({
+                    "check_name": "INVALID_TRANSFER_AMOUNT",
+                    "severity": "HIGH",
+                    "details": f"Transfer '{tr_id}' has non-positive amount {amt}",
+                    "expected": "> 0.00",
+                    "actual": str(amt),
+                })
+
+            if from_id == to_id and from_id != "":
+                discrepancies.append({
+                    "check_name": "IDENTICAL_TRANSFER_ACCOUNTS",
+                    "severity": "HIGH",
+                    "details": f"Transfer '{tr_id}' has source account identical to destination account ({from_id})",
+                    "expected": "from_account_id != to_account_id",
+                    "actual": f"{from_id} == {to_id}",
+                })
+
+            if account_ids:
+                if from_id and from_id not in account_ids:
+                    discrepancies.append({
+                        "check_name": "UNMATCHED_TRANSFER_SOURCE",
+                        "severity": "HIGH",
+                        "details": f"Transfer '{tr_id}' refers to non-existent source account: {from_id}",
+                        "expected": "account exists in user accounts",
+                        "actual": from_id,
+                    })
+                if to_id and to_id not in account_ids:
+                    discrepancies.append({
+                        "check_name": "UNMATCHED_TRANSFER_DESTINATION",
+                        "severity": "HIGH",
+                        "details": f"Transfer '{tr_id}' refers to non-existent destination account: {to_id}",
+                        "expected": "account exists in user accounts",
+                        "actual": to_id,
+                    })
+
+        # ---------------------------------------------------------------------
+        # Check 4: Account Balance Flow Reconciliation & Variance Detection
+        # Formula: Expected Closing = Opening Balance + Income - Expenses + Transfers In - Transfers Out
+        # Variance = Recorded Closing Balance - Expected Closing Balance
         # ---------------------------------------------------------------------
         checks_performed += 1
         account_flows = defaultdict(lambda: {
@@ -148,6 +198,8 @@ class ReconciliationEngine(BaseCalculator):
             acc_id = str(acc.get("id"))
             acc_name = acc.get("name", "Account")
             recorded_bal = to_decimal(acc.get("balance", 0))
+            opening_bal = to_decimal(acc.get("opening_balance", acc.get("initial_balance", 0)))
+            has_opening_declared = "opening_balance" in acc or "initial_balance" in acc
             classification = str(acc.get("classification") or "asset").lower()
 
             flows = account_flows.get(acc_id, {
@@ -158,6 +210,21 @@ class ReconciliationEngine(BaseCalculator):
             })
 
             net_flow = flows["income"] - flows["expenses"] + flows["transfers_in"] - flows["transfers_out"]
+            expected_closing = opening_bal + net_flow
+            variance = recorded_bal - expected_closing
+
+            # Detect variance if opening balance was explicitly supplied
+            if has_opening_declared and abs(variance) > Decimal("0.01"):
+                discrepancies.append({
+                    "check_name": "ACCOUNT_BALANCE_FLOW_VARIANCE",
+                    "severity": "HIGH",
+                    "account_id": acc_id,
+                    "account_name": acc_name,
+                    "details": f"Account '{acc_name}' recorded balance ({recorded_bal}) does not match expected closing balance ({expected_closing}). Variance: {variance}",
+                    "expected": str(quantize_currency(expected_closing)),
+                    "actual": str(quantize_currency(recorded_bal)),
+                    "variance": str(quantize_currency(variance)),
+                })
 
             # Unexpected negative balance on liquid cash or bank accounts
             if classification == "asset" and recorded_bal < Decimal("0.00"):
@@ -172,7 +239,10 @@ class ReconciliationEngine(BaseCalculator):
                 "account_id": acc_id,
                 "account_name": acc_name,
                 "classification": classification,
+                "opening_balance": str(quantize_currency(opening_bal)),
                 "recorded_balance": str(quantize_currency(recorded_bal)),
+                "expected_closing_balance": str(quantize_currency(expected_closing)),
+                "variance": str(quantize_currency(variance)),
                 "total_income_credited": str(quantize_currency(flows["income"])),
                 "total_expense_debited": str(quantize_currency(flows["expenses"])),
                 "transfers_received": str(quantize_currency(flows["transfers_in"])),
@@ -181,7 +251,7 @@ class ReconciliationEngine(BaseCalculator):
             })
 
         # ---------------------------------------------------------------------
-        # Check 4: Net Worth Integrity Check (Assets - Liabilities = Net Worth)
+        # Check 5: Net Worth Integrity Check (Assets - Liabilities = Net Worth)
         # ---------------------------------------------------------------------
         checks_performed += 1
         total_assets = Decimal("0.00")
@@ -197,7 +267,6 @@ class ReconciliationEngine(BaseCalculator):
             else:
                 total_assets += bal
 
-        # Add investment holdings if available
         total_holdings_val = Decimal("0.00")
         for h in holdings:
             qty = to_decimal(h.get("quantity", 0))

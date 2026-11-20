@@ -30,7 +30,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { getFromLocalCache, saveToLocalCache, invalidateCacheKeys, invalidateAllFinancialCache } from "@/utils/cacheClient";
-import { CACHE_KEYS, getUserCacheKey } from "@/utils/redis";
+import { CACHE_KEYS, getUserCacheKey } from "@/utils/cacheKeys";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
 import BankLogo from "@/components/BankLogo";
 import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";

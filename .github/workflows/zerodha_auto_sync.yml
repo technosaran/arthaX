@@ -2,10 +2,8 @@ name: Zerodha Daily Portfolio Auto-Sync
 
 on:
   schedule:
-    # 03:00 UTC is 08:30 AM IST (Monday through Friday)
-    - cron: '0 3 * * 1-5'
-    # Optional weekend run for portfolio NAV & cash balance at 08:30 AM IST
-    - cron: '0 3 * * 0,6'
+    # 10:15 UTC is 03:45 PM IST (Monday through Friday, post market closing)
+    - cron: '15 10 * * 1-5'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 jobs:

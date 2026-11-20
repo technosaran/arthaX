@@ -23,7 +23,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
-import { getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
