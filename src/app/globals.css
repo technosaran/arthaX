@@ -168,7 +168,8 @@ pre {
   border: 1px solid var(--app-border);
 }
 
-[data-theme="light"] .glass-panel {
+[data-theme="light"] .glass-panel,
+.light .glass-panel {
   background-color: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -190,6 +191,26 @@ pre {
 
 .ambient-glow-amber {
   background: radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.15) 0%, transparent 60%);
+}
+
+[data-theme="light"] .ambient-glow-emerald,
+.light .ambient-glow-emerald {
+  background: radial-gradient(circle at 80% 20%, rgba(5, 150, 105, 0.08) 0%, transparent 60%);
+}
+
+[data-theme="light"] .ambient-glow-rose,
+.light .ambient-glow-rose {
+  background: radial-gradient(circle at 80% 20%, rgba(225, 29, 72, 0.08) 0%, transparent 60%);
+}
+
+[data-theme="light"] .ambient-glow-cyan,
+.light .ambient-glow-cyan {
+  background: radial-gradient(circle at 80% 20%, rgba(2, 132, 199, 0.08) 0%, transparent 60%);
+}
+
+[data-theme="light"] .ambient-glow-amber,
+.light .ambient-glow-amber {
+  background: radial-gradient(circle at 80% 20%, rgba(217, 119, 6, 0.08) 0%, transparent 60%);
 }
 
 /* Shimmer Skeleton Animation */
