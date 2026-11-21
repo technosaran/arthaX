@@ -393,10 +393,10 @@ export default function AccountAdjustModal({
           <div>
             <div className="text-sm font-bold text-[var(--app-fg)] flex items-center gap-1.5">
               <span>Adjust & Manage</span>
-              <span className="text-emerald-400 font-mono">({account.name})</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-mono">({account.name})</span>
             </div>
             <div className="text-[11px] font-mono text-[var(--app-muted)]">
-              Current Balance: <span className="font-bold text-white">{formatINR(account.balance)}</span>
+              Current Balance: <span className="font-bold text-[var(--app-fg)]">{formatINR(account.balance)}</span>
             </div>
           </div>
         </div>
@@ -414,11 +414,11 @@ export default function AccountAdjustModal({
             }}
             className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               mode === "deposit"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 shadow-xs"
-                : "text-[var(--app-muted)] hover:text-white"
+                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 shadow-xs"
+                : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
             }`}
           >
-            <Plus size={13} className="text-emerald-400" />
+            <Plus size={13} className="text-emerald-600 dark:text-emerald-400" />
             <span>Deposit (+)</span>
           </button>
 
@@ -430,11 +430,11 @@ export default function AccountAdjustModal({
             }}
             className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               mode === "withdraw"
-                ? "bg-rose-500/20 text-rose-300 border border-rose-500/35 shadow-xs"
-                : "text-[var(--app-muted)] hover:text-white"
+                ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/35 shadow-xs"
+                : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
             }`}
           >
-            <Minus size={13} className="text-rose-400" />
+            <Minus size={13} className="text-rose-600 dark:text-rose-400" />
             <span>Withdraw (-)</span>
           </button>
 
@@ -443,11 +443,11 @@ export default function AccountAdjustModal({
             onClick={() => setMode("adjust")}
             className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               mode === "adjust"
-                ? "bg-sky-500/20 text-sky-300 border border-sky-500/35 shadow-xs"
-                : "text-[var(--app-muted)] hover:text-white"
+                ? "bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/35 shadow-xs"
+                : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
             }`}
           >
-            <SlidersHorizontal size={13} className="text-sky-400" />
+            <SlidersHorizontal size={13} className="text-sky-600 dark:text-sky-400" />
             <span>Calibrate</span>
           </button>
         </div>
