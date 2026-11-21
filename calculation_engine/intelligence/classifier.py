@@ -151,6 +151,38 @@ class TransactionClassifier:
                     normalized_narration=narration,
                 )
 
+            # Check if counterparty was extracted via UPI
+            if counterparty:
+                tx_type = "PERSONAL_TRANSFER_SENT" if direction == "DEBIT" else "PERSONAL_TRANSFER_RECEIVED"
+                cat = "Personal Transfers" if direction == "DEBIT" else "Other Inflow"
+                lower_cp = counterparty.lower()
+                if any(k in lower_cp for k in ("store", "hotel", "bunk", "shop", "madurai", "jam")):
+                    cat = "Groceries & Food"
+                    tx_type = "MERCHANT_EXPENSE"
+                elif "amazon" in lower_cp or "flipkart" in lower_cp:
+                    cat = "Shopping"
+                    tx_type = "SHOPPING"
+                elif "swiggy" in lower_cp or "zomato" in lower_cp:
+                    cat = "Food & Dining"
+                    tx_type = "FOOD_AND_DINING"
+                elif "vodafone" in lower_cp or "airtel" in lower_cp or "jio" in lower_cp:
+                    cat = "Bills & Utilities"
+                    tx_type = "UTILITY_BILL"
+                elif "google" in lower_cp or "paytm" in lower_cp or "mobi" in lower_cp:
+                    cat = "Payment Gateway"
+
+                return ClassificationResult(
+                    category=cat,
+                    transaction_type=tx_type,
+                    confidence=Decimal("0.9000"),
+                    reason="UPI:COUNTERPARTY_EXTRACTED",
+                    merchant_name=counterparty,
+                    counterparty_name=counterparty,
+                    counterparty_identifier=vpa,
+                    channel="UPI",
+                    normalized_narration=counterparty,
+                )
+
             # Check if P2P UPI
             if upi_data.get("mode") == "P2P":
                 tx_type = "PERSONAL_TRANSFER_SENT" if direction == "DEBIT" else "PERSONAL_TRANSFER_RECEIVED"
@@ -163,7 +195,7 @@ class TransactionClassifier:
                     counterparty_name=counterparty,
                     counterparty_identifier=vpa,
                     channel="UPI",
-                    normalized_narration=narration,
+                    normalized_narration=counterparty or narration,
                 )
 
         # -------------------------------------------------------------
