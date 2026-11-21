@@ -465,8 +465,8 @@ export default function AccountAdjustModal({
                   onClick={() => setDepositType("transfer")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     depositType === "transfer"
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Transfer In
@@ -476,8 +476,8 @@ export default function AccountAdjustModal({
                   onClick={() => setDepositType("income")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     depositType === "income"
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   External Income
@@ -487,8 +487,8 @@ export default function AccountAdjustModal({
                   onClick={() => setDepositType("direct")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     depositType === "direct"
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Direct Adjust
