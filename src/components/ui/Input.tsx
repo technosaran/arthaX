@@ -84,7 +84,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <p
             id={errorId}
             role="alert"
-            className="text-[10px] sm:text-[11px] text-rose-400 font-medium tracking-tight"
+            className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400 font-medium tracking-tight"
           >
             {error}
           </p>
