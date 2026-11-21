@@ -20,10 +20,7 @@ import {
   AlertCircle,
   Landmark,
   RefreshCw,
-  Upload,
-  Zap,
 } from "lucide-react";
-import AutomationHub from "@/components/AutomationHub";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
@@ -93,7 +90,7 @@ export default function AccountsSection() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"holdings" | "history" | "statements">("holdings");
+  const [viewMode, setViewMode] = useState<"holdings" | "history">("holdings");
 
   // History and Activity State (Account Section Data Only)
   const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
@@ -735,16 +732,6 @@ export default function AccountsSection() {
             <Button
               variant="outline"
               size="sm"
-              icon={<Upload size={13} className="text-emerald-400" />}
-              onClick={() => setViewMode("statements")}
-              title="Import and reconcile bank statements (SBI, Indian Bank, CSV)"
-            >
-              Import Statement
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
               icon={<RefreshCw size={13} className={syncingZerodha ? "animate-spin" : ""} />}
               disabled={syncingZerodha}
               onClick={handleSyncZerodha}
@@ -909,11 +896,6 @@ export default function AccountsSection() {
               value: "history",
               label: `Account Transfers (${filteredHistory.length})`,
               icon: <ArrowRightLeft size={13} />,
-            },
-            {
-              value: "statements",
-              label: "Automations & Statements",
-              icon: <Zap size={13} className="text-emerald-400" />,
             },
           ]}
         />
@@ -1273,26 +1255,6 @@ export default function AccountsSection() {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* AUTOMATIONS & STATEMENTS INGESTION VIEW */}
-      {viewMode === "statements" && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between pb-1">
-            <button
-              type="button"
-              onClick={() => setViewMode("holdings")}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:underline cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-              <span>Back to Accounts</span>
-            </button>
-            <span className="text-xs text-[var(--app-muted)] font-mono">
-              Bank Statement Ingestion & Automation Hub
-            </span>
-          </div>
-          <AutomationHub />
         </div>
       )}
 

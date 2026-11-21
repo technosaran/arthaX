@@ -8,7 +8,6 @@ import TopNav from "@/components/TopNav";
 import DashboardSection from "@/components/DashboardSection";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { Loader2 } from "lucide-react";
 
@@ -91,9 +90,6 @@ const TaxSection = dynamic(() => import("@/components/TaxSection"), {
   loading: TabLoadingFallback,
 });
 const SettingsSection = dynamic(() => import("@/components/SettingsSection"), {
-  loading: TabLoadingFallback,
-});
-const AutomationHub = dynamic(() => import("@/components/AutomationHub"), {
   loading: TabLoadingFallback,
 });
 
@@ -299,20 +295,6 @@ export default function HomeClient() {
                 initialTab={activeTab === "tax" ? "overview" : "harvesting"}
                 onNavigate={handleTabChange}
               />
-            </div>
-          )}
-          {visitedTabs.automation && (
-            <div className={`h-full w-full ${activeTab === "automation" ? "block" : "hidden"}`}>
-              <main
-                className="flex-1 h-full p-4 sm:p-6 md:p-8 overflow-y-auto select-none space-y-6 sm:space-y-8"
-                style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
-              >
-                <PageHeader
-                  title="Automations & Financial Intelligence"
-                  description="Automated bank statement ingestion, Gmail auto-sync, mathematical reconciliation, and transaction intelligence."
-                />
-                <AutomationHub />
-              </main>
             </div>
           )}
           {(visitedTabs.settings || visitedTabs.profile) && (

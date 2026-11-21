@@ -29,9 +29,6 @@ import {
   Calendar,
   KeyRound,
   Bitcoin,
-  Cpu,
-  Play,
-  Activity,
   Clock,
   XCircle,
 } from "lucide-react";
@@ -57,7 +54,6 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
-import AutomationHub from "@/components/AutomationHub";
 
 // Utility function to escape CSV values according to RFC 4180
 function escapeCSV(val: unknown): string {
@@ -90,7 +86,7 @@ interface DataCounts {
   total: number;
 }
 
-type SettingsTab = "profile" | "statements" | "integrations" | "security" | "engine" | "danger";
+type SettingsTab = "profile" | "statements" | "integrations" | "security" | "danger";
 
 interface SettingsSectionProps {
   initialTab?: SettingsTab;
@@ -250,94 +246,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   const [exportingTarget, setExportingTarget] = useState<string | null>(null);
   const inFlightTelegramRef = useRef<boolean>(false);
   const inFlightZerodhaRef = useRef<boolean>(false);
-
-  // Calculation Engine Telemetry & Validation State
-  const [engineMetrics, setEngineMetrics] = useState<any | null>(null);
-  const [engineHistory, setEngineHistory] = useState<any[]>([]);
-  const [engineLoading, setEngineLoading] = useState(false);
-  const [engineRunningTest, setEngineRunningTest] = useState(false);
-  const [engineTestResult, setEngineTestResult] = useState<any | null>(null);
-  const [engineSelectedRecord, setEngineSelectedRecord] = useState<any | null>(null);
-
-  const fetchEngineTelemetry = useCallback(async () => {
-    setEngineLoading(true);
-    try {
-      const [valRes, histRes] = await Promise.all([
-        fetch("/api/v1/calculations/validation"),
-        fetch("/api/v1/calculations/history?limit=30"),
-      ]);
-      if (valRes.ok) {
-        const valData = await valRes.json();
-        setEngineMetrics(valData);
-      }
-      if (histRes.ok) {
-        const histData = await histRes.json();
-        setEngineHistory(histData.history || []);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch calculation engine telemetry:", err);
-    } finally {
-      setEngineLoading(false);
-    }
-  }, []);
-
-  const runEngineBenchmark = async () => {
-    setEngineRunningTest(true);
-    setEngineTestResult(null);
-    try {
-      const res = await fetch("/api/v1/calculations/networth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accounts: [
-            { id: "acc-1", name: "HDFC Savings", type: "SAVINGS", balance: 50000, classification: "ASSET" },
-            { id: "acc-2", name: "ICICI Fixed Deposit", type: "DEPOSIT", balance: 50000, classification: "ASSET" },
-            { id: "acc-3", name: "Axis Credit Card", type: "CREDIT", balance: 15000, classification: "LIABILITY" },
-          ],
-          investments: [],
-          liabilities: [],
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const resultData = data.data ?? data;
-        const expected = 85000;
-        const actual = Number(resultData.net_worth ?? data.net_worth);
-        const executionTime = data.metadata?.execution_time_ms ?? data.execution_time_ms;
-        setEngineTestResult({
-          scenario: "Assets ₹100,000 - Liabilities ₹15,000",
-          expected,
-          actual,
-          pass: actual === expected,
-          execution_time_ms: executionTime,
-        });
-        showToast("Calculation Verified", "Benchmark Net Worth calculation passed with 100% precision.", "success");
-      } else {
-        const errJson = await res.json().catch(() => null);
-        const errMsg =
-          errJson?.error?.message ||
-          errJson?.error ||
-          errJson?.detail ||
-          "Calculation engine returned an error. Ensure the Python microservice is running.";
-        setEngineTestResult({
-          scenario: "Benchmark execution",
-          error: typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg),
-          pass: false,
-        });
-        showToast("Benchmark Error", typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), "error");
-      }
-      fetchEngineTelemetry();
-    } catch (err: any) {
-      setEngineTestResult({
-        scenario: "Benchmark execution",
-        error: err.message,
-        pass: false,
-      });
-      showToast("Verification Failed", err.message || "Failed to execute benchmark", "error");
-    } finally {
-      setEngineRunningTest(false);
-    }
-  };
 
   const nameInputRef = useRef(greetingName);
   useEffect(() => {
@@ -633,12 +541,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
   }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus]);
 
-  useEffect(() => {
-    if (activeTab === "engine") {
-      fetchEngineTelemetry();
-    }
-  }, [activeTab, fetchEngineTelemetry]);
-
   // Handle Zerodha URL Redirects / Callbacks and section deep links
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -648,7 +550,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     const reqToken = url.searchParams.get("request_token");
     const section = url.searchParams.get("section");
 
-    if (section && ["profile", "statements", "integrations", "security", "engine", "danger"].includes(section)) {
+    if (section && ["profile", "statements", "integrations", "security", "danger"].includes(section)) {
       if (activeTab !== section) {
         setActiveTab(section as SettingsTab);
       }
@@ -1826,15 +1728,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               ),
             },
             {
-              value: "engine",
-              label: (
-                <span className="flex items-center gap-2 text-emerald-400">
-                  <Cpu size={14} />
-                  <span>Calculation Engine</span>
-                </span>
-              ),
-            },
-            {
               value: "danger",
               label: (
                 <span className="flex items-center gap-2 text-rose-400">
@@ -2069,10 +1962,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
         {/* TAB 2: STATEMENTS & DATA REPORTS */}
         {activeTab === "statements" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Live Automated Ingestion & Statement Hub */}
-            <AutomationHub />
-
+          <div className="space-y-4 animate-in fade-in duration-200">
             <Card className="p-4 sm:p-5 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--app-border-subtle)]">
@@ -2827,236 +2717,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               </div>
             </Card>
 
-          </div>
-        )}
-
-        {/* TAB 5: CALCULATION ENGINE & ACCURACY VALIDATION DASHBOARD */}
-        {activeTab === "engine" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Header Card */}
-            <Card className="p-6 sm:p-7 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
-                    <Cpu size={24} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold">ArthaX Financial Calculation Engine (AFCE)</h3>
-                      <Badge variant="accent">v1.0.0</Badge>
-                      <Badge variant="neutral">Python Decimal</Badge>
-                    </div>
-                    <p className="text-xs opacity-70">
-                      Centralized, deterministic monetary calculation engine with zero floating-point error.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={<RefreshCw size={13} className={engineLoading ? "animate-spin" : ""} />}
-                    onClick={fetchEngineTelemetry}
-                    disabled={engineLoading}
-                  >
-                    Refresh Telemetry
-                  </Button>
-                </div>
-              </div>
-
-              {/* KPI Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
-                  <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <Activity size={14} /> Total Executed
-                  </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-[var(--app-fg)]">
-                    {engineMetrics ? engineMetrics.total_calculations_executed : 0}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
-                  <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" /> Pass Rate
-                  </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
-                    {engineMetrics ? `${engineMetrics.validation_pass_rate_percent}%` : "100%"}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
-                  <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <Clock size={14} /> Avg Latency
-                  </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-sky-600 dark:text-sky-400">
-                    {engineMetrics ? `${engineMetrics.average_execution_time_ms} ms` : "0 ms"}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
-                  <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" /> Inconsistencies
-                  </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-amber-600 dark:text-amber-400">
-                    {engineMetrics ? engineMetrics.failed_calculations : 0}
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Live On-Demand Benchmark Self-Test */}
-            <Card className="p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <Play size={16} className="text-emerald-400" />
-                    <span>Live Deterministic Benchmark Test</span>
-                  </div>
-                  <p className="text-xs opacity-70">
-                    Executes real-time verification of the canonical Net Worth formula: Assets ₹100,000 - Liabilities ₹15,000 = Expected ₹85,000.
-                  </p>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={<RefreshCw size={13} className={engineRunningTest ? "animate-spin" : ""} />}
-                  disabled={engineRunningTest}
-                  onClick={runEngineBenchmark}
-                >
-                  {engineRunningTest ? "Calculating..." : "Run Live Verification"}
-                </Button>
-              </div>
-
-              {engineTestResult && (
-                <div
-                  className={`p-4 rounded-xl border text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    engineTestResult.pass
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="font-bold flex items-center gap-1.5">
-                      {engineTestResult.pass ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                      <span>{engineTestResult.scenario}</span>
-                    </div>
-                    <div>
-                      Expected: ₹{engineTestResult.expected?.toLocaleString("en-IN")} | Actual: ₹{engineTestResult.actual?.toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <div>Execution Latency: {engineTestResult.execution_time_ms} ms</div>
-                    <div className="font-bold">{engineTestResult.pass ? "PASSED (Bit-for-Bit Deterministic)" : "FAILED"}</div>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* Active Calculation Engine Modules */}
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <ShieldCheck size={16} className="text-emerald-400" />
-                <span>Centralized Engine Modules</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                {[
-                  { name: "ExpenseEngine", desc: "Refunds, reversals, internal transfer exclusion, category sums" },
-                  { name: "IncomeEngine", desc: "Income sources, recurring flows, savings rates, cash flow" },
-                  { name: "BudgetEngine", desc: "Rollover, category caps, overspending alerts, utilization" },
-                  { name: "NetWorthEngine", desc: "Multi-asset balance, debt deduction, zero negative clamping" },
-                  { name: "InvestmentEngine", desc: "Invested capital, live valuation, realized & unrealized P&L" },
-                  { name: "PortfolioEngine", desc: "CAGR, XIRR dated cash flows, weighted avg buy price" },
-                  { name: "ReconciliationEngine", desc: "Forensic ledger checks, duplicate detection, cross-validation" },
-                  { name: "PrecisionEngine", desc: "Python Decimal arithmetic, safe divide, currency quantization" },
-                ].map((mod) => (
-                  <div key={mod.name} className="p-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] space-y-1">
-                    <div className="flex items-center justify-between font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                      <span>{mod.name}</span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    </div>
-                    <p className="text-[11px] opacity-70 leading-normal">{mod.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Audit History Log */}
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <Activity size={16} className="text-sky-600 dark:text-sky-400" />
-                  <span>Immutable Calculation Audit Trail</span>
-                </div>
-                <span className="text-xs text-[var(--app-muted)]">
-                  {engineHistory.length} events logged in ring buffer
-                </span>
-              </div>
-
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-[var(--app-border)] text-xs font-mono">
-                {engineHistory.length === 0 ? (
-                  <div className="p-6 text-center text-[var(--app-muted)]">
-                    No calculations recorded in audit ring buffer yet. Run a calculation above to inspect.
-                  </div>
-                ) : (
-                  <table className="w-full text-left">
-                    <thead className="bg-[var(--app-card-subtle)] border-b border-[var(--app-border)] text-[var(--app-muted)]">
-                      <tr>
-                        <th className="p-2.5">Calculation ID</th>
-                        <th className="p-2.5">Module</th>
-                        <th className="p-2.5">Status</th>
-                        <th className="p-2.5">Latency</th>
-                        <th className="p-2.5">Recorded At</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--app-border)]">
-                      {engineHistory.map((rec: any) => (
-                        <tr
-                          key={rec.calculation_id}
-                          onClick={() => setEngineSelectedRecord(rec)}
-                          className="hover:bg-[var(--app-card-hover)] cursor-pointer transition-colors"
-                        >
-                          <td className="p-2.5 truncate max-w-[120px] font-semibold">{rec.calculation_id}</td>
-                          <td className="p-2.5 text-sky-600 dark:text-sky-400">{rec.calculation_type}</td>
-                          <td className="p-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                rec.status === "SUCCESS"
-                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20"
-                              }`}
-                            >
-                              {rec.status}
-                            </span>
-                          </td>
-                          <td className="p-2.5">{rec.execution_time_ms} ms</td>
-                          <td className="p-2.5 text-[var(--app-muted)]">
-                            {new Date(rec.timestamp).toLocaleTimeString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {engineSelectedRecord && (
-                <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-2 text-xs font-mono">
-                  <div className="flex items-center justify-between font-bold text-sky-600 dark:text-sky-400">
-                    <span>Audit Event: {engineSelectedRecord.calculation_id}</span>
-                    <button
-                      onClick={() => setEngineSelectedRecord(null)}
-                      className="text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div>Module: {engineSelectedRecord.calculation_type} (v{engineSelectedRecord.version})</div>
-                  <div>Status: {engineSelectedRecord.status} | Execution Time: {engineSelectedRecord.execution_time_ms} ms</div>
-                  <pre className="p-2 rounded bg-[var(--app-card-subtle)] text-[var(--app-fg)] border border-[var(--app-border)] overflow-x-auto text-[11px]">
-                    {JSON.stringify(engineSelectedRecord.result_summary, null, 2)}
-                  </pre>
-                  {engineSelectedRecord.error && <div className="text-rose-600 dark:text-rose-400 font-bold">Error: {engineSelectedRecord.error}</div>}
-                </div>
-              )}
-            </Card>
           </div>
         )}
 

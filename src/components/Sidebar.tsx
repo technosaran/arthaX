@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   Landmark,
-  Bot,
   CandlestickChart,
   TrendingUp,
   TrendingDown,
@@ -52,7 +51,6 @@ const NAV_ITEMS: NavItemDef[] = [
   // Overview
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "finance" },
   { id: "accounts", label: "Accounts", icon: Landmark, group: "finance" },
-  { id: "automation", label: "Automations & AI", icon: Bot, group: "finance" },
 
   // Cash Flow
   { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
