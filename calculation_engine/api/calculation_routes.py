@@ -17,6 +17,7 @@ from ..modules.portfolio_engine import PortfolioEngine
 from ..modules.reconciliation_engine import ReconciliationEngine
 from ..modules.tax_engine import TaxEngine
 from ..bank_ingestion import parser_registry, validate_statement_continuity
+from ..bank_ingestion.gmail_service import GmailStatementIngestor
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
 from ..audit.calculation_logger import (
     get_validation_metrics,
@@ -106,6 +107,14 @@ class StatementParseRequest(CalculationBaseRequest):
     content_base64: str
     passwords: Optional[List[str]] = Field(default_factory=list)
     account_id: Optional[str] = None
+
+
+class GmailSyncRequest(CalculationBaseRequest):
+    access_token: str
+    password_candidates: Optional[List[str]] = Field(default_factory=list)
+    after_date: Optional[str] = None
+    max_messages: Optional[int] = 10
+    custom_query: Optional[str] = None
 
 
 class TransactionClassifyBatchRequest(CalculationBaseRequest):
@@ -345,4 +354,26 @@ def classify_batch_transactions(payload: TransactionClassifyBatchRequest):
         "total_processed": len(classified),
         "transfers_detected": len(transfer_matches),
     }
+
+
+@router.post("/statements/gmail/sync")
+def sync_gmail_statements(payload: GmailSyncRequest, x_user_id: Optional[str] = Header(None)):
+    """
+    Synchronizes bank statements from user's Gmail mailbox using the Gmail REST API,
+    extracts attachments, decrypts password-protected statements, validates balances,
+    and classifies all extracted transactions.
+    """
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    ingestor = GmailStatementIngestor(access_token=payload.access_token)
+    try:
+        res = ingestor.sync_statements(
+            password_candidates=payload.password_candidates,
+            after_date=payload.after_date,
+            max_messages=payload.max_messages or 10,
+            custom_query=payload.custom_query,
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gmail statement synchronization failed: {str(e)}")
+
 

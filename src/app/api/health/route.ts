@@ -59,6 +59,30 @@ export async function GET(req: Request) {
     status: isGeminiConfigured ? "healthy" : "disabled",
   };
 
+  // 5. ArthaX Financial Calculation Engine (AFCE) Health Check
+  const pyUrl =
+    process.env.PYTHON_BACKEND_URL ||
+    process.env.PYTHON_SERVICE_URL ||
+    "http://127.0.0.1:8000";
+
+  try {
+    const calcStart = Date.now();
+    const calcRes = await fetch(`${pyUrl}/api/py/calculations/health`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(2000),
+    });
+    const calcLatency = Date.now() - calcStart;
+    if (calcRes.ok) {
+      checks.calculationEngine = { status: "healthy", latencyMs: calcLatency };
+    } else {
+      checks.calculationEngine = { status: "unhealthy", latencyMs: calcLatency, error: `HTTP ${calcRes.status}` };
+    }
+  } catch {
+    // In serverless / dev mode when microservice is standalone or idle
+    checks.calculationEngine = { status: "configured" };
+  }
+
   const isAllHealthy = checks.database.status === "healthy";
   const totalDuration = Date.now() - startTime;
 

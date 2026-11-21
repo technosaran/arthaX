@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, extractRequestId } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
 import { logger } from "@/utils/logger";
+import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import crypto from "crypto";
 
 const PYTHON_SERVICE_URL =
@@ -210,6 +211,34 @@ export async function POST(req: NextRequest) {
       }
       importedCount = inserted?.length || rowsToInsert.length;
       duplicateCount = rowsToInsert.length - importedCount;
+
+      // 5b. Synchronize verified non-transfer canonical records into expenses and income
+      for (const row of rowsToInsert) {
+        if (row.is_transfer) continue;
+        if (row.direction === "DEBIT") {
+          await supabaseAdmin.from("expenses").insert({
+            user_id: userId,
+            account_id: targetAccountId,
+            amount: row.amount,
+            category: row.category || "Food & Dining",
+            expense_date: row.transaction_date,
+            title: row.merchant_name || row.normalized_narration,
+            notes: `Statement import: ${row.original_narration}`,
+            tags: ["statement_import", "verified"],
+          });
+        } else if (row.direction === "CREDIT") {
+          await supabaseAdmin.from("income").insert({
+            user_id: userId,
+            account_id: targetAccountId,
+            amount: row.amount,
+            category: row.category === "Salary" ? "Salary" : "Other Income",
+            received_date: row.transaction_date,
+            title: row.counterparty_name || row.normalized_narration,
+            notes: `Statement import: ${row.original_narration}`,
+            tags: ["statement_import", "verified"],
+          });
+        }
+      }
     }
 
     // 6. Update target account balance to latest closing balance if statement is reconciled
@@ -220,6 +249,17 @@ export async function POST(req: NextRequest) {
         .eq("id", targetAccountId)
         .eq("user_id", userId);
     }
+
+    // 7. Invalidate multi-tier caches to trigger immediate UI consistency
+    try {
+      await invalidateCachedData([
+        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
+        getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
+        getUserCacheKey(userId, CACHE_KEYS.INCOME),
+        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
+        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+      ]);
+    } catch {}
 
     return NextResponse.json({
       success: true,

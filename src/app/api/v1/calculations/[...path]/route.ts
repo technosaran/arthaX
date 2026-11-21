@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
-import { apiError, apiUnauthorized, extractRequestId } from "@/utils/apiResponse";
+import { apiError, apiUnauthorized, apiForbidden, extractRequestId } from "@/utils/apiResponse";
 import { logger } from "@/utils/logger";
+import { constantTimeCompare } from "@/utils/crypto";
+
+function isDeveloperOrAdmin(req: NextRequest, userId: string): boolean {
+  const adminKey = process.env.ADMIN_API_KEY || process.env.CRON_SECRET;
+  const headerKey =
+    req.headers.get("x-admin-key") ||
+    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+
+  if (adminKey && headerKey && constantTimeCompare(headerKey.trim(), adminKey.trim())) {
+    return true;
+  }
+
+  const adminUserId = process.env.ADMIN_USER_ID;
+  if (adminUserId && userId === adminUserId) {
+    return true;
+  }
+
+  return false;
+}
 
 function getPythonServiceUrl(req: NextRequest): string {
   if (process.env.PYTHON_BACKEND_URL) return process.env.PYTHON_BACKEND_URL;
@@ -41,6 +60,23 @@ export async function GET(
   const subPath = path ? path.join("/") : "";
   const { search } = new URL(req.url);
 
+  // 1. Restrict global calculation metrics to authorized developer/admin access
+  if (subPath === "validation") {
+    if (!isDeveloperOrAdmin(req, userId)) {
+      return apiForbidden("Access denied. Global calculation metrics are restricted to developer/admin access.", req);
+    }
+  }
+
+  // 2. Restrict calculation history strictly to the authenticated user unless developer/admin
+  let effectiveSearch = search;
+  if (subPath === "history") {
+    if (!isDeveloperOrAdmin(req, userId)) {
+      const sp = new URLSearchParams(search);
+      sp.set("user_id", userId);
+      effectiveSearch = `?${sp.toString()}`;
+    }
+  }
+
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
     process.env.CRON_SECRET ||
@@ -48,7 +84,7 @@ export async function GET(
     "";
 
   const baseUrl = getPythonServiceUrl(req);
-  const targetUrl = `${baseUrl}/api/py/calculations/${subPath}${search}`;
+  const targetUrl = `${baseUrl}/api/py/calculations/${subPath}${effectiveSearch}`;
 
   try {
     const res = await fetch(targetUrl, {

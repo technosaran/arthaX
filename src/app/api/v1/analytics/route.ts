@@ -6,6 +6,15 @@ import { getCurrentMonthYear, getLocalDateString, formatMonthDisplay } from "@/u
 import { apiSuccess, apiError, apiUnauthorized, extractRequestId } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
 import { logger } from "@/utils/logger";
+import {
+  addMoney,
+  subMoney,
+  mulMoney,
+  divMoney,
+  sumMoney,
+  roundMoney,
+  percentMoney,
+} from "@/utils/money";
 
 export interface AnalyticsSummary {
   portfolio: {
@@ -154,18 +163,18 @@ export async function GET(req: NextRequest) {
     if (incomeRes.error) throw incomeRes.error;
     if (budgetsRes.error) throw budgetsRes.error;
 
-    // 1. Portfolio calculations
+    // 1. Portfolio calculations using Decimal-precision arithmetic
     const rawAccounts = accountsRes.data || [];
     let liquidAssets = 0;
     let totalLiabilities = 0;
 
     const mappedAccounts = rawAccounts.map((a) => {
-      const bal = Number(a.balance) || 0;
+      const bal = roundMoney(a.balance);
       const isLiab = a.classification === "liability" || /credit|loan/i.test(a.type);
       if (isLiab) {
-        totalLiabilities += Math.abs(bal);
+        totalLiabilities = addMoney(totalLiabilities, Math.abs(bal));
       } else {
-        liquidAssets += bal;
+        liquidAssets = addMoney(liquidAssets, bal);
       }
       return {
         id: a.id,
@@ -177,45 +186,95 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Investments valuation (Accurate Real-Time Market Valuation)
-    let investmentsTotal = 0;
+    // Investments valuation (Accurate Real-Time Market Valuation with Decimal precision)
+    let stocksValuation = 0;
     if (stocksRes?.data) {
-      investmentsTotal += stocksRes.data.reduce(
-        (sum, s) => sum + (Number(s.quantity) || 0) * (Number(s.current_price) || Number(s.avg_buy_price) || 0),
-        0
+      stocksValuation = sumMoney(
+        stocksRes.data.map((s) =>
+          mulMoney(s.quantity, s.current_price || s.avg_buy_price || 0)
+        )
       );
-    }
-    if (mfRes?.data) {
-      investmentsTotal += mfRes.data.reduce((sum, m) => {
-        const currentNav = Number(m.current_nav) || Number(m.avg_nav) || 0;
-        const currentVal = (Number(m.units) || 0) * currentNav;
-        return sum + (currentVal > 0 ? currentVal : (Number(m.invested_amount) || 0));
-      }, 0);
-    }
-    if (bondsRes?.data) {
-      investmentsTotal += bondsRes.data.reduce((sum, b) => {
-        const p = Number(b.current_price) || Number(b.avg_buy_price) || Number(b.face_value) || 1000;
-        const val = (Number(b.quantity) || 0) * p;
-        return sum + (val > 0 ? val : (Number(b.invested_amount) || 0));
-      }, 0);
-    }
-    if (bullionRes?.data) {
-      investmentsTotal += bullionRes.data.reduce((sum, bul) => {
-        const marketRate = Number(bul.current_rate_per_gram) || 0;
-        const marketVal = (Number(bul.weight_grams) || 0) * marketRate;
-        return sum + (marketVal > 0 ? marketVal : (Number(bul.total_buy_price) || 0));
-      }, 0);
-    }
-    if (cryptoRes?.data) {
-      const cryptoUsd = cryptoRes.data.reduce(
-        (sum, c) => sum + (Number(c.total_value_usd) || 0),
-        0
-      );
-      investmentsTotal += cryptoUsd * 84.5;
     }
 
-    const totalAssets = liquidAssets + investmentsTotal;
-    const netWorth = totalAssets - totalLiabilities;
+    let mfValuation = 0;
+    if (mfRes?.data) {
+      mfValuation = sumMoney(
+        mfRes.data.map((m) => {
+          const nav = m.current_nav || m.avg_nav || 0;
+          const val = mulMoney(m.units, nav);
+          return val > 0 ? val : (m.invested_amount || 0);
+        })
+      );
+    }
+
+    let bondsValuation = 0;
+    if (bondsRes?.data) {
+      bondsValuation = sumMoney(
+        bondsRes.data.map((b) => {
+          const p = b.current_price || b.avg_buy_price || b.face_value || 1000;
+          const val = mulMoney(b.quantity, p);
+          return val > 0 ? val : (b.invested_amount || 0);
+        })
+      );
+    }
+
+    let bullionValuation = 0;
+    if (bullionRes?.data) {
+      bullionValuation = sumMoney(
+        bullionRes.data.map((bul) => {
+          const marketVal = mulMoney(bul.weight_grams, bul.current_rate_per_gram || 0);
+          return marketVal > 0 ? marketVal : (bul.total_buy_price || 0);
+        })
+      );
+    }
+
+    let cryptoValuation = 0;
+    if (cryptoRes?.data) {
+      const cryptoUsdTotal = sumMoney(cryptoRes.data.map((c) => c.total_value_usd || 0));
+      cryptoValuation = mulMoney(cryptoUsdTotal, 84.5);
+    }
+
+    const investmentsTotal = sumMoney([
+      stocksValuation,
+      mfValuation,
+      bondsValuation,
+      bullionValuation,
+      cryptoValuation,
+    ]);
+
+    const totalAssets = addMoney(liquidAssets, investmentsTotal);
+    const netWorth = subMoney(totalAssets, totalLiabilities);
+
+    // Persist daily net worth snapshot asynchronously in background
+    const todayStr = new Date().toISOString().split("T")[0];
+    try {
+      await supabaseAdmin
+        .from("net_worth_snapshots")
+        .upsert(
+          {
+            user_id: userId,
+            snapshot_date: todayStr,
+            total_assets: totalAssets,
+            total_liabilities: totalLiabilities,
+            net_worth: netWorth,
+            currency: "INR",
+            breakdown: {
+              liquid_cash: liquidAssets,
+              stocks: stocksValuation,
+              mutual_funds: mfValuation,
+              bonds: bondsValuation,
+              bullion: bullionValuation,
+              crypto: cryptoValuation,
+              liabilities: totalLiabilities,
+            },
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,snapshot_date" }
+        );
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.warn("Failed to persist net worth snapshot", "AnalyticsAPI", { error: errMsg });
+    }
 
     // 2. Cash flow calculations (excluding internal transfers / family transfers from spending)
     const isTransferOrFamily = (e: any): boolean => {
@@ -234,24 +293,24 @@ export async function GET(req: NextRequest) {
     const rawExpenses = (expensesRes.data || []).filter((e) => !isTransferOrFamily(e));
     const rawIncome = incomeRes.data || [];
 
-    const totalExpense = rawExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const totalIncome = rawIncome.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-    const netSavings = totalIncome - totalExpense;
-    const savingsRatePercent = totalIncome > 0 ? Math.max(0, Math.round((netSavings / totalIncome) * 100)) : 0;
+    const totalExpense = sumMoney(rawExpenses.map((e) => e.amount));
+    const totalIncome = sumMoney(rawIncome.map((i) => i.amount));
+    const netSavings = subMoney(totalIncome, totalExpense);
+    const savingsRatePercent = percentMoney(netSavings, totalIncome);
 
     // 3. Spending velocity
-    const dailyAverageSpend = currentDay > 0 ? Math.round((totalExpense / currentDay) * 100) / 100 : 0;
-    const projectedMonthEndExpense = Math.round(dailyAverageSpend * lastDayNum);
+    const dailyAverageSpend = currentDay > 0 ? divMoney(totalExpense, currentDay) : 0;
+    const projectedMonthEndExpense = roundMoney(mulMoney(dailyAverageSpend, lastDayNum));
 
     // 4. Category breakdown
     const categoryTotals: Record<string, { amount: number; count: number }> = {};
     for (const exp of rawExpenses) {
       const cat = exp.category || "General";
-      const amt = Number(exp.amount) || 0;
+      const amt = roundMoney(exp.amount);
       if (!categoryTotals[cat]) {
         categoryTotals[cat] = { amount: 0, count: 0 };
       }
-      categoryTotals[cat].amount += amt;
+      categoryTotals[cat].amount = addMoney(categoryTotals[cat].amount, amt);
       categoryTotals[cat].count += 1;
     }
 
@@ -260,17 +319,17 @@ export async function GET(req: NextRequest) {
         category: cat,
         amount: info.amount,
         count: info.count,
-        percentage: totalExpense > 0 ? Math.round((info.amount / totalExpense) * 100) : 0,
+        percentage: percentMoney(info.amount, totalExpense),
       }))
       .sort((a, b) => b.amount - a.amount);
 
     // 5. Budget status
     const rawBudgets = budgetsRes.data || [];
     const budgetStatus = rawBudgets.map((b) => {
-      const budgeted = Number(b.amount) || 0;
+      const budgeted = roundMoney(b.amount);
       const spent = categoryTotals[b.category]?.amount || 0;
-      const remaining = budgeted - spent;
-      const percent = budgeted > 0 ? Math.round((spent / budgeted) * 100) : 0;
+      const remaining = subMoney(budgeted, spent);
+      const percent = percentMoney(spent, budgeted);
       return {
         category: b.category,
         budgeted,
