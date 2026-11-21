@@ -239,9 +239,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_budgets_amount_limit_nonnegative'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_budgets_amount_nonnegative'
   ) THEN
-    ALTER TABLE public.budgets ADD CONSTRAINT chk_budgets_amount_limit_nonnegative CHECK (amount_limit >= 0);
+    ALTER TABLE public.budgets ADD CONSTRAINT chk_budgets_amount_nonnegative CHECK (amount >= 0);
   END IF;
 END $$;
 
