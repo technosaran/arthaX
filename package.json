@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:py": "python python_service/main.py",
+    "dev:all": "npx concurrently -k -p \"[{name}]\" -n \"NEXT,PY\" -c \"cyan.bold,magenta.bold\" \"next dev\" \"python python_service/main.py\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:py": "pytest",
     "db:types": "supabase gen types typescript --project-id fvpfzbuoizzjwgekuhot > src/types/database.types.ts",
     "zerodha:sync": "npx tsx --env-file=.env.local scripts/zerodhaAutoSync.ts"
   },

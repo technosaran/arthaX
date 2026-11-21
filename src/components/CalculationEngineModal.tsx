@@ -104,16 +104,30 @@ export default function CalculationEngineModal({
 
       if (res.ok) {
         const data = await res.json();
+        const resultData = data.data ?? data;
         const expected = 85000;
-        const actual = Number(data.net_worth);
+        const actual = Number(resultData.net_worth ?? data.net_worth);
         const pass = actual === expected;
+        const executionTime = data.metadata?.execution_time_ms ?? data.execution_time_ms;
         setTestResult({
           scenario: "Net Worth Benchmark: ₹100,000 Assets - ₹15,000 Liabilities",
           expected,
           actual,
           pass,
-          version: data.calculation_version || "1.0.0",
-          execution_time_ms: data.execution_time_ms,
+          version: data.calculation_version || data.metadata?.version || "1.0.0",
+          execution_time_ms: executionTime,
+        });
+      } else {
+        const errJson = await res.json().catch(() => null);
+        const errMsg =
+          errJson?.error?.message ||
+          errJson?.error ||
+          errJson?.detail ||
+          "Calculation engine returned an error. Ensure the Python microservice is running.";
+        setTestResult({
+          scenario: "Benchmark execution",
+          error: typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg),
+          pass: false,
         });
       }
       fetchTelemetry();
