@@ -18,6 +18,15 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+# Load local environment files if available
+try:
+    from dotenv import load_dotenv
+    _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    load_dotenv(os.path.join(_base_dir, ".env.local"))
+    load_dotenv(os.path.join(_base_dir, ".env"))
+except ImportError:
+    pass
+
 # High-Performance Mathematical & Statistical Libraries
 try:
     import numpy as np
@@ -64,9 +73,6 @@ def verify_auth_dependency(
     authorization: Optional[str] = Header(None),
     x_internal_service_key: Optional[str] = Header(None),
 ) -> dict:
-    if not IS_PROD and (os.getenv("DISABLE_AUTH") == "1" or (not authorization and not x_internal_service_key)):
-        return {"user_id": "dev_user", "auth_method": "development_bypass"}
-
     internal_key = (
         os.getenv("INTERNAL_SERVICE_KEY")
         or os.getenv("CRON_SECRET")
@@ -75,6 +81,9 @@ def verify_auth_dependency(
     if internal_key and x_internal_service_key:
         if hmac.compare_digest(x_internal_service_key.strip(), internal_key.strip()):
             return {"user_id": "internal_service", "auth_method": "service_key"}
+
+    if not IS_PROD and (os.getenv("DISABLE_AUTH") == "1" or not authorization):
+        return {"user_id": "dev_user", "auth_method": "development_bypass"}
 
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()

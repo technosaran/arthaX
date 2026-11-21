@@ -13,6 +13,8 @@ import {
   ArrowRight,
   PiggyBank,
   Clock,
+  Upload,
+  Zap,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -711,6 +713,28 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           <p className="text-xs sm:text-sm text-[var(--app-muted)] font-normal">
             Sovereign ledger overview, net worth telemetry, and real-time cash flow.
           </p>
+        </div>
+
+        {/* Quick Automation & Statement Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Upload size={14} />}
+            onClick={() => onNavigate?.("automation")}
+            className="h-9 px-3.5 text-xs font-semibold cursor-pointer"
+          >
+            Import Statement
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<Zap size={14} className="text-emerald-400" />}
+            onClick={() => onNavigate?.("automation")}
+            className="h-9 px-3.5 text-xs font-medium cursor-pointer"
+          >
+            Automations & AI
+          </Button>
         </div>
       </div>
 
