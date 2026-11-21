@@ -53,6 +53,26 @@ def test_networth_api(client):
     assert json_data["data"]["net_worth"] == "85000.00"
 
 
+def test_networth_api_with_internal_service_key(client, monkeypatch):
+    test_key = "test-service-key-999"
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", test_key)
+    payload = {
+        "user_id": "test_user_1",
+        "accounts": [
+            {"id": "acc-1", "name": "Savings", "balance": 100000.0, "classification": "asset"},
+            {"id": "acc-2", "name": "Loan", "balance": 15000.0, "classification": "liability"},
+        ],
+    }
+    res = client.post(
+        "/api/calculations/networth",
+        json=payload,
+        headers={"X-Internal-Service-Key": test_key},
+    )
+    assert res.status_code == 200
+    json_data = res.json()
+    assert json_data["data"]["net_worth"] == "85000.00"
+
+
 def test_tax_api(client):
     payload = {
         "user_id": "test_user_1",

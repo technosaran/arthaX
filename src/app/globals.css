@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 /* ==========================================================================
    arthaX Sovereign FinTech Design System — Minimalist, Clean & Luminous
    ========================================================================== */
@@ -9,7 +11,8 @@
 }
 
 :root,
-[data-theme="dark"] {
+[data-theme="dark"],
+.dark {
   /* Dark Mode (Institutional Minimalist) */
   color-scheme: dark;
   accent-color: var(--app-accent);
@@ -31,6 +34,9 @@
   --app-accent-border: rgba(16, 185, 129, 0.28);
   --app-profit: #10b981;
   --app-loss: #f43f5e;
+  --app-warning: #fbbf24;
+  --app-info: #38bdf8;
+  --app-violet: #a78bfa;
   --app-ring: rgba(16, 185, 129, 0.35);
   --app-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.55);
   --app-shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
@@ -42,7 +48,8 @@
   --app-shimmer-to: rgba(255, 255, 255, 0.09);
 }
 
-[data-theme="light"] {
+[data-theme="light"],
+.light {
   /* Studio Minimalist (Crisp Slate-50 Canvas, Snow White Cards) */
   color-scheme: light;
   accent-color: var(--app-accent);
@@ -50,24 +57,27 @@
   --app-card: #ffffff;
   --app-card-hover: #f1f5f9;
   --app-card-elevated: #ffffff;
-  --app-card-subtle: #f8fafc;
+  --app-card-subtle: #f1f5f9;
   --app-fg: #0f172a;
-  --app-fg-muted: #64748b;
-  --app-fg-subtle: #94a3b8;
-  --app-border: #e2e8f0;
-  --app-border-subtle: #f1f5f9;
-  --app-border-hover: #cbd5e1;
+  --app-fg-muted: #475569;
+  --app-fg-subtle: #64748b;
+  --app-border: #cbd5e1;
+  --app-border-subtle: #e2e8f0;
+  --app-border-hover: #94a3b8;
   --app-muted: #64748b;
   --app-accent: #059669;
   --app-accent-hover: #047857;
-  --app-accent-subtle: rgba(5, 150, 105, 0.08);
+  --app-accent-subtle: rgba(5, 150, 105, 0.09);
   --app-accent-border: rgba(5, 150, 105, 0.25);
   --app-profit: #059669;
   --app-loss: #e11d48;
+  --app-warning: #d97706;
+  --app-info: #0284c7;
+  --app-violet: #7c3aed;
   --app-ring: rgba(5, 150, 105, 0.25);
-  --app-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
-  --app-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-  --app-badge-bg: rgba(5, 150, 105, 0.08);
+  --app-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --app-shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --app-badge-bg: rgba(5, 150, 105, 0.09);
   --app-badge-fg: #059669;
   --app-track-bg: #e2e8f0;
   --app-input-bg: #ffffff;
