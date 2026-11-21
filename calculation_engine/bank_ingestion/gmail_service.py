@@ -27,13 +27,15 @@ logger = logging.getLogger("arthax.gmail_ingestion")
 
 # Targeted Gmail search query for statement discovery across major Indian banks and brokers
 DEFAULT_GMAIL_STATEMENT_QUERY = (
-    "(from:sbi.co.in OR from:indianbank.co.in OR from:hdfcbank.net OR from:hdfcbank.com "
+    "(from:sbi.co.in OR from:alerts.sbi.bank.in OR from:sbi.bank.in OR from:communications.sbi "
+    "OR from:indianbank.co.in OR from:hdfcbank.net OR from:hdfcbank.com "
     "OR from:icicibank.com OR from:axisbank.com OR from:kotak.com OR from:pnb.co.in "
     "OR from:bankofbaroda.com OR from:canarabank.com OR from:unionbankofindia.co.in "
     "OR from:standardchartered.co.in OR from:indusind.com OR from:idfcfirstbank.com "
     "OR from:federalbank.co.in OR from:camsonline.com OR from:kfintech.com) "
     "AND (subject:statement OR subject:e-statement OR subject:\"account statement\" "
-    "OR subject:\"statement of account\" OR subject:\"eCAS\" OR subject:\"consolidated account statement\") "
+    "OR subject:\"statement of account\" OR subject:\"eCAS\" OR subject:\"consolidated account statement\" "
+    "OR subject:\"Email Statement\") "
     "AND has:attachment"
 )
 
@@ -45,7 +47,7 @@ def detect_bank_from_metadata(sender: str, subject: str, filename: str = "") -> 
     Detects bank identifier from email headers, subject, and attachment filename.
     """
     combined = f"{sender} {subject} {filename}".lower()
-    if "sbi" in combined or "state bank of india" in combined or "sbin" in combined:
+    if "sbi" in combined or "state bank of india" in combined or "sbin" in combined or "yonobysbi" in combined:
         return "SBI"
     if "indianbank" in combined or "indian bank" in combined or "indbank" in combined:
         return "INDIAN_BANK"

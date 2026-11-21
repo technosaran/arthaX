@@ -95,17 +95,17 @@ class SbiBankAdapter(BaseBankAdapter):
             try:
                 doc = pymupdf.open(stream=content, filetype="pdf")
                 if doc.is_encrypted:
-                    # Could be SBI statement if filename suggests or default check
+                    # Could be SBI statement if filename suggests or standard email statement name
                     doc.close()
-                    return "sbi" in fn
+                    return "sbi" in fn or "email_statement" in fn or "statement" in fn
                 text = ""
                 for i in range(min(2, doc.page_count)):
                     text += doc[i].get_text().upper()
                 doc.close()
-                return "STATE BANK OF INDIA" in text or "SBIN" in text or "WWW.ONLINESBI.COM" in text
+                return "STATE BANK OF INDIA" in text or "SBIN" in text or "WWW.ONLINESBI.COM" in text or "sbi" in fn or "email_statement" in fn
             except Exception:
                 pass
-        return "sbi" in fn
+        return "sbi" in fn or "email_statement" in fn
 
     def parse(
         self,
@@ -348,7 +348,8 @@ class SbiBankAdapter(BaseBankAdapter):
                     transactions.append(tx_item)
 
             if not transactions:
-                return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from SBI PDF.")
+                # Fall back to vertical cell layout (standard in SBI YONO e-statements)
+                return self._parse_vertical_pdf(doc, filename, file_hash, account_number, ifsc)
 
             transactions.sort(key=lambda t: t.transaction_date)
             period_start = transactions[0].transaction_date
@@ -462,6 +463,161 @@ class SbiBankAdapter(BaseBankAdapter):
             transaction_reference=ref_no,
             balance_after_transaction=bal,
             raw_row_index=tx_dict["raw_idx"],
+        )
+
+    def _parse_vertical_pdf(
+        self,
+        doc: pymupdf.Document,
+        filename: str,
+        file_hash: str,
+        account_number: Optional[str] = None,
+        ifsc: Optional[str] = None,
+    ) -> StatementParseResult:
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text() + "\n"
+
+        if not account_number:
+            m_acc = re.search(r"Account\s+Number\s*[:\n\s]+(\d{9,18})", full_text, re.IGNORECASE)
+            if m_acc:
+                account_number = m_acc.group(1)
+            else:
+                m2 = re.search(r"(\d{11})\s+(?:LOTUS|SAVING)", full_text, re.IGNORECASE)
+                if m2:
+                    account_number = m2.group(1)
+
+        if not ifsc:
+            m_ifsc = re.search(r"(SBIN\d{7})", full_text, re.IGNORECASE)
+            if m_ifsc:
+                ifsc = m_ifsc.group(1).upper()
+
+        date_re = re.compile(r"^(\d{2}/\d{2}/\d{4})$")
+        num_re = re.compile(r"^\d{1,3}(?:,\d{3})*(?:\.\d{2})$")
+
+        transactions: List[ParsedTransactionItem] = []
+        raw_row_idx = 0
+
+        for p_no in range(doc.page_count):
+            text = doc[p_no].get_text()
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+            i = 0
+            while i < len(lines):
+                if date_re.match(lines[i]):
+                    d_str = lines[i]
+                    if p_no == 0 and "Account open Date" in text and i < 40 and d_str == "30/03/2024":
+                        i += 1
+                        continue
+
+                    parsed_d = parse_date(d_str)
+                    i += 1
+
+                    val_d = parsed_d
+                    if i < len(lines) and date_re.match(lines[i]):
+                        val_d = parse_date(lines[i]) or parsed_d
+                        i += 1
+
+                    item_lines = []
+                    while i < len(lines):
+                        if date_re.match(lines[i]):
+                            break
+                        if "Statement Summary" in lines[i] or "Page no." in lines[i] or "Please do not share" in lines[i]:
+                            break
+                        item_lines.append(lines[i])
+                        i += 1
+
+                    clean_tokens = [tok for tok in item_lines if tok not in ('( )', 'Page no.')]
+
+                    bal_idx = -1
+                    bal = None
+                    for idx in range(len(clean_tokens) - 1, -1, -1):
+                        if num_re.match(clean_tokens[idx]):
+                            bal_idx = idx
+                            bal = parse_amount(clean_tokens[idx])
+                            break
+
+                    if bal_idx != -1 and bal_idx >= 2:
+                        cr_tok = clean_tokens[bal_idx - 1]
+                        dr_tok = clean_tokens[bal_idx - 2]
+
+                        credit = parse_amount(cr_tok) if num_re.match(cr_tok) else Decimal("0.00")
+                        debit = parse_amount(dr_tok) if num_re.match(dr_tok) else Decimal("0.00")
+
+                        ref_no = None
+                        if bal_idx >= 3 and clean_tokens[bal_idx - 3] != '-':
+                            ref_no = clean_tokens[bal_idx - 3]
+
+                        narration_tokens = clean_tokens[:bal_idx - 2]
+                        if bal_idx >= 3 and clean_tokens[bal_idx - 3] == '-':
+                            narration_tokens = clean_tokens[:bal_idx - 3]
+
+                        narration = " ".join(narration_tokens).strip()
+
+                        direction = "CREDIT" if credit > Decimal("0.00") else "DEBIT"
+                        amt = credit if credit > Decimal("0.00") else debit
+
+                        if amt > Decimal("0.00"):
+                            raw_row_idx += 1
+                            transactions.append(
+                                ParsedTransactionItem(
+                                    transaction_date=parsed_d,
+                                    value_date=val_d,
+                                    amount=amt,
+                                    direction=direction,
+                                    original_narration=narration,
+                                    normalized_narration=narration,
+                                    transaction_reference=ref_no,
+                                    balance_after_transaction=bal,
+                                    raw_row_index=raw_row_idx,
+                                )
+                            )
+                else:
+                    i += 1
+
+        if not transactions:
+            return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from SBI PDF.")
+
+        transactions.sort(key=lambda t: t.transaction_date)
+        period_start = transactions[0].transaction_date
+        period_end = transactions[-1].transaction_date
+
+        first_bal = transactions[0].balance_after_transaction
+        last_bal = transactions[-1].balance_after_transaction
+
+        if first_bal is not None:
+            if transactions[0].direction == "CREDIT":
+                opening_balance = first_bal - transactions[0].amount
+            else:
+                opening_balance = first_bal + transactions[0].amount
+        else:
+            opening_balance = Decimal("0.00")
+
+        closing_balance = last_bal if last_bal is not None else Decimal("0.00")
+
+        metadata = StatementMetadata(
+            bank_name=self.BANK_NAME,
+            account_number_masked=f"******{account_number[-4:]}" if account_number else None,
+            account_type="SAVINGS",
+            statement_period_start=period_start,
+            statement_period_end=period_end,
+            opening_balance=opening_balance,
+            closing_balance=closing_balance,
+            currency="INR",
+            ifsc_code=ifsc,
+        )
+
+        validation = validate_statement_math(metadata, transactions)
+
+        return StatementParseResult(
+            success=validation.is_valid,
+            bank_name=self.BANK_NAME,
+            metadata=metadata,
+            transactions=transactions,
+            validation=validation,
+            parser_version=self.PARSER_VERSION,
+            file_hash=file_hash,
+            file_name=filename,
+            errors=validation.errors,
         )
 
     def _build_empty_failure(

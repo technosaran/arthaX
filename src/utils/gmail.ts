@@ -849,10 +849,13 @@ export async function syncUserGmailStatements(
       })
       .eq("id", integration.id);
 
+    const totalExtracted = statements.reduce((acc: number, s: any) => acc + (s.transactions?.length || 0), 0);
+
     return {
       success: !hasFailures,
       statementsCount: statements.length,
       transactionsImported: totalImported,
+      transactionsExtracted: totalExtracted,
       duplicatesSkipped: totalDuplicates,
       transfersMatched: transfersMatchedCount,
       accountsCreated,

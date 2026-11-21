@@ -68,7 +68,7 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
   const rawName = (identity.name || "").trim().replace(/[^a-zA-Z]/g, "");
   const name4 = rawName.slice(0, 4);
 
-  // 1. DOB variations
+  // 1. Phone + DOB combinations (SBI YONO Primary standard & Bank of Baroda)
   if (dob) {
     const ddmm = `${dob.dd}${dob.mm}`;
     const mmdd = `${dob.mm}${dob.dd}`;
@@ -76,20 +76,26 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
     const ddmmyy = `${dob.dd}${dob.mm}${dob.yy}`;
     const yyyymmdd = `${dob.yyyy}${dob.mm}${dob.dd}`;
 
-    candidates.add(ddmmyyyy);
-    candidates.add(ddmmyy);
-    candidates.add(ddmm);
-    candidates.add(yyyymmdd);
-    candidates.add(mmdd);
+    // SBI YONO Primary standard: Last 5 digits of mobile + DDMMYY
+    if (phoneLast5) {
+      candidates.add(`${phoneLast5}${ddmmyy}`);
+      candidates.add(`${phoneLast5}${ddmmyyyy}`);
+    }
+    if (phoneLast4) {
+      candidates.add(`${phoneLast4}${ddmmyy}`);
+      candidates.add(`${phoneLast4}${ddmmyyyy}`);
+      candidates.add(`${phoneLast4}${ddmm}`);
+      candidates.add(`${ddmm}${phoneLast4}`);
+    }
 
-    // 2. PAN + DOB combinations (Standard SBI, Axis, HDFC)
+    // 2. PAN + DOB combinations (Standard SBI Netbanking, Axis, HDFC)
     if (pan.length >= 5) {
       const pan5Upper = pan.slice(0, 5);
       const pan5Lower = pan5Upper.toLowerCase();
       const pan4Upper = pan.slice(0, 4);
       const pan4Lower = pan4Upper.toLowerCase();
 
-      // SBI Primary: First 5 of PAN + DDMM (e.g. ABCDE1508)
+      // SBI Netbanking: First 5 of PAN + DDMM (e.g. ABCDE1508)
       candidates.add(`${pan5Upper}${ddmm}`);
       candidates.add(`${pan5Lower}${ddmm}`);
       candidates.add(`${pan4Upper}${ddmm}`);
@@ -113,13 +119,12 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
       candidates.add(`${name4Lower}${dob.dd}`);
     }
 
-    // 4. Phone + DOB combinations (SBI Alternative, Bank of Baroda)
-    if (phoneLast4) {
-      // SBI Alternative: DDMM + last 4 digits of phone
-      candidates.add(`${ddmm}${phoneLast4}`);
-      candidates.add(`${phoneLast4}${ddmm}`);
-      candidates.add(`${ddmmyyyy}${phoneLast4}`);
-    }
+    // 4. DOB standalone variations (HDFC, Axis, PNB)
+    candidates.add(ddmmyyyy);
+    candidates.add(ddmmyy);
+    candidates.add(ddmm);
+    candidates.add(yyyymmdd);
+    candidates.add(mmdd);
   }
 
   // 5. Standalone PAN (HDFC, Kotak, Axis)

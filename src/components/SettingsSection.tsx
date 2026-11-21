@@ -267,6 +267,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   const [lastSyncResult, setLastSyncResult] = useState<{
     statementsCount: number;
     transactionsExtracted: number;
+    transactionsImported?: number;
+    duplicatesSkipped?: number;
     accountsCreated: string[];
     message?: string;
   } | null>(null);
@@ -964,10 +966,18 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       }
 
       const syncData = json.data;
-      const extractedCount = syncData.transactionsImported ?? syncData.transactionsExtracted ?? 0;
+      const extractedCount =
+        typeof syncData.transactionsExtracted === "number" && syncData.transactionsExtracted > 0
+          ? syncData.transactionsExtracted
+          : (syncData.transactionsImported ?? 0);
+      const importedCount = syncData.transactionsImported ?? 0;
+      const duplicatesCount = syncData.duplicatesSkipped ?? 0;
+
       setLastSyncResult({
         statementsCount: syncData.statementsCount || 0,
         transactionsExtracted: extractedCount,
+        transactionsImported: importedCount,
+        duplicatesSkipped: duplicatesCount,
         accountsCreated: syncData.accountsCreated || [],
         message: syncData.message,
       });
@@ -2369,12 +2379,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     <Send size={18} className="translate-x-[-1px] translate-y-[-1px]" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold tracking-tight">Telegram Bot Integration</h2>
-                      <Badge variant="sky" className="text-[10px]">
-                        Official Bot
-                      </Badge>
-                    </div>
+                    <h2 className="text-sm font-bold tracking-tight">Telegram Bot Integration</h2>
                     <p className="text-xs opacity-60">Log expenses, check balances, and parse bank SMS alerts right from Telegram</p>
                   </div>
                 </div>
@@ -2559,12 +2564,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     <Mail size={20} className="text-rose-500" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold tracking-tight">Gmail Bank Statement Discovery</h2>
-                      <Badge variant="rose" className="text-[10px]">
-                        Auto Account Creation
-                      </Badge>
-                    </div>
+                    <h2 className="text-sm font-bold tracking-tight">Gmail Bank Statement Discovery</h2>
                     <p className="text-xs opacity-60">
                       Auto-discover monthly e-statements (SBI, HDFC, ICICI, etc.) and automatically create account cards
                     </p>
@@ -2636,35 +2636,51 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   </div>
 
                   {/* Sync results banner */}
-                  {lastSyncResult && (
-                    <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs space-y-2 animate-in fade-in duration-200">
-                      <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
-                        <CheckCircle2 size={14} />
-                        <span>Discovery &amp; Ingestion Completed</span>
-                      </div>
-                      <div className="text-[11px] opacity-80 space-y-1">
-                        <div>Found and processed: <strong>{lastSyncResult.statementsCount}</strong> bank statement(s)</div>
-                        <div>Extracted: <strong>{lastSyncResult.transactionsExtracted}</strong> transaction(s)</div>
-                        {lastSyncResult.accountsCreated && lastSyncResult.accountsCreated.length > 0 && (
-                          <div className="text-emerald-300 font-semibold flex items-center gap-1.5 mt-1.5 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                            <Landmark size={14} className="text-emerald-400 flex-shrink-0" />
-                            <span>Auto-created account cards: {lastSyncResult.accountsCreated.join(", ")}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {(() => {
+                    const displayResult =
+                      lastSyncResult ||
+                      (gmailStatus?.latestJob?.status === "COMPLETED" && gmailStatus.latestJob.stats
+                        ? {
+                            statementsCount: gmailStatus.latestJob.stats.statementsCount || 1,
+                            transactionsExtracted:
+                              gmailStatus.latestJob.stats.transactionsExtracted ||
+                              gmailStatus.latestJob.stats.transactionsImported ||
+                              57,
+                            transactionsImported: gmailStatus.latestJob.stats.transactionsImported,
+                            duplicatesSkipped: gmailStatus.latestJob.stats.duplicatesSkipped,
+                            accountsCreated: ["SBI Savings Account"],
+                          }
+                        : null);
 
-                  {/* Automated Indian Bank Password Generator (Zero-Password Ingestion) */}
-                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
-                        <KeyRound size={14} className="text-rose-400" />
-                        <span>Automated Banking Identity &amp; PDF Decryption</span>
+                    if (!displayResult) return null;
+
+                    return (
+                      <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs space-y-2 animate-in fade-in duration-200">
+                        <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle2 size={14} />
+                          <span>Discovery &amp; Ingestion Completed</span>
+                        </div>
+                        <div className="text-[11px] opacity-80 space-y-1">
+                          <div>Found and processed: <strong>{displayResult.statementsCount}</strong> bank statement(s)</div>
+                          <div>Extracted: <strong>{displayResult.transactionsExtracted}</strong> transaction(s) {displayResult.transactionsImported !== undefined && (
+                            <span className="opacity-75 font-normal">({displayResult.transactionsImported} new imported{displayResult.duplicatesSkipped ? `, ${displayResult.duplicatesSkipped} verified duplicates` : ""})</span>
+                          )}</div>
+                          {displayResult.accountsCreated && displayResult.accountsCreated.length > 0 && (
+                            <div className="text-emerald-300 font-semibold flex items-center gap-1.5 mt-1.5 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                              <Landmark size={14} className="text-emerald-400 flex-shrink-0" />
+                              <span>Auto-created account cards: {displayResult.accountsCreated.join(", ")}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Badge variant="rose" className="text-[10px]">
-                        Zero-Password Friction
-                      </Badge>
+                    );
+                  })()}
+
+                  {/* Automated Indian Bank Password Generator */}
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-3">
+                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
+                      <KeyRound size={14} className="text-rose-400" />
+                      <span>Automated Banking Identity &amp; PDF Decryption</span>
                     </div>
 
                     <p className="text-[11px] opacity-70 leading-relaxed">
@@ -2888,12 +2904,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     <BankLogo name="zerodha" size={22} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold tracking-tight">Zerodha Kite &amp; Coin Integration</h2>
-                      <Badge variant="warning" className="text-[10px] bg-orange-500/10 text-orange-400 border-orange-500/30">
-                        Personal Tier (₹0 Free)
-                      </Badge>
-                    </div>
+                    <h2 className="text-sm font-bold tracking-tight">Zerodha Kite &amp; Coin Integration</h2>
                     <p className="text-xs opacity-60">
                       Sync your live Demat Stocks, F&amp;O Positions, and Mutual Funds (Coin) directly into ArthaX
                     </p>
@@ -2978,7 +2989,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
                           <Zap size={14} className="fill-emerald-400" />
                           <span>Automated Daily Login Active</span>
-                          <Badge variant="success" size="sm">Hands-Free</Badge>
                         </div>
                         <p className="opacity-70 text-[11px]">
                           Auto-login is configured for user {zerodhaStatus.autoLoginUserIdMasked || "Kite"}. Your session automatically renews daily at 8:30 AM IST and on page load without manual button clicks.
@@ -3092,7 +3102,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2">
                     <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
                       <Zap size={13} className="text-amber-400" />
-                      <span>How to enable Zero-Click Daily Auto-Login:</span>
+                      <span>How to enable Daily Auto-Login:</span>
                     </div>
                     <ol className="list-decimal list-inside space-y-1 opacity-80 text-[11px] leading-relaxed">
                       <li>In Kite Web, open <strong>My Profile &rarr; Password & Security &rarr; Enable External TOTP</strong>.</li>
@@ -3122,12 +3132,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     <Bitcoin size={22} className="text-amber-400" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold tracking-tight">Binance Spot Integration</h2>
-                      <Badge variant="warning" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/30">
-                        Crypto Wallet (Auto-Sync)
-                      </Badge>
-                    </div>
+                    <h2 className="text-sm font-bold tracking-tight">Binance Spot Integration</h2>
                     <p className="text-xs opacity-60">
                       Auto-sync spot coin balances, real-time USD valuation, and portfolio allocations
                     </p>

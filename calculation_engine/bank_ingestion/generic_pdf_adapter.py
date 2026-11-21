@@ -71,7 +71,7 @@ class GenericPdfBankAdapter(BaseBankAdapter):
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
         file_hash = compute_file_hash(content)
-        doc = open_pdf_document(content, filename, passwords)
+        doc, _ = open_pdf_document(content, passwords)
 
         try:
             full_text = ""
