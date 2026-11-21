@@ -300,18 +300,31 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       });
       if (res.ok) {
         const data = await res.json();
+        const resultData = data.data ?? data;
         const expected = 85000;
-        const actual = Number(data.net_worth);
+        const actual = Number(resultData.net_worth ?? data.net_worth);
+        const executionTime = data.metadata?.execution_time_ms ?? data.execution_time_ms;
         setEngineTestResult({
           scenario: "Assets ₹100,000 - Liabilities ₹15,000",
           expected,
           actual,
           pass: actual === expected,
-          execution_time_ms: data.execution_time_ms,
+          execution_time_ms: executionTime,
         });
         showToast("Calculation Verified", "Benchmark Net Worth calculation passed with 100% precision.", "success");
       } else {
-        showToast("Benchmark Error", "Calculation engine returned an error.", "error");
+        const errJson = await res.json().catch(() => null);
+        const errMsg =
+          errJson?.error?.message ||
+          errJson?.error ||
+          errJson?.detail ||
+          "Calculation engine returned an error. Ensure the Python microservice is running.";
+        setEngineTestResult({
+          scenario: "Benchmark execution",
+          error: typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg),
+          pass: false,
+        });
+        showToast("Benchmark Error", typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), "error");
       }
       fetchEngineTelemetry();
     } catch (err: any) {
