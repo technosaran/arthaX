@@ -1742,7 +1742,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         className="p-4 sm:p-5 rounded-xl border border-rose-500/20 bg-[var(--app-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div className="space-y-1.5 max-w-xl">
-          <div className="font-bold text-xs text-rose-300">
+          <div className="font-bold text-xs text-rose-600 dark:text-rose-300">
             Delete All Data & Reset Account
           </div>
           <p className="text-xs opacity-70 leading-relaxed">
@@ -2697,8 +2697,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               ) : (
                 <div className="space-y-4">
                   {/* Setup Instructions */}
-                  <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs space-y-2 text-amber-200">
-                    <div className="font-semibold flex items-center gap-1.5 text-amber-400">
+                  <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs space-y-2 text-amber-900 dark:text-amber-200">
+                    <div className="font-semibold flex items-center gap-1.5 text-amber-800 dark:text-amber-400">
                       <KeyRound size={14} />
                       <span>How to generate a Read-Only Binance API Key:</span>
                     </div>
@@ -2867,7 +2867,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
               {/* KPI Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-black/5 dark:bg-white/2">
+                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
                   <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
                     <Activity size={14} /> Total Executed
                   </div>
@@ -2875,27 +2875,27 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     {engineMetrics ? engineMetrics.total_calculations_executed : 0}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-black/5 dark:bg-white/2">
+                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
                   <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-400" /> Pass Rate
+                    <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" /> Pass Rate
                   </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-emerald-400">
+                  <div className="text-2xl font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
                     {engineMetrics ? `${engineMetrics.validation_pass_rate_percent}%` : "100%"}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-black/5 dark:bg-white/2">
+                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
                   <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
                     <Clock size={14} /> Avg Latency
                   </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-blue-400">
+                  <div className="text-2xl font-bold font-mono mt-1 text-sky-600 dark:text-sky-400">
                     {engineMetrics ? `${engineMetrics.average_execution_time_ms} ms` : "0 ms"}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-black/5 dark:bg-white/2">
+                <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
                   <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
-                    <AlertTriangle size={14} className="text-amber-400" /> Inconsistencies
+                    <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" /> Inconsistencies
                   </div>
-                  <div className="text-2xl font-bold font-mono mt-1 text-amber-400">
+                  <div className="text-2xl font-bold font-mono mt-1 text-amber-600 dark:text-amber-400">
                     {engineMetrics ? engineMetrics.failed_calculations : 0}
                   </div>
                 </div>
@@ -2967,10 +2967,10 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   { name: "ReconciliationEngine", desc: "Forensic ledger checks, duplicate detection, cross-validation" },
                   { name: "PrecisionEngine", desc: "Python Decimal arithmetic, safe divide, currency quantization" },
                 ].map((mod) => (
-                  <div key={mod.name} className="p-3 rounded-xl border border-[var(--app-border)] bg-black/5 dark:bg-white/2 space-y-1">
-                    <div className="flex items-center justify-between font-mono font-semibold text-emerald-400">
+                  <div key={mod.name} className="p-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] space-y-1">
+                    <div className="flex items-center justify-between font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                       <span>{mod.name}</span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </div>
                     <p className="text-[11px] opacity-70 leading-normal">{mod.desc}</p>
                   </div>
@@ -2982,7 +2982,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
             <Card className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-sm">
-                  <Activity size={16} className="text-blue-400" />
+                  <Activity size={16} className="text-sky-600 dark:text-sky-400" />
                   <span>Immutable Calculation Audit Trail</span>
                 </div>
                 <span className="text-xs text-[var(--app-muted)]">
@@ -2997,7 +2997,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   </div>
                 ) : (
                   <table className="w-full text-left">
-                    <thead className="bg-black/10 dark:bg-white/5 border-b border-[var(--app-border)] text-[var(--app-muted)]">
+                    <thead className="bg-[var(--app-card-subtle)] border-b border-[var(--app-border)] text-[var(--app-muted)]">
                       <tr>
                         <th className="p-2.5">Calculation ID</th>
                         <th className="p-2.5">Module</th>
@@ -3011,16 +3011,16 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         <tr
                           key={rec.calculation_id}
                           onClick={() => setEngineSelectedRecord(rec)}
-                          className="hover:bg-white/5 cursor-pointer transition-colors"
+                          className="hover:bg-[var(--app-card-hover)] cursor-pointer transition-colors"
                         >
                           <td className="p-2.5 truncate max-w-[120px] font-semibold">{rec.calculation_id}</td>
-                          <td className="p-2.5 text-blue-400">{rec.calculation_type}</td>
+                          <td className="p-2.5 text-sky-600 dark:text-sky-400">{rec.calculation_type}</td>
                           <td className="p-2.5">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                                 rec.status === "SUCCESS"
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20"
                               }`}
                             >
                               {rec.status}
@@ -3038,22 +3038,22 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               </div>
 
               {engineSelectedRecord && (
-                <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5 space-y-2 text-xs font-mono">
-                  <div className="flex items-center justify-between font-bold text-blue-400">
+                <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-2 text-xs font-mono">
+                  <div className="flex items-center justify-between font-bold text-sky-600 dark:text-sky-400">
                     <span>Audit Event: {engineSelectedRecord.calculation_id}</span>
                     <button
                       onClick={() => setEngineSelectedRecord(null)}
-                      className="text-[var(--app-muted)] hover:text-white"
+                      className="text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                     >
                       ✕
                     </button>
                   </div>
                   <div>Module: {engineSelectedRecord.calculation_type} (v{engineSelectedRecord.version})</div>
                   <div>Status: {engineSelectedRecord.status} | Execution Time: {engineSelectedRecord.execution_time_ms} ms</div>
-                  <pre className="p-2 rounded bg-black/30 overflow-x-auto text-[11px]">
+                  <pre className="p-2 rounded bg-[var(--app-card-subtle)] text-[var(--app-fg)] border border-[var(--app-border)] overflow-x-auto text-[11px]">
                     {JSON.stringify(engineSelectedRecord.result_summary, null, 2)}
                   </pre>
-                  {engineSelectedRecord.error && <div className="text-rose-400 font-bold">Error: {engineSelectedRecord.error}</div>}
+                  {engineSelectedRecord.error && <div className="text-rose-600 dark:text-rose-400 font-bold">Error: {engineSelectedRecord.error}</div>}
                 </div>
               )}
             </Card>
@@ -3112,13 +3112,13 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         <div className="space-y-5">
           {/* Warning Details Callout */}
           <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2 text-xs">
-            <div className="font-bold text-rose-300 flex items-center gap-1.5">
+            <div className="font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
               <span>Are you absolutely certain?</span>
             </div>
-            <p className="opacity-80 leading-relaxed">
+            <p className="opacity-80 leading-relaxed text-rose-950 dark:text-rose-200">
               You are about to delete all data from your account. The following records will be permanently removed:
             </p>
-            <ul className="list-disc list-inside space-y-1 opacity-90 pl-1 font-mono text-[11px] text-rose-200">
+            <ul className="list-disc list-inside space-y-1 opacity-90 pl-1 font-mono text-[11px] text-rose-800 dark:text-rose-200">
               <li>All Expenses & Receipts ({counts.expenses} items)</li>
               <li>All Income Records ({counts.income} items)</li>
               <li>All Account Transfers & Recurring Rules</li>

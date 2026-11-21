@@ -888,7 +888,7 @@ export default function LedgerSection() {
                             variant="ghost"
                             size="icon-sm"
                             title="Delete and reverse balance"
-                            className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                            className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 hover:bg-rose-500/10"
                             icon={<Trash2 size={13} />}
                             onClick={(e) => promptDeleteEntry(entry, e)}
                           />
@@ -914,7 +914,7 @@ export default function LedgerSection() {
             <Button
               variant="ghost"
               size="xs"
-              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+              className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 hover:bg-rose-500/10"
               icon={<Trash2 size={12} />}
               onClick={() => selectedVoucher && promptDeleteEntry(selectedVoucher)}
             >

@@ -456,7 +456,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
 
       {/* Sync error alert if present */}
       {portfolio.syncError && (
-        <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex items-center justify-between gap-3">
+        <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertCircle size={16} className="text-rose-400 flex-shrink-0" />
             <span>Binance Sync Alert: {portfolio.syncError}</span>

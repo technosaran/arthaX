@@ -152,15 +152,15 @@ export default function InteractiveCandlestickChart({
             </span>
             <span>
               <span className="text-[var(--app-muted)] mr-1">H:</span>
-              <span className="text-emerald-400">{formatPrice(activeCandle.high)}</span>
+              <span className="text-emerald-600 dark:text-emerald-400">{formatPrice(activeCandle.high)}</span>
             </span>
             <span>
               <span className="text-[var(--app-muted)] mr-1">L:</span>
-              <span className="text-rose-400">{formatPrice(activeCandle.low)}</span>
+              <span className="text-rose-600 dark:text-rose-400">{formatPrice(activeCandle.low)}</span>
             </span>
             <span>
               <span className="text-[var(--app-muted)] mr-1">C:</span>
-              <span className={activeCandle.isBullish ? "text-emerald-400" : "text-rose-400"}>
+              <span className={activeCandle.isBullish ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
                 {formatPrice(activeCandle.close)}
               </span>
             </span>
@@ -171,8 +171,8 @@ export default function InteractiveCandlestickChart({
           </div>
         ) : candleData.length > 0 ? (
           <div className="flex items-center gap-3 text-[11px] font-mono tabular-nums text-[var(--app-muted)]">
-            <span>High: <span className="text-emerald-400 font-semibold">{formatPrice(maxPrice)}</span></span>
-            <span>Low: <span className="text-rose-400 font-semibold">{formatPrice(minPrice)}</span></span>
+            <span>High: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{formatPrice(maxPrice)}</span></span>
+            <span>Low: <span className="text-rose-600 dark:text-rose-400 font-semibold">{formatPrice(minPrice)}</span></span>
           </div>
         ) : null}
       </div>

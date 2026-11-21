@@ -1001,7 +1001,7 @@ export default function BondsSection() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleOpenCouponModal(b)}
-                              className="text-xs text-emerald-400 hover:text-emerald-300 px-2 py-1 h-auto"
+                              className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 px-2 py-1 h-auto"
                               title="Record interest credit"
                             >
                               <Receipt size={13} className="mr-1" />
@@ -1100,7 +1100,7 @@ export default function BondsSection() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenCouponModal(b)}
-                        className="text-xs text-emerald-400 hover:text-emerald-300 px-2 py-1 h-auto"
+                        className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 px-2 py-1 h-auto"
                       >
                         Log Payout
                       </Button>

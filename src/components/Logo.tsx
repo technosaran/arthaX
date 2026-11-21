@@ -265,7 +265,7 @@ export default function Logo({
         >
           <span
             style={{ color: "var(--app-fg)" }}
-            className="transition-colors tracking-tight text-white font-bold"
+            className="transition-colors tracking-tight font-bold"
           >
             artha
           </span>

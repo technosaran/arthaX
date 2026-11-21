@@ -758,7 +758,7 @@ export default function InteractiveLineChart({
                             type === "expense"
                               ? "rgba(244,63,94,0.12)"
                               : "rgba(16,185,129,0.12)",
-                          color: type === "expense" ? "#f43f5e" : "#10b981",
+                          color: type === "expense" ? "var(--app-loss)" : "var(--app-profit)",
                         }}
                       >
                         <TrendingUp size={10} /> +{momGrowth.toFixed(1)}% vs prev
@@ -771,7 +771,7 @@ export default function InteractiveLineChart({
                             type === "expense"
                               ? "rgba(16,185,129,0.12)"
                               : "rgba(244,63,94,0.12)",
-                          color: type === "expense" ? "#10b981" : "#f43f5e",
+                          color: type === "expense" ? "var(--app-profit)" : "var(--app-loss)",
                         }}
                       >
                         <TrendingDown size={10} /> {momGrowth.toFixed(1)}% vs prev

@@ -575,7 +575,7 @@ export default function AccountAdjustModal({
                       key={val}
                       type="button"
                       onClick={() => handlePreset(val)}
-                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-emerald-500/20 text-[var(--app-fg)] hover:text-emerald-300 border border-[var(--app-border-subtle)] hover:border-emerald-500/30 transition-all cursor-pointer"
+                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-emerald-500/20 text-[var(--app-fg)] hover:text-emerald-700 dark:hover:text-emerald-300 border border-[var(--app-border-subtle)] hover:border-emerald-500/30 transition-all cursor-pointer"
                     >
                       +{formatINR(val)}
                     </button>
@@ -597,8 +597,8 @@ export default function AccountAdjustModal({
                   onClick={() => setWithdrawType("transfer")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     withdrawType === "transfer"
-                      ? "bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Transfer Out
@@ -608,8 +608,8 @@ export default function AccountAdjustModal({
                   onClick={() => setWithdrawType("expense")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     withdrawType === "expense"
-                      ? "bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Record Expense
@@ -619,8 +619,8 @@ export default function AccountAdjustModal({
                   onClick={() => setWithdrawType("direct")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     withdrawType === "direct"
-                      ? "bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Direct Adjust
@@ -707,7 +707,7 @@ export default function AccountAdjustModal({
                       key={val}
                       type="button"
                       onClick={() => handlePreset(val)}
-                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-rose-500/20 text-[var(--app-fg)] hover:text-rose-300 border border-[var(--app-border-subtle)] hover:border-rose-500/30 transition-all cursor-pointer"
+                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-rose-500/20 text-[var(--app-fg)] hover:text-rose-700 dark:hover:text-rose-300 border border-[var(--app-border-subtle)] hover:border-rose-500/30 transition-all cursor-pointer"
                     >
                       -{formatINR(val)}
                     </button>
@@ -728,8 +728,8 @@ export default function AccountAdjustModal({
                   onClick={() => setAdjustType("add")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     adjustType === "add"
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   + Add
@@ -739,8 +739,8 @@ export default function AccountAdjustModal({
                   onClick={() => setAdjustType("subtract")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     adjustType === "subtract"
-                      ? "bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   - Deduct
@@ -750,8 +750,8 @@ export default function AccountAdjustModal({
                   onClick={() => setAdjustType("set")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
                     adjustType === "set"
-                      ? "bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30"
-                      : "text-[var(--app-muted)] hover:text-white"
+                      ? "bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold border border-sky-500/30"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
                   Set Exact
@@ -770,11 +770,11 @@ export default function AccountAdjustModal({
                     onChange={(e) => setExactBalanceInput(e.target.value)}
                     required
                     autoFocus
-                    leftIcon={<span className="font-mono text-xs font-bold text-sky-400">₹</span>}
+                    leftIcon={<span className="font-mono text-xs font-bold text-sky-600 dark:text-sky-400">₹</span>}
                   />
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 font-mono text-xs flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] font-mono text-xs flex items-center justify-between">
                     <span className="text-[var(--app-muted)]">Current: {formatINR(account.balance)}</span>
-                    <span className="text-sky-300 font-bold">
+                    <span className="text-sky-700 dark:text-sky-300 font-bold">
                       Difference:{" "}
                       {(parseFloat(exactBalanceInput) || 0) >= account.balance ? "+" : ""}
                       {formatINR((parseFloat(exactBalanceInput) || 0) - account.balance)}
@@ -796,7 +796,7 @@ export default function AccountAdjustModal({
                     leftIcon={
                       <span
                         className={`font-mono text-xs font-bold ${
-                          adjustType === "add" ? "text-emerald-400" : "text-rose-400"
+                          adjustType === "add" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                         }`}
                       >
                         ₹
@@ -812,7 +812,7 @@ export default function AccountAdjustModal({
                         key={val}
                         type="button"
                         onClick={() => handlePreset(val)}
-                        className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-sky-500/20 text-[var(--app-fg)] hover:text-sky-300 border border-[var(--app-border-subtle)] hover:border-sky-500/30 transition-all cursor-pointer"
+                        className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--app-card-subtle)] hover:bg-sky-500/20 text-[var(--app-fg)] hover:text-sky-700 dark:hover:text-sky-300 border border-[var(--app-border-subtle)] hover:border-sky-500/30 transition-all cursor-pointer"
                       >
                         {adjustType === "add" ? "+" : "-"}
                         {formatINR(val)}
@@ -821,10 +821,10 @@ export default function AccountAdjustModal({
                   </div>
 
                   {parsedAmount > 0 && (
-                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 font-mono text-xs flex items-center justify-between">
+                    <div className="p-2.5 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] font-mono text-xs flex items-center justify-between">
                       <span className="text-[var(--app-muted)]">Current: {formatINR(account.balance)}</span>
                       <span
-                        className={`font-bold ${adjustType === "add" ? "text-emerald-400" : "text-rose-400"}`}
+                        className={`font-bold ${adjustType === "add" ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}
                       >
                         New:{" "}
                         {formatINR(

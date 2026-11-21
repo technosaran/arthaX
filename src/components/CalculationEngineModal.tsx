@@ -179,7 +179,7 @@ export default function CalculationEngineModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/5 text-[var(--app-muted,#a1a1aa)] hover:text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-[var(--app-card-hover)] text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors"
           >
             <X size={20} />
           </button>
@@ -187,48 +187,48 @@ export default function CalculationEngineModal({
 
         {/* Telemetry KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl border border-[var(--app-border,#27272a)] bg-white/2">
-            <div className="text-xs text-[var(--app-muted,#a1a1aa)] flex items-center gap-1.5">
+          <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
+            <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
               <Activity size={14} /> Total Calculations
             </div>
-            <div className="text-2xl font-bold font-mono mt-1 text-[var(--app-fg,#fafafa)]">
+            <div className="text-2xl font-bold font-mono mt-1 text-[var(--app-fg)]">
               {metrics ? metrics.total_calculations_executed : 0}
             </div>
           </div>
-          <div className="p-4 rounded-xl border border-[var(--app-border,#27272a)] bg-white/2">
-            <div className="text-xs text-[var(--app-muted,#a1a1aa)] flex items-center gap-1.5">
-              <CheckCircle2 size={14} className="text-emerald-400" /> Pass Rate
+          <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
+            <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" /> Pass Rate
             </div>
-            <div className="text-2xl font-bold font-mono mt-1 text-emerald-400">
+            <div className="text-2xl font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
               {metrics ? `${metrics.validation_pass_rate_percent}%` : "100%"}
             </div>
           </div>
-          <div className="p-4 rounded-xl border border-[var(--app-border,#27272a)] bg-white/2">
-            <div className="text-xs text-[var(--app-muted,#a1a1aa)] flex items-center gap-1.5">
+          <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
+            <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
               <Clock size={14} /> Avg Execution Time
             </div>
-            <div className="text-2xl font-bold font-mono mt-1 text-blue-400">
+            <div className="text-2xl font-bold font-mono mt-1 text-sky-600 dark:text-sky-400">
               {metrics ? `${metrics.average_execution_time_ms} ms` : "0 ms"}
             </div>
           </div>
-          <div className="p-4 rounded-xl border border-[var(--app-border,#27272a)] bg-white/2">
-            <div className="text-xs text-[var(--app-muted,#a1a1aa)] flex items-center gap-1.5">
-              <AlertTriangle size={14} className="text-amber-400" /> Inconsistencies
+          <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)]">
+            <div className="text-xs text-[var(--app-muted)] flex items-center gap-1.5">
+              <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" /> Inconsistencies
             </div>
-            <div className="text-2xl font-bold font-mono mt-1 text-amber-400">
+            <div className="text-2xl font-bold font-mono mt-1 text-amber-600 dark:text-amber-400">
               {metrics ? metrics.failed_calculations : 0}
             </div>
           </div>
         </div>
 
         {/* Live On-Demand Self-Verification */}
-        <div className="p-4 rounded-xl border border-[var(--app-border,#27272a)] bg-white/2 space-y-3">
+        <div className="p-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] space-y-3">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <div className="text-sm font-semibold flex items-center gap-2">
-                <Play size={16} className="text-emerald-400" /> Live Benchmark Self-Test
+                <Play size={16} className="text-emerald-600 dark:text-emerald-400" /> Live Benchmark Self-Test
               </div>
-              <div className="text-xs text-[var(--app-muted,#a1a1aa)]">
+              <div className="text-xs text-[var(--app-muted)]">
                 Executes live deterministic test: Assets (₹100,000) - Liabilities (₹15,000) = ₹85,000.
               </div>
             </div>
@@ -286,10 +286,10 @@ export default function CalculationEngineModal({
             ].map((mod) => (
               <div
                 key={mod}
-                className="p-2.5 rounded-lg border border-[var(--app-border,#27272a)] bg-white/2 flex items-center justify-between"
+                className="p-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-card-subtle)] flex items-center justify-between"
               >
                 <span>{mod}</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
             ))}
           </div>
@@ -297,24 +297,24 @@ export default function CalculationEngineModal({
 
         {/* Audit Trail History */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[var(--app-muted,#a1a1aa)]">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[var(--app-muted)]">
             <span>Recent Immutable Audit Trail</span>
             <button
               onClick={fetchTelemetry}
-              className="text-emerald-400 hover:underline flex items-center gap-1"
+              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
             </button>
           </div>
 
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--app-border,#27272a)] text-xs font-mono">
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--app-border)] text-xs font-mono">
             {history.length === 0 ? (
-              <div className="p-4 text-center text-[var(--app-muted,#a1a1aa)]">
+              <div className="p-4 text-center text-[var(--app-muted)]">
                 No calculation audit events recorded yet. Run a calculation or self-test above.
               </div>
             ) : (
               <table className="w-full text-left">
-                <thead className="bg-white/5 border-b border-[var(--app-border,#27272a)] text-[var(--app-muted,#a1a1aa)]">
+                <thead className="bg-[var(--app-card-subtle)] border-b border-[var(--app-border)] text-[var(--app-muted)]">
                   <tr>
                     <th className="p-2">ID</th>
                     <th className="p-2">Module</th>
@@ -323,28 +323,28 @@ export default function CalculationEngineModal({
                     <th className="p-2">Timestamp</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--app-border,#27272a)]">
+                <tbody className="divide-y divide-[var(--app-border)]">
                   {history.map((rec) => (
                     <tr
                       key={rec.calculation_id}
                       onClick={() => setSelectedRecord(rec)}
-                      className="hover:bg-white/5 cursor-pointer transition-colors"
+                      className="hover:bg-[var(--app-card-hover)] cursor-pointer transition-colors"
                     >
                       <td className="p-2 truncate max-w-[120px]">{rec.calculation_id}</td>
-                      <td className="p-2 text-blue-400">{rec.calculation_type}</td>
+                      <td className="p-2 text-sky-600 dark:text-sky-400">{rec.calculation_type}</td>
                       <td className="p-2">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] ${
                             rec.status === "SUCCESS"
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-red-500/10 text-red-400"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              : "bg-red-500/10 text-red-700 dark:text-red-400"
                           }`}
                         >
                           {rec.status}
                         </span>
                       </td>
                       <td className="p-2">{rec.execution_time_ms} ms</td>
-                      <td className="p-2 text-[var(--app-muted,#a1a1aa)]">
+                      <td className="p-2 text-[var(--app-muted)]">
                         {new Date(rec.timestamp).toLocaleTimeString()}
                       </td>
                     </tr>
@@ -357,12 +357,12 @@ export default function CalculationEngineModal({
 
         {/* Selected Audit Record Details Modal */}
         {selectedRecord && (
-          <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5 space-y-2 text-xs font-mono">
-            <div className="flex items-center justify-between font-bold text-blue-400">
+          <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-2 text-xs font-mono">
+            <div className="flex items-center justify-between font-bold text-sky-600 dark:text-sky-400">
               <span>Calculation Details: {selectedRecord.calculation_id}</span>
               <button
                 onClick={() => setSelectedRecord(null)}
-                className="text-[var(--app-muted,#a1a1aa)] hover:text-white"
+                className="text-[var(--app-muted)] hover:text-[var(--app-fg)]"
               >
                 ✕
               </button>

@@ -95,12 +95,12 @@ export function TaxHarvestingModal({ isOpen, onClose }: TaxHarvestingModalProps)
         </div>
 
         {/* Budget 2024 Rule Explainer Pill */}
-        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-1">
-          <div className="flex items-center gap-1.5 font-bold text-amber-300">
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200/90 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
             <Info size={14} />
             <span>Union Budget 2024 Capital Gains Rules</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-amber-200/80">
+          <p className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-200/80">
             • <b>Equity LTCG</b> (holding ≥ 12m): <b>12.5%</b> on gains above the revised <b>₹1.25 Lakh</b> exemption threshold (Sec 112A).<br />
             • <b>Equity STCG</b> (holding &lt; 12m): <b>20%</b> flat rate (Sec 111A).<br />
             • <b>Debt Mutual Funds</b>: Taxed at slab rate without indexation.<br />
@@ -232,11 +232,11 @@ export function TaxHarvestingModal({ isOpen, onClose }: TaxHarvestingModalProps)
         {/* Actionable Strategy Advice */}
         {taxData?.advice && taxData.advice.length > 0 && (
           <div className="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs space-y-1.5">
-            <div className="font-bold text-sky-400 flex items-center gap-1.5">
+            <div className="font-bold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
               <ShieldCheck size={14} />
               <span>Smart Tax Planning Recommendations</span>
             </div>
-            <ul className="list-disc list-inside space-y-1 text-sky-200/90 text-[11px]">
+            <ul className="list-disc list-inside space-y-1 text-sky-900 dark:text-sky-200/90 text-[11px]">
               {taxData.advice.map((item, idx) => (
                 <li key={idx}>{item}</li>
               ))}

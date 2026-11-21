@@ -253,7 +253,7 @@ export default function InteractiveDonutChart({
         >
           {icon || <PieChartIcon size={26} className="opacity-50 text-[var(--app-accent)]" />}
           <div
-            className="absolute inset-0 rounded-full border border-dashed border-white/15 animate-spin"
+            className="absolute inset-0 rounded-full border border-dashed border-[var(--app-border)] animate-spin"
             style={{ animationDuration: "14s" }}
           />
         </div>
@@ -523,7 +523,7 @@ export default function InteractiveDonutChart({
                 <button
                   type="button"
                   onClick={() => setSelectedIndex(null)}
-                  className="text-[9.5px] font-semibold text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors px-1.5 py-0.5 rounded hover:bg-white/5 cursor-pointer"
+                  className="text-[9.5px] font-semibold text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors px-1.5 py-0.5 rounded hover:bg-[var(--app-card-hover)] cursor-pointer"
                   title="Reset to total view"
                 >
                   Reset

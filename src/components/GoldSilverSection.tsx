@@ -681,7 +681,7 @@ export default function GoldSilverSection() {
           {/* 999 Fine Silver */}
           <div className="p-3 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)] space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-300">Silver 999 (Fine)</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">Silver 999 (Fine)</span>
               <span
                 className={`text-[10px] font-mono font-bold flex items-center ${
                   rates.silverChangePercent24h >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -703,8 +703,8 @@ export default function GoldSilverSection() {
           {/* 925 Sterling Silver */}
           <div className="p-3 rounded-xl bg-[var(--app-card-elevated)] border border-[var(--app-border)] space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-400">Silver 925 (Sterling)</span>
-              <span className="text-[10px] font-mono text-slate-400 font-bold">Jewelry</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">Silver 925 (Sterling)</span>
+              <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 font-bold">Jewelry</span>
             </div>
             <div className="text-base sm:text-lg font-bold font-mono text-[var(--app-fg)] tabular-nums">
               {formatCurrencyINR(rates.silver925PerGram)}
@@ -762,11 +762,11 @@ export default function GoldSilverSection() {
         <StatCard
           title="Physical Silver Reserve"
           value={formatCurrencyINR(summary.silver.currentValue)}
-          icon={<Scale size={20} className="text-slate-300" />}
+          icon={<Scale size={20} className="text-slate-700 dark:text-slate-300" />}
           iconColor="neutral"
           subtitle={
             <div className="space-y-0.5">
-              <div className="text-xs font-semibold text-slate-300">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 {summary.silver.totalWeightGrams >= 1000
                   ? `${summary.silver.weightInKg.toFixed(3)} kg`
                   : `${summary.silver.totalWeightGrams.toFixed(1)} g`}
@@ -1020,8 +1020,8 @@ export default function GoldSilverSection() {
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                               isGold
-                                ? "bg-amber-500/15 text-amber-400 border border-amber-500/25"
-                                : "bg-slate-400/15 text-slate-300 border border-slate-400/25"
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25"
+                                : "bg-slate-400/15 text-slate-700 dark:text-slate-300 border border-slate-400/25"
                             }`}
                           >
                             {item.metal} • {item.purity}
@@ -1195,11 +1195,11 @@ export default function GoldSilverSection() {
                   onClick={() => handleMetalChange("SILVER")}
                   className={`py-1.5 px-2 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
                     formMetal === "SILVER"
-                      ? "bg-slate-400/20 border-slate-400/40 text-slate-200 shadow-xs"
+                      ? "bg-slate-400/20 border-slate-400/40 text-slate-800 dark:text-slate-200 shadow-xs"
                       : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
-                  <Scale size={13} className="text-slate-300" />
+                  <Scale size={13} className="text-slate-700 dark:text-slate-300" />
                   <span>Silver</span>
                 </button>
               </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
 import Logo from "@/components/Logo";
 import {
@@ -25,6 +26,8 @@ import {
   Check,
   X as XIcon,
   Circle,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -34,6 +37,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 export default function LoginClient() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
 
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
@@ -298,6 +302,23 @@ export default function LoginClient() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none translate-y-1/2" />
 
+      {/* Floating Theme Switcher */}
+      <div className="absolute top-4 right-4 z-20">
+        <button
+          type="button"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-2.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] transition-all cursor-pointer shadow-xs active:scale-95 fintech-focus"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          aria-label="Toggle visual theme"
+        >
+          {theme === "dark" ? (
+            <Moon size={16} className="text-sky-400" />
+          ) : (
+            <Sun size={16} className="text-amber-500" />
+          )}
+        </button>
+      </div>
+
       {/* Main Dual-Panel Container */}
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
         
@@ -499,7 +520,7 @@ export default function LoginClient() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                        className="text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors cursor-pointer"
                         title={showPassword ? "Hide password" : "Show password"}
                       >
                         {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -526,7 +547,7 @@ export default function LoginClient() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                        className="text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-colors cursor-pointer"
                         title={showConfirmPassword ? "Hide password" : "Show password"}
                       >
                         {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}

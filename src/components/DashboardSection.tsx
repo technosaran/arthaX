@@ -841,7 +841,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         Crypto Assets (USD)
                       </div>
                       <div
-                        className="text-sm sm:text-base font-bold font-mono text-amber-400 mt-0.5 tabular-nums truncate"
+                        className="text-sm sm:text-base font-bold font-mono text-amber-600 dark:text-amber-400 mt-0.5 tabular-nums truncate"
                         title={formatUSD(displayedAssets)}
                       >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatUSD(displayedAssets)}
@@ -856,7 +856,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         USD Liabilities
                       </div>
                       <div
-                        className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums truncate"
+                        className="text-sm sm:text-base font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5 tabular-nums truncate"
                         title={formatUSD(displayedLiabilities)}
                       >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatUSD(displayedLiabilities)}
@@ -873,7 +873,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         Total Assets
                       </div>
                       <div
-                        className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate"
+                        className="text-sm sm:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums truncate"
                         title={formatCurrency(totalAssets)}
                       >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
@@ -888,7 +888,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         Total Liabilities
                       </div>
                       <div
-                        className="text-sm sm:text-base font-bold font-mono text-rose-400 mt-0.5 tabular-nums truncate"
+                        className="text-sm sm:text-base font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5 tabular-nums truncate"
                         title={formatCurrency(totalLiabilities)}
                       >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalLiabilities)}
@@ -905,7 +905,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         Total Assets
                       </div>
                       <div
-                        className="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums truncate"
+                        className="text-sm sm:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums truncate"
                         title={formatCurrency(totalAssets)}
                       >
                         {loading ? <Skeleton className="h-5 w-20 rounded-md" /> : formatCurrency(totalAssets)}
@@ -919,7 +919,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                       <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] font-semibold truncate">
                         Active Accounts
                       </div>
-                      <div className="text-sm sm:text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums truncate">
+                      <div className="text-sm sm:text-base font-bold font-mono text-sky-600 dark:text-sky-400 mt-0.5 tabular-nums truncate">
                         {loading ? (
                           <Skeleton className="h-5 w-16 rounded-md" />
                         ) : (

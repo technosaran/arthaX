@@ -1213,7 +1213,7 @@ export default function FamilySection() {
                           </div>
 
                           {/* Progress Bar */}
-                          <div className="w-full h-2 rounded-full overflow-hidden bg-white/5 ring-1 ring-white/10 p-[1px]">
+                          <div className="w-full h-2 rounded-full overflow-hidden bg-[var(--app-track-bg)] ring-1 ring-[var(--app-border-subtle)] p-[1px]">
                             <div
                               className="h-full rounded-full transition-all duration-500"
                               style={{
@@ -1444,7 +1444,7 @@ export default function FamilySection() {
                                 <div className="flex items-center justify-between text-[10px] font-mono opacity-60">
                                   <span>{percentSpent}%</span>
                                 </div>
-                                <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/5">
+                                <div className="w-full h-1.5 rounded-full overflow-hidden bg-[var(--app-track-bg)]">
                                   <div
                                     className="h-full rounded-full transition-all"
                                     style={{
@@ -1506,7 +1506,7 @@ export default function FamilySection() {
                                   variant="ghost"
                                   size="icon-sm"
                                   title="Remove Member"
-                                  className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                  className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 hover:bg-rose-500/10"
                                   icon={<Trash2 size={12} />}
                                   onClick={() => handleDeleteMember(member.id, member.name)}
                                 />
@@ -1725,7 +1725,7 @@ export default function FamilySection() {
                                 variant="ghost"
                                 size="icon-sm"
                                 title="Reverse transfer record"
-                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                                className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 hover:bg-rose-500/10"
                                 icon={<Trash2 size={12} />}
                                 onClick={() => handleDeleteTransfer(item.id, item.title, item.amount)}
                               />
@@ -1819,7 +1819,7 @@ export default function FamilySection() {
                 type="button"
                 variant="ghost"
                 size="xs"
-                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 hover:bg-rose-500/10"
                 icon={<Trash2 size={12} />}
                 onClick={() => {
                   const toDelete = editingMember;
