@@ -1,14 +1,18 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiError, apiSuccess } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
-import { encryptSensitiveData } from "@/utils/crypto";
+import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { generateBankPasswordPermutations, BankingIdentityDetails } from "@/utils/bankPasswords";
 import { z } from "zod";
 
 const ConnectGmailSchema = z.object({
-  email: z.string().email("Please provide a valid Gmail address").max(255),
+  email: z.string().email("Please provide a valid Gmail address").max(255).optional().nullable(),
   password_hint: z.string().max(100).optional().nullable(),
   bank_name: z.string().default("ALL"),
+  pan: z.string().max(20).optional().nullable(),
+  dob: z.string().max(30).optional().nullable(),
+  phone: z.string().max(25).optional().nullable(),
 });
 
 /**
@@ -26,7 +30,7 @@ export const GET = createApiRoute({
         .maybeSingle(),
       supabaseAdmin
         .from("statement_password_hints")
-        .select("id, bank_name, hint_pattern")
+        .select("id, bank_name, hint_pattern, encrypted_secret")
         .eq("user_id", userId!),
       supabaseAdmin
         .from("automation_jobs")
@@ -43,6 +47,50 @@ export const GET = createApiRoute({
     }
 
     const integration = intRes.data;
+    const hints = hintsRes.data || [];
+
+    // Extract stored banking identity if available
+    let bankingIdentity: {
+      hasPan: boolean;
+      panMasked: string | null;
+      hasDob: boolean;
+      dobMasked: string | null;
+      hasPhone: boolean;
+      phoneMasked: string | null;
+    } = {
+      hasPan: false,
+      panMasked: null,
+      hasDob: false,
+      dobMasked: null,
+      hasPhone: false,
+      phoneMasked: null,
+    };
+
+    const identityHint = hints.find((h) => h.hint_pattern === "BANKING_IDENTITY");
+    if (identityHint?.encrypted_secret) {
+      try {
+        const decrypted = decryptSensitiveData(identityHint.encrypted_secret, "statement-passwords");
+        if (decrypted) {
+          const parsed: BankingIdentityDetails = JSON.parse(decrypted);
+          if (parsed.pan) {
+            const cleanPan = parsed.pan.trim().toUpperCase();
+            bankingIdentity.hasPan = true;
+            bankingIdentity.panMasked = `${cleanPan.slice(0, 2)}****${cleanPan.slice(-2)}`;
+          }
+          if (parsed.dob) {
+            bankingIdentity.hasDob = true;
+            bankingIdentity.dobMasked = `****-**-${parsed.dob.trim().slice(-2)}`;
+          }
+          if (parsed.phone) {
+            const cleanPhone = parsed.phone.replace(/\D/g, "");
+            bankingIdentity.hasPhone = true;
+            bankingIdentity.phoneMasked = `******${cleanPhone.slice(-4)}`;
+          }
+        }
+      } catch (err) {
+        // Safe decryption ignore
+      }
+    }
 
     return apiSuccess(
       {
@@ -51,7 +99,8 @@ export const GET = createApiRoute({
         syncStatus: integration?.sync_status || "DISCONNECTED",
         lastSyncAt: integration?.last_sync_at || null,
         errorDetails: integration?.error_details || null,
-        passwordHintsCount: (hintsRes.data || []).length,
+        passwordHintsCount: hints.length,
+        bankingIdentity,
         latestJob: latestJobRes.data || null,
       },
       undefined,
@@ -62,40 +111,82 @@ export const GET = createApiRoute({
 });
 
 /**
- * POST: Connect or update Gmail integration with email address and optional PDF password hints
+ * POST: Connect or update Gmail integration with email address and optional PDF password hints / Banking Identity
  */
 export const POST = createApiRoute({
   auth: "required",
   rateLimit: { limit: 20, windowSeconds: 60 },
   schema: ConnectGmailSchema,
   handler: async ({ userId, body, req }) => {
-    const { email, password_hint, bank_name } = body;
-    const cleanEmail = email.trim().toLowerCase();
+    const { email, password_hint, bank_name, pan, dob, phone } = body;
+    let cleanEmail = email?.trim().toLowerCase();
 
-    // 1. Encrypt and store access token
-    const encryptedToken = encryptSensitiveData(`token_${Date.now()}`, "gmail-tokens");
+    // 1. If email provided or updating existing integration
+    let updatedIntegration: any = null;
+    if (cleanEmail) {
+      const encryptedToken = encryptSensitiveData(`token_${Date.now()}`, "gmail-tokens");
 
-    const { data: updatedIntegration, error: upsertErr } = await supabaseAdmin
-      .from("gmail_integrations")
-      .upsert(
-        {
-          user_id: userId!,
-          email_address: cleanEmail,
-          access_token_encrypted: encryptedToken,
-          sync_status: "ACTIVE",
-          error_details: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-      .select()
-      .single();
+      const { data, error: upsertErr } = await supabaseAdmin
+        .from("gmail_integrations")
+        .upsert(
+          {
+            user_id: userId!,
+            email_address: cleanEmail,
+            access_token_encrypted: encryptedToken,
+            sync_status: "ACTIVE",
+            error_details: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        )
+        .select()
+        .single();
 
-    if (upsertErr) {
-      return apiError(upsertErr.message, "DATABASE_ERROR", 500, undefined, req);
+      if (upsertErr) {
+        return apiError(upsertErr.message, "DATABASE_ERROR", 500, undefined, req);
+      }
+      updatedIntegration = data;
     }
 
-    // 2. If user provided a statement password hint (e.g. DOB or PAN), encrypt and store
+    // 2. If banking identity provided (PAN, DOB, Phone), store encrypted identity and auto-generate permutations
+    if ((pan && pan.trim()) || (dob && dob.trim()) || (phone && phone.trim())) {
+      const identityObj: BankingIdentityDetails = {
+        pan: pan?.trim().toUpperCase() || null,
+        dob: dob?.trim() || null,
+        phone: phone?.trim() || null,
+      };
+
+      const encryptedIdentity = encryptSensitiveData(JSON.stringify(identityObj), "statement-passwords");
+      await supabaseAdmin.from("statement_password_hints").upsert(
+        {
+          user_id: userId!,
+          bank_name: "ALL",
+          hint_pattern: "BANKING_IDENTITY",
+          encrypted_secret: encryptedIdentity,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,bank_name,account_id" }
+      );
+
+      // Generate individual candidates and save primary SBI hint
+      const permutations = generateBankPasswordPermutations(identityObj);
+      if (permutations.length > 0) {
+        const primaryHint = permutations[0];
+        const encryptedPrimary = encryptSensitiveData(primaryHint, "statement-passwords");
+        await supabaseAdmin.from("statement_password_hints").upsert(
+          {
+            user_id: userId!,
+            bank_name: "SBI",
+            hint_pattern: "AUTO_PERMUTATION",
+            encrypted_secret: encryptedPrimary,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,bank_name,account_id" }
+        );
+      }
+    }
+
+    // 3. If explicit statement password hint provided, encrypt and store
     if (password_hint && password_hint.trim()) {
       const encryptedSecret = encryptSensitiveData(password_hint.trim(), "statement-passwords");
       await supabaseAdmin.from("statement_password_hints").upsert(
@@ -117,7 +208,7 @@ export const POST = createApiRoute({
         connected: true,
         email: cleanEmail,
         syncStatus: "ACTIVE",
-        message: `Gmail statement reader connected for ${cleanEmail}. Ready to discover bank statements.`,
+        message: "Banking identity and password configuration saved. Bank statements will now decrypt and auto-create accounts automatically.",
         integration: updatedIntegration,
       },
       undefined,

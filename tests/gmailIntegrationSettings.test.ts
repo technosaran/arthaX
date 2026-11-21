@@ -153,6 +153,39 @@ describe("Gmail Bank Statement Integration & Auto-Account Creation", () => {
     expect(json.syncStatus).toBe("ACTIVE");
   });
 
+  it("POST /api/v1/integrations/gmail saves Banking Identity (PAN, DOB, Phone) and auto-generates permutations", async () => {
+    mockedAuth.mockResolvedValueOnce({
+      user: { id: "user_123" } as any,
+      userId: "user_123",
+      error: null,
+    });
+
+    const mockUpsert = vi.fn().mockResolvedValue({ data: null, error: null });
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "statement_password_hints") {
+        return { upsert: mockUpsert };
+      }
+      return {};
+    });
+    mockedSupabase.from = mockFrom as any;
+
+    const req = new NextRequest("http://localhost:3000/api/v1/integrations/gmail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pan: "ABCDE1234F",
+        dob: "1995-08-15",
+        phone: "9876543210",
+      }),
+    });
+
+    const res = await connectGmail(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(mockUpsert).toHaveBeenCalled();
+  });
+
   it("DELETE /api/v1/integrations/gmail marks integration as DISCONNECTED", async () => {
     mockedAuth.mockResolvedValueOnce({
       user: { id: "user_123" } as any,

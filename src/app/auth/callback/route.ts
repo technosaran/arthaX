@@ -45,12 +45,40 @@ export async function GET(request: Request) {
       },
     });
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    const { data: authData, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && authData?.session) {
+      const session = authData.session;
+      const providerToken = (session as any).provider_token;
+      const providerRefreshToken = (session as any).provider_refresh_token;
+      const user = session.user;
+
+      if (providerToken && user?.id) {
+        try {
+          const { supabaseAdmin } = await import("@/utils/supabase/admin");
+          const { encryptSensitiveData } = await import("@/utils/crypto");
+          const encAccess = encryptSensitiveData(providerToken, "gmail-tokens");
+          const encRefresh = providerRefreshToken ? encryptSensitiveData(providerRefreshToken, "gmail-tokens") : null;
+          await supabaseAdmin.from("gmail_integrations").upsert(
+            {
+              user_id: user.id,
+              email_address: user.email?.toLowerCase() || "",
+              access_token_encrypted: encAccess,
+              refresh_token_encrypted: encRefresh,
+              sync_status: "ACTIVE",
+              error_details: null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" }
+          );
+        } catch (tokenErr) {
+          console.warn("[Auth Callback] Failed to store Google provider tokens:", tokenErr);
+        }
+      }
+
       return NextResponse.redirect(`${baseOrigin}${safeNext}`);
     }
 
-    console.error("[Auth Callback] Error exchanging code for session:", error.message);
+    console.error("[Auth Callback] Error exchanging code for session:", error?.message || "No session returned");
   }
 
   return NextResponse.redirect(`${baseOrigin}/login?error=auth_callback_failed`);

@@ -4,6 +4,7 @@ import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
+import { generateBankPasswordPermutations, BankingIdentityDetails } from "@/utils/bankPasswords";
 import crypto from "crypto";
 
 export interface GoogleTokenRefreshResult {
@@ -69,8 +70,22 @@ export async function refreshGoogleAccessToken(
 export async function fetchUserPasswordCandidates(userId: string): Promise<string[]> {
   const candidates: string[] = [];
 
+  let userName: string | null = null;
   try {
-    // 1. Fetch encrypted hints strictly from statement_password_hints
+    const userQuery = supabaseAdmin.from("user_settings");
+    if (userQuery && typeof userQuery.select === "function") {
+      const { data: userSettings } = await userQuery
+        .select("name")
+        .eq("id", userId)
+        .maybeSingle();
+      userName = userSettings?.name || null;
+    }
+  } catch {
+    // Ignore if user_settings is unmocked or table not ready
+  }
+
+  try {
+    // Fetch encrypted hints strictly from statement_password_hints
     const { data: hints } = await supabaseAdmin
       .from("statement_password_hints")
       .select("encrypted_secret, hint_pattern")
@@ -82,7 +97,25 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
           const decrypted = decryptSensitiveData(h.encrypted_secret, "statement-passwords");
           if (decrypted && typeof decrypted === "string") {
             const trimmed = decrypted.trim();
-            if (trimmed && !candidates.includes(trimmed)) {
+            // If stored as structured banking identity JSON (PAN, DOB, Phone)
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+              try {
+                const parsed: BankingIdentityDetails = JSON.parse(trimmed);
+                if (!parsed.name && userName) {
+                  parsed.name = userName;
+                }
+                const perms = generateBankPasswordPermutations(parsed);
+                for (const p of perms) {
+                  if (p && !candidates.includes(p)) {
+                    candidates.push(p);
+                  }
+                }
+              } catch {
+                if (!candidates.includes(trimmed)) {
+                  candidates.push(trimmed);
+                }
+              }
+            } else if (trimmed && !candidates.includes(trimmed)) {
               candidates.push(trimmed);
             }
           }
@@ -93,7 +126,7 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
     logger.warn("Could not load authorized password hints for user", "GmailService", { userId });
   }
 
-  // Bound to MAX_PASSWORD_ATTEMPTS = 10
+  // Bound candidates to MAX_PASSWORD_ATTEMPTS = 10
   return candidates.slice(0, 10);
 }
 
