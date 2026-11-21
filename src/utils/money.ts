@@ -7,6 +7,166 @@
 export type MoneyInput = number | string | null | undefined;
 
 /**
+ * Thrown when a monetary input fails strict financial validation.
+ */
+export class InvalidMoneyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMoneyError";
+  }
+}
+
+export interface MoneyValidationOptions {
+  allowNegative?: boolean;
+  maxLimit?: number;
+  minLimit?: number;
+  fieldName?: string;
+  maxDecimals?: number;
+}
+
+const DEFAULT_MAX_LIMIT = 100_000_000_000; // 100 Billion max limit
+
+/**
+ * Strict validator for monetary inputs prior to persistence or mission-critical ledger ops.
+ * Rejects null, undefined, NaN, Infinity, non-numeric strings, bad signs, and overflow.
+ * Returns the exact 2-decimal rounded number.
+ */
+export function validateMonetaryAmount(
+  val: unknown,
+  options?: MoneyValidationOptions
+): number {
+  const fieldName = options?.fieldName || "Monetary amount";
+  const allowNegative = options?.allowNegative ?? false;
+  const maxLimit = options?.maxLimit ?? DEFAULT_MAX_LIMIT;
+  const minLimit = options?.minLimit ?? (allowNegative ? -DEFAULT_MAX_LIMIT : 0);
+
+  if (val === null || val === undefined) {
+    throw new InvalidMoneyError(`${fieldName} cannot be null or undefined`);
+  }
+
+  let num: number;
+  if (typeof val === "number") {
+    if (isNaN(val)) {
+      throw new InvalidMoneyError(`${fieldName} cannot be NaN`);
+    }
+    if (!isFinite(val)) {
+      throw new InvalidMoneyError(`${fieldName} cannot be infinite`);
+    }
+    num = val;
+  } else if (typeof val === "string") {
+    const trimmed = val.replace(/[₹$€£,\s]/g, "").trim();
+    if (trimmed === "") {
+      throw new InvalidMoneyError(`${fieldName} cannot be empty`);
+    }
+    // Strict numeric check: optional leading minus, digits, optional single dot with up to 4 decimal places
+    const validNumericPattern = /^-?\d+(\.\d+)?$/;
+    if (!validNumericPattern.test(trimmed)) {
+      throw new InvalidMoneyError(`${fieldName} contains invalid characters or malformed format: "${val}"`);
+    }
+    num = Number(trimmed);
+    if (isNaN(num) || !isFinite(num)) {
+      throw new InvalidMoneyError(`${fieldName} parsed to invalid number: "${val}"`);
+    }
+  } else {
+    throw new InvalidMoneyError(`${fieldName} must be a number or string, received ${typeof val}`);
+  }
+
+  if (!allowNegative && num < 0) {
+    throw new InvalidMoneyError(`${fieldName} cannot be negative (received ${num})`);
+  }
+
+  if (num < minLimit) {
+    throw new InvalidMoneyError(`${fieldName} (${num}) is below allowed minimum (${minLimit})`);
+  }
+
+  if (num > maxLimit) {
+    throw new InvalidMoneyError(`${fieldName} (${num}) exceeds maximum allowed limit (${maxLimit})`);
+  }
+
+  // Quantize strictly to 2 decimal places using cent scaling
+  const cents = Math.round(num * 100);
+  return fromCents(cents);
+}
+
+/**
+ * Converts a monetary value to integer cents/paise with strict validation.
+ * Throws InvalidMoneyError on invalid input.
+ */
+export function toCentsStrict(val: unknown, fieldName = "Monetary amount"): number {
+  const valid = validateMonetaryAmount(val, { fieldName, allowNegative: true });
+  return Math.round(valid * 100);
+}
+
+/**
+ * Strict division of monetary values.
+ * Throws InvalidMoneyError on division by zero or invalid inputs.
+ */
+export function divMoneyStrict(
+  a: unknown,
+  divisor: unknown,
+  fieldName = "Division operation"
+): number {
+  const validA = validateMonetaryAmount(a, { fieldName: `${fieldName} (numerator)`, allowNegative: true });
+  const validDiv = validateMonetaryAmount(divisor, { fieldName: `${fieldName} (denominator)`, allowNegative: true });
+
+  if (validDiv === 0) {
+    throw new InvalidMoneyError(`${fieldName}: Division by zero is prohibited`);
+  }
+
+  const cents = Math.round((validA / validDiv) * 100);
+  return fromCents(cents);
+}
+
+/**
+ * Strict percentage calculation: (part / total) * 100
+ * Throws InvalidMoneyError if total <= 0 or inputs are malformed.
+ */
+export function percentMoneyStrict(
+  part: unknown,
+  total: unknown,
+  fieldName = "Percentage operation"
+): number {
+  const validPart = validateMonetaryAmount(part, { fieldName: `${fieldName} (part)`, allowNegative: true });
+  const validTotal = validateMonetaryAmount(total, { fieldName: `${fieldName} (total)`, allowNegative: false });
+
+  if (validTotal <= 0) {
+    throw new InvalidMoneyError(`${fieldName}: Total must be strictly positive for percentage calculation`);
+  }
+
+  const pct = (validPart / validTotal) * 100;
+  const clamped = Math.max(0, Math.min(100, pct));
+  return Math.round(clamped * 100) / 100;
+}
+
+/**
+ * Strict Decimal addition: a + b
+ */
+export function addMoneyStrict(a: unknown, b: unknown): number {
+  const centsA = toCentsStrict(a, "Operand A");
+  const centsB = toCentsStrict(b, "Operand B");
+  return fromCents(centsA + centsB);
+}
+
+/**
+ * Strict Decimal subtraction: a - b
+ */
+export function subMoneyStrict(a: unknown, b: unknown): number {
+  const centsA = toCentsStrict(a, "Operand A");
+  const centsB = toCentsStrict(b, "Operand B");
+  return fromCents(centsA - centsB);
+}
+
+/**
+ * Strict Decimal multiplication: a * factor
+ */
+export function mulMoneyStrict(a: unknown, factor: unknown): number {
+  const validA = validateMonetaryAmount(a, { fieldName: "Operand A", allowNegative: true });
+  const validFactor = validateMonetaryAmount(factor, { fieldName: "Factor", allowNegative: true });
+  const cents = Math.round(validA * validFactor * 100);
+  return fromCents(cents);
+}
+
+/**
  * Safely parses any numeric, string, or nullish input into a clean number.
  * Strips currency symbols (₹, $, €, £), commas, and whitespace.
  * Returns 0 if input is NaN, Infinity, null, or unparseable.

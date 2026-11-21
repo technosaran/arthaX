@@ -2,6 +2,8 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
 import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { reconcileInternalTransfers } from "@/utils/transfers";
+import { validateMonetaryAmount } from "@/utils/money";
 import crypto from "crypto";
 
 export interface GoogleTokenRefreshResult {
@@ -59,14 +61,16 @@ export async function refreshGoogleAccessToken(
 }
 
 /**
- * Resolves password candidates for a user from their configured hints and profile data.
+ * Resolves password candidates for a user strictly from user-authorized hints.
+ * Enforces zero guessing from personal info or account numbers, in-memory decryption,
+ * and bounds candidates to MAX_PASSWORD_ATTEMPTS = 10.
  * Secrets are decrypted securely in memory and never logged or exposed.
  */
 export async function fetchUserPasswordCandidates(userId: string): Promise<string[]> {
   const candidates: string[] = [];
 
   try {
-    // 1. Fetch encrypted hints from statement_password_hints
+    // 1. Fetch encrypted hints strictly from statement_password_hints
     const { data: hints } = await supabaseAdmin
       .from("statement_password_hints")
       .select("encrypted_secret, hint_pattern")
@@ -76,41 +80,43 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
       for (const h of hints) {
         if (h.encrypted_secret) {
           const decrypted = decryptSensitiveData(h.encrypted_secret, "statement-passwords");
-          if (decrypted) {
-            candidates.push(decrypted.trim());
+          if (decrypted && typeof decrypted === "string") {
+            const trimmed = decrypted.trim();
+            if (trimmed && !candidates.includes(trimmed)) {
+              candidates.push(trimmed);
+            }
           }
         }
       }
     }
-
-    // 2. Fetch user accounts (for Indian Bank account number candidates)
-    const { data: accounts } = await supabaseAdmin
-      .from("accounts")
-      .select("last_four")
-      .eq("user_id", userId);
-
-    if (accounts) {
-      for (const acc of accounts) {
-        if (acc.last_four && acc.last_four !== "0000") {
-          candidates.push(acc.last_four.trim());
-        }
-      }
-    }
   } catch (err) {
-    logger.warn("Could not load full password candidates for user", "GmailService", { userId });
+    logger.warn("Could not load authorized password hints for user", "GmailService", { userId });
   }
 
-  return Array.from(new Set(candidates));
+  // Bound to MAX_PASSWORD_ATTEMPTS = 10
+  return candidates.slice(0, 10);
+}
+
+export interface GmailSyncOptions {
+  maxMessages?: number;
+  afterDate?: string;
+  customQuery?: string;
 }
 
 /**
  * Executes statement sync and financial ingestion pipeline for a given user.
  */
-export async function syncUserGmailStatements(userId: string): Promise<{
+export async function syncUserGmailStatements(
+  userId: string,
+  options?: GmailSyncOptions
+): Promise<{
   success: boolean;
   statementsCount: number;
   transactionsImported: number;
   duplicatesSkipped: number;
+  transfersMatched?: number;
+  failedCount?: number;
+  status?: "COMPLETED" | "PARTIAL" | "FAILED";
   error?: string;
 }> {
   // 1. Fetch user's Gmail integration
@@ -121,11 +127,29 @@ export async function syncUserGmailStatements(userId: string): Promise<{
     .maybeSingle();
 
   if (intErr || !integration) {
-    return { success: false, statementsCount: 0, transactionsImported: 0, duplicatesSkipped: 0, error: "Gmail integration not configured" };
+    return {
+      success: false,
+      statementsCount: 0,
+      transactionsImported: 0,
+      duplicatesSkipped: 0,
+      transfersMatched: 0,
+      failedCount: 0,
+      status: "FAILED",
+      error: "Gmail integration not configured",
+    };
   }
 
   if (integration.sync_status === "DISCONNECTED") {
-    return { success: false, statementsCount: 0, transactionsImported: 0, duplicatesSkipped: 0, error: "Gmail integration is disconnected" };
+    return {
+      success: false,
+      statementsCount: 0,
+      transactionsImported: 0,
+      duplicatesSkipped: 0,
+      transfersMatched: 0,
+      failedCount: 0,
+      status: "FAILED",
+      error: "Gmail integration is disconnected",
+    };
   }
 
   // 2. Token refresh check
@@ -154,14 +178,32 @@ export async function syncUserGmailStatements(userId: string): Promise<{
         .from("gmail_integrations")
         .update({ sync_status: "EXPIRED", error_details: "OAuth token expired and refresh failed", updated_at: new Date().toISOString() })
         .eq("id", integration.id);
-      return { success: false, statementsCount: 0, transactionsImported: 0, duplicatesSkipped: 0, error: "Google OAuth token expired" };
+      return {
+        success: false,
+        statementsCount: 0,
+        transactionsImported: 0,
+        duplicatesSkipped: 0,
+        transfersMatched: 0,
+        failedCount: 0,
+        status: "FAILED",
+        error: "Google OAuth token expired",
+      };
     }
   } else if (integration.access_token_encrypted) {
     accessToken = decryptSensitiveData(integration.access_token_encrypted, "gmail-tokens");
   }
 
   if (!accessToken) {
-    return { success: false, statementsCount: 0, transactionsImported: 0, duplicatesSkipped: 0, error: "No valid access token available" };
+    return {
+      success: false,
+      statementsCount: 0,
+      transactionsImported: 0,
+      duplicatesSkipped: 0,
+      transfersMatched: 0,
+      failedCount: 0,
+      status: "FAILED",
+      error: "No valid access token available",
+    };
   }
 
   // 3. Password candidates
@@ -189,9 +231,12 @@ export async function syncUserGmailStatements(userId: string): Promise<{
     process.env.CRON_SECRET ||
     "";
 
+  // Determine bounded batch size (min 5, max 100, default 25)
+  const batchLimit = Math.min(Math.max(options?.maxMessages ?? 25, 5), 100);
+
   // Determine checkpoint after_date with safety margin to avoid reprocessing entire mailbox
-  let afterDateStr: string | undefined = undefined;
-  if (integration.last_sync_at) {
+  let afterDateStr: string | undefined = options?.afterDate;
+  if (!afterDateStr && integration.last_sync_at) {
     const lastSync = new Date(integration.last_sync_at);
     lastSync.setDate(lastSync.getDate() - 1); // 1-day safety buffer
     const yyyy = lastSync.getFullYear();
@@ -214,7 +259,8 @@ export async function syncUserGmailStatements(userId: string): Promise<{
         access_token: accessToken,
         password_candidates: passwordCandidates,
         after_date: afterDateStr,
-        max_messages: 15,
+        max_messages: batchLimit,
+        custom_query: options?.customQuery,
       }),
     });
 
@@ -229,13 +275,38 @@ export async function syncUserGmailStatements(userId: string): Promise<{
     let totalDuplicates = 0;
 
     for (const stmt of statements) {
-      if (!stmt.success) continue;
+      const messageId = stmt.email_metadata?.message_id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const attachmentId = stmt.file_hash || `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const fileName = stmt.file_name || "gmail_statement.pdf";
+      const bankName = stmt.bank_name || stmt.detected_bank || "BANK";
+
+      // If statement failed in extraction or decryption, record failed attachment job
+      if (!stmt.success) {
+        try {
+          await supabaseAdmin.from("statement_attachment_jobs").upsert(
+            {
+              user_id: userId,
+              message_id: messageId,
+              attachment_id: attachmentId,
+              filename: fileName,
+              file_hash: stmt.file_hash || null,
+              bank_name: bankName,
+              status: "FAILED",
+              error_message: (stmt.errors || []).join("; ") || "Statement ingestion failed",
+              retry_count: 1,
+              metadata: stmt.email_metadata || {},
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,message_id,attachment_id" }
+          );
+        } catch {}
+        continue;
+      }
 
       const meta = stmt.metadata || {};
       const validation = stmt.validation || {};
       const txs = stmt.transactions || [];
       const fileHash = stmt.file_hash;
-      const bankName = stmt.bank_name || stmt.detected_bank || "BANK";
 
       // Match or resolve user account
       const { data: accounts } = await supabaseAdmin
@@ -271,7 +342,7 @@ export async function syncUserGmailStatements(userId: string): Promise<{
             account_id: targetAccountId,
             bank_name: bankName,
             statement_source: "GMAIL_AUTO",
-            file_name: stmt.file_name || "gmail_statement.pdf",
+            file_name: fileName,
             file_hash: fileHash,
             period_start: meta.statement_period_start || new Date().toISOString().split("T")[0],
             period_end: meta.statement_period_end || new Date().toISOString().split("T")[0],
@@ -292,9 +363,32 @@ export async function syncUserGmailStatements(userId: string): Promise<{
 
       const stmtId = stmtRecord?.id;
 
-      // Prepare canonical transactions
+      // Record attachment job state
+      try {
+        await supabaseAdmin.from("statement_attachment_jobs").upsert(
+          {
+            user_id: userId,
+            message_id: messageId,
+            attachment_id: attachmentId,
+            filename: fileName,
+            file_hash: fileHash,
+            bank_name: bankName,
+            status: validation.is_valid ? "RECONCILED" : "IMPORTED",
+            statement_id: stmtId,
+            metadata: stmt.email_metadata || {},
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,message_id,attachment_id" }
+        );
+      } catch {}
+
+      // Prepare canonical transactions with strict monetary validation
       const canonicalRows = txs.map((t: any) => {
-        const dedupRaw = `${targetAccountId}:${t.transaction_date}:${t.amount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+        const parsedAmount = validateMonetaryAmount(t.amount, {
+          fieldName: "Gmail transaction amount",
+          allowNegative: false,
+        });
+        const dedupRaw = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
         const dedupHash = crypto.createHash("sha256").update(dedupRaw).digest("hex");
 
         return {
@@ -303,7 +397,7 @@ export async function syncUserGmailStatements(userId: string): Promise<{
           statement_id: stmtId,
           transaction_date: t.transaction_date,
           value_date: t.value_date || t.transaction_date,
-          amount: Number(t.amount),
+          amount: parsedAmount,
           currency: "INR",
           direction: t.direction,
           original_narration: t.original_narration,
@@ -338,7 +432,7 @@ export async function syncUserGmailStatements(userId: string): Promise<{
 
         // Synchronize ONLY newly inserted non-transfer canonical records into expenses and income
         for (const row of canonicalRows) {
-          if (row.is_transfer) continue; // Transfers are handled separately
+          if (row.is_transfer) continue; // Transfers are reconciled separately
           const canonicalId = newCanonicalMap.get(row.dedup_hash);
           if (!canonicalId) {
             // Already imported in a previous statement run; skip to prevent duplication
@@ -377,25 +471,92 @@ export async function syncUserGmailStatements(userId: string): Promise<{
         }
       }
 
-      // Update account balance if statement is reconciled
-      if (validation.is_valid && targetAccountId && meta.closing_balance) {
-        await supabaseAdmin
-          .from("accounts")
-          .update({ balance: Number(meta.closing_balance) })
-          .eq("id", targetAccountId)
-          .eq("user_id", userId);
+      // Update account balance only if this statement represents the latest verified period
+      if (validation.is_valid && targetAccountId && meta.closing_balance !== undefined) {
+        const stmtPeriodEnd = meta.statement_period_end;
+        let isLatestStatement = true;
+
+        if (stmtPeriodEnd) {
+          const { data: newerStatements } = await supabaseAdmin
+            .from("bank_statements")
+            .select("id, period_end")
+            .eq("user_id", userId)
+            .eq("account_id", targetAccountId)
+            .eq("reconciliation_status", "RECONCILED")
+            .gt("period_end", stmtPeriodEnd)
+            .limit(1);
+
+          if (newerStatements && newerStatements.length > 0) {
+            isLatestStatement = false;
+            logger.info("Preserving newer account balance; gmail statement is older than existing verified statement", "GmailService", {
+              accountId: targetAccountId,
+              statementPeriodEnd: stmtPeriodEnd,
+              newerPeriodEnd: newerStatements[0].period_end,
+            });
+          }
+        }
+
+        if (isLatestStatement) {
+          const validClosingBalance = validateMonetaryAmount(meta.closing_balance, {
+            fieldName: "Closing balance",
+            allowNegative: true,
+          });
+          await supabaseAdmin
+            .from("accounts")
+            .update({ balance: validClosingBalance })
+            .eq("id", targetAccountId)
+            .eq("user_id", userId);
+        }
       }
+    }
+
+    // Reconcile internal transfers across accounts
+    let transfersMatchedCount = 0;
+    try {
+      const recResult = await reconcileInternalTransfers(userId, 60);
+      transfersMatchedCount = recResult.transfersReconciled;
+    } catch (recErr) {
+      logger.warn("Transfer reconciliation notice during Gmail sync", "GmailService", { error: String(recErr) });
     }
 
     const failedStatements = statements.filter((s: any) => !s.success);
     const hasFailures = failedStatements.length > 0;
-    const finalJobStatus = hasFailures
+    const finalJobStatus: "COMPLETED" | "PARTIAL" | "FAILED" = hasFailures
       ? (failedStatements.length === statements.length ? "FAILED" : "PARTIAL")
       : "COMPLETED";
 
     const failureSummary = hasFailures
       ? failedStatements.map((f: any) => `${f.file_name || 'attachment'}: ${(f.errors || []).join(', ')}`).join("; ")
       : null;
+
+    // Durable Checkpoint Determination:
+    // If statements failed, do not advance last_sync_at past that failed message's date
+    let nextSyncTimestamp: string;
+    if (!hasFailures) {
+      nextSyncTimestamp = new Date().toISOString();
+    } else if (failedStatements.length === statements.length) {
+      nextSyncTimestamp = integration.last_sync_at || new Date(0).toISOString();
+    } else {
+      let earliestFailedDate: Date | null = null;
+      for (const f of failedStatements) {
+        const dateStr = f.email_metadata?.date;
+        if (dateStr) {
+          const parsedD = new Date(dateStr);
+          if (!isNaN(parsedD.getTime())) {
+            if (!earliestFailedDate || parsedD < earliestFailedDate) {
+              earliestFailedDate = parsedD;
+            }
+          }
+        }
+      }
+
+      if (earliestFailedDate) {
+        earliestFailedDate.setDate(earliestFailedDate.getDate() - 1);
+        nextSyncTimestamp = earliestFailedDate.toISOString();
+      } else {
+        nextSyncTimestamp = integration.last_sync_at || new Date(0).toISOString();
+      }
+    }
 
     // Invalidate affected caches
     await invalidateCachedData([
@@ -404,6 +565,7 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       getUserCacheKey(userId, CACHE_KEYS.INCOME),
       getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
       getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+      getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
     ]);
 
     // Update job record
@@ -419,16 +581,17 @@ export async function syncUserGmailStatements(userId: string): Promise<{
             failedCount: failedStatements.length,
             transactionsImported: totalImported,
             duplicatesSkipped: totalDuplicates,
+            transfersMatched: transfersMatchedCount,
           },
         })
         .eq("id", jobRecord.id);
     }
 
-    // Update integration last sync timestamp
+    // Update integration last sync timestamp with durable checkpoint
     await supabaseAdmin
       .from("gmail_integrations")
       .update({
-        last_sync_at: new Date().toISOString(),
+        last_sync_at: nextSyncTimestamp,
         sync_status: hasFailures && failedStatements.length === statements.length ? "FAILED" : "ACTIVE",
         error_details: failureSummary,
       })
@@ -439,6 +602,9 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       statementsCount: statements.length,
       transactionsImported: totalImported,
       duplicatesSkipped: totalDuplicates,
+      transfersMatched: transfersMatchedCount,
+      failedCount: failedStatements.length,
+      status: finalJobStatus,
       error: failureSummary || undefined,
     };
   } catch (err: unknown) {
@@ -462,6 +628,9 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       statementsCount: 0,
       transactionsImported: 0,
       duplicatesSkipped: 0,
+      transfersMatched: 0,
+      failedCount: 0,
+      status: "FAILED",
       error: errorMsg,
     };
   }

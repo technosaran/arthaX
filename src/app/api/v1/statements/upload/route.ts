@@ -5,6 +5,8 @@ import { apiUnauthorized, apiError, extractRequestId } from "@/utils/apiResponse
 import { rateLimit } from "@/utils/rateLimit";
 import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { reconcileInternalTransfers } from "@/utils/transfers";
+import { validateMonetaryAmount } from "@/utils/money";
 import crypto from "crypto";
 
 const PYTHON_SERVICE_URL =
@@ -169,7 +171,11 @@ export async function POST(req: NextRequest) {
     let duplicateCount = 0;
 
     const rowsToInsert = transactions.map((t: any) => {
-      const dedupRaw = `${targetAccountId}:${t.transaction_date}:${t.amount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+      const parsedAmount = validateMonetaryAmount(t.amount, {
+        fieldName: "Statement transaction amount",
+        allowNegative: false,
+      });
+      const dedupRaw = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
       const dedupHash = crypto.createHash("sha256").update(dedupRaw).digest("hex");
 
       return {
@@ -178,7 +184,7 @@ export async function POST(req: NextRequest) {
         statement_id: stmtRecord.id,
         transaction_date: t.transaction_date,
         value_date: t.value_date || t.transaction_date,
-        amount: Number(t.amount),
+        amount: parsedAmount,
         currency: "INR",
         direction: t.direction,
         original_narration: t.original_narration,
@@ -252,13 +258,51 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 6. Update target account balance to latest closing balance if statement is reconciled
-    if (validation.is_valid && targetAccountId) {
-      await supabaseAdmin
-        .from("accounts")
-        .update({ balance: Number(metadata.closing_balance) })
-        .eq("id", targetAccountId)
-        .eq("user_id", userId);
+    // 6. Update target account balance ONLY if this statement is the latest verified statement
+    if (validation.is_valid && targetAccountId && metadata.closing_balance !== undefined) {
+      const stmtPeriodEnd = metadata.statement_period_end;
+      let isLatestStatement = true;
+
+      if (stmtPeriodEnd) {
+        const { data: newerStatements } = await supabaseAdmin
+          .from("bank_statements")
+          .select("id, period_end")
+          .eq("user_id", userId)
+          .eq("account_id", targetAccountId)
+          .eq("reconciliation_status", "RECONCILED")
+          .gt("period_end", stmtPeriodEnd)
+          .limit(1);
+
+        if (newerStatements && newerStatements.length > 0) {
+          isLatestStatement = false;
+          logger.info("Preserving newer account balance; uploaded statement is older than existing verified statement", "StatementUpload", {
+            accountId: targetAccountId,
+            statementPeriodEnd: stmtPeriodEnd,
+            newerStatementPeriodEnd: newerStatements[0].period_end,
+          });
+        }
+      }
+
+      if (isLatestStatement) {
+        const validClosingBalance = validateMonetaryAmount(metadata.closing_balance, {
+          fieldName: "Account closing balance",
+          allowNegative: true,
+        });
+        await supabaseAdmin
+          .from("accounts")
+          .update({ balance: validClosingBalance })
+          .eq("id", targetAccountId)
+          .eq("user_id", userId);
+      }
+    }
+
+    // 6b. Automatically reconcile internal transfers across canonical transactions
+    let transfersReconciledCount = 0;
+    try {
+      const recResult = await reconcileInternalTransfers(userId, 60);
+      transfersReconciledCount = recResult.transfersReconciled;
+    } catch (recErr) {
+      logger.warn("Automated transfer reconciliation notice in StatementUpload", "StatementUpload", { error: String(recErr) });
     }
 
     // 7. Invalidate multi-tier caches to trigger immediate UI consistency
@@ -269,6 +313,7 @@ export async function POST(req: NextRequest) {
         getUserCacheKey(userId, CACHE_KEYS.INCOME),
         getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
         getUserCacheKey(userId, CACHE_KEYS.LEDGER),
+        getUserCacheKey(userId, CACHE_KEYS.TRANSFERS),
       ]);
     } catch {}
 
@@ -278,6 +323,7 @@ export async function POST(req: NextRequest) {
       validation,
       importedCount,
       duplicateCount,
+      transfersReconciledCount,
       totalExtracted: transactions.length,
       bankName: parseResult.bank_name,
     }, { headers: { "X-Request-Id": requestId } });
