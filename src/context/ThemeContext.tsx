@@ -42,6 +42,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove("light");
       document.documentElement.classList.add("dark");
     }
+
+    if (typeof document !== "undefined") {
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute("content", t === "light" ? "#f8fafc" : "#07080c");
+      }
+    }
   };
 
   useEffect(() => {
