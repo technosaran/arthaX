@@ -60,8 +60,19 @@ export function apiSuccess<T>(
     | NextRequest
     | undefined;
   const requestId = extractRequestId(effectiveReq);
-  const payload: ApiResponse<T> = {
+  
+  // Backward compatibility: If data is a non-null plain object and not an array,
+  // shallow-merge its properties into the top level of the response payload
+  // so that legacy components expecting json.holdings or json.stats directly
+  // continue to function seamlessly alongside modern json.data consumers.
+  const objectPayload =
+    typeof data === "object" && data !== null && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+
+  const payload: any = {
     success: true,
+    ...objectPayload,
     data,
     ...(meta ? { meta } : {}),
     requestId,

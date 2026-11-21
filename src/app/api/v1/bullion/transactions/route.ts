@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, extractRequestId } from "@/utils/apiResponse";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { rateLimit } from "@/utils/rateLimit";
 import { z } from "zod";
 
@@ -153,6 +154,8 @@ export async function POST(req: NextRequest) {
           .eq("id", holding.id);
       }
 
+      await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
+
       return NextResponse.json(
         {
           success: true,
@@ -200,6 +203,8 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", holding.id);
+
+      await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
 
       return NextResponse.json(
         {

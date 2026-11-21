@@ -67,6 +67,7 @@ interface AccountItem {
   type: string;
   balance: number;
   last_four?: string;
+  classification?: "asset" | "liability";
 }
 
 const EXPENSE_CATEGORIES = [
@@ -169,6 +170,7 @@ export default function ExpensesSection() {
   const [accounts, setAccounts] = useState<AccountItem[]>(initialAccounts);
   const [loading, setLoading] = useState<boolean>(initialExpenses.length === 0);
   const inFlightRef = useRef<{ expenses: boolean; accounts: boolean }>({ expenses: false, accounts: false });
+  const pendingRefetchRef = useRef<{ expenses: boolean; accounts: boolean }>({ expenses: false, accounts: false });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -306,7 +308,11 @@ export default function ExpensesSection() {
 
   // 1. Fetch Accounts for linking
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current.accounts) return;
+    if (!user) return;
+    if (inFlightRef.current.accounts) {
+      pendingRefetchRef.current.accounts = true;
+      return;
+    }
     inFlightRef.current.accounts = true;
 
     if (!skipCache) {
@@ -320,15 +326,22 @@ export default function ExpensesSection() {
       const supabase = createClient();
       const { data } = await supabase
         .from("accounts")
-        .select("id, name, type, balance, last_four")
+        .select("id, name, type, balance, last_four, classification")
         .eq("user_id", user.id)
         .order("name", { ascending: true });
 
       if (data) {
-        const mapped = data.map((a) => ({
+        const mapped: AccountItem[] = data.map((a) => ({
           id: a.id,
           name: a.name,
           type: a.type,
+          classification:
+            a.classification ||
+            (a.type?.toLowerCase().includes("credit") ||
+            a.name?.toLowerCase().includes("credit") ||
+            a.type?.toLowerCase().includes("loan")
+              ? "liability"
+              : "asset"),
           balance: Number(a.balance) || 0,
           last_four: a.last_four,
         }));
@@ -339,12 +352,20 @@ export default function ExpensesSection() {
       // Non-blocking
     } finally {
       inFlightRef.current.accounts = false;
+      if (pendingRefetchRef.current.accounts) {
+        pendingRefetchRef.current.accounts = false;
+        fetchAccounts(true);
+      }
     }
   }, [user, redisAccountsKey]);
 
   // 2. Fetch Expenses
   const fetchExpenses = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current.expenses) return;
+    if (!user) return;
+    if (inFlightRef.current.expenses) {
+      pendingRefetchRef.current.expenses = true;
+      return;
+    }
     inFlightRef.current.expenses = true;
     setErrorMsg(null);
 
@@ -389,6 +410,10 @@ export default function ExpensesSection() {
     } finally {
       setLoading(false);
       inFlightRef.current.expenses = false;
+      if (pendingRefetchRef.current.expenses) {
+        pendingRefetchRef.current.expenses = false;
+        fetchExpenses(true);
+      }
     }
   }, [user, redisExpensesKey]);
 

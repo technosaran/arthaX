@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
+import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit } from "@/utils/rateLimit";
+import { apiError } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import {
+  roundMoney,
+  addMoney,
+  mulMoney,
+  divMoney,
+} from "@/utils/money";
 import { z } from "zod";
 
 const AddHoldingSchema = z.object({
@@ -32,82 +38,40 @@ const UpdateHoldingSchema = z.object({
 });
 
 // GET: Fetch all holdings and transactions for the authenticated user
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const GET = createApiRoute({
+  rateLimit: { limit: 120, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const [holdingsRes, transactionsRes] = await Promise.all([
       supabaseAdmin
         .from("stock_holdings")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("symbol", { ascending: true }),
       supabaseAdmin
         .from("stock_transactions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("transaction_date", { ascending: false })
         .limit(100),
     ]);
 
     if (holdingsRes.error) {
-      console.error("[Stocks API] Error fetching holdings:", holdingsRes.error);
       return apiError(holdingsRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        holdings: holdingsRes.data || [],
-        transactions: transactionsRes.data || [],
-      },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch stock holdings";
-    console.error("[Stocks API] Unexpected error:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return {
+      holdings: holdingsRes.data || [],
+      transactions: transactionsRes.data || [],
+    };
+  },
+});
 
 // POST: Add a new holding or average into an existing holding
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  const rl = await rateLimit(`stocks_post:${userId}`, 60, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests. Please slow down.", requestId },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = AddHoldingSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-          requestId,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
+export const POST = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  idempotent: true,
+  schema: AddHoldingSchema,
+  handler: async ({ userId, body, req }) => {
     const {
       symbol,
       exchange,
@@ -120,7 +84,7 @@ export async function POST(req: NextRequest) {
       target_price,
       stop_loss,
       transaction_date,
-    } = parsed.data;
+    } = body;
 
     const cleanSymbol = symbol.trim().toUpperCase().replace(/\.(NS|BO)$/, "");
 
@@ -128,13 +92,12 @@ export async function POST(req: NextRequest) {
     const { data: existingHolding, error: fetchErr } = await supabaseAdmin
       .from("stock_holdings")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .eq("symbol", cleanSymbol)
       .eq("exchange", exchange)
       .maybeSingle();
 
     if (fetchErr) {
-      console.error("[Stocks API] Error checking existing holding:", fetchErr);
       return apiError(fetchErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
@@ -143,13 +106,17 @@ export async function POST(req: NextRequest) {
     let finalAvgPrice: number;
 
     if (existingHolding) {
-      // Calculate weighted average price
       const existingQty = Number(existingHolding.quantity) || 0;
       const existingAvg = Number(existingHolding.avg_buy_price) || 0;
       const newTotalQty = existingQty + quantity;
 
       if (newTotalQty > 0) {
-        finalAvgPrice = +((existingQty * existingAvg + quantity * avg_buy_price) / newTotalQty).toFixed(2);
+        finalAvgPrice = roundMoney(
+          divMoney(
+            addMoney(mulMoney(existingQty, existingAvg), mulMoney(quantity, avg_buy_price)),
+            newTotalQty
+          )
+        );
       } else {
         finalAvgPrice = avg_buy_price;
       }
@@ -173,20 +140,18 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (updateErr) {
-        console.error("[Stocks API] Update error:", updateErr);
         return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       }
 
       holdingId = existingHolding.id;
     } else {
-      // Create new holding
       finalQty = quantity;
       finalAvgPrice = avg_buy_price;
 
       const { data: created, error: createErr } = await supabaseAdmin
         .from("stock_holdings")
         .insert({
-          user_id: userId,
+          user_id: userId!,
           symbol: cleanSymbol,
           exchange,
           company_name,
@@ -202,7 +167,6 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (createErr) {
-        console.error("[Stocks API] Create error:", createErr);
         return apiError(createErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       }
 
@@ -211,7 +175,7 @@ export async function POST(req: NextRequest) {
 
     // Record BUY transaction in stock_transactions ledger
     await supabaseAdmin.from("stock_transactions").insert({
-      user_id: userId,
+      user_id: userId!,
       holding_id: holdingId,
       symbol: cleanSymbol,
       exchange,
@@ -222,54 +186,28 @@ export async function POST(req: NextRequest) {
       notes: notes || `Manual purchase of ${quantity} shares at ₹${avg_buy_price}`,
     });
 
-    return apiSuccess(
-      {
-        holdingId,
-        symbol: cleanSymbol,
-        exchange,
-        quantity: finalQty,
-        avg_buy_price: finalAvgPrice,
-        message: existingHolding
-          ? `Added to existing holding. New average: ₹${finalAvgPrice}`
-          : `Holding created successfully for ${cleanSymbol}`,
-      },
-      undefined,
-      200,
-      req
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to record stock holding";
-    console.error("[Stocks API] Exception:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    // Invalidate caches across stocks, portfolio, and analytics
+    await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
+
+    return {
+      holdingId,
+      symbol: cleanSymbol,
+      exchange,
+      quantity: finalQty,
+      avg_buy_price: finalAvgPrice,
+      message: existingHolding
+        ? `Added to existing holding. New average: ₹${finalAvgPrice}`
+        : `Holding created successfully for ${cleanSymbol}`,
+    };
+  },
+});
 
 // PUT: Update holding details (notes, targets, manual edit)
-export async function PUT(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = UpdateHoldingSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-          requestId,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
-    const { id, ...updates } = parsed.data;
+export const PUT = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  schema: UpdateHoldingSchema,
+  handler: async ({ userId, body, req }) => {
+    const { id, ...updates } = body;
 
     const { data: updated, error: updateErr } = await supabaseAdmin
       .from("stock_holdings")
@@ -278,53 +216,42 @@ export async function PUT(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .select()
       .single();
 
     if (updateErr) {
-      console.error("[Stocks API] Update error:", updateErr);
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return apiSuccess(updated, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to update holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
+
+    return updated;
+  },
+});
 
 // DELETE: Delete a holding
-export async function DELETE(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const DELETE = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const id = query.get("id");
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+    if (!id) {
+      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
-  }
-
-  try {
-    // Foreign key with ON DELETE CASCADE will clean up stock_transactions automatically
     const { error: delErr } = await supabaseAdmin
       .from("stock_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId!);
 
     if (delErr) {
-      console.error("[Stocks API] Delete error:", delErr);
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return apiSuccess({ deletedId: id }, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to delete holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
+
+    return { deletedId: id };
+  },
+});

@@ -86,6 +86,7 @@ export default function AutomationHub() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [statementPassword, setStatementPassword] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [syncingGmail, setSyncingGmail] = useState(false);
   const [lastUploadResult, setLastUploadResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,6 +173,30 @@ export default function AutomationHub() {
     }
   };
 
+  const handleGmailSync = async () => {
+    setSyncingGmail(true);
+    try {
+      const res = await fetch("/api/v1/integrations/gmail/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxMessages: 50 }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.error || "Gmail synchronization failed.");
+      }
+      showToast(
+        `Gmail automated discovery complete: Ingested ${data.statementsCount || 0} statements (${data.transactionsImported || 0} transactions imported, ${data.duplicatesSkipped || 0} duplicates skipped).`,
+        "success"
+      );
+      fetchStatus();
+    } catch (err: any) {
+      showToast(err.message || "Failed to trigger Gmail statement discovery.", "error");
+    } finally {
+      setSyncingGmail(false);
+    }
+  };
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -184,17 +209,37 @@ export default function AutomationHub() {
     <div className="space-y-6">
       {/* Overview Metric Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-4 space-y-1.5 border-[var(--app-border-subtle)] bg-[var(--app-bg-card)]">
-          <div className="flex items-center justify-between text-xs text-[var(--app-fg-muted)]">
-            <span>Gmail Auto-Sync</span>
-            <Mail size={14} className={telemetry?.gmail.connected ? "text-emerald-400" : "text-amber-400"} />
+        <Card className="p-4 space-y-2 border-[var(--app-border-subtle)] bg-[var(--app-bg-card)] flex flex-col justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-[var(--app-fg-muted)]">
+              <span>Gmail Auto-Sync</span>
+              <Mail size={14} className={telemetry?.gmail.connected ? "text-emerald-400" : "text-amber-400"} />
+            </div>
+            <div className="text-lg font-semibold tracking-tight text-[var(--app-fg)] flex items-center justify-between">
+              <span>{telemetry?.gmail.connected ? "Active" : "Ready to Connect"}</span>
+              {telemetry?.gmail.connected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGmailSync}
+                  disabled={syncingGmail}
+                  className="h-6 text-[10px] px-2 py-0 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                  icon={syncingGmail ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                >
+                  {syncingGmail ? "Syncing..." : "Sync Now"}
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--app-fg-muted)] truncate">
+              {telemetry?.gmail.email || "Automated bank statement discovery"}
+            </p>
           </div>
-          <div className="text-lg font-semibold tracking-tight text-[var(--app-fg)]">
-            {telemetry?.gmail.connected ? "Active" : "Ready to Connect"}
-          </div>
-          <p className="text-[11px] text-[var(--app-fg-muted)] truncate">
-            {telemetry?.gmail.email || "Automated bank statement discovery"}
-          </p>
+          {telemetry?.gmail.lastSyncAt && (
+            <div className="text-[10px] text-[var(--app-fg-muted)] flex items-center gap-1 opacity-80 pt-1 border-t border-[var(--app-border-subtle)]">
+              <Clock size={10} />
+              <span>Last synced: {new Date(telemetry.gmail.lastSyncAt).toLocaleDateString()}</span>
+            </div>
+          )}
         </Card>
 
         <Card className="p-4 space-y-1.5 border-[var(--app-border-subtle)] bg-[var(--app-bg-card)]">
@@ -255,10 +300,14 @@ export default function AutomationHub() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="neutral" size="sm">SBI</Badge>
+            <Badge variant="neutral" size="sm">HDFC</Badge>
+            <Badge variant="neutral" size="sm">ICICI</Badge>
+            <Badge variant="neutral" size="sm">Axis</Badge>
+            <Badge variant="neutral" size="sm">Kotak</Badge>
             <Badge variant="neutral" size="sm">Indian Bank</Badge>
-            <Badge variant="neutral" size="sm">HDFC / ICICI CSV</Badge>
+            <Badge variant="neutral" size="sm">Universal PDF & CSV</Badge>
           </div>
         </div>
 
@@ -335,15 +384,29 @@ export default function AutomationHub() {
             <Landmark size={16} className="text-indigo-400" />
             <h3 className="text-sm font-semibold text-[var(--app-fg)]">Connected Bank Statements</h3>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchStatus}
-            icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}
-            className="h-7 text-xs"
-          >
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {telemetry?.gmail.connected && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGmailSync}
+                disabled={syncingGmail}
+                icon={syncingGmail ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                className="h-7 text-xs border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
+              >
+                {syncingGmail ? "Syncing..." : "Sync Gmail"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchStatus}
+              icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}
+              className="h-7 text-xs"
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {statements.length === 0 ? (

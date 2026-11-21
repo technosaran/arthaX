@@ -16,6 +16,8 @@ from ..modules.investment_engine import InvestmentEngine
 from ..modules.portfolio_engine import PortfolioEngine
 from ..modules.reconciliation_engine import ReconciliationEngine
 from ..modules.tax_engine import TaxEngine
+from ..modules.fire_engine import FireEngine
+from ..modules.rebalancing_engine import RebalancingEngine
 from ..bank_ingestion import parser_registry, validate_statement_continuity
 from ..bank_ingestion.gmail_service import GmailStatementIngestor
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
@@ -35,6 +37,8 @@ investment_engine = InvestmentEngine()
 portfolio_engine = PortfolioEngine()
 reconciliation_engine = ReconciliationEngine()
 tax_engine = TaxEngine()
+fire_engine = FireEngine()
+rebalancing_engine = RebalancingEngine()
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +104,43 @@ class TaxCalculationRequest(CalculationBaseRequest):
     unrealized_holdings: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     assessment_year: Optional[str] = "2025-2026"
     tax_slab_rate: Optional[float] = 0.30
+    gross_salary: Optional[float] = None
+    annual_income: Optional[float] = None
+    deductions_80c: Optional[float] = 0.0
+    deductions_80d: Optional[float] = 0.0
+    nps_80ccd_1b: Optional[float] = 0.0
+    home_loan_interest_24b: Optional[float] = 0.0
+    hra_exemption: Optional[float] = 0.0
+    other_deductions: Optional[float] = 0.0
+
+
+class TaxRegimeComparisonRequest(CalculationBaseRequest):
+    gross_income: float
+    deductions_80c: Optional[float] = 0.0
+    deductions_80d: Optional[float] = 0.0
+    nps_80ccd_1b: Optional[float] = 0.0
+    home_loan_interest_24b: Optional[float] = 0.0
+    hra_exemption: Optional[float] = 0.0
+    other_deductions: Optional[float] = 0.0
+
+
+class FireCalculationRequest(CalculationBaseRequest):
+    current_net_worth: float = 0.0
+    annual_expenses: float = 0.0
+    annual_savings: float = 0.0
+    current_age: Optional[int] = 30
+    target_retirement_age: Optional[int] = 50
+    expected_annual_return_pct: Optional[float] = 11.0
+    expected_inflation_pct: Optional[float] = 6.0
+    safe_withdrawal_rate_pct: Optional[float] = 3.5
+
+
+class RebalancingCalculationRequest(CalculationBaseRequest):
+    portfolio: Dict[str, float] = Field(default_factory=dict)
+    target_allocation: Optional[Dict[str, float]] = None
+    liabilities: Optional[float] = 0.0
+    monthly_expenses: Optional[float] = 0.0
+    monthly_income: Optional[float] = 0.0
 
 
 class StatementParseRequest(CalculationBaseRequest):
@@ -186,12 +227,41 @@ def calculate_tax(payload: TaxCalculationRequest, x_user_id: Optional[str] = Hea
     return tax_engine.execute(inputs, user_id=user_id)
 
 
+@router.post("/calculations/tax/regimes")
+def calculate_tax_regimes(payload: TaxRegimeComparisonRequest, x_user_id: Optional[str] = Header(None)):
+    from decimal import Decimal
+    res = tax_engine.compare_regimes(
+        gross_income=Decimal(str(payload.gross_income)),
+        deductions_80c=Decimal(str(payload.deductions_80c or 0)),
+        deductions_80d=Decimal(str(payload.deductions_80d or 0)),
+        nps_80ccd_1b=Decimal(str(payload.nps_80ccd_1b or 0)),
+        home_loan_interest_24b=Decimal(str(payload.home_loan_interest_24b or 0)),
+        hra_exemption=Decimal(str(payload.hra_exemption or 0)),
+        other_deductions=Decimal(str(payload.other_deductions or 0)),
+    )
+    return {"success": True, "result": res}
+
+
+@router.post("/calculations/fire")
+def calculate_fire(payload: FireCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return fire_engine.execute(inputs, user_id=user_id)
+
+
+@router.post("/calculations/rebalancing")
+def calculate_rebalancing(payload: RebalancingCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return rebalancing_engine.execute(inputs, user_id=user_id)
+
+
 @router.get("/calculations/health")
 def calculation_engine_health():
     return {
         "status": "healthy",
         "engine": "ArthaX Financial Calculation Engine (AFCE)",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "precision_engine": "Python Decimal (Zero Floating-Point Error)",
         "active_modules": [
             "ExpenseEngine",
@@ -202,6 +272,8 @@ def calculation_engine_health():
             "PortfolioEngine",
             "ReconciliationEngine",
             "TaxEngine",
+            "FireEngine",
+            "RebalancingEngine",
         ],
     }
 

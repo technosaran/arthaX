@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
+import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit } from "@/utils/rateLimit";
+import { apiError } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import {
+  roundMoney,
+  addMoney,
+  mulMoney,
+  divMoney,
+} from "@/utils/money";
 import { z } from "zod";
 
 const AddMutualFundSchema = z.object({
@@ -50,82 +56,40 @@ const UpdateMutualFundSchema = z.object({
 });
 
 // GET: Fetch all mutual fund holdings and transactions for the authenticated user
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const GET = createApiRoute({
+  rateLimit: { limit: 120, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const [holdingsRes, transactionsRes] = await Promise.all([
       supabaseAdmin
         .from("mutual_fund_holdings")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("mutual_fund_transactions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("transaction_date", { ascending: false })
         .limit(100),
     ]);
 
     if (holdingsRes.error) {
-      console.error("[MF API] Error fetching holdings:", holdingsRes.error);
       return apiError(holdingsRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        holdings: holdingsRes.data || [],
-        transactions: transactionsRes.data || [],
-      },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch mutual fund holdings";
-    console.error("[MF API] Unexpected error:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return {
+      holdings: holdingsRes.data || [],
+      transactions: transactionsRes.data || [],
+    };
+  },
+});
 
 // POST: Add a new holding or average into an existing scheme holding
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  const rl = await rateLimit(`mf_post:${userId}`, 60, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests. Please slow down.", requestId },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = AddMutualFundSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-          requestId,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
+export const POST = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  idempotent: true,
+  schema: AddMutualFundSchema,
+  handler: async ({ userId, body, req }) => {
     const {
       scheme_code,
       scheme_name,
@@ -149,16 +113,15 @@ export async function POST(req: NextRequest) {
       account_id,
       notes,
       transaction_date,
-    } = parsed.data;
+    } = body;
 
-    const actualInvested = reqInvested !== undefined ? reqInvested : +(units * avg_nav).toFixed(2);
+    const actualInvested = reqInvested !== undefined ? roundMoney(reqInvested) : roundMoney(mulMoney(units, avg_nav));
     const actualCurrentNav = reqCurrentNav !== undefined ? reqCurrentNav : avg_nav;
 
-    // Check if user already holds this scheme + folio (e.g. Zerodha Coin Demat holding)
     const { data: existingHolding } = await supabaseAdmin
       .from("mutual_fund_holdings")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .eq("scheme_code", scheme_code)
       .eq("folio_number", folio_number)
       .maybeSingle();
@@ -167,17 +130,15 @@ export async function POST(req: NextRequest) {
     let finalHolding: Record<string, unknown>;
 
     if (existingHolding) {
-      // Average into existing holding
       const existingUnits = Number(existingHolding.units) || 0;
       const existingAvgNav = Number(existingHolding.avg_nav) || 0;
       const totalUnits = +(existingUnits + units).toFixed(4);
 
-      // Weighted average NAV
       const newAvgNav =
         totalUnits > 0
           ? +((existingUnits * existingAvgNav + units * avg_nav) / totalUnits).toFixed(4)
           : avg_nav;
-      const totalInvested = +(totalUnits * newAvgNav).toFixed(2);
+      const totalInvested = roundMoney(mulMoney(totalUnits, newAvgNav));
 
       const { data: updated, error: updateErr } = await supabaseAdmin
         .from("mutual_fund_holdings")
@@ -201,18 +162,16 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (updateErr) {
-        console.error("[MF API] Update holding error:", updateErr);
         return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       }
 
       holdingId = existingHolding.id;
       finalHolding = updated;
     } else {
-      // Insert brand new holding
       const { data: inserted, error: insertErr } = await supabaseAdmin
         .from("mutual_fund_holdings")
         .insert({
-          user_id: userId,
+          user_id: userId!,
           scheme_code,
           scheme_name,
           fund_house,
@@ -240,7 +199,6 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (insertErr) {
-        console.error("[MF API] Insert holding error:", insertErr);
         return apiError(insertErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       }
 
@@ -248,116 +206,83 @@ export async function POST(req: NextRequest) {
       finalHolding = inserted;
     }
 
-    // Automatically record the investment transaction
+    // Automatically record investment transaction
     const txType = is_sip_active ? "SIP" : "BUY";
     await supabaseAdmin.from("mutual_fund_transactions").insert({
-      user_id: userId,
+      user_id: userId!,
       holding_id: holdingId,
       scheme_code,
       scheme_name,
       type: txType,
       units,
       nav: avg_nav,
-      amount: +(units * avg_nav).toFixed(2),
+      amount: roundMoney(mulMoney(units, avg_nav)),
       transaction_date: transaction_date || new Date().toISOString().split("T")[0],
       notes: notes || (is_sip_active ? "Initial SIP investment" : "Lumpsum investment"),
     });
 
-    return apiSuccess(finalHolding, undefined, 201, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to create mutual fund holding";
-    console.error("[MF API] Unexpected error:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
+
+    return finalHolding;
+  },
+});
 
 // PUT: Update holding details
-export async function PUT(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const PUT = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  schema: UpdateMutualFundSchema,
+  handler: async ({ userId, body, req }) => {
+    const { id, ...updates } = body;
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = UpdateMutualFundSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-          requestId,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
-    const { id, ...updates } = parsed.data;
-
-    // Recalculate invested_amount if units or avg_nav changed and invested_amount not provided
     const updatePayload: Record<string, unknown> = {
       ...updates,
       updated_at: new Date().toISOString(),
     };
 
     if (updates.units !== undefined && updates.avg_nav !== undefined && updates.invested_amount === undefined) {
-      updatePayload.invested_amount = +(updates.units * updates.avg_nav).toFixed(2);
+      updatePayload.invested_amount = roundMoney(mulMoney(updates.units, updates.avg_nav));
     }
 
     const { data: updated, error: updateErr } = await supabaseAdmin
       .from("mutual_fund_holdings")
       .update(updatePayload)
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .select()
       .single();
 
     if (updateErr) {
-      console.error("[MF API] Update error:", updateErr);
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return apiSuccess(updated, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to update holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
+
+    return updated;
+  },
+});
 
 // DELETE: Delete a mutual fund holding
-export async function DELETE(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const DELETE = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const id = query.get("id");
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+    if (!id) {
+      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
-  }
-
-  try {
     const { error: delErr } = await supabaseAdmin
       .from("mutual_fund_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId!);
 
     if (delErr) {
-      console.error("[MF API] Delete error:", delErr);
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return apiSuccess({ deletedId: id }, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to delete holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
+
+    return { deletedId: id };
+  },
+});

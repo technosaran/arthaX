@@ -1,9 +1,15 @@
 import { NextRequest } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiSuccess, apiError, apiUnauthorized, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit } from "@/utils/rateLimit";
-import { logger } from "@/utils/logger";
+import { apiError } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import {
+  roundMoney,
+  addMoney,
+  subMoney,
+  mulMoney,
+  divMoney,
+  sumMoney,
+} from "@/utils/money";
 
 export interface TaxHarvestingOpportunity {
   id: string;
@@ -48,6 +54,7 @@ export interface TaxAnalysisPayload {
   harvestingOpportunities: TaxHarvestingOpportunity[];
   totalHarvestableLoss: number;
   totalPotentialTaxSavings: number;
+  regimeComparison?: any;
   advice: string[];
 }
 
@@ -63,30 +70,20 @@ interface StockLot {
   date: Date;
 }
 
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+export const GET = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const assessmentYear = query.get("ay") || "2025-26";
+    const slabRate = Math.min(Math.max(parseFloat(query.get("slab") || "0.30"), 0.0), 0.45);
 
-  const rl = await rateLimit(`tax_analysis:${userId}`, 30, 60);
-  if (!rl.success) {
-    return apiError("Too many tax calculation requests. Please wait.", "RATE_LIMITED", 429, undefined, req);
-  }
-
-  const { searchParams } = new URL(req.url);
-  const assessmentYear = searchParams.get("ay") || "2025-26";
-  const slabRate = Math.min(Math.max(parseFloat(searchParams.get("slab") || "0.30"), 0.0), 0.45);
-
-  try {
-    // 1. Fetch user's stock holdings, mutual funds, bullion, stock transactions, and crypto trades
-    const [stocksRes, mfRes, bullionRes, stockTxRes, cryptoTradesRes] = await Promise.all([
-      supabaseAdmin.from("stock_holdings").select("*").eq("user_id", userId),
-      supabaseAdmin.from("mutual_fund_holdings").select("*").eq("user_id", userId),
-      supabaseAdmin.from("bullion_holdings").select("*").eq("user_id", userId),
-      supabaseAdmin.from("stock_transactions").select("*").eq("user_id", userId).order("transaction_date", { ascending: true }),
-      supabaseAdmin.from("crypto_trades").select("*").eq("user_id", userId).order("executed_at", { ascending: true }),
+    // 1. Fetch user's stock holdings, mutual funds, bonds, bullion, stock transactions, and crypto trades
+    const [stocksRes, mfRes, bondsRes, bullionRes, stockTxRes, cryptoTradesRes] = await Promise.all([
+      supabaseAdmin.from("stock_holdings").select("*").eq("user_id", userId!),
+      supabaseAdmin.from("mutual_fund_holdings").select("*").eq("user_id", userId!),
+      supabaseAdmin.from("bond_holdings").select("*").eq("user_id", userId!),
+      supabaseAdmin.from("bullion_holdings").select("*").eq("user_id", userId!),
+      supabaseAdmin.from("stock_transactions").select("*").eq("user_id", userId!).order("transaction_date", { ascending: true }),
+      supabaseAdmin.from("crypto_trades").select("*").eq("user_id", userId!).order("executed_at", { ascending: true }),
     ]);
 
     const now = new Date();
@@ -97,11 +94,11 @@ export async function GET(req: NextRequest) {
     // A. Analyze Stock Holdings for Tax-Loss Harvesting
     if (stocksRes.data) {
       for (const stock of stocksRes.data) {
-        const invested = Number(stock.quantity || 0) * Number(stock.avg_buy_price || 0);
-        const current = Number(stock.quantity || 0) * Number(stock.current_price || stock.avg_buy_price || 0);
+        const invested = mulMoney(Number(stock.quantity || 0), Number(stock.avg_buy_price || 0));
+        const current = mulMoney(Number(stock.quantity || 0), Number(stock.current_price || stock.avg_buy_price || 0));
 
         if (current < invested && invested > 0) {
-          const loss = Math.round((invested - current) * 100) / 100;
+          const loss = subMoney(invested, current);
           const buyDate = stock.created_at ? new Date(stock.created_at) : now;
           const diffDays = Math.max(0, Math.floor((now.getTime() - buyDate.getTime()) / (1000 * 60 * 60 * 24)));
           const months = Math.round((diffDays / 30.4) * 10) / 10;
@@ -109,15 +106,15 @@ export async function GET(req: NextRequest) {
 
           const gainType: "LTCG" | "STCG" = isLtcg ? "LTCG" : "STCG";
           const taxRate = isLtcg ? 0.125 : 0.20; // Union Budget 2024: 12.5% LTCG (Sec 112A), 20% STCG (Sec 111A)
-          const savings = Math.round(loss * taxRate * 100) / 100;
+          const savings = roundMoney(mulMoney(loss, taxRate));
 
           harvestingOpportunities.push({
             id: stock.id,
             symbol: stock.symbol,
             assetClass: "equity",
             buyDate: buyDate.toISOString().split("T")[0],
-            investedAmount: Math.round(invested * 100) / 100,
-            currentValue: Math.round(current * 100) / 100,
+            investedAmount: roundMoney(invested),
+            currentValue: roundMoney(current),
             unrealizedLoss: loss,
             holdingPeriodMonths: months,
             gainType,
@@ -126,8 +123,8 @@ export async function GET(req: NextRequest) {
             recommendation: `Harvest ₹${loss.toLocaleString("en-IN")} in ${gainType} loss by booking before March 31st to save up to ₹${savings.toLocaleString("en-IN")} in tax.`,
           });
 
-          totalHarvestableLoss += loss;
-          totalPotentialTaxSavings += savings;
+          totalHarvestableLoss = addMoney(totalHarvestableLoss, loss);
+          totalPotentialTaxSavings = addMoney(totalPotentialTaxSavings, savings);
         }
       }
     }
@@ -135,29 +132,29 @@ export async function GET(req: NextRequest) {
     // B. Analyze Mutual Funds for Harvesting
     if (mfRes.data) {
       for (const fund of mfRes.data) {
-        const invested = Number(fund.invested_amount || (Number(fund.units || 0) * Number(fund.avg_nav || 0)) || 0);
+        const invested = Number(fund.invested_amount || mulMoney(Number(fund.units || 0), Number(fund.avg_nav || 0)) || 0);
         const currentNav = Number(fund.current_nav || fund.avg_nav || 0);
-        const currentVal = Number(fund.current_value || (Number(fund.units || 0) * currentNav) || 0);
+        const currentVal = Number(fund.current_value || mulMoney(Number(fund.units || 0), currentNav) || 0);
 
         if (currentVal < invested && invested > 0) {
-          const loss = Math.round((invested - currentVal) * 100) / 100;
+          const loss = subMoney(invested, currentVal);
           const buyDate = fund.created_at ? new Date(fund.created_at) : now;
           const diffDays = Math.max(0, Math.floor((now.getTime() - buyDate.getTime()) / (1000 * 60 * 60 * 24)));
           const months = Math.round((diffDays / 30.4) * 10) / 10;
-          const isDebt = (fund.asset_class || "").toLowerCase().includes("debt");
+          const isDebt = (fund.asset_class || "").toLowerCase().includes("debt") || (fund.category || "").toLowerCase().includes("debt");
           const isLtcg = !isDebt && diffDays >= 365;
 
           const gainType: "LTCG" | "STCG" = isLtcg ? "LTCG" : "STCG";
           const taxRate = isDebt ? slabRate : (isLtcg ? 0.125 : 0.20);
-          const savings = Math.round(loss * taxRate * 100) / 100;
+          const savings = roundMoney(mulMoney(loss, taxRate));
 
           harvestingOpportunities.push({
             id: fund.id,
             symbol: fund.scheme_name,
             assetClass: isDebt ? "debt_fund" : "mutual_fund",
             buyDate: buyDate.toISOString().split("T")[0],
-            investedAmount: Math.round(invested * 100) / 100,
-            currentValue: Math.round(currentVal * 100) / 100,
+            investedAmount: roundMoney(invested),
+            currentValue: roundMoney(currentVal),
             unrealizedLoss: loss,
             holdingPeriodMonths: months,
             gainType,
@@ -166,8 +163,87 @@ export async function GET(req: NextRequest) {
             recommendation: `Switch or redeem to harvest ₹${loss.toLocaleString("en-IN")} loss, reducing your taxable capital gains by up to ₹${savings.toLocaleString("en-IN")}.`,
           });
 
-          totalHarvestableLoss += loss;
-          totalPotentialTaxSavings += savings;
+          totalHarvestableLoss = addMoney(totalHarvestableLoss, loss);
+          totalPotentialTaxSavings = addMoney(totalPotentialTaxSavings, savings);
+        }
+      }
+    }
+
+    // C. Analyze Bullion (Gold & Silver) for Harvesting
+    if (bullionRes.data) {
+      for (const bul of bullionRes.data) {
+        const invested = Number(bul.total_buy_price || 0);
+        const currentRate = Number(bul.current_rate_per_gram || 0);
+        const currentVal = currentRate > 0 ? mulMoney(Number(bul.weight_grams || 0), currentRate) : invested;
+
+        if (currentVal < invested && invested > 0) {
+          const loss = subMoney(invested, currentVal);
+          const buyDate = bul.created_at ? new Date(bul.created_at) : now;
+          const diffDays = Math.max(0, Math.floor((now.getTime() - buyDate.getTime()) / (1000 * 60 * 60 * 24)));
+          const months = Math.round((diffDays / 30.4) * 10) / 10;
+          // Union Budget 2024: Bullion LTCG threshold is 24 months (730 days)
+          const isLtcg = diffDays >= 730;
+
+          const gainType: "LTCG" | "STCG" = isLtcg ? "LTCG" : "STCG";
+          const taxRate = isLtcg ? 0.125 : slabRate;
+          const savings = roundMoney(mulMoney(loss, taxRate));
+
+          harvestingOpportunities.push({
+            id: bul.id,
+            symbol: `${bul.metal || "Gold"} Bullion`,
+            assetClass: "bullion",
+            buyDate: buyDate.toISOString().split("T")[0],
+            investedAmount: roundMoney(invested),
+            currentValue: roundMoney(currentVal),
+            unrealizedLoss: loss,
+            holdingPeriodMonths: months,
+            gainType,
+            potentialTaxSavings: savings,
+            effectiveTaxRate: Math.round(taxRate * 1000) / 10,
+            recommendation: `Harvest ₹${loss.toLocaleString("en-IN")} bullion loss to offset other capital gains and save ~₹${savings.toLocaleString("en-IN")}.`,
+          });
+
+          totalHarvestableLoss = addMoney(totalHarvestableLoss, loss);
+          totalPotentialTaxSavings = addMoney(totalPotentialTaxSavings, savings);
+        }
+      }
+    }
+
+    // D. Analyze Bonds for Harvesting
+    if (bondsRes.data) {
+      for (const bond of bondsRes.data) {
+        const invested = Number(bond.invested_amount || mulMoney(Number(bond.quantity || 1), Number(bond.avg_buy_price || 1000)));
+        const curPrice = Number(bond.current_price) > 0 ? Number(bond.current_price) : Number(bond.avg_buy_price || 1000);
+        const currentVal = mulMoney(Number(bond.quantity || 1), curPrice);
+
+        if (currentVal < invested && invested > 0) {
+          const loss = subMoney(invested, currentVal);
+          const buyDate = bond.created_at ? new Date(bond.created_at) : now;
+          const diffDays = Math.max(0, Math.floor((now.getTime() - buyDate.getTime()) / (1000 * 60 * 60 * 24)));
+          const months = Math.round((diffDays / 30.4) * 10) / 10;
+          const isLtcg = diffDays >= 365;
+
+          const gainType: "LTCG" | "STCG" = isLtcg ? "LTCG" : "STCG";
+          const taxRate = isLtcg ? 0.125 : slabRate;
+          const savings = roundMoney(mulMoney(loss, taxRate));
+
+          harvestingOpportunities.push({
+            id: bond.id,
+            symbol: bond.name || bond.isin || "Bond",
+            assetClass: "debt_fund",
+            buyDate: buyDate.toISOString().split("T")[0],
+            investedAmount: roundMoney(invested),
+            currentValue: roundMoney(currentVal),
+            unrealizedLoss: loss,
+            holdingPeriodMonths: months,
+            gainType,
+            potentialTaxSavings: savings,
+            effectiveTaxRate: Math.round(taxRate * 1000) / 10,
+            recommendation: `Harvest ₹${loss.toLocaleString("en-IN")} bond loss to offset gains and save ~₹${savings.toLocaleString("en-IN")}.`,
+          });
+
+          totalHarvestableLoss = addMoney(totalHarvestableLoss, loss);
+          totalPotentialTaxSavings = addMoney(totalPotentialTaxSavings, savings);
         }
       }
     }
@@ -175,7 +251,7 @@ export async function GET(req: NextRequest) {
     // Sort opportunities by highest potential tax savings first
     harvestingOpportunities.sort((a, b) => b.potentialTaxSavings - a.potentialTaxSavings);
 
-    // C. Calculate Realized Gains from Stock Transactions using Strict FIFO Matching
+    // E. Calculate Realized Gains from Stock Transactions using Strict FIFO Matching
     let equityLtcgGain = 0;
     let equityStcgGain = 0;
 
@@ -202,15 +278,15 @@ export async function GET(req: NextRequest) {
           while (unfilled > 0 && lots.length > 0) {
             const currentLot = lots[0];
             const matchedQty = Math.min(unfilled, currentLot.quantity);
-            const costBasis = matchedQty * currentLot.price;
-            const saleProceeds = matchedQty * price;
-            const gain = saleProceeds - costBasis;
+            const costBasis = mulMoney(matchedQty, currentLot.price);
+            const saleProceeds = mulMoney(matchedQty, price);
+            const gain = subMoney(saleProceeds, costBasis);
             const holdingDays = Math.max(0, Math.floor((txDate.getTime() - currentLot.date.getTime()) / (1000 * 60 * 60 * 24)));
 
             if (holdingDays >= 365) {
-              equityLtcgGain += gain;
+              equityLtcgGain = addMoney(equityLtcgGain, gain);
             } else {
-              equityStcgGain += gain;
+              equityStcgGain = addMoney(equityStcgGain, gain);
             }
 
             currentLot.quantity -= matchedQty;
@@ -221,18 +297,17 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          // If sell could not be matched with historical buys, estimate cost conservatively at 85%
           if (unfilled > 0) {
-            const saleProceeds = unfilled * price;
-            const costBasis = saleProceeds * 0.85;
-            const gain = saleProceeds - costBasis;
-            equityStcgGain += gain;
+            const saleProceeds = mulMoney(unfilled, price);
+            const costBasis = mulMoney(saleProceeds, 0.85);
+            const gain = subMoney(saleProceeds, costBasis);
+            equityStcgGain = addMoney(equityStcgGain, gain);
           }
         }
       }
     }
 
-    // D. Calculate Realized Crypto Gains (Section 115BBH)
+    // F. Calculate Realized Crypto Gains (Section 115BBH)
     let cryptoGain = 0;
     let cryptoLosses = 0;
 
@@ -258,14 +333,14 @@ export async function GET(req: NextRequest) {
           while (unfilled > 0 && lots.length > 0) {
             const currentLot = lots[0];
             const matchedQty = Math.min(unfilled, currentLot.qty);
-            const costBasis = matchedQty * currentLot.price;
-            const saleProceeds = matchedQty * price;
-            const gain = saleProceeds - costBasis;
+            const costBasis = mulMoney(matchedQty, currentLot.price);
+            const saleProceeds = mulMoney(matchedQty, price);
+            const gain = subMoney(saleProceeds, costBasis);
 
             if (gain > 0) {
-              cryptoGain += gain;
+              cryptoGain = addMoney(cryptoGain, gain);
             } else {
-              cryptoLosses += Math.abs(gain);
+              cryptoLosses = addMoney(cryptoLosses, Math.abs(gain));
             }
 
             currentLot.qty -= matchedQty;
@@ -277,11 +352,11 @@ export async function GET(req: NextRequest) {
           }
 
           if (unfilled > 0) {
-            const saleProceeds = unfilled * price;
-            const costBasis = saleProceeds * 0.90;
-            const gain = saleProceeds - costBasis;
+            const saleProceeds = mulMoney(unfilled, price);
+            const costBasis = mulMoney(saleProceeds, 0.90);
+            const gain = subMoney(saleProceeds, costBasis);
             if (gain > 0) {
-              cryptoGain += gain;
+              cryptoGain = addMoney(cryptoGain, gain);
             }
           }
         }
@@ -289,28 +364,26 @@ export async function GET(req: NextRequest) {
     }
 
     // Section 70 & 71 Set-Off Rules:
-    // STCL can offset LTCG; LTCL cannot offset STCG.
-    // Crypto losses CANNOT offset any gains (Section 115BBH).
     let adjustedEquityLtcg = equityLtcgGain;
     let adjustedEquityStcg = equityStcgGain;
 
     if (adjustedEquityStcg < 0 && adjustedEquityLtcg > 0) {
       const offset = Math.min(Math.abs(adjustedEquityStcg), adjustedEquityLtcg);
-      adjustedEquityLtcg -= offset;
-      adjustedEquityStcg += offset;
+      adjustedEquityLtcg = subMoney(adjustedEquityLtcg, offset);
+      adjustedEquityStcg = addMoney(adjustedEquityStcg, offset);
     }
 
     // Union Budget 2024 revised Section 112A threshold: ₹1.25 Lakh
     const ltcgExemption = 125000.0;
-    const equityLtcgTaxable = Math.max(0, adjustedEquityLtcg - ltcgExemption);
-    const equityLtcgTax = Math.round(equityLtcgTaxable * 0.125 * 100) / 100;
-    const equityStcgTax = Math.round(Math.max(0, adjustedEquityStcg) * 0.20 * 100) / 100;
+    const equityLtcgTaxable = Math.max(0, subMoney(adjustedEquityLtcg, ltcgExemption));
+    const equityLtcgTax = roundMoney(mulMoney(equityLtcgTaxable, 0.125));
+    const equityStcgTax = roundMoney(mulMoney(Math.max(0, adjustedEquityStcg), 0.20));
 
     // Crypto flat 30% + 4% cess = 31.2% (Section 115BBH)
-    const cryptoTax = Math.round(cryptoGain * 0.312 * 100) / 100;
+    const cryptoTax = roundMoney(mulMoney(cryptoGain, 0.312));
 
-    const totalRealizedGains = Math.round((equityLtcgGain + equityStcgGain + cryptoGain) * 100) / 100;
-    const totalEstimatedTax = Math.round((equityLtcgTax + equityStcgTax + cryptoTax) * 100) / 100;
+    const totalRealizedGains = roundMoney(sumMoney([equityLtcgGain, equityStcgGain, cryptoGain]));
+    const totalEstimatedTax = roundMoney(sumMoney([equityLtcgTax, equityStcgTax, cryptoTax]));
 
     const advice: string[] = [];
     if (equityLtcgTaxable > 0) {
@@ -318,7 +391,7 @@ export async function GET(req: NextRequest) {
         `Equity LTCG exceeds the Section 112A ₹1.25 Lakh exemption limit by ₹${equityLtcgTaxable.toLocaleString("en-IN")}. You have an estimated 12.5% tax liability of ₹${equityLtcgTax.toLocaleString("en-IN")}.`
       );
     } else if (equityLtcgGain > 0) {
-      const remainingExemption = ltcgExemption - equityLtcgGain;
+      const remainingExemption = subMoney(ltcgExemption, equityLtcgGain);
       advice.push(
         `You have ₹${remainingExemption.toLocaleString("en-IN")} of tax-exempt Equity LTCG room available under Section 112A for AY ${assessmentYear}.`
       );
@@ -348,10 +421,10 @@ export async function GET(req: NextRequest) {
       taxRulesVersion: "Union Budget 2024 (Finance (No. 2) Act, 2024)",
       disclaimer: DISCLAIMER_TEXT,
       realized: {
-        equityLtcgGain: Math.round(equityLtcgGain * 100) / 100,
-        equityLtcgTaxable: Math.round(equityLtcgTaxable * 100) / 100,
+        equityLtcgGain: roundMoney(equityLtcgGain),
+        equityLtcgTaxable: roundMoney(equityLtcgTaxable),
         equityLtcgTax,
-        equityStcgGain: Math.round(equityStcgGain * 100) / 100,
+        equityStcgGain: roundMoney(equityStcgGain),
         equityStcgTax,
         debtGain: 0,
         debtTax: 0,
@@ -359,8 +432,8 @@ export async function GET(req: NextRequest) {
         bullionLtcgTax: 0,
         bullionStcgGain: 0,
         bullionStcgTax: 0,
-        cryptoGain: Math.round(cryptoGain * 100) / 100,
-        cryptoLosses: Math.round(cryptoLosses * 100) / 100,
+        cryptoGain: roundMoney(cryptoGain),
+        cryptoLosses: roundMoney(cryptoLosses),
         cryptoTax,
         fnoIncome: 0,
         fnoTax: 0,
@@ -368,20 +441,11 @@ export async function GET(req: NextRequest) {
         totalEstimatedTax,
       },
       harvestingOpportunities,
-      totalHarvestableLoss: Math.round(totalHarvestableLoss * 100) / 100,
-      totalPotentialTaxSavings: Math.round(totalPotentialTaxSavings * 100) / 100,
+      totalHarvestableLoss: roundMoney(totalHarvestableLoss),
+      totalPotentialTaxSavings: roundMoney(totalPotentialTaxSavings),
       advice,
     };
 
-    return apiSuccess(payload, { requestId, timestamp: new Date().toISOString() }, 200, req);
-  } catch (err: unknown) {
-    logger.error("Failed to execute tax harvesting calculation", "TaxAnalysis", err);
-    return apiError(
-      err instanceof Error ? err.message : "Internal tax calculation error",
-      "TAX_CALCULATION_ERROR",
-      500,
-      undefined,
-      req
-    );
-  }
-}
+    return payload;
+  },
+});

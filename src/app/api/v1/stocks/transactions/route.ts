@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { z } from "zod";
 
 const TransactionSchema = z.object({
@@ -120,6 +121,8 @@ export async function POST(req: NextRequest) {
       console.error("[Stock Txn] Insert error:", insertErr);
       return apiError(insertErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
+
+    await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
 
     return apiSuccess(
       {

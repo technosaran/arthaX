@@ -148,4 +148,202 @@ describe("ArthaX Financial Calculations Suite", () => {
       expect(() => executeTransfer(bank, bank, 1000)).toThrow("Accounts must be distinct");
     });
   });
+
+  describe("Adding Money & Net Worth Updates", () => {
+    it("adding money directly to an asset account increases balance and net worth", () => {
+      const initialAccounts: AccountItem[] = [
+        { id: "1", name: "HDFC Bank", type: "Savings", balance: 50000, classification: "asset" },
+        { id: "2", name: "Cash in Hand", type: "Liquid Cash", balance: 5000, classification: "asset" },
+      ];
+      const initialNetWorth = computeNetWorth(initialAccounts).netWorth;
+      expect(initialNetWorth).toBe(55000);
+
+      // Direct addition of ₹25,000 to HDFC Bank (e.g. Quick Add / Direct Deposit)
+      const depositAmount = 25000;
+      const updatedAccounts = initialAccounts.map((acc) =>
+        acc.id === "1"
+          ? { ...acc, balance: Number((acc.balance + depositAmount).toFixed(2)) }
+          : acc
+      );
+
+      const updated = computeNetWorth(updatedAccounts);
+      expect(updated.totalAssets).toBe(80000);
+      expect(updated.netWorth).toBe(80000);
+      expect(updated.netWorth - initialNetWorth).toBe(depositAmount);
+    });
+
+    it("adding money / paying down a liability account decreases debt and increases net worth", () => {
+      const initialAccounts: AccountItem[] = [
+        { id: "1", name: "HDFC Bank", type: "Savings", balance: 50000, classification: "asset" },
+        { id: "2", name: "Credit Card", type: "Credit Card", balance: 20000, classification: "liability" },
+      ];
+      const initialNetWorth = computeNetWorth(initialAccounts).netWorth;
+      expect(initialNetWorth).toBe(30000); // 50,000 - 20,000 = 30,000
+
+      // Paying down ₹10,000 to Credit Card directly
+      const depositAmount = 10000;
+      const updatedAccounts = initialAccounts.map((acc) =>
+        acc.id === "2"
+          ? { ...acc, balance: Math.max(0, Number((acc.balance - depositAmount).toFixed(2))) }
+          : acc
+      );
+
+      const updated = computeNetWorth(updatedAccounts);
+      expect(updated.totalLiabilities).toBe(10000);
+      expect(updated.netWorth).toBe(40000);
+      expect(updated.netWorth - initialNetWorth).toBe(depositAmount);
+    });
+
+    it("internal transfer moves money between accounts without altering net worth", () => {
+      const initialAccounts: AccountItem[] = [
+        { id: "1", name: "HDFC Bank", type: "Savings", balance: 50000, classification: "asset" },
+        { id: "2", name: "Cash in Hand", type: "Liquid Cash", balance: 10000, classification: "asset" },
+      ];
+      const initialNetWorth = computeNetWorth(initialAccounts).netWorth;
+
+      // Transfer ₹5,000 from Cash to Bank
+      const { fromBal, toBal } = executeTransfer(initialAccounts[1], initialAccounts[0], 5000);
+      const updatedAccounts = [
+        { ...initialAccounts[0], balance: toBal },
+        { ...initialAccounts[1], balance: fromBal },
+      ];
+
+      const updated = computeNetWorth(updatedAccounts);
+      expect(updated.netWorth).toBe(initialNetWorth);
+    });
+  });
+
+  describe("Income Edit Reconciliation & Account Sync", () => {
+    it("correctly reconciles account balance when income amount is edited", () => {
+      let bankAccount: AccountItem = {
+        id: "bank-1",
+        name: "HDFC Bank",
+        type: "Savings",
+        balance: 50000,
+        classification: "asset",
+      };
+
+      // User initially recorded salary of ₹50,000 (already in bankAccount.balance = 50,000)
+      const oldAmount = 50000;
+      const newAmount = 60000; // corrected salary to ₹60,000
+
+      const diff = newAmount - oldAmount; // +10,000
+      bankAccount = {
+        ...bankAccount,
+        balance: Math.round((bankAccount.balance + diff) * 100) / 100,
+      };
+
+      expect(bankAccount.balance).toBe(60000);
+      const res = computeNetWorth([bankAccount]);
+      expect(res.netWorth).toBe(60000);
+    });
+
+    it("correctly transfers credited funds when income account is changed", () => {
+      let hdfc: AccountItem = {
+        id: "hdfc-1",
+        name: "HDFC Bank",
+        type: "Savings",
+        balance: 50000, // holds the initial ₹50,000 salary
+        classification: "asset",
+      };
+      let icici: AccountItem = {
+        id: "icici-2",
+        name: "ICICI Bank",
+        type: "Savings",
+        balance: 20000,
+        classification: "asset",
+      };
+
+      const oldAmount = 50000;
+      const newAmount = 55000; // updated salary credited to ICICI instead of HDFC
+
+      // Revert old account
+      hdfc = {
+        ...hdfc,
+        balance: Math.round((hdfc.balance - oldAmount) * 100) / 100,
+      };
+      // Credit new account
+      icici = {
+        ...icici,
+        balance: Math.round((icici.balance + newAmount) * 100) / 100,
+      };
+
+      expect(hdfc.balance).toBe(0);
+      expect(icici.balance).toBe(75000);
+
+      const res = computeNetWorth([hdfc, icici]);
+      expect(res.netWorth).toBe(75000);
+    });
+  });
+
+  describe("Ledger Portfolio Balance & Liability Segregation", () => {
+    it("computes baseline and running balance subtracting liabilities", () => {
+      const accounts: AccountItem[] = [
+        { id: "1", name: "HDFC Bank", type: "Savings", balance: 100000, classification: "asset" },
+        { id: "2", name: "Credit Card", type: "Credit Card", balance: 30000, classification: "liability" },
+      ];
+
+      // Total portfolio balance in Ledger
+      const assets = accounts
+        .filter((a) => a.classification !== "liability")
+        .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
+      const liabilities = accounts
+        .filter((a) => a.classification === "liability")
+        .reduce((acc, curr) => acc + Math.abs(Number(curr.balance) || 0), 0);
+      const totalPortfolioBalance = assets - liabilities;
+
+      expect(totalPortfolioBalance).toBe(70000); // 1,00,000 - 30,000 = 70,000, NOT 1,30,000!
+
+      // Given ledger entries: Income 50k, Expense 20k
+      const totalCredits = 50000;
+      const totalDebits = 20000;
+      const baseline = totalPortfolioBalance - (totalCredits - totalDebits);
+      expect(baseline).toBe(40000);
+
+      // Running balance after entries:
+      let running = baseline;
+      running += 50000; // Credit
+      expect(running).toBe(90000);
+      running -= 20000; // Debit
+      expect(running).toBe(70000); // Concludes exactly at totalPortfolioBalance
+    });
+  });
+
+  describe("Concurrency Pending Refetch Queueing", () => {
+    it("ensures in-flight queries trigger a subsequent fetch when invalidated concurrently", async () => {
+      let fetchCallCount = 0;
+      const inFlightRef = { current: false };
+      const pendingRefetchRef = { current: false };
+
+      const fetchTelemetry = async () => {
+        if (inFlightRef.current) {
+          pendingRefetchRef.current = true;
+          return;
+        }
+        inFlightRef.current = true;
+        fetchCallCount += 1;
+
+        // Simulate async network latency
+        await new Promise((r) => setTimeout(r, 20));
+
+        inFlightRef.current = false;
+        if (pendingRefetchRef.current) {
+          pendingRefetchRef.current = false;
+          await fetchTelemetry();
+        }
+      };
+
+      // Call 1: Starts execution
+      const p1 = fetchTelemetry();
+      // Call 2: Arrives while p1 is in-flight (e.g. from user adding money or realtime event)
+      const p2 = fetchTelemetry();
+
+      await Promise.all([p1, p2]);
+
+      // Both initial and queued fetches must have executed
+      expect(fetchCallCount).toBe(2);
+      expect(pendingRefetchRef.current).toBe(false);
+      expect(inFlightRef.current).toBe(false);
+    });
+  });
 });

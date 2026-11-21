@@ -82,6 +82,7 @@ export default function BudgetsSection() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(initialBudgets.length === 0);
   const inFlightRef = useRef<{ budgets: boolean; expenses: boolean }>({ budgets: false, expenses: false });
+  const pendingRefetchRef = useRef<{ budgets: boolean; expenses: boolean }>({ budgets: false, expenses: false });
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [submittingCopy, setSubmittingCopy] = useState(false);
@@ -155,7 +156,11 @@ export default function BudgetsSection() {
 
   // 1. Fetch Budgets
   const fetchBudgets = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current.budgets) return;
+    if (!user) return;
+    if (inFlightRef.current.budgets) {
+      pendingRefetchRef.current.budgets = true;
+      return;
+    }
     inFlightRef.current.budgets = true;
     setErrorMsg(null);
     try {
@@ -196,12 +201,20 @@ export default function BudgetsSection() {
     } finally {
       setLoading(false);
       inFlightRef.current.budgets = false;
+      if (pendingRefetchRef.current.budgets) {
+        pendingRefetchRef.current.budgets = false;
+        fetchBudgets(true);
+      }
     }
   }, [user, redisBudgetsKey]);
 
   // 2. Fetch Expenses
   const fetchExpenses = useCallback(async () => {
-    if (!user || inFlightRef.current.expenses) return;
+    if (!user) return;
+    if (inFlightRef.current.expenses) {
+      pendingRefetchRef.current.expenses = true;
+      return;
+    }
     inFlightRef.current.expenses = true;
     try {
       const supabase = createClient();
@@ -229,6 +242,10 @@ export default function BudgetsSection() {
       // Non-blocking
     } finally {
       inFlightRef.current.expenses = false;
+      if (pendingRefetchRef.current.expenses) {
+        pendingRefetchRef.current.expenses = false;
+        fetchExpenses();
+      }
     }
   }, [user]);
 

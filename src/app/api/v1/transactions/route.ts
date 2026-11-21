@@ -1,10 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
-import { apiSuccess, apiError, apiUnauthorized, apiValidationError, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
-import { logger } from "@/utils/logger";
+import { apiSuccess, apiError } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { z } from "zod";
 
 const TransactionSchema = z.object({
@@ -28,33 +25,18 @@ function getMonthBounds(monthStr: string): { start: string; nextMonthStart: stri
   return { start, nextMonthStart };
 }
 
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+export const GET = createApiRoute({
+  rateLimit: { limit: 120, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const type = query.get("type") || "all"; // 'all' | 'expense' | 'income'
+    const month = query.get("month"); // 'YYYY-MM'
+    const accountId = query.get("account_id");
+    const category = query.get("category");
+    const search = query.get("search");
+    const limit = Math.min(parseInt(query.get("limit") || "50", 10), 100);
+    const page = Math.max(parseInt(query.get("page") || "1", 10), 1);
+    const offset = (page - 1) * limit;
 
-  // Rate limit queries
-  const rl = await rateLimit(`txn_get:${userId}`, 120, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests. Please slow down.", requestId },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  const { searchParams } = new URL(req.url);
-  const type = searchParams.get("type") || "all"; // 'all' | 'expense' | 'income'
-  const month = searchParams.get("month"); // 'YYYY-MM'
-  const accountId = searchParams.get("account_id");
-  const category = searchParams.get("category");
-  const search = searchParams.get("search");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100);
-  const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
-  const offset = (page - 1) * limit;
-
-  try {
     type SupabaseListResult = { data: Record<string, unknown>[] | null; count: number | null; error: { message: string } | null };
     let expensesPromise: Promise<SupabaseListResult> = Promise.resolve({ data: [], count: 0, error: null });
     let incomePromise: Promise<SupabaseListResult> = Promise.resolve({ data: [], count: 0, error: null });
@@ -63,7 +45,7 @@ export async function GET(req: NextRequest) {
       let expQuery = supabaseAdmin
         .from("expenses")
         .select("*, account:accounts(name, type, last_four, classification)", { count: "exact" })
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("expense_date", { ascending: false });
 
       if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -74,7 +56,6 @@ export async function GET(req: NextRequest) {
       if (category) expQuery = expQuery.eq("category", category);
       if (search) expQuery = expQuery.ilike("title", `%${search}%`);
 
-      // For unified streams, query from 0 to offset + limit - 1 so globally sorted pagination is correct
       const queryStart = type === "all" ? 0 : offset;
       const queryEnd = type === "all" ? offset + limit - 1 : offset + limit - 1;
       expensesPromise = expQuery.range(queryStart, queryEnd) as unknown as Promise<SupabaseListResult>;
@@ -84,7 +65,7 @@ export async function GET(req: NextRequest) {
       let incQuery = supabaseAdmin
         .from("income")
         .select("*, account:accounts(name, type, last_four, classification)", { count: "exact" })
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("received_date", { ascending: false });
 
       if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -132,55 +113,20 @@ export async function GET(req: NextRequest) {
       200,
       req
     );
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch transactions";
-    logger.error("Transaction fetch error", "TransactionsAPI", err, { userId, requestId });
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});
 
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  // Idempotency support
-  const idempotencyKey = req.headers.get("idempotency-key");
-  if (idempotencyKey) {
-    const isFirstTime = await checkAndSetIdempotency(`txn:${userId}:${idempotencyKey}`, 86400);
-    if (!isFirstTime) {
-      return NextResponse.json(
-        { success: false, error: "Duplicate transaction rejected (Idempotency conflict)", requestId },
-        { status: 409, headers: { "X-Request-Id": requestId } }
-      );
-    }
-  }
-
-  // Rate limit creation
-  const rl = await rateLimit(`txn_post:${userId}`, 60, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Rate limit exceeded. Please wait a moment before logging again.", requestId },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
-    const rawBody = await req.json();
-    const parseResult = TransactionSchema.safeParse(rawBody);
-
-    if (!parseResult.success) {
-      return apiValidationError(parseResult.error.format(), "Validation failed", req);
-    }
-
-    const data = parseResult.data;
-
+export const POST = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  idempotent: true,
+  schema: TransactionSchema,
+  handler: async ({ userId, body, req }) => {
+    const data = body;
     let rpcResponse: unknown;
+
     if (data.type === "expense") {
       const { data: result, error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
-        p_user_id: userId,
+        p_user_id: userId!,
         p_title: data.title,
         p_amount: data.amount,
         p_category: data.category,
@@ -193,7 +139,7 @@ export async function POST(req: NextRequest) {
       rpcResponse = result;
     } else {
       const { data: result, error: rpcErr } = await supabaseAdmin.rpc("fn_record_income_atomic", {
-        p_user_id: userId,
+        p_user_id: userId!,
         p_title: data.title,
         p_amount: data.amount,
         p_category: data.category,
@@ -207,79 +153,54 @@ export async function POST(req: NextRequest) {
       rpcResponse = result;
     }
 
-    // Invalidate affected caches including analytics
-    try {
-      const monthPrefix = data.date.slice(0, 7);
-      await invalidateCachedData([
-        getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(userId, CACHE_KEYS.INCOME),
-        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
-        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
-        getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
-        getUserCacheKey(userId, `analytics:${monthPrefix}`),
-      ]);
-    } catch {}
+    const monthPrefix = data.date.slice(0, 7);
+    await invalidateUserCaches(
+      userId,
+      ["EXPENSES", "INCOME", "ACCOUNTS", "PORTFOLIO", "LEDGER", "BUDGETS", "ANALYTICS"],
+      { monthPrefix }
+    );
 
     return apiSuccess(rpcResponse, undefined, 201, req);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to record transaction";
-    logger.error("Failed to record transaction", "TransactionsAPI", err, { userId, requestId });
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});
 
-export async function DELETE(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+export const DELETE = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const id = query.get("id");
+    const type = query.get("type"); // 'expense' | 'income'
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-  const type = searchParams.get("type"); // 'expense' | 'income'
+    if (!id || !/^[0-9a-fA-F-]{36}$/.test(id) || !type || !["expense", "income"].includes(type)) {
+      return apiError("Missing or invalid id / type parameters", "BAD_REQUEST", 400, undefined, req);
+    }
 
-  if (!id || !/^[0-9a-fA-F-]{36}$/.test(id) || !type || !["expense", "income"].includes(type)) {
-    return NextResponse.json(
-      { success: false, error: "Missing or invalid id / type parameters", requestId },
-      { status: 400, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
     let result: unknown;
     if (type === "expense") {
       const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_delete_expense_atomic", {
         p_expense_id: id,
-        p_user_id: userId,
+        p_user_id: userId!,
       });
       if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       result = rpcResult;
     } else {
       const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc("fn_delete_income_atomic", {
         p_income_id: id,
-        p_user_id: userId,
+        p_user_id: userId!,
       });
       if (rpcErr) return apiError(rpcErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
       result = rpcResult;
     }
 
-    try {
-      await invalidateCachedData([
-        getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(userId, CACHE_KEYS.INCOME),
-        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
-        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
-        getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
-      ]);
-    } catch {}
+    await invalidateUserCaches(userId, [
+      "EXPENSES",
+      "INCOME",
+      "ACCOUNTS",
+      "PORTFOLIO",
+      "LEDGER",
+      "BUDGETS",
+      "ANALYTICS",
+    ]);
 
-    return apiSuccess(result, undefined, 200, req);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to delete transaction";
-    logger.error("Failed to delete transaction", "TransactionsAPI", err, { userId, requestId });
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return result;
+  },
+});

@@ -228,6 +228,38 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   const [syncingBinance, setSyncingBinance] = useState(false);
   const inFlightBinanceRef = useRef(false);
 
+  // Gmail Bank Statement Integration State
+  const [gmailStatus, setGmailStatus] = useState<{
+    connected: boolean;
+    email: string | null;
+    syncStatus: string;
+    lastSyncAt: string | null;
+    errorDetails: string | null;
+    passwordHintsCount: number;
+    latestJob: any | null;
+  }>({
+    connected: false,
+    email: null,
+    syncStatus: "DISCONNECTED",
+    lastSyncAt: null,
+    errorDetails: null,
+    passwordHintsCount: 0,
+    latestJob: null,
+  });
+  const [loadingGmail, setLoadingGmail] = useState(false);
+  const [connectingGmail, setConnectingGmail] = useState(false);
+  const [syncingGmail, setSyncingGmail] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState("");
+  const [gmailPasswordHint, setGmailPasswordHint] = useState("");
+  const [gmailBankFilter, setGmailBankFilter] = useState("ALL");
+  const [lastSyncResult, setLastSyncResult] = useState<{
+    statementsCount: number;
+    transactionsExtracted: number;
+    accountsCreated: string[];
+    message?: string;
+  } | null>(null);
+  const inFlightGmailRef = useRef(false);
+
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -456,6 +488,36 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
   }, []);
 
+  const fetchGmailStatus = useCallback(async (showLoading = false) => {
+    if (inFlightGmailRef.current) return;
+    inFlightGmailRef.current = true;
+    if (showLoading) setLoadingGmail(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/gmail", { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setGmailStatus(json.data);
+          if (json.data.email && !gmailEmail) {
+            setGmailEmail(json.data.email);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch Gmail status:", err);
+    } finally {
+      inFlightGmailRef.current = false;
+      setLoadingGmail(false);
+    }
+  }, [gmailEmail]);
+
   useEffect(() => {
     refreshCounts();
 
@@ -493,8 +555,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       fetchTelegramStatus(false);
       fetchZerodhaStatus(false);
       fetchBinanceStatus(false);
+      fetchGmailStatus(false);
     }
-  }, [fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, activeTab]);
+  }, [fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, activeTab]);
 
   // Sync profile telegram changes if profile arrives after mount
   useEffect(() => {
@@ -520,11 +583,13 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       fetchTelegramStatus(false);
       fetchZerodhaStatus(false);
       fetchBinanceStatus(false);
+      fetchGmailStatus(false);
 
       const onFocus = () => {
         fetchTelegramStatus(false);
         fetchZerodhaStatus(false);
         fetchBinanceStatus(false);
+        fetchGmailStatus(false);
       };
       window.addEventListener("focus", onFocus);
 
@@ -539,7 +604,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         clearInterval(interval);
       };
     }
-  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus]);
+  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus]);
 
   // Handle Zerodha URL Redirects / Callbacks and section deep links
   useEffect(() => {
@@ -819,6 +884,137 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       }
     } catch (err: any) {
       showToast("Disconnect Error", "Failed to disconnect Binance.", "error");
+    }
+  };
+
+  const handleConnectGmail = async () => {
+    const targetEmail = gmailEmail.trim().toLowerCase() || user?.email?.toLowerCase();
+    if (!targetEmail) {
+      showToast("Missing Email", "Please enter a valid Gmail address.", "error");
+      return;
+    }
+    setConnectingGmail(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/gmail", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          email: targetEmail,
+          password_hint: gmailPasswordHint.trim() || undefined,
+          bank_name: gmailBankFilter,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showToast("Connection Error", json.error?.message || (typeof json.error === "string" ? json.error : "Failed to connect Gmail integration."), "error");
+        return;
+      }
+
+      showToast("Gmail Connected!", json.data?.message || "Gmail statement reader connected successfully.", "success");
+      setGmailPasswordHint("");
+      await fetchGmailStatus(true);
+    } catch (err: any) {
+      showToast("Connection Error", err?.message || "Error connecting to Gmail", "error");
+    } finally {
+      setConnectingGmail(false);
+    }
+  };
+
+  const handleSyncGmail = async () => {
+    setSyncingGmail(true);
+    setLastSyncResult(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/gmail/sync", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showToast("Gmail Sync Failed", json.error?.message || (typeof json.error === "string" ? json.error : "Failed to sync Gmail bank statements."), "error");
+        return;
+      }
+
+      const syncData = json.data;
+      const extractedCount = syncData.transactionsImported ?? syncData.transactionsExtracted ?? 0;
+      setLastSyncResult({
+        statementsCount: syncData.statementsCount || 0,
+        transactionsExtracted: extractedCount,
+        accountsCreated: syncData.accountsCreated || [],
+        message: syncData.message,
+      });
+
+      let successDetail = `Processed ${syncData.statementsCount || 0} statement(s), extracted ${extractedCount} transaction(s).`;
+      if (syncData.accountsCreated && syncData.accountsCreated.length > 0) {
+        successDetail += ` Auto-created accounts: ${syncData.accountsCreated.join(", ")}.`;
+      }
+      showToast("Statements Synced!", successDetail, "success");
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
+      }
+
+      refreshCounts();
+      await fetchGmailStatus(false);
+    } catch (err: any) {
+      showToast("Sync Error", err?.message || "Error syncing Gmail statements", "error");
+    } finally {
+      setSyncingGmail(false);
+    }
+  };
+
+  const handleDisconnectGmail = async () => {
+    if (!window.confirm("Are you sure you want to disconnect Gmail statement reader?")) {
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/integrations/gmail", {
+        method: "DELETE",
+        headers,
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        showToast("Gmail Disconnected", "Statement discovery integration removed.", "info");
+        setGmailStatus({
+          connected: false,
+          email: null,
+          syncStatus: "DISCONNECTED",
+          lastSyncAt: null,
+          errorDetails: null,
+          passwordHintsCount: 0,
+          latestJob: null,
+        });
+        setLastSyncResult(null);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
+        }
+      }
+    } catch (err: any) {
+      showToast("Disconnect Error", "Failed to disconnect Gmail.", "error");
     }
   };
 
@@ -2267,6 +2463,215 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           />
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* GMAIL BANK STATEMENT INTEGRATION CARD */}
+            <Card className="p-6 sm:p-7 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/25 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <Mail size={20} className="text-rose-500" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold tracking-tight">Gmail Bank Statement Discovery</h2>
+                      <Badge variant="rose" className="text-[10px]">
+                        Auto Account Creation
+                      </Badge>
+                    </div>
+                    <p className="text-xs opacity-60">
+                      Auto-discover monthly e-statements (SBI, HDFC, ICICI, etc.) and automatically create account cards
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {loadingGmail ? (
+                    <Badge variant="neutral" className="opacity-75 animate-pulse flex items-center gap-1.5 text-[10px]">
+                      <Loader2 size={11} className="animate-spin text-rose-500" />
+                      <span>Checking...</span>
+                    </Badge>
+                  ) : gmailStatus.connected ? (
+                    <Badge variant="emerald" dot>
+                      Connected: {gmailStatus.email}
+                    </Badge>
+                  ) : (
+                    <Badge variant="neutral">Not Linked</Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Status or Configuration */}
+              {gmailStatus.connected ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                      <div>
+                        <div className="font-semibold text-[var(--app-foreground)] flex items-center gap-2">
+                          <CheckCircle2 size={15} className="text-emerald-400" />
+                          <span>Active Connection: {gmailStatus.email}</span>
+                        </div>
+                        <p className="text-[11px] opacity-60 mt-0.5">
+                          {gmailStatus.lastSyncAt
+                            ? `Last synchronized: ${new Date(gmailStatus.lastSyncAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+                            : "Ready for statement discovery sync"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={syncingGmail}
+                          onClick={handleSyncGmail}
+                          className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
+                        >
+                          <RefreshCw size={12} className={syncingGmail ? "animate-spin" : ""} />
+                          <span>{syncingGmail ? "Scanning Statements..." : "Sync Bank Statements Now"}</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={syncingGmail}
+                          onClick={handleDisconnectGmail}
+                          className="text-rose-400 hover:text-rose-300 hover:border-rose-500/40"
+                        >
+                          Disconnect
+                        </Button>
+                      </div>
+                    </div>
+
+                    {gmailStatus.passwordHintsCount > 0 && (
+                      <div className="text-[11px] text-emerald-400/90 flex items-center gap-1.5 pt-1 border-t border-[var(--app-border-subtle)]">
+                        <KeyRound size={12} />
+                        <span>{gmailStatus.passwordHintsCount} encrypted statement decryption hint(s) stored</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sync results banner */}
+                  {lastSyncResult && (
+                    <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs space-y-2 animate-in fade-in duration-200">
+                      <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 size={14} />
+                        <span>Discovery &amp; Ingestion Completed</span>
+                      </div>
+                      <div className="text-[11px] opacity-80 space-y-1">
+                        <div>Found and processed: <strong>{lastSyncResult.statementsCount}</strong> bank statement(s)</div>
+                        <div>Extracted: <strong>{lastSyncResult.transactionsExtracted}</strong> transaction(s)</div>
+                        {lastSyncResult.accountsCreated && lastSyncResult.accountsCreated.length > 0 && (
+                          <div className="text-emerald-300 font-semibold flex items-center gap-1.5 mt-1.5 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                            <Landmark size={14} className="text-emerald-400 flex-shrink-0" />
+                            <span>Auto-created account cards: {lastSyncResult.accountsCreated.join(", ")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional Password Hint Update */}
+                  <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-3">
+                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
+                      <KeyRound size={13} className="text-rose-400" />
+                      <span>Add / Update PDF Decryption Password Hint:</span>
+                    </div>
+                    <p className="text-[11px] opacity-70">
+                      Bank statements (e.g. SBI, HDFC, ICICI) are password-protected PDFs. Standard passwords are your Date of Birth in <code className="font-mono bg-[var(--app-bg)] px-1 rounded">DDMMYYYY</code> format or PAN in uppercase.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="password"
+                        placeholder="e.g. 01011995 or ABCDE1234F"
+                        value={gmailPasswordHint}
+                        onChange={(e) => setGmailPasswordHint(e.target.value)}
+                        className="font-mono text-xs max-w-sm"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={connectingGmail || !gmailPasswordHint.trim()}
+                        onClick={handleConnectGmail}
+                      >
+                        {connectingGmail ? "Saving..." : "Save Hint"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Instructions */}
+                  <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2">
+                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
+                      <Zap size={13} className="text-amber-400" />
+                      <span>How Gmail Statement Discovery Works:</span>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1 opacity-80 text-[11px] leading-relaxed">
+                      <li>Connect your primary banking email address below.</li>
+                      <li>ArthaX discovers incoming bank e-statements (SBI, HDFC, ICICI, Axis, Kotak, etc.).</li>
+                      <li>When a statement is found, <strong>ArthaX automatically creates the account card</strong> in your Accounts tab with live balance and asset classification.</li>
+                      <li>Your Net Worth immediately updates without any manual calculations.</li>
+                    </ol>
+                  </div>
+
+                  {/* Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                        Gmail Address
+                      </label>
+                      <Input
+                        type="email"
+                        placeholder="e.g. yourname@gmail.com"
+                        value={gmailEmail || (user?.email || "")}
+                        onChange={(e) => setGmailEmail(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                        PDF Decryption Hint (Optional)
+                      </label>
+                      <Input
+                        type="password"
+                        placeholder="DOB (DDMMYYYY) or PAN"
+                        value={gmailPasswordHint}
+                        onChange={(e) => setGmailPasswordHint(e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-[var(--app-border-subtle)]">
+                    <div className="text-[11px] opacity-60 flex items-center gap-1.5">
+                      <Landmark size={12} className="text-rose-400" />
+                      <span>Supports SBI, HDFC, ICICI, Axis, Kotak, PNB, Canara &amp; more</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={connectingGmail || (!gmailEmail.trim() && !user?.email)}
+                        onClick={handleConnectGmail}
+                        className="gap-2 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
+                      >
+                        {connectingGmail ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin text-white" />
+                            <span>Connecting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mail size={14} />
+                            <span>Connect Gmail &amp; Enable Auto-Discovery</span>
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>

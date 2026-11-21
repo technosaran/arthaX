@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { rateLimit } from "@/utils/rateLimit";
 import { z } from "zod";
 
@@ -179,6 +180,8 @@ export async function POST(req: NextRequest) {
       return apiError(updateHoldErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
+    await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
+
     return apiSuccess(
       {
         transaction: tx,
@@ -221,6 +224,8 @@ export async function DELETE(req: NextRequest) {
       console.error("[MF Transactions API] Delete error:", delErr);
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
+
+    await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
 
     return apiSuccess({ deletedId: id }, undefined, 200, req);
   } catch (err) {

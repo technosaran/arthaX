@@ -142,6 +142,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   const [transfers, setTransfers] = useState<TransferItem[]>(initialCache?.transfers || []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
   const inFlightRef = useRef<boolean>(false);
+  const pendingRefetchRef = useRef<boolean>(false);
 
   const displayName = profile?.name || name;
 
@@ -175,7 +176,11 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user || inFlightRef.current) return;
+    if (!user) return;
+    if (inFlightRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
     inFlightRef.current = true;
 
     try {
@@ -354,6 +359,10 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     } finally {
       setLoading(false);
       inFlightRef.current = false;
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        fetchDashboardData();
+      }
     }
   }, [user, redisPortfolioKey, profile?.name]);
 
@@ -390,6 +399,31 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "income", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "transfers", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stock_holdings", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "mutual_fund_holdings", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bullion_holdings", filter: `user_id=eq.${user.id}` },
+        () => fetchDashboardData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bond_holdings", filter: `user_id=eq.${user.id}` },
         () => fetchDashboardData()
       )
       .on(
@@ -478,20 +512,28 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   const totalAssets = useMemo(() => {
     const liquidAssets = accounts
       .filter((a) => a.classification !== "liability")
-      .reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
+      .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
     return liquidAssets + (investmentsBreakdown?.total || 0);
   }, [accounts, investmentsBreakdown]);
 
   const totalLiabilities = useMemo(() => {
     return accounts
       .filter((a) => a.classification === "liability")
-      .reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.balance) || 0), 0);
   }, [accounts]);
+
+  // Derived Net Worth (Guaranteed mathematically consistent with totalAssets - totalLiabilities)
+  const calculatedNetWorth = useMemo(() => {
+    if (accounts.length > 0 || (investmentsBreakdown?.total || 0) > 0) {
+      return totalAssets - totalLiabilities;
+    }
+    return netWorth;
+  }, [totalAssets, totalLiabilities, accounts.length, investmentsBreakdown?.total, netWorth]);
 
   // Currency-Specific Independent Values (No conversion applied)
   const displayedNetWorth = useMemo(() => {
-    return currencyView === "USD" ? totalCryptoUsd : netWorth;
-  }, [currencyView, totalCryptoUsd, netWorth]);
+    return currencyView === "USD" ? totalCryptoUsd : calculatedNetWorth;
+  }, [currencyView, totalCryptoUsd, calculatedNetWorth]);
 
   const displayedAssets = useMemo(() => {
     return currencyView === "USD" ? totalCryptoUsd : totalAssets;
@@ -945,7 +987,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 <InteractiveDonutChart
                   title={currencyView === "USD" ? "Binance Crypto Allocation" : "Portfolio Asset Allocation"}
                   totalLabel={currencyView === "USD" ? "Crypto Assets (USD)" : "Total Assets"}
-                  totalValue={currencyView === "USD" ? displayedAssets : (totalAssets > 0 ? totalAssets : netWorth)}
+                  totalValue={currencyView === "USD" ? displayedAssets : (totalAssets > 0 ? totalAssets : calculatedNetWorth)}
                   segments={currencyView === "USD" ? cryptoDonutSegments : donutSegments}
                   formatter={currencyView === "USD" ? formatUSD : formatCurrency}
                   unitLabel={currencyView === "USD" ? "Coin" : "Class"}

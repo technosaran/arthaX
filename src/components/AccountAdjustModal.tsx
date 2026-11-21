@@ -14,6 +14,7 @@ import BankLogo from "@/components/BankLogo";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
+import { invalidateAllFinancialCache } from "@/utils/cacheClient";
 
 export interface AccountItem {
   id: string;
@@ -74,8 +75,8 @@ export default function AccountAdjustModal({
   const [mode, setMode] = useState<"deposit" | "withdraw" | "adjust">(initialMode);
 
   // Sub-modes
-  const [depositType, setDepositType] = useState<"transfer" | "income" | "direct">("transfer");
-  const [withdrawType, setWithdrawType] = useState<"transfer" | "expense" | "direct">("transfer");
+  const [depositType, setDepositType] = useState<"transfer" | "income" | "direct">("direct");
+  const [withdrawType, setWithdrawType] = useState<"transfer" | "expense" | "direct">("direct");
   const [adjustType, setAdjustType] = useState<"add" | "subtract" | "set">("add");
 
   // Form Fields
@@ -109,7 +110,7 @@ export default function AccountAdjustModal({
     const firstOther = accounts.find((a) => a.id !== account.id);
 
     if (initialMode === "deposit") {
-      // If depositing into bank, default source is Cash in Hand (if available and different)
+      setDepositType("direct");
       if (!isTargetCash && cashAcc && cashAcc.id !== account.id) {
         setFromAccountId(cashAcc.id);
       } else if (firstOther) {
@@ -121,8 +122,8 @@ export default function AccountAdjustModal({
       setTitle(`Deposit to ${account.name}`);
       setCategory("Cash Deposit");
     } else if (initialMode === "withdraw") {
+      setWithdrawType("direct");
       setFromAccountId(account.id);
-      // If withdrawing from bank, default destination is Cash in Hand
       if (!isTargetCash && cashAcc && cashAcc.id !== account.id) {
         setToAccountId(cashAcc.id);
       } else if (firstOther) {
@@ -180,6 +181,15 @@ export default function AccountAdjustModal({
             setSubmitting(false);
             return;
           }
+          if (sourceAccount && sourceAccount.classification !== "liability" && sourceAccount.balance < parsedAmount) {
+            showToast(
+              "Insufficient Balance",
+              `${sourceAccount.name} only has ${formatINR(sourceAccount.balance)}. Please select another source or use "Quick Add".`,
+              "warning"
+            );
+            setSubmitting(false);
+            return;
+          }
 
           const { error } = await supabase.rpc("fn_record_transfer_atomic", {
             p_user_id: user.id,
@@ -231,7 +241,21 @@ export default function AccountAdjustModal({
             setSubmitting(false);
             return;
           }
-          const newBalance = Number((account.balance + parsedAmount).toFixed(2));
+          // Fetch freshest account balance to prevent stale override
+          const { data: freshAcc } = await supabase
+            .from("accounts")
+            .select("balance, classification")
+            .eq("id", account.id)
+            .eq("user_id", user.id)
+            .single();
+
+          const baseBal = freshAcc ? Number(freshAcc.balance) || 0 : account.balance;
+          const isLiability = (freshAcc?.classification || account.classification) === "liability";
+          // If liability (debt), depositing/adding money reduces the debt. If asset, it increases balance.
+          const newBalance = isLiability
+            ? Math.max(0, Number((baseBal - parsedAmount).toFixed(2)))
+            : Number((baseBal + parsedAmount).toFixed(2));
+
           const { error } = await supabase
             .from("accounts")
             .update({ balance: newBalance })
@@ -241,7 +265,7 @@ export default function AccountAdjustModal({
           if (error) throw error;
 
           showToast(
-            "Balance Increased",
+            isLiability ? "Debt Reduced" : "Balance Increased",
             `${account.name} balance updated to ${formatINR(newBalance)}.`,
             "success"
           );
@@ -261,6 +285,15 @@ export default function AccountAdjustModal({
           }
           if (parsedAmount <= 0) {
             showToast("Invalid Amount", "Please enter an amount greater than zero.", "warning");
+            setSubmitting(false);
+            return;
+          }
+          if (sourceAccount && sourceAccount.classification !== "liability" && sourceAccount.balance < parsedAmount) {
+            showToast(
+              "Insufficient Balance",
+              `${sourceAccount.name} only has ${formatINR(sourceAccount.balance)}. Please select another source or use "Quick Add".`,
+              "warning"
+            );
             setSubmitting(false);
             return;
           }
@@ -314,7 +347,21 @@ export default function AccountAdjustModal({
             setSubmitting(false);
             return;
           }
-          const newBalance = Math.max(0, Number((account.balance - parsedAmount).toFixed(2)));
+          // Fetch freshest account balance to prevent stale override
+          const { data: freshAcc } = await supabase
+            .from("accounts")
+            .select("balance, classification")
+            .eq("id", account.id)
+            .eq("user_id", user.id)
+            .single();
+
+          const baseBal = freshAcc ? Number(freshAcc.balance) || 0 : account.balance;
+          const isLiability = (freshAcc?.classification || account.classification) === "liability";
+          // If liability (debt), withdrawing/drawing increases the debt. If asset, it decreases balance.
+          const newBalance = isLiability
+            ? Number((baseBal + parsedAmount).toFixed(2))
+            : Math.max(0, Number((baseBal - parsedAmount).toFixed(2)));
+
           const { error } = await supabase
             .from("accounts")
             .update({ balance: newBalance })
@@ -324,13 +371,14 @@ export default function AccountAdjustModal({
           if (error) throw error;
 
           showToast(
-            "Balance Deducted",
+            isLiability ? "Debt Increased" : "Balance Deducted",
             `${account.name} balance updated to ${formatINR(newBalance)}.`,
             "success"
           );
         }
       } else {
         // Direct Adjust / Calibrate
+        const isLiability = account.classification === "liability";
         let newBalance = account.balance;
         if (adjustType === "add") {
           if (parsedAmount <= 0) {
@@ -338,14 +386,18 @@ export default function AccountAdjustModal({
             setSubmitting(false);
             return;
           }
-          newBalance = Number((account.balance + parsedAmount).toFixed(2));
+          newBalance = isLiability
+            ? Math.max(0, Number((account.balance - parsedAmount).toFixed(2)))
+            : Number((account.balance + parsedAmount).toFixed(2));
         } else if (adjustType === "subtract") {
           if (parsedAmount <= 0) {
             showToast("Invalid Amount", "Please enter an amount to deduct.", "warning");
             setSubmitting(false);
             return;
           }
-          newBalance = Math.max(0, Number((account.balance - parsedAmount).toFixed(2)));
+          newBalance = isLiability
+            ? Number((account.balance + parsedAmount).toFixed(2))
+            : Math.max(0, Number((account.balance - parsedAmount).toFixed(2)));
         } else {
           const parsedExact = parseFloat(exactBalanceInput);
           if (isNaN(parsedExact) || parsedExact < 0) {
@@ -371,6 +423,9 @@ export default function AccountAdjustModal({
         );
       }
 
+      if (user?.id) {
+        await invalidateAllFinancialCache(user.id);
+      }
       await onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -462,14 +517,14 @@ export default function AccountAdjustModal({
               <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[var(--app-card)] border border-[var(--app-border-subtle)] text-[11px] font-medium">
                 <button
                   type="button"
-                  onClick={() => setDepositType("transfer")}
+                  onClick={() => setDepositType("direct")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
-                    depositType === "transfer"
+                    depositType === "direct"
                       ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
                       : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
-                  Transfer In
+                  Quick Add
                 </button>
                 <button
                   type="button"
@@ -484,16 +539,23 @@ export default function AccountAdjustModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDepositType("direct")}
+                  onClick={() => setDepositType("transfer")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
-                    depositType === "direct"
+                    depositType === "transfer"
                       ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
                       : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
-                  Direct Adjust
+                  Transfer from Account
                 </button>
               </div>
+
+              {/* Informative banner for internal transfer */}
+              {depositType === "transfer" && (
+                <div className="p-2.5 rounded-lg text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">
+                  ℹ️ Internal transfers move funds between your existing accounts. Total portfolio net worth remains unchanged.
+                </div>
+              )}
 
               {/* DEPOSIT: TRANSFER FROM ANOTHER ACCOUNT */}
               {depositType === "transfer" && (
@@ -594,14 +656,14 @@ export default function AccountAdjustModal({
               <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[var(--app-card)] border border-[var(--app-border-subtle)] text-[11px] font-medium">
                 <button
                   type="button"
-                  onClick={() => setWithdrawType("transfer")}
+                  onClick={() => setWithdrawType("direct")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
-                    withdrawType === "transfer"
+                    withdrawType === "direct"
                       ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
                       : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
-                  Transfer Out
+                  Quick Deduct
                 </button>
                 <button
                   type="button"
@@ -616,16 +678,23 @@ export default function AccountAdjustModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setWithdrawType("direct")}
+                  onClick={() => setWithdrawType("transfer")}
                   className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
-                    withdrawType === "direct"
+                    withdrawType === "transfer"
                       ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30"
                       : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
                   }`}
                 >
-                  Direct Adjust
+                  Transfer to Account
                 </button>
               </div>
+
+              {/* Informative banner for internal transfer */}
+              {withdrawType === "transfer" && (
+                <div className="p-2.5 rounded-lg text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">
+                  ℹ️ Internal transfers move funds between your existing accounts. Total portfolio net worth remains unchanged.
+                </div>
+              )}
 
               {/* WITHDRAW: TRANSFER TO DESTINATION */}
               {withdrawType === "transfer" && (
@@ -872,14 +941,14 @@ export default function AccountAdjustModal({
                 ? depositType === "transfer"
                   ? "Transfer In"
                   : depositType === "income"
-                  ? "Record Income"
-                  : "Update Balance"
+                  ? "Record Income & Credit"
+                  : "Add to Balance"
                 : mode === "withdraw"
                 ? withdrawType === "transfer"
                   ? "Transfer Out"
                   : withdrawType === "expense"
-                  ? "Record Expense"
-                  : "Update Balance"
+                  ? "Record Expense & Deduct"
+                  : "Deduct from Balance"
                 : "Update Balance"}
             </Button>
           </div>

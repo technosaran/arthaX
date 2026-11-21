@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
+import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit } from "@/utils/rateLimit";
+import { apiError, apiSuccess } from "@/utils/apiResponse";
 import { calculateZerodhaCharges } from "@/utils/fnoCalculations";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { z } from "zod";
 
 export { calculateZerodhaCharges };
@@ -40,28 +40,21 @@ const SquareOffPositionSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
-
-
 // GET: Fetch all open & closed F&O positions + trade history
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const GET = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const [positionsRes, tradesRes] = await Promise.all([
       supabaseAdmin
         .from("fno_positions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("fno_trades")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("trade_date", { ascending: false })
         .limit(100),
     ]);
@@ -71,39 +64,24 @@ export async function GET(req: NextRequest) {
       return apiError(positionsRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
+    return apiSuccess(
       {
-        success: true,
         positions: positionsRes.data || [],
         trades: tradesRes.data || [],
       },
-      { headers: { "X-Request-Id": requestId } }
+      undefined,
+      200,
+      req
     );
-  } catch (err) {
-    console.error("[F&O API] Unexpected error:", err);
-    return apiError("Failed to fetch F&O derivatives data", "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});
 
 // POST: Add new F&O position (or log contract entry)
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  // Rate limit
-  const rl = await rateLimit(`fno-add:${userId}`, 30, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests. Please slow down.", requestId },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
+export const POST = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 30, windowSeconds: 60 },
+  idempotent: true,
+  handler: async ({ userId, req }) => {
     const body = await req.json();
     const parsed = AddFnoPositionSchema.safeParse(body);
 
@@ -121,7 +99,6 @@ export async function POST(req: NextRequest) {
     const cleanSymbol = data.symbol.trim().toUpperCase();
     const totalQuantity = +(data.lots * data.lot_size).toFixed(2);
 
-    // Option contracts require strike price
     if (data.instrument_type !== "FUT" && (!data.strike_price || data.strike_price <= 0)) {
       return apiError("Option contracts (CE/PE) require a valid strike price", "BAD_REQUEST", 400, undefined, req);
     }
@@ -138,7 +115,7 @@ export async function POST(req: NextRequest) {
     const { data: newPosition, error: posError } = await supabaseAdmin
       .from("fno_positions")
       .insert({
-        user_id: userId,
+        user_id: userId!,
         symbol: cleanSymbol,
         instrument_type: data.instrument_type,
         strike_price: data.instrument_type === "FUT" ? null : data.strike_price,
@@ -149,7 +126,7 @@ export async function POST(req: NextRequest) {
         lots: data.lots,
         quantity: totalQuantity,
         avg_price: data.avg_price,
-        ltp: data.avg_price, // initial LTP matches entry
+        ltp: data.avg_price,
         status: "OPEN",
         target_price: data.target_price || null,
         stop_loss: data.stop_loss || null,
@@ -167,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Log initial entry in fno_trades
     await supabaseAdmin.from("fno_trades").insert({
-      user_id: userId,
+      user_id: userId!,
       position_id: newPosition.id,
       symbol: cleanSymbol,
       instrument_type: data.instrument_type,
@@ -185,6 +162,8 @@ export async function POST(req: NextRequest) {
       notes: data.notes || `Initial ${data.side} entry via Zerodha Kite`,
     });
 
+    await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);
+
     return apiSuccess(
       {
         position: newPosition,
@@ -195,21 +174,14 @@ export async function POST(req: NextRequest) {
       201,
       req
     );
-  } catch (err) {
-    console.error("[F&O API] Unexpected error on POST:", err);
-    return apiError("Failed to add F&O position", "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});
 
 // PUT: Square off position or update notes/targets
-export async function PUT(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const PUT = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 30, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const body = await req.json();
 
     // Check if this is a Square-Off action
@@ -232,7 +204,7 @@ export async function PUT(req: NextRequest) {
         .from("fno_positions")
         .select("*")
         .eq("id", id)
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .single();
 
       if (fetchErr || !pos) {
@@ -243,9 +215,6 @@ export async function PUT(req: NextRequest) {
         return apiError("Position is already squared off and closed", "BAD_REQUEST", 400, undefined, req);
       }
 
-      // Compute Realized P&L
-      // If position was BUY (Long), exit side is SELL: P&L = (Exit - Entry) * Qty
-      // If position was SELL (Short), exit side is BUY: P&L = (Entry - Exit) * Qty
       const exitSide = pos.side === "BUY" ? "SELL" : "BUY";
       const rawPnL =
         pos.side === "BUY"
@@ -273,7 +242,7 @@ export async function PUT(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .select()
         .single();
 
@@ -283,7 +252,7 @@ export async function PUT(req: NextRequest) {
 
       // Record EXIT trade log
       await supabaseAdmin.from("fno_trades").insert({
-        user_id: userId,
+        user_id: userId!,
         position_id: pos.id,
         symbol: pos.symbol,
         instrument_type: pos.instrument_type,
@@ -300,6 +269,8 @@ export async function PUT(req: NextRequest) {
         pnl: netPnL,
         notes: notes || `Square-off exit on Zerodha Kite at ₹${exit_price}`,
       });
+
+      await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);
 
       return apiSuccess(
         {
@@ -329,7 +300,7 @@ export async function PUT(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .select()
       .single();
 
@@ -337,22 +308,17 @@ export async function PUT(req: NextRequest) {
       return apiError(err.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
+    await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);
+
     return apiSuccess({ position: updated, message: "Position updated" }, undefined, 200, req);
-  } catch (err) {
-    console.error("[F&O API] Unexpected error on PUT:", err);
-    return apiError("Failed to update position", "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});
 
 // DELETE: Delete a position and associated trades
-export async function DELETE(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const DELETE = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 30, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -364,15 +330,14 @@ export async function DELETE(req: NextRequest) {
       .from("fno_positions")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId!);
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
+    await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);
+
     return apiSuccess({ message: "Position deleted successfully" }, undefined, 200, req);
-  } catch (err) {
-    console.error("[F&O API] Unexpected error on DELETE:", err);
-    return apiError("Failed to delete position", "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+  },
+});

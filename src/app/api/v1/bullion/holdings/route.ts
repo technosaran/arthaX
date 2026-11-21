@@ -1,8 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, extractRequestId } from "@/utils/apiResponse";
-import { rateLimit } from "@/utils/rateLimit";
+import { apiError } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import {
+  roundMoney,
+  addMoney,
+  mulMoney,
+} from "@/utils/money";
 import { z } from "zod";
 import { getStandardPurityPercentage, MetalType, BullionItemType } from "@/utils/bullionCalculations";
 
@@ -46,92 +50,55 @@ const UpdateBullionSchema = z.object({
 });
 
 // GET: Fetch all bullion holdings and recent transactions
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  // Rate limit: 120 req/min
-  const rl = await rateLimit(`bullion:get:${userId}`, 120, 60);
-  if (!rl.success) {
-    return NextResponse.json(
-      { success: false, error: "Rate limit exceeded. Please try again shortly." },
-      { status: 429, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
+export const GET = createApiRoute({
+  rateLimit: { limit: 120, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const [holdingsRes, transactionsRes] = await Promise.all([
       supabaseAdmin
         .from("bullion_holdings")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("bullion_transactions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("transaction_date", { ascending: false })
         .limit(100),
     ]);
 
     if (holdingsRes.error) {
-      console.error("[Bullion Holdings GET Error]:", holdingsRes.error);
       return apiError(holdingsRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        holdings: holdingsRes.data || [],
-        transactions: transactionsRes.data || [],
-      },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch bullion portfolio";
-    console.error("[Bullion Holdings GET Unexpected]:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return {
+      holdings: holdingsRes.data || [],
+      transactions: transactionsRes.data || [],
+    };
+  },
+});
 
 // POST: Add new bullion holding and record initial buy transaction
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = AddBullionSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: parsed.error.issues[0]?.message || "Invalid input data",
-          issues: parsed.error.issues,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
-    const item = parsed.data;
+export const POST = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  idempotent: true,
+  schema: AddBullionSchema,
+  handler: async ({ userId, body, req }) => {
+    const item = body;
     const metal = item.metal as MetalType;
     const purityPercentage =
       item.purity_percentage ?? getStandardPurityPercentage(metal, item.purity);
 
-    const totalWeight = item.weight_grams * item.quantity;
+    const totalWeight = mulMoney(item.weight_grams, item.quantity);
     const calculatedTotalBuy =
       item.total_buy_price !== undefined
-        ? item.total_buy_price
-        : +(totalWeight * item.buy_price_per_gram + item.making_charges + item.tax_gst).toFixed(2);
+        ? roundMoney(item.total_buy_price)
+        : roundMoney(
+            addMoney(
+              addMoney(mulMoney(totalWeight, item.buy_price_per_gram), item.making_charges),
+              item.tax_gst
+            )
+          );
 
     const purchaseDate = item.purchase_date || new Date().toISOString().split("T")[0];
 
@@ -139,7 +106,7 @@ export async function POST(req: NextRequest) {
     const { data: holdingData, error: holdingError } = await supabaseAdmin
       .from("bullion_holdings")
       .insert({
-        user_id: userId,
+        user_id: userId!,
         metal,
         name: item.name.trim(),
         item_type: item.item_type as BullionItemType,
@@ -151,7 +118,6 @@ export async function POST(req: NextRequest) {
         making_charges: item.making_charges,
         tax_gst: item.tax_gst,
         total_buy_price: calculatedTotalBuy,
-        purchase_date: purchaseDate,
         storage_location: item.storage_location.trim(),
         cert_id: item.cert_id?.trim() || null,
         account_id: item.account_id || null,
@@ -160,87 +126,60 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (holdingError || !holdingData) {
-      console.error("[Bullion Insert Error]:", holdingError);
-      return apiError(holdingError?.message || "Failed to create bullion holding", "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    if (holdingError) {
+      return apiError(holdingError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    // 2. Automatically log corresponding BUY transaction
+    // 2. Automatically record in bullion_transactions ledger
     await supabaseAdmin.from("bullion_transactions").insert({
-      user_id: userId,
+      user_id: userId!,
       holding_id: holdingData.id,
+      transaction_type: "BUY",
       metal,
-      type: "BUY",
-      weight_grams: totalWeight,
+      weight_grams: item.weight_grams * item.quantity,
       price_per_gram: item.buy_price_per_gram,
+      total_amount: calculatedTotalBuy,
       making_charges: item.making_charges,
       tax_gst: item.tax_gst,
-      total_amount: calculatedTotalBuy,
+      payment_account_id: item.account_id || null,
+      storage_location: item.storage_location.trim(),
       transaction_date: purchaseDate,
-      notes: `Initial purchase recorded for ${item.name}`,
+      notes: item.notes ? `Initial asset purchase: ${item.notes}` : "Initial asset purchase",
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: `${metal === "GOLD" ? "Gold" : "Silver"} asset added successfully`,
-        holding: holdingData,
-      },
-      { status: 201, headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to add bullion asset";
-    console.error("[Bullion POST Unexpected]:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
+
+    return {
+      message: "Bullion asset recorded successfully",
+      holding: holdingData,
+    };
+  },
+});
 
 // PUT: Update an existing bullion holding
-export async function PUT(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const PUT = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  schema: UpdateBullionSchema,
+  handler: async ({ userId, body, req }) => {
+    const { id, ...updates } = body;
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = UpdateBullionSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: parsed.error.issues[0]?.message || "Invalid update data",
-          issues: parsed.error.issues,
-        },
-        { status: 400, headers: { "X-Request-Id": requestId } }
-      );
-    }
-
-    const { id, ...updates } = parsed.data;
-
-    // Verify ownership
     const { data: existing, error: findError } = await supabaseAdmin
       .from("bullion_holdings")
       .select("*")
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .single();
 
     if (findError || !existing) {
       return apiError("Holding not found or access denied", "NOT_FOUND", 404, undefined, req);
     }
 
-    // Recalculate purity percentage if purity changed
     const metal = (updates.metal || existing.metal) as MetalType;
     let purityPercentage = updates.purity_percentage ?? existing.purity_percentage;
     if (updates.purity && !updates.purity_percentage) {
       purityPercentage = getStandardPurityPercentage(metal, updates.purity);
     }
 
-    // Recalculate total buy price if weight or price changed
     const weight = updates.weight_grams ?? existing.weight_grams;
     const qty = updates.quantity ?? existing.quantity;
     const pricePerGram = updates.buy_price_per_gram ?? existing.buy_price_per_gram;
@@ -249,8 +188,13 @@ export async function PUT(req: NextRequest) {
 
     const totalBuyPrice =
       updates.total_buy_price !== undefined
-        ? updates.total_buy_price
-        : +(weight * qty * pricePerGram + makingCharges + taxGst).toFixed(2);
+        ? roundMoney(updates.total_buy_price)
+        : roundMoney(
+            addMoney(
+              addMoney(mulMoney(mulMoney(weight, qty), pricePerGram), makingCharges),
+              taxGst
+            )
+          );
 
     const { data: updatedHolding, error: updateError } = await supabaseAdmin
       .from("bullion_holdings")
@@ -261,67 +205,45 @@ export async function PUT(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .select()
       .single();
 
     if (updateError) {
-      console.error("[Bullion Update Error]:", updateError);
       return apiError(updateError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Holding updated successfully",
-        holding: updatedHolding,
-      },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to update holding";
-    console.error("[Bullion PUT Unexpected]:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
+
+    return {
+      message: "Holding updated successfully",
+      holding: updatedHolding,
+    };
+  },
+});
 
 // DELETE: Delete a bullion holding
-export async function DELETE(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const DELETE = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const id = query.get("id");
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
+    if (!id) {
+      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json(
-      { success: false, error: "Holding ID is required" },
-      { status: 400, headers: { "X-Request-Id": requestId } }
-    );
-  }
-
-  try {
     const { error: deleteError } = await supabaseAdmin
       .from("bullion_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId!);
 
     if (deleteError) {
-      console.error("[Bullion DELETE Error]:", deleteError);
       return apiError(deleteError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    return NextResponse.json(
-      { success: true, message: "Bullion asset deleted successfully" },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to delete holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
+
+    return { message: "Bullion asset deleted successfully" };
+  },
+});

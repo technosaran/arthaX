@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 import { CACHE_KEYS, getUserCacheKey } from "@/utils/cacheKeys";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cacheClient";
+import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -77,6 +77,7 @@ interface AccountItem {
   balance: number;
   last_four?: string;
   created_at?: string;
+  classification?: "asset" | "liability";
 }
 
 export interface LedgerEntry {
@@ -120,6 +121,7 @@ export default function LedgerSection() {
   const [loading, setLoading] = useState<boolean>(!initialCache);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const inFlightRef = useRef<boolean>(false);
+  const pendingRefetchRef = useRef<boolean>(false);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -221,6 +223,9 @@ export default function LedgerSection() {
 
   // Invalidate Redis caches across all related keys
   const invalidateAllCaches = async () => {
+    if (user?.id) {
+      await invalidateAllFinancialCache(user.id);
+    }
     await invalidateCacheKeys([
       redisLedgerKey,
       redisIncomeKey,
@@ -236,7 +241,11 @@ export default function LedgerSection() {
 
   // Fetch All Ledger Telemetry
   const fetchAllData = useCallback(async (skipCache = false) => {
-    if (!user || inFlightRef.current) return;
+    if (!user) return;
+    if (inFlightRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
     inFlightRef.current = true;
     setErrorMsg(null);
 
@@ -271,6 +280,13 @@ export default function LedgerSection() {
           name: a.name,
           type: a.type,
           balance: Number(a.balance) || 0,
+          classification:
+            a.classification ||
+            (a.type?.toLowerCase().includes("credit") ||
+            a.name?.toLowerCase().includes("credit") ||
+            a.type?.toLowerCase().includes("loan")
+              ? "liability"
+              : "asset"),
           last_four: a.last_four,
           created_at: a.created_at,
         }));
@@ -323,6 +339,10 @@ export default function LedgerSection() {
     } finally {
       setLoading(false);
       inFlightRef.current = false;
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        fetchAllData(true);
+      }
     }
   }, [user, redisLedgerKey]);
 
@@ -371,7 +391,13 @@ export default function LedgerSection() {
   }, [accounts]);
 
   const totalPortfolioBalance = useMemo(() => {
-    return accounts.reduce((acc, curr) => acc + curr.balance, 0);
+    const assets = accounts
+      .filter((a) => a.classification !== "liability")
+      .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
+    const liabilities = accounts
+      .filter((a) => a.classification === "liability")
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.balance) || 0), 0);
+    return assets - liabilities;
   }, [accounts]);
 
   // Master Chronological Ledger & Running Balance Calculation

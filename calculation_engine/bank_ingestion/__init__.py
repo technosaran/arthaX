@@ -10,7 +10,12 @@ from .models import (
 )
 from .base_adapter import BaseBankAdapter
 from .sbi_adapter import SbiBankAdapter
+from .hdfc_adapter import HdfcBankAdapter
+from .icici_adapter import IciciBankAdapter
+from .axis_adapter import AxisBankAdapter
+from .kotak_adapter import KotakBankAdapter
 from .indian_bank_adapter import IndianBankAdapter
+from .generic_pdf_adapter import GenericPdfBankAdapter
 from .generic_csv_adapter import GenericCsvBankAdapter
 from .pdf_decryptor import (
     open_pdf_document,
@@ -29,7 +34,12 @@ __all__ = [
     "StatementParseResult",
     "BaseBankAdapter",
     "SbiBankAdapter",
+    "HdfcBankAdapter",
+    "IciciBankAdapter",
+    "AxisBankAdapter",
+    "KotakBankAdapter",
     "IndianBankAdapter",
+    "GenericPdfBankAdapter",
     "GenericCsvBankAdapter",
     "open_pdf_document",
     "generate_candidate_passwords",

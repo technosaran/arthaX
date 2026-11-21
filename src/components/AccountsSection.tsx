@@ -96,6 +96,7 @@ export default function AccountsSection() {
   const [activityHistory, setActivityHistory] = useState<AccountActivity[]>(initialHistory);
   const [historyLoading, setHistoryLoading] = useState<boolean>(initialHistory.length === 0);
   const inFlightRef = useRef<boolean>(false);
+  const pendingRefetchRef = useRef<boolean>(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [historyTypeFilter, setHistoryTypeFilter] = useState<"all" | "inflow" | "outflow">("all");
   const [historySearch, setHistorySearch] = useState("");
@@ -162,7 +163,11 @@ export default function AccountsSection() {
   };
 
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current) return;
+    if (!user) return;
+    if (inFlightRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
     inFlightRef.current = true;
     setErrorMsg(null);
 
@@ -300,6 +305,10 @@ export default function AccountsSection() {
       setLoading(false);
       setHistoryLoading(false);
       inFlightRef.current = false;
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        fetchAccounts(true);
+      }
     }
   }, [user, redisKey, redisTransfersKey]);
 
@@ -669,11 +678,11 @@ export default function AccountsSection() {
 
   const totalAssets = accounts
     .filter((a) => a.classification !== "liability")
-    .reduce((acc, curr) => acc + curr.balance, 0);
+    .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
 
   const totalLiabilities = accounts
     .filter((a) => a.classification === "liability")
-    .reduce((acc, curr) => acc + curr.balance, 0);
+    .reduce((acc, curr) => acc + Math.abs(Number(curr.balance) || 0), 0);
 
   const netWorth = totalAssets - totalLiabilities;
   const totalBalance = totalAssets;

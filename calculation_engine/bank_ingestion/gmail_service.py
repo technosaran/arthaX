@@ -27,9 +27,13 @@ logger = logging.getLogger("arthax.gmail_ingestion")
 
 # Targeted Gmail search query for statement discovery across major Indian banks and brokers
 DEFAULT_GMAIL_STATEMENT_QUERY = (
-    "(from:sbi.co.in OR from:indianbank.co.in OR from:hdfcbank.net OR from:icicibank.com "
-    "OR from:axisbank.com OR from:kotak.com OR from:camsonline.com OR from:kfintech.com) "
-    "AND (subject:statement OR subject:e-statement OR subject:\"account statement\" OR subject:\"eCAS\") "
+    "(from:sbi.co.in OR from:indianbank.co.in OR from:hdfcbank.net OR from:hdfcbank.com "
+    "OR from:icicibank.com OR from:axisbank.com OR from:kotak.com OR from:pnb.co.in "
+    "OR from:bankofbaroda.com OR from:canarabank.com OR from:unionbankofindia.co.in "
+    "OR from:standardchartered.co.in OR from:indusind.com OR from:idfcfirstbank.com "
+    "OR from:federalbank.co.in OR from:camsonline.com OR from:kfintech.com) "
+    "AND (subject:statement OR subject:e-statement OR subject:\"account statement\" "
+    "OR subject:\"statement of account\" OR subject:\"eCAS\" OR subject:\"consolidated account statement\") "
     "AND has:attachment"
 )
 
@@ -49,10 +53,26 @@ def detect_bank_from_metadata(sender: str, subject: str, filename: str = "") -> 
         return "HDFC"
     if "icici" in combined:
         return "ICICI"
-    if "axis" in combined:
+    if "axis" in combined or "utib" in combined:
         return "AXIS"
-    if "kotak" in combined:
+    if "kotak" in combined or "kkbk" in combined:
         return "KOTAK"
+    if "pnb" in combined or "punjab national bank" in combined:
+        return "PNB"
+    if "baroda" in combined or "bob" in combined:
+        return "BANK_OF_BARODA"
+    if "canara" in combined:
+        return "CANARA_BANK"
+    if "union bank" in combined or "unionbank" in combined:
+        return "UNION_BANK"
+    if "standard chartered" in combined or "scbl" in combined:
+        return "STANDARD_CHARTERED"
+    if "indusind" in combined:
+        return "INDUSIND"
+    if "idfc" in combined:
+        return "IDFC_FIRST"
+    if "federal" in combined:
+        return "FEDERAL_BANK"
     if "cams" in combined or "kfintech" in combined or "ecas" in combined:
         return "MUTUAL_FUND_CAS"
     return "GENERIC"

@@ -65,6 +65,7 @@ interface AccountItem {
   type: string;
   balance: number;
   last_four?: string;
+  classification?: "asset" | "liability";
 }
 
 const INCOME_CATEGORIES = [
@@ -116,6 +117,7 @@ export default function IncomeSection() {
   const [accounts, setAccounts] = useState<AccountItem[]>(initialAccounts);
   const [loading, setLoading] = useState<boolean>(initialIncomes.length === 0);
   const inFlightRef = useRef<{ income: boolean; accounts: boolean }>({ income: false, accounts: false });
+  const pendingRefetchRef = useRef<{ income: boolean; accounts: boolean }>({ income: false, accounts: false });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -254,7 +256,11 @@ export default function IncomeSection() {
 
   // 1. Fetch Accounts for linking
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current.accounts) return;
+    if (!user) return;
+    if (inFlightRef.current.accounts) {
+      pendingRefetchRef.current.accounts = true;
+      return;
+    }
     inFlightRef.current.accounts = true;
 
     if (!skipCache) {
@@ -268,15 +274,22 @@ export default function IncomeSection() {
       const supabase = createClient();
       const { data } = await supabase
         .from("accounts")
-        .select("id, name, type, balance, last_four")
+        .select("id, name, type, balance, last_four, classification")
         .eq("user_id", user.id)
         .order("name", { ascending: true });
 
       if (data) {
-        const mapped = data.map((a) => ({
+        const mapped: AccountItem[] = data.map((a) => ({
           id: a.id,
           name: a.name,
           type: a.type,
+          classification:
+            a.classification ||
+            (a.type?.toLowerCase().includes("credit") ||
+            a.name?.toLowerCase().includes("credit") ||
+            a.type?.toLowerCase().includes("loan")
+              ? "liability"
+              : "asset"),
           balance: Number(a.balance) || 0,
           last_four: a.last_four,
         }));
@@ -287,12 +300,20 @@ export default function IncomeSection() {
       // Non-blocking
     } finally {
       inFlightRef.current.accounts = false;
+      if (pendingRefetchRef.current.accounts) {
+        pendingRefetchRef.current.accounts = false;
+        fetchAccounts(true);
+      }
     }
   }, [user, redisAccountsKey]);
 
   // 2. Fetch Income records
   const fetchIncome = useCallback(async (skipCache: boolean = false) => {
-    if (!user || inFlightRef.current.income) return;
+    if (!user) return;
+    if (inFlightRef.current.income) {
+      pendingRefetchRef.current.income = true;
+      return;
+    }
     inFlightRef.current.income = true;
     setErrorMsg(null);
 
@@ -335,6 +356,10 @@ export default function IncomeSection() {
     } finally {
       setLoading(false);
       inFlightRef.current.income = false;
+      if (pendingRefetchRef.current.income) {
+        pendingRefetchRef.current.income = false;
+        fetchIncome(true);
+      }
     }
   }, [user, redisIncomeKey]);
 
@@ -434,12 +459,93 @@ export default function IncomeSection() {
 
     try {
       if (editingIncome) {
+        const oldAccountId = editingIncome.account_id || null;
+        const oldAmount = Number(editingIncome.amount) || 0;
+        const newAccountId = accountId || null;
+
+        // Reconcile account balances to prevent desynchronization
+        if (oldAccountId === newAccountId) {
+          if (newAccountId) {
+            const diff = parsedAmount - oldAmount;
+            if (diff !== 0) {
+              const { data: accData } = await supabase
+                .from("accounts")
+                .select("id, balance, classification")
+                .eq("id", newAccountId)
+                .eq("user_id", user.id)
+                .single();
+
+              if (accData) {
+                const currentBal = Number(accData.balance) || 0;
+                const isLiability = accData.classification === "liability";
+                const newBal = isLiability
+                  ? Math.round((currentBal - diff) * 100) / 100
+                  : Math.round((currentBal + diff) * 100) / 100;
+
+                await supabase
+                  .from("accounts")
+                  .update({ balance: newBal })
+                  .eq("id", newAccountId)
+                  .eq("user_id", user.id);
+              }
+            }
+          }
+        } else {
+          // Account changed: revert old account balance
+          if (oldAccountId) {
+            const { data: oldAccData } = await supabase
+              .from("accounts")
+              .select("id, balance, classification")
+              .eq("id", oldAccountId)
+              .eq("user_id", user.id)
+              .single();
+
+            if (oldAccData) {
+              const currentBal = Number(oldAccData.balance) || 0;
+              const isLiability = oldAccData.classification === "liability";
+              const revertedBal = isLiability
+                ? Math.round((currentBal + oldAmount) * 100) / 100
+                : Math.round((currentBal - oldAmount) * 100) / 100;
+
+              await supabase
+                .from("accounts")
+                .update({ balance: revertedBal })
+                .eq("id", oldAccountId)
+                .eq("user_id", user.id);
+            }
+          }
+
+          // Apply to new account
+          if (newAccountId) {
+            const { data: newAccData } = await supabase
+              .from("accounts")
+              .select("id, balance, classification")
+              .eq("id", newAccountId)
+              .eq("user_id", user.id)
+              .single();
+
+            if (newAccData) {
+              const currentBal = Number(newAccData.balance) || 0;
+              const isLiability = newAccData.classification === "liability";
+              const appliedBal = isLiability
+                ? Math.round((currentBal - parsedAmount) * 100) / 100
+                : Math.round((currentBal + parsedAmount) * 100) / 100;
+
+              await supabase
+                .from("accounts")
+                .update({ balance: appliedBal })
+                .eq("id", newAccountId)
+                .eq("user_id", user.id);
+            }
+          }
+        }
+
         const { error } = await supabase.from("income").update({
           title: title.trim(),
           amount: parsedAmount,
           category,
           frequency,
-          account_id: accountId || null,
+          account_id: newAccountId,
           received_date: receivedDate,
           notes: notes.trim() || null,
         }).eq("id", editingIncome.id).eq("user_id", user.id);
@@ -447,7 +553,7 @@ export default function IncomeSection() {
         if (error) {
           showToast("Income Update Failed", error.message || "Failed to update record.", "error");
         } else {
-          showToast("Income Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated.`, "success");
+          showToast("Income Updated", `${title.trim()} (${formatINR(parsedAmount)}) updated and balances reconciled.`, "success");
           setIsModalOpen(false);
           await invalidateAllFinancialCache(user.id);
           await fetchIncome(true);

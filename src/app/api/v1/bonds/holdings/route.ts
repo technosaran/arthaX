@@ -1,8 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/utils/auth";
+import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
-import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { apiError, apiSuccess } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import {
+  roundMoney,
+  addMoney,
+  subMoney,
+  mulMoney,
+  divMoney,
+  percentMoney,
+} from "@/utils/money";
 import { z } from "zod";
 
 const AddBondSchema = z.object({
@@ -59,35 +67,28 @@ const UpdateBondSchema = z.object({
 });
 
 // GET: Fetch all bond holdings, transactions, and calculated portfolio metrics
-export async function GET(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
+export const GET = createApiRoute({
+  rateLimit: { limit: 120, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
     const [holdingsRes, transactionsRes, accountsRes] = await Promise.all([
       supabaseAdmin
         .from("bond_holdings")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("maturity_date", { ascending: true }),
       supabaseAdmin
         .from("bond_transactions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("transaction_date", { ascending: false })
         .limit(100),
       supabaseAdmin
         .from("accounts")
         .select("id, name, type, balance, last_four")
-        .eq("user_id", userId),
+        .eq("user_id", userId!),
     ]);
 
     if (holdingsRes.error) {
-      console.error("[Bonds API] Error fetching holdings:", holdingsRes.error);
       return apiError(holdingsRes.error.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
@@ -95,12 +96,10 @@ export async function GET(req: NextRequest) {
     const transactions = transactionsRes.data || [];
     const accounts = accountsRes.data || [];
 
-    // Locate user's Zerodha Demat account if available
     const zerodhaAccount = accounts.find((a) =>
       a.name.toLowerCase().includes("zerodha") || a.type.toLowerCase().includes("investment")
     );
 
-    // Compute live portfolio metrics
     let totalInvested = 0;
     let totalCurrentValue = 0;
     let totalFaceValue = 0;
@@ -131,8 +130,6 @@ export async function GET(req: NextRequest) {
       platform: string;
     }> = [];
 
-    const now = new Date();
-
     for (const bond of holdings) {
       const qty = Number(bond.quantity) || 0;
       const faceVal = Number(bond.face_value) || 1000;
@@ -141,47 +138,43 @@ export async function GET(req: NextRequest) {
       const couponRate = Number(bond.coupon_rate) || 0;
       const ytm = Number(bond.ytm) || couponRate;
 
-      const bondFaceTotal = qty * faceVal;
-      const bondInvested = Number(bond.invested_amount) > 0 ? Number(bond.invested_amount) : qty * buyPrice;
-      const bondCurrent = qty * curPrice;
-      const bondAnnualCoupon = (bondFaceTotal * couponRate) / 100;
+      const bondFaceTotal = mulMoney(qty, faceVal);
+      const bondInvested = Number(bond.invested_amount) > 0 ? Number(bond.invested_amount) : mulMoney(qty, buyPrice);
+      const bondCurrent = mulMoney(qty, curPrice);
+      const bondAnnualCoupon = divMoney(mulMoney(bondFaceTotal, couponRate), 100);
 
-      totalInvested += bondInvested;
-      totalCurrentValue += bondCurrent;
-      totalFaceValue += bondFaceTotal;
-      totalAnnualInterest += bondAnnualCoupon;
-      weightedCouponNumerator += bondAnnualCoupon;
+      totalInvested = addMoney(totalInvested, bondInvested);
+      totalCurrentValue = addMoney(totalCurrentValue, bondCurrent);
+      totalFaceValue = addMoney(totalFaceValue, bondFaceTotal);
+      totalAnnualInterest = addMoney(totalAnnualInterest, bondAnnualCoupon);
+      weightedCouponNumerator = addMoney(weightedCouponNumerator, bondAnnualCoupon);
 
       if (ytm > 0) {
-        weightedYtmNumerator += ytm * bondInvested;
-        weightedYtmDenominator += bondInvested;
+        weightedYtmNumerator = addMoney(weightedYtmNumerator, mulMoney(ytm, bondInvested));
+        weightedYtmDenominator = addMoney(weightedYtmDenominator, bondInvested);
       }
 
-      // Platform Stats
       const plt = bond.platform || "INDIABONDS";
       if (!platformBreakdown[plt]) {
         platformBreakdown[plt] = { count: 0, invested: 0 };
       }
       platformBreakdown[plt].count += 1;
-      platformBreakdown[plt].invested += bondInvested;
+      platformBreakdown[plt].invested = addMoney(platformBreakdown[plt].invested, bondInvested);
 
-      // Type Stats
       const bType = bond.bond_type || "CORPORATE";
       if (!typeBreakdown[bType]) {
         typeBreakdown[bType] = { count: 0, value: 0 };
       }
       typeBreakdown[bType].count += 1;
-      typeBreakdown[bType].value += bondCurrent;
+      typeBreakdown[bType].value = addMoney(typeBreakdown[bType].value, bondCurrent);
 
-      // Rating Stats
       const rating = bond.credit_rating || "CRISIL AAA";
       if (!ratingBreakdown[rating]) {
         ratingBreakdown[rating] = { count: 0, value: 0 };
       }
       ratingBreakdown[rating].count += 1;
-      ratingBreakdown[rating].value += bondCurrent;
+      ratingBreakdown[rating].value = addMoney(ratingBreakdown[rating].value, bondCurrent);
 
-      // Upcoming coupons schedule
       if (bond.next_coupon_date) {
         let perPayoutMultiplier = 1;
         if (bond.coupon_frequency === "MONTHLY") perPayoutMultiplier = 1 / 12;
@@ -189,7 +182,7 @@ export async function GET(req: NextRequest) {
         else if (bond.coupon_frequency === "SEMI_ANNUAL") perPayoutMultiplier = 1 / 2;
         else if (bond.coupon_frequency === "CUMULATIVE_AT_MATURITY") perPayoutMultiplier = 0;
 
-        const expectedPerPayout = bondAnnualCoupon * perPayoutMultiplier;
+        const expectedPerPayout = mulMoney(bondAnnualCoupon, perPayoutMultiplier);
 
         upcomingCoupons.push({
           id: bond.id,
@@ -197,7 +190,7 @@ export async function GET(req: NextRequest) {
           issuer: bond.issuer_name,
           isin: bond.isin,
           nextDate: bond.next_coupon_date,
-          expectedPayout: Math.round(expectedPerPayout * 100) / 100,
+          expectedPayout: expectedPerPayout,
           couponRate,
           frequency: bond.coupon_frequency,
           platform: bond.platform,
@@ -209,59 +202,40 @@ export async function GET(req: NextRequest) {
 
     const weightedCouponRate = totalFaceValue > 0 ? (weightedCouponNumerator / totalFaceValue) * 100 : 0;
     const weightedYtm = weightedYtmDenominator > 0 ? weightedYtmNumerator / weightedYtmDenominator : 0;
-    const totalPnl = totalCurrentValue - totalInvested;
-    const totalReturnsPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+    const totalPnl = subMoney(totalCurrentValue, totalInvested);
+    const totalReturnsPercent = totalInvested > 0 ? percentMoney(totalPnl, totalInvested, { clamp: false }) : 0;
 
-    return NextResponse.json(
-      {
-        success: true,
-        holdings,
-        transactions,
-        accounts,
-        zerodhaDematAccount: zerodhaAccount || null,
-        stats: {
-          totalHoldingsCount: holdings.length,
-          totalInvested: Math.round(totalInvested * 100) / 100,
-          totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
-          totalFaceValue: Math.round(totalFaceValue * 100) / 100,
-          totalAnnualInterest: Math.round(totalAnnualInterest * 100) / 100,
-          monthlyPassiveIncome: Math.round((totalAnnualInterest / 12) * 100) / 100,
-          weightedCouponRate: Math.round(weightedCouponRate * 100) / 100,
-          weightedYtm: Math.round(weightedYtm * 100) / 100,
-          totalPnl: Math.round(totalPnl * 100) / 100,
-          totalReturnsPercent: Math.round(totalReturnsPercent * 100) / 100,
-          platformBreakdown,
-          typeBreakdown,
-          ratingBreakdown,
-          upcomingCoupons,
-        },
+    return {
+      holdings,
+      transactions,
+      accounts,
+      zerodhaDematAccount: zerodhaAccount || null,
+      stats: {
+        totalHoldingsCount: holdings.length,
+        totalInvested: roundMoney(totalInvested),
+        totalCurrentValue: roundMoney(totalCurrentValue),
+        totalFaceValue: roundMoney(totalFaceValue),
+        totalAnnualInterest: roundMoney(totalAnnualInterest),
+        monthlyPassiveIncome: roundMoney(divMoney(totalAnnualInterest, 12)),
+        weightedCouponRate: roundMoney(weightedCouponRate),
+        weightedYtm: roundMoney(weightedYtm),
+        totalPnl: roundMoney(totalPnl),
+        totalReturnsPercent: roundMoney(totalReturnsPercent),
+        platformBreakdown,
+        typeBreakdown,
+        ratingBreakdown,
+        upcomingCoupons,
       },
-      { headers: { "X-Request-Id": requestId } }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch bond holdings";
-    console.error("[Bonds API] Unexpected error:", err);
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    };
+  },
+});
 
-// POST: Add new bond holding (or add to existing holding)
-export async function POST(req: NextRequest) {
-  const requestId = extractRequestId(req);
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = AddBondSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return apiError(parsed.error.issues[0]?.message || "Validation failed", "BAD_REQUEST", 400, undefined, req);
-    }
-
+// POST: Add new bond holding (or average into existing holding)
+export const POST = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  idempotent: true,
+  schema: AddBondSchema,
+  handler: async ({ userId, body, req }) => {
     const {
       isin,
       name,
@@ -287,28 +261,26 @@ export async function POST(req: NextRequest) {
       order_reference,
       notes,
       transaction_date,
-    } = parsed.data;
+    } = body;
 
-    // Check if user already holds this bond by ISIN
     const { data: existing } = await supabaseAdmin
       .from("bond_holdings")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .eq("isin", isin)
       .maybeSingle();
 
     let holdingId: string;
     let finalQty = quantity;
     let finalBuyPrice = avg_buy_price;
-    let finalInvested = quantity * avg_buy_price;
+    let finalInvested = mulMoney(quantity, avg_buy_price);
 
     if (existing) {
-      // Average the position if already held
       const prevQty = Number(existing.quantity) || 0;
       const prevBuyPrice = Number(existing.avg_buy_price) || 0;
-      finalQty = prevQty + quantity;
-      finalInvested = prevQty * prevBuyPrice + quantity * avg_buy_price;
-      finalBuyPrice = finalQty > 0 ? finalInvested / finalQty : avg_buy_price;
+      finalQty = addMoney(prevQty, quantity);
+      finalInvested = addMoney(mulMoney(prevQty, prevBuyPrice), mulMoney(quantity, avg_buy_price));
+      finalBuyPrice = finalQty > 0 ? divMoney(finalInvested, finalQty) : avg_buy_price;
 
       const { data: updated, error: updateErr } = await supabaseAdmin
         .from("bond_holdings")
@@ -321,8 +293,8 @@ export async function POST(req: NextRequest) {
           demat_broker: demat_broker || existing.demat_broker,
           face_value,
           quantity: finalQty,
-          avg_buy_price: Math.round(finalBuyPrice * 100) / 100,
-          invested_amount: Math.round(finalInvested * 100) / 100,
+          avg_buy_price: roundMoney(finalBuyPrice),
+          invested_amount: roundMoney(finalInvested),
           current_price: current_price ?? existing.current_price ?? finalBuyPrice,
           coupon_rate,
           ytm: ytm ?? existing.ytm,
@@ -349,7 +321,7 @@ export async function POST(req: NextRequest) {
       const { data: inserted, error: insertErr } = await supabaseAdmin
         .from("bond_holdings")
         .insert({
-          user_id: userId,
+          user_id: userId!,
           isin,
           name,
           issuer_name,
@@ -360,7 +332,7 @@ export async function POST(req: NextRequest) {
           face_value,
           quantity,
           avg_buy_price,
-          invested_amount: Math.round(finalInvested * 100) / 100,
+          invested_amount: roundMoney(finalInvested),
           current_price: current_price ?? avg_buy_price,
           coupon_rate,
           ytm: ytm ?? coupon_rate,
@@ -386,61 +358,36 @@ export async function POST(req: NextRequest) {
 
     // Record BUY transaction
     await supabaseAdmin.from("bond_transactions").insert({
-      user_id: userId,
+      user_id: userId!,
       holding_id: holdingId,
       isin,
       type: "BUY",
       quantity,
       price: avg_buy_price,
-      amount: Math.round(quantity * avg_buy_price * 100) / 100,
+      amount: roundMoney(mulMoney(quantity, avg_buy_price)),
       platform,
       demat_account_id: demat_account_id || null,
       transaction_date: transaction_date || new Date().toISOString().split("T")[0],
       notes: `Purchased via ${platform}. Settled to ${demat_broker} Demat.`,
     });
 
-    // Invalidate caches
-    try {
-      await Promise.allSettled([
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.BONDS)),
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO)),
-      ]);
-    } catch {}
+    // Invalidate caches across bonds, portfolio, and analytics
+    await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);
 
-    return apiSuccess(
-      {
-        message: existing ? "Bond holding updated successfully" : "New bond holding added successfully",
-        holdingId,
-      },
-      undefined,
-      201,
-      req
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to add bond holding";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return {
+      message: existing ? "Bond holding updated successfully" : "New bond holding added successfully",
+      holdingId,
+    };
+  },
+});
 
 // PUT: Update an existing bond holding
-export async function PUT(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
+export const PUT = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  schema: UpdateBondSchema,
+  handler: async ({ userId, body, req }) => {
+    const { id, ...updates } = body;
 
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const body = await req.json();
-    const parsed = UpdateBondSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return apiError(parsed.error.issues[0]?.message || "Validation failed", "BAD_REQUEST", 400, undefined, req);
-    }
-
-    const { id, ...updates } = parsed.data;
-
-    // Recalculate invested amount if quantity or avg_buy_price changed
     const updatePayload: Record<string, unknown> = {
       ...updates,
       updated_at: new Date().toISOString(),
@@ -451,13 +398,13 @@ export async function PUT(req: NextRequest) {
         .from("bond_holdings")
         .select("quantity, avg_buy_price")
         .eq("id", id)
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .single();
 
       if (current) {
         const q = updates.quantity ?? Number(current.quantity);
         const p = updates.avg_buy_price ?? Number(current.avg_buy_price);
-        updatePayload.invested_amount = Math.round(q * p * 100) / 100;
+        updatePayload.invested_amount = roundMoney(mulMoney(q, p));
       }
     }
 
@@ -465,7 +412,7 @@ export async function PUT(req: NextRequest) {
       .from("bond_holdings")
       .update(updatePayload)
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("user_id", userId!)
       .select()
       .single();
 
@@ -473,31 +420,17 @@ export async function PUT(req: NextRequest) {
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    try {
-      await Promise.allSettled([
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.BONDS)),
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO)),
-      ]);
-    } catch {}
+    await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);
 
-    return apiSuccess({ message: "Bond updated successfully", holding: updated }, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to update bond";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return { message: "Bond updated successfully", holding: updated };
+  },
+});
 
 // DELETE: Remove a bond holding
-export async function DELETE(req: NextRequest) {
-  const { user, userId, error: authError } = await getAuthenticatedUser(req);
-
-  if (!user || !userId) {
-    return apiUnauthorized(authError || "Unauthorized", req);
-  }
-
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+export const DELETE = createApiRoute({
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, query, req }) => {
+    const id = query.get("id");
 
     if (!id) {
       return apiError("Bond ID is required", "BAD_REQUEST", 400, undefined, req);
@@ -507,22 +440,14 @@ export async function DELETE(req: NextRequest) {
       .from("bond_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId!);
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    try {
-      await Promise.allSettled([
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.BONDS)),
-        invalidateCachedData(getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO)),
-      ]);
-    } catch {}
+    await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);
 
-    return apiSuccess({ message: "Bond holding deleted successfully" }, undefined, 200, req);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to delete bond";
-    return apiError(msg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-  }
-}
+    return { message: "Bond holding deleted successfully" };
+  },
+});

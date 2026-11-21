@@ -385,6 +385,20 @@ class TaxEngine(BaseCalculator):
                 f"Note: You have ₹{crypto_losses:,.2f} in cryptocurrency losses. Section 115BBH strictly prohibits setting off crypto losses against capital gains from stocks, mutual funds, or other crypto."
             )
 
+        # Optional: Include Income Tax Old vs New Regime Comparison if gross income provided
+        regime_comparison = None
+        gross_salary = inputs.get("gross_salary") or inputs.get("annual_income")
+        if gross_salary is not None and to_decimal(gross_salary) > Decimal("0.00"):
+            regime_comparison = self.compare_regimes(
+                gross_income=to_decimal(gross_salary),
+                deductions_80c=to_decimal(inputs.get("deductions_80c", 0)),
+                deductions_80d=to_decimal(inputs.get("deductions_80d", 0)),
+                nps_80ccd_1b=to_decimal(inputs.get("nps_80ccd_1b", 0)),
+                home_loan_interest_24b=to_decimal(inputs.get("home_loan_interest_24b", 0)),
+                hra_exemption=to_decimal(inputs.get("hra_exemption", 0)),
+                other_deductions=to_decimal(inputs.get("other_deductions", 0)),
+            )
+
         return {
             "disclaimer": DISCLAIMER_TEXT,
             "assessmentYear": ay,
@@ -417,5 +431,164 @@ class TaxEngine(BaseCalculator):
             "harvestingOpportunities": harvesting_opportunities,
             "totalHarvestableLoss": float(quantize_currency(total_harvestable_loss)),
             "totalPotentialTaxSavings": float(quantize_currency(total_potential_tax_savings)),
+            "regimeComparison": regime_comparison,
             "advice": advice,
+        }
+
+    def compare_regimes(
+        self,
+        gross_income: Decimal,
+        deductions_80c: Decimal = Decimal("0.00"),
+        deductions_80d: Decimal = Decimal("0.00"),
+        nps_80ccd_1b: Decimal = Decimal("0.00"),
+        home_loan_interest_24b: Decimal = Decimal("0.00"),
+        hra_exemption: Decimal = Decimal("0.00"),
+        other_deductions: Decimal = Decimal("0.00"),
+    ) -> Dict[str, Any]:
+        """
+        Comprehensive Union Budget 2024 Old vs New Tax Regime Comparator.
+        Calculates tax liability under both regimes and recommends the optimal strategy.
+        """
+        cess_rate = Decimal("0.04")
+
+        # ---------------------------------------------------------
+        # 1. New Tax Regime (Section 115BAC - Union Budget 2024)
+        # ---------------------------------------------------------
+        # Standard deduction increased to ₹75,000
+        new_std_deduction = Decimal("75000.00")
+        new_taxable_income = max(Decimal("0.00"), gross_income - new_std_deduction)
+
+        new_tax = Decimal("0.00")
+        if new_taxable_income <= Decimal("300000.00"):
+            new_tax = Decimal("0.00")
+        else:
+            # Slabs: 0-3L: 0%, 3-7L: 5%, 7-10L: 10%, 10-12L: 15%, 12-15L: 20%, >15L: 30%
+            rem = new_taxable_income
+            # 3L - 7L (4 Lakhs @ 5% = 20,000)
+            taxable_slab_1 = min(rem - Decimal("300000.00"), Decimal("400000.00"))
+            if taxable_slab_1 > 0:
+                new_tax += taxable_slab_1 * Decimal("0.05")
+
+            # 7L - 10L (3 Lakhs @ 10% = 30,000)
+            if rem > Decimal("700000.00"):
+                taxable_slab_2 = min(rem - Decimal("700000.00"), Decimal("300000.00"))
+                new_tax += taxable_slab_2 * Decimal("0.10")
+
+            # 10L - 12L (2 Lakhs @ 15% = 30,000)
+            if rem > Decimal("1000000.00"):
+                taxable_slab_3 = min(rem - Decimal("1000000.00"), Decimal("200000.00"))
+                new_tax += taxable_slab_3 * Decimal("0.15")
+
+            # 12L - 15L (3 Lakhs @ 20% = 60,000)
+            if rem > Decimal("1200000.00"):
+                taxable_slab_4 = min(rem - Decimal("1200000.00"), Decimal("300000.00"))
+                new_tax += taxable_slab_4 * Decimal("0.20")
+
+            # > 15L @ 30%
+            if rem > Decimal("1500000.00"):
+                taxable_slab_5 = rem - Decimal("1500000.00")
+                new_tax += taxable_slab_5 * Decimal("0.30")
+
+        # Section 87A Rebate for New Regime: Income up to ₹7,00,000 pays zero tax
+        if new_taxable_income <= Decimal("700000.00"):
+            new_tax = Decimal("0.00")
+
+        new_cess = new_tax * cess_rate
+        new_total_tax = new_tax + new_cess
+
+        # ---------------------------------------------------------
+        # 2. Old Tax Regime
+        # ---------------------------------------------------------
+        old_std_deduction = Decimal("50000.00")
+        capped_80c = min(deductions_80c, Decimal("150000.00"))
+        capped_80d = min(deductions_80d, Decimal("100000.00"))
+        capped_nps = min(nps_80ccd_1b, Decimal("50000.00"))
+        capped_24b = min(home_loan_interest_24b, Decimal("200000.00"))
+
+        total_old_deductions = (
+            old_std_deduction
+            + capped_80c
+            + capped_80d
+            + capped_nps
+            + capped_24b
+            + hra_exemption
+            + other_deductions
+        )
+
+        old_taxable_income = max(Decimal("0.00"), gross_income - total_old_deductions)
+
+        old_tax = Decimal("0.00")
+        if old_taxable_income <= Decimal("250000.00"):
+            old_tax = Decimal("0.00")
+        else:
+            # Slabs: 0-2.5L: 0%, 2.5L-5L: 5%, 5L-10L: 20%, >10L: 30%
+            rem = old_taxable_income
+            # 2.5L - 5L (2.5 Lakhs @ 5% = 12,500)
+            slab1 = min(rem - Decimal("250000.00"), Decimal("250000.00"))
+            if slab1 > 0:
+                old_tax += slab1 * Decimal("0.05")
+
+            # 5L - 10L (5 Lakhs @ 20% = 100,000)
+            if rem > Decimal("500000.00"):
+                slab2 = min(rem - Decimal("500000.00"), Decimal("500000.00"))
+                old_tax += slab2 * Decimal("0.20")
+
+            # > 10L @ 30%
+            if rem > Decimal("1000000.00"):
+                slab3 = rem - Decimal("1000000.00")
+                old_tax += slab3 * Decimal("0.30")
+
+        # Section 87A Rebate for Old Regime: Income up to ₹5,00,000 gets up to ₹12,500 rebate
+        if old_taxable_income <= Decimal("500000.00"):
+            old_tax = Decimal("0.00")
+
+        old_cess = old_tax * cess_rate
+        old_total_tax = old_tax + old_cess
+
+        # ---------------------------------------------------------
+        # 3. Recommendation & Savings
+        # ---------------------------------------------------------
+        tax_difference = abs(old_total_tax - new_total_tax)
+        if new_total_tax < old_total_tax:
+            recommended_regime = "NEW_REGIME"
+            savings_amount = old_total_tax - new_total_tax
+            advice_summary = (
+                f"New Tax Regime saves ₹{savings_amount:,.2f} in taxes under Union Budget 2024 revisions "
+                f"(₹75,000 standard deduction + revised tax slabs)."
+            )
+        elif old_total_tax < new_total_tax:
+            recommended_regime = "OLD_REGIME"
+            savings_amount = new_total_tax - old_total_tax
+            advice_summary = (
+                f"Old Tax Regime saves ₹{savings_amount:,.2f} due to high deductions "
+                f"(₹{total_old_deductions:,.2f} total claimed)."
+            )
+        else:
+            recommended_regime = "EQUAL"
+            savings_amount = Decimal("0.00")
+            advice_summary = "Both tax regimes yield the exact same tax liability."
+
+        return {
+            "recommendedRegime": recommended_regime,
+            "savingsAmount": float(quantize_currency(savings_amount)),
+            "advice": advice_summary,
+            "newRegime": {
+                "grossIncome": float(quantize_currency(gross_income)),
+                "standardDeduction": float(quantize_currency(new_std_deduction)),
+                "taxableIncome": float(quantize_currency(new_taxable_income)),
+                "incomeTax": float(quantize_currency(new_tax)),
+                "cess": float(quantize_currency(new_cess)),
+                "totalTax": float(quantize_currency(new_total_tax)),
+                "effectiveRatePercent": float(safe_percentage(new_total_tax, gross_income)),
+            },
+            "oldRegime": {
+                "grossIncome": float(quantize_currency(gross_income)),
+                "standardDeduction": float(quantize_currency(old_std_deduction)),
+                "totalDeductions": float(quantize_currency(total_old_deductions)),
+                "taxableIncome": float(quantize_currency(old_taxable_income)),
+                "incomeTax": float(quantize_currency(old_tax)),
+                "cess": float(quantize_currency(old_cess)),
+                "totalTax": float(quantize_currency(old_total_tax)),
+                "effectiveRatePercent": float(safe_percentage(old_total_tax, gross_income)),
+            },
         }
