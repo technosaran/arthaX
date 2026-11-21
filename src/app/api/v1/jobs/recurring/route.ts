@@ -4,22 +4,47 @@ import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { constantTimeCompare } from "@/utils/crypto";
 
-function computeNextRunDate(currentDateStr: string, frequency: string): string {
-  const d = new Date(currentDateStr);
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+export function computeNextRunDate(currentDateStr: string, frequency: string): string {
+  const parts = currentDateStr.split("-");
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // 0-indexed
+  const day = parseInt(parts[2], 10);
+
   if (frequency === "daily") {
-    d.setDate(d.getDate() + 1);
+    const d = new Date(Date.UTC(year, month, day + 1));
+    return d.toISOString().split("T")[0];
   } else if (frequency === "weekly") {
-    d.setDate(d.getDate() + 7);
-  } else if (frequency === "monthly") {
-    d.setMonth(d.getMonth() + 1);
-  } else if (frequency === "quarterly") {
-    d.setMonth(d.getMonth() + 3);
+    const d = new Date(Date.UTC(year, month, day + 7));
+    return d.toISOString().split("T")[0];
+  } else if (frequency === "monthly" || frequency === "quarterly") {
+    const monthsToAdd = frequency === "quarterly" ? 3 : 1;
+    const targetMonth = month + monthsToAdd;
+    const targetYear = year + Math.floor(targetMonth / 12);
+    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+    // Get last day of target month (day 0 of next month in UTC gives last day of target month)
+    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+    const targetDay = Math.min(day, lastDayOfTargetMonth);
+    const d = new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
+    return d.toISOString().split("T")[0];
   } else if (frequency === "yearly") {
-    d.setFullYear(d.getFullYear() + 1);
+    const targetYear = year + 1;
+    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, month + 1, 0)).getUTCDate();
+    const targetDay = Math.min(day, lastDayOfTargetMonth);
+    const d = new Date(Date.UTC(targetYear, month, targetDay));
+    return d.toISOString().split("T")[0];
   } else {
-    d.setMonth(d.getMonth() + 1);
+    // Default monthly
+    const targetMonth = month + 1;
+    const targetYear = year + Math.floor(targetMonth / 12);
+    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+    const targetDay = Math.min(day, lastDayOfTargetMonth);
+    const d = new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
+    return d.toISOString().split("T")[0];
   }
-  return d.toISOString().split("T")[0];
 }
 
 export async function POST(req: NextRequest) {

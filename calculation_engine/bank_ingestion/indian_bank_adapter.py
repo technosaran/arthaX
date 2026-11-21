@@ -355,14 +355,36 @@ class IndianBankAdapter(BaseBankAdapter):
         if not numeric_tokens:
             return None
 
-        bal = numeric_tokens[0]
-        amt = numeric_tokens[1] if len(numeric_tokens) > 1 else Decimal("0.00")
-
         upper_text = combined_text.upper()
-        if "CR" in tokens[-1].upper() or "DEPOSIT" in upper_text or "BY " in upper_text:
-            direction = "CREDIT"
+        if len(numeric_tokens) >= 3:
+            bal = numeric_tokens[0]
+            cred = numeric_tokens[1]
+            deb = numeric_tokens[2]
+            if deb > Decimal("0.00") and cred == Decimal("0.00"):
+                amt = deb
+                direction = "DEBIT"
+            elif cred > Decimal("0.00") and deb == Decimal("0.00"):
+                amt = cred
+                direction = "CREDIT"
+            else:
+                amt = cred if cred > 0 else deb
+                direction = "CREDIT" if cred > 0 else "DEBIT"
         else:
-            direction = "DEBIT"
+            bal = numeric_tokens[0]
+            amt = numeric_tokens[1] if len(numeric_tokens) > 1 else Decimal("0.00")
+            amt_tok = tokens[-2].upper() if len(tokens) >= 2 else ""
+            if "DR" in amt_tok:
+                direction = "DEBIT"
+            elif "CR" in amt_tok:
+                direction = "CREDIT"
+            elif any(k in upper_text for k in ["ATM", "WDL", "WITHDRAWAL", "POS", "PURCHASE", "TRANSFER TO", "TO TRANSFER", "PAID TO", "BILLPAY", "CREDIT CARD"]):
+                direction = "DEBIT"
+            elif any(k in upper_text for k in ["TRANSFER FROM", "BY TRANSFER", "SALARY", "INTEREST", "DIVIDEND", "REFUND", "DEPOSIT"]):
+                direction = "CREDIT"
+            elif "CREDIT" in upper_text and "CREDIT CARD" not in upper_text:
+                direction = "CREDIT"
+            else:
+                direction = "DEBIT"
 
         ref_no = None
         m_ref = re.search(r"(?:UPI/|IMPS/|NEFT/|UTR:?)(\w{8,25})", combined_text, re.IGNORECASE)

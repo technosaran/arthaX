@@ -70,4 +70,17 @@ describe("Money & Decimal Precision Arithmetic Suite", () => {
     expect(formatINR(150000)).toBe("₹1,50,000.00");
     expect(formatINR(12345678.9)).toBe("₹1,23,45,678.90");
   });
+
+  it("handles half-up rounding in divMoneyStrict and non-currency rates in mulMoneyStrict", async () => {
+    const { divMoneyStrict, mulMoneyStrict } = await import("@/utils/money");
+    // 5 / 3 = 1.6666... rounds half-up to 1.67
+    expect(divMoneyStrict(5, 3)).toBe(1.67);
+    // 4 / 3 = 1.3333... rounds half-up to 1.33
+    expect(divMoneyStrict(4, 3)).toBe(1.33);
+
+    // 100,000 * 0.125 (Budget 2024 12.5% LTCG) = 12,500.00 (not distorted to 13,000.00)
+    expect(mulMoneyStrict(100_000, 0.125)).toBe(12500);
+    // 10,000 * 0.0003 (0.03% brokerage) = 3.00
+    expect(mulMoneyStrict(10_000, 0.0003)).toBe(3);
+  });
 });

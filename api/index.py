@@ -73,13 +73,20 @@ def verify_auth_dependency(
     authorization: Optional[str] = Header(None),
     x_internal_service_key: Optional[str] = Header(None),
 ) -> dict:
-    internal_key = (
-        os.getenv("INTERNAL_SERVICE_KEY")
-        or os.getenv("CRON_SECRET")
-    )
-    if internal_key and x_internal_service_key:
-        if hmac.compare_digest(x_internal_service_key.strip(), internal_key.strip()):
-            return {"user_id": "internal_service", "auth_method": "service_key"}
+    valid_internal_keys = [
+        k.strip()
+        for k in [
+            os.getenv("INTERNAL_SERVICE_KEY"),
+            os.getenv("CRON_SECRET"),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
+        ]
+        if k and k.strip()
+    ]
+    if x_internal_service_key and valid_internal_keys:
+        provided = x_internal_service_key.strip()
+        for key in valid_internal_keys:
+            if hmac.compare_digest(provided, key):
+                return {"user_id": "internal_service", "auth_method": "service_key"}
 
     if not IS_PROD and (os.getenv("DISABLE_AUTH") == "1" or not authorization):
         return {"user_id": "dev_user", "auth_method": "development_bypass"}
@@ -377,12 +384,16 @@ def detect_anomalies_logic(transactions: List[Any]):
         z_scores = (amounts - mean) / std_dev if std_dev > 0 else np.zeros_like(amounts)
 
         # Robust Modified Z-Score using Median Absolute Deviation (MAD)
-        try:
-            mad = float(stats.median_abs_deviation(amounts, scale="normal"))
-        except Exception:
-            mad = float(np.median(np.abs(amounts - median))) * 1.4826
-
-        modified_z = (0.6745 * np.abs(amounts - median) / mad) if mad > 0 else np.zeros_like(amounts)
+        # Boris Iglewicz & David Hoaglin (1993): M_i = 0.6745 * |x_i - median| / raw_mad
+        raw_mad = float(np.median(np.abs(amounts - median)))
+        if raw_mad > 0:
+            modified_z = 0.6745 * np.abs(amounts - median) / raw_mad
+        else:
+            try:
+                normal_mad = float(stats.median_abs_deviation(amounts, scale="normal"))
+                modified_z = (np.abs(amounts - median) / normal_mad) if normal_mad > 0 else np.zeros_like(amounts)
+            except Exception:
+                modified_z = np.zeros_like(amounts)
 
         for i, tx in enumerate(valid_items):
             amt = amounts_list[i]

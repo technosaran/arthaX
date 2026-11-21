@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   ShieldCheck,
   TrendingUp,
@@ -260,9 +260,14 @@ export default function BondsSection() {
     }
   }, [supabase, showToast, fetchData]);
 
+  const autoSyncedRef = useRef(false);
+
   // Initial load + Background Auto-Sync from Zerodha (0ms manual work)
   useEffect(() => {
     fetchData();
+
+    if (autoSyncedRef.current) return;
+    autoSyncedRef.current = true;
 
     // Silent background auto-sync from Zerodha when active session exists
     (async () => {

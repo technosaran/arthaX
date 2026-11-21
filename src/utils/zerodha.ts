@@ -97,9 +97,8 @@ export async function getZerodhaIntegration(userId: string): Promise<{
       .map((id) => id.trim())
       .filter(Boolean);
     const isAuthorizedOwner =
-      authorizedUserIds.length === 0 ||
-      userId === "default_user" ||
-      authorizedUserIds.includes(userId);
+      (authorizedUserIds.length > 0 && authorizedUserIds.includes(userId)) ||
+      (process.env.NODE_ENV !== "production" && userId === "default_user");
 
     if (!record && envApiKey && envApiSecret && isAuthorizedOwner) {
       const encryptedSecret = encryptSensitiveData(envApiSecret, "broker-credentials");

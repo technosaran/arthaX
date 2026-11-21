@@ -126,8 +126,12 @@ export function divMoneyStrict(
     throw new InvalidMoneyError(`${fieldName}: Division by zero is prohibited`);
   }
 
-  // Exact integer scaling: (centsA * BigInt(100)) / centsDiv
-  const divCents = (centsA * BigInt(100)) / centsDiv;
+  // Exact integer scaling with half-up rounding
+  const isNegative = (centsA < BigInt(0)) !== (centsDiv < BigInt(0));
+  const absA = centsA < BigInt(0) ? -centsA : centsA;
+  const absDiv = centsDiv < BigInt(0) ? -centsDiv : centsDiv;
+  const divCentsAbs = (absA * BigInt(100) + (absDiv / BigInt(2))) / absDiv;
+  const divCents = isNegative ? -divCentsAbs : divCentsAbs;
   const numCents = Number(divCents);
   if (!Number.isSafeInteger(numCents)) {
     throw new InvalidMoneyError(`${fieldName}: Division result exceeds safe integer precision`);
@@ -195,8 +199,40 @@ export function subMoneyStrict(a: unknown, b: unknown): number {
  */
 export function mulMoneyStrict(a: unknown, factor: unknown): number {
   const centsA = BigInt(toCentsStrict(a, "Operand A"));
-  const factorCents = BigInt(toCentsStrict(factor, "Factor"));
-  const prodCents = (centsA * factorCents) / BigInt(100);
+
+  // Factor may be a scalar rate (e.g. 0.125 for 12.5% LTCG, 0.0003 for brokerage),
+  // a numeric string, or an integer multiplier.
+  let factorNum: number;
+  if (typeof factor === "number") {
+    if (!Number.isFinite(factor)) {
+      throw new InvalidMoneyError("Factor must be a finite number");
+    }
+    factorNum = factor;
+  } else if (typeof factor === "string") {
+    const clean = factor.replace(/,/g, "").trim();
+    factorNum = Number(clean);
+    if (!Number.isFinite(factorNum)) {
+      throw new InvalidMoneyError(`Factor "${factor}" is not a valid number`);
+    }
+  } else if (typeof factor === "bigint") {
+    factorNum = Number(factor);
+  } else {
+    throw new InvalidMoneyError("Factor must be a number, bigint, or numeric string");
+  }
+
+  // To preserve precision without floating-point drift:
+  // Convert factor to integer ratio by scaling by 1,000,000 (micro-precision)
+  const SCALE = BigInt(1_000_000);
+  const scaledFactor = BigInt(Math.round(factorNum * 1_000_000));
+
+  const isNegative = (centsA < BigInt(0)) !== (scaledFactor < BigInt(0));
+  const absA = centsA < BigInt(0) ? -centsA : centsA;
+  const absFactor = scaledFactor < BigInt(0) ? -scaledFactor : scaledFactor;
+
+  // Half-up rounding: (absA * absFactor + (SCALE / 2)) / SCALE
+  const prodCentsAbs = (absA * absFactor + (SCALE / BigInt(2))) / SCALE;
+  const prodCents = isNegative ? -prodCentsAbs : prodCentsAbs;
+
   const numCents = Number(prodCents);
   if (!Number.isSafeInteger(numCents)) {
     throw new InvalidMoneyError("Multiplication result exceeds safe integer precision");

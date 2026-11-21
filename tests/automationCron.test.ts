@@ -116,4 +116,22 @@ describe("Universal Automation Cron Route Suite", () => {
     expect(json.results[0].success).toBe(false);
     expect(json.results[0].error).toContain("PASSWORD_REQUIRED");
   });
+
+  describe("computeNextRunDate Schedule Integrity", () => {
+    it("correctly clamps January 31st to February 28th/29th without skipping February", async () => {
+      const { computeNextRunDate } = await import("@/app/api/v1/jobs/recurring/route");
+      // Non-leap year 2026: Jan 31 -> Feb 28
+      expect(computeNextRunDate("2026-01-31", "monthly")).toBe("2026-02-28");
+      // Leap year 2024: Jan 31 -> Feb 29
+      expect(computeNextRunDate("2024-01-31", "monthly")).toBe("2024-02-29");
+      // March 31 quarterly -> June 30
+      expect(computeNextRunDate("2026-03-31", "quarterly")).toBe("2026-06-30");
+      // Daily
+      expect(computeNextRunDate("2026-02-28", "daily")).toBe("2026-03-01");
+      // Weekly
+      expect(computeNextRunDate("2026-02-25", "weekly")).toBe("2026-03-04");
+      // Yearly
+      expect(computeNextRunDate("2024-02-29", "yearly")).toBe("2025-02-28");
+    });
+  });
 });
