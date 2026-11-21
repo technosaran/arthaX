@@ -83,22 +83,35 @@ export function validateMonetaryAmount(
     throw new InvalidMoneyError(`${fieldName} (${num}) exceeds maximum allowed limit (${maxLimit})`);
   }
 
-  // Quantize strictly to 2 decimal places using cent scaling
+  // Safe integer paise math validation
   const cents = Math.round(num * 100);
+  if (!Number.isSafeInteger(cents)) {
+    throw new InvalidMoneyError(`${fieldName} exceeds safe integer numeric precision`);
+  }
   return fromCents(cents);
 }
 
 /**
  * Converts a monetary value to integer cents/paise with strict validation.
- * Throws InvalidMoneyError on invalid input.
+ * Throws InvalidMoneyError on invalid input or integer overflow.
  */
 export function toCentsStrict(val: unknown, fieldName = "Monetary amount"): number {
   const valid = validateMonetaryAmount(val, { fieldName, allowNegative: true });
-  return Math.round(valid * 100);
+  const cents = Math.round(valid * 100);
+  if (!Number.isSafeInteger(cents)) {
+    throw new InvalidMoneyError(`${fieldName} integer paise value exceeds safe integer range`);
+  }
+  return cents;
 }
 
 /**
- * Strict division of monetary values.
+ * Safe aliases for paise precision
+ */
+export const toPaise = toCentsStrict;
+export const fromPaise = fromCents;
+
+/**
+ * Strict division of monetary values using integer paise arithmetic.
  * Throws InvalidMoneyError on division by zero or invalid inputs.
  */
 export function divMoneyStrict(
@@ -106,64 +119,89 @@ export function divMoneyStrict(
   divisor: unknown,
   fieldName = "Division operation"
 ): number {
-  const validA = validateMonetaryAmount(a, { fieldName: `${fieldName} (numerator)`, allowNegative: true });
-  const validDiv = validateMonetaryAmount(divisor, { fieldName: `${fieldName} (denominator)`, allowNegative: true });
+  const centsA = BigInt(toCentsStrict(a, `${fieldName} (numerator)`));
+  const centsDiv = BigInt(toCentsStrict(divisor, `${fieldName} (denominator)`));
 
-  if (validDiv === 0) {
+  if (centsDiv === BigInt(0)) {
     throw new InvalidMoneyError(`${fieldName}: Division by zero is prohibited`);
   }
 
-  const cents = Math.round((validA / validDiv) * 100);
-  return fromCents(cents);
+  // Exact integer scaling: (centsA * BigInt(100)) / centsDiv
+  const divCents = (centsA * BigInt(100)) / centsDiv;
+  const numCents = Number(divCents);
+  if (!Number.isSafeInteger(numCents)) {
+    throw new InvalidMoneyError(`${fieldName}: Division result exceeds safe integer precision`);
+  }
+  return fromCents(numCents);
 }
 
 /**
  * Strict percentage calculation: (part / total) * 100
- * Throws InvalidMoneyError if total <= 0 or inputs are malformed.
+ * Uses integer paise arithmetic and DOES NOT clamp legitimate financial percentages (e.g. >100% ROI or negative returns).
+ * Throws InvalidMoneyError if total is zero or inputs are malformed.
  */
 export function percentMoneyStrict(
   part: unknown,
   total: unknown,
-  fieldName = "Percentage operation"
+  fieldName = "Percentage operation",
+  options?: { clamp?: boolean }
 ): number {
   const validPart = validateMonetaryAmount(part, { fieldName: `${fieldName} (part)`, allowNegative: true });
-  const validTotal = validateMonetaryAmount(total, { fieldName: `${fieldName} (total)`, allowNegative: false });
+  const validTotal = validateMonetaryAmount(total, { fieldName: `${fieldName} (total)`, allowNegative: true });
 
-  if (validTotal <= 0) {
-    throw new InvalidMoneyError(`${fieldName}: Total must be strictly positive for percentage calculation`);
+  if (validTotal === 0) {
+    throw new InvalidMoneyError(`${fieldName}: Total cannot be zero for percentage calculation`);
   }
 
-  const pct = (validPart / validTotal) * 100;
-  const clamped = Math.max(0, Math.min(100, pct));
-  return Math.round(clamped * 100) / 100;
+  // Exact integer paise arithmetic: (part * 10000) / total
+  const partPaise = BigInt(Math.round(validPart * 100));
+  const totPaise = BigInt(Math.round(validTotal * 100));
+  const pctScaled = Number((partPaise * BigInt(10000)) / totPaise) / 100;
+
+  if (options?.clamp) {
+    return Math.max(0, Math.min(100, pctScaled));
+  }
+  return pctScaled;
 }
 
 /**
- * Strict Decimal addition: a + b
+ * Strict Decimal addition: a + b using safe integer paise arithmetic.
  */
 export function addMoneyStrict(a: unknown, b: unknown): number {
   const centsA = toCentsStrict(a, "Operand A");
   const centsB = toCentsStrict(b, "Operand B");
-  return fromCents(centsA + centsB);
+  const sum = centsA + centsB;
+  if (!Number.isSafeInteger(sum)) {
+    throw new InvalidMoneyError("Addition result exceeds safe integer precision");
+  }
+  return fromCents(sum);
 }
 
 /**
- * Strict Decimal subtraction: a - b
+ * Strict Decimal subtraction: a - b using safe integer paise arithmetic.
  */
 export function subMoneyStrict(a: unknown, b: unknown): number {
   const centsA = toCentsStrict(a, "Operand A");
   const centsB = toCentsStrict(b, "Operand B");
-  return fromCents(centsA - centsB);
+  const diff = centsA - centsB;
+  if (!Number.isSafeInteger(diff)) {
+    throw new InvalidMoneyError("Subtraction result exceeds safe integer precision");
+  }
+  return fromCents(diff);
 }
 
 /**
- * Strict Decimal multiplication: a * factor
+ * Strict Decimal multiplication: a * factor using safe integer paise arithmetic.
  */
 export function mulMoneyStrict(a: unknown, factor: unknown): number {
-  const validA = validateMonetaryAmount(a, { fieldName: "Operand A", allowNegative: true });
-  const validFactor = validateMonetaryAmount(factor, { fieldName: "Factor", allowNegative: true });
-  const cents = Math.round(validA * validFactor * 100);
-  return fromCents(cents);
+  const centsA = BigInt(toCentsStrict(a, "Operand A"));
+  const factorCents = BigInt(toCentsStrict(factor, "Factor"));
+  const prodCents = (centsA * factorCents) / BigInt(100);
+  const numCents = Number(prodCents);
+  if (!Number.isSafeInteger(numCents)) {
+    throw new InvalidMoneyError("Multiplication result exceeds safe integer precision");
+  }
+  return fromCents(numCents);
 }
 
 /**
@@ -267,15 +305,20 @@ export function roundMoney(val: MoneyInput): number {
 
 /**
  * Calculates percentage: (part / total) * 100
- * Clamped between 0 and 100, rounded to 2 decimal places.
+ * Clamped between 0 and 100 by default for standard UI progress/budget widgets.
+ * Pass { clamp: false } or use percentMoneyStrict() for true unclamped financial percentage changes (ROI/PnL).
  */
-export function percentMoney(part: MoneyInput, total: MoneyInput): number {
+export function percentMoney(part: MoneyInput, total: MoneyInput, options?: { clamp?: boolean }): number {
   const tot = parseCleanNumber(total);
   if (tot <= 0) return 0;
   const p = parseCleanNumber(part);
   const pct = (p / tot) * 100;
-  const clamped = Math.max(0, Math.min(100, pct));
-  return Math.round(clamped * 100) / 100;
+  const rounded = Math.round(pct * 100) / 100;
+  if (options?.clamp === false) {
+    return rounded;
+  }
+  const clamped = Math.max(0, Math.min(100, rounded));
+  return clamped;
 }
 
 /**

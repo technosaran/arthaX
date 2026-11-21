@@ -51,6 +51,11 @@ DROP POLICY IF EXISTS "Users can insert own statement attachment jobs" ON public
 CREATE POLICY "Users can insert own statement attachment jobs" ON public.statement_attachment_jobs
   FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
 
+-- Enforce 1-to-1 counterpart uniqueness on canonical_transactions
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_tx_transfer_counterpart 
+  ON public.canonical_transactions(transfer_counterpart_id) 
+  WHERE transfer_counterpart_id IS NOT NULL;
+
 
 -- ----------------------------------------------------------------------------
 -- 2. HARDENED ATOMIC CANONICAL TRANSACTION SYNCHRONIZATION FUNCTION
@@ -94,8 +99,12 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- If called from an authenticated client context (not service_role), caller must match p_user_id
-  IF v_calling_user IS NOT NULL AND v_calling_role <> 'service_role' THEN
+  -- If called from an authenticated client context (not service_role), identity must be present and match
+  IF v_calling_role <> 'service_role' THEN
+    IF v_calling_user IS NULL OR trim(v_calling_user) = '' THEN
+      RAISE EXCEPTION 'Unauthorized: Authenticated identity missing for ledger synchronization'
+        USING ERRCODE = '42501';
+    END IF;
     IF v_calling_user <> p_user_id THEN
       RAISE EXCEPTION 'Forbidden: Authenticated user (%) cannot sync financial records for user (%)',
         v_calling_user, p_user_id
@@ -114,7 +123,7 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- C. Account Ownership Verification
+  -- C. Source Account Ownership Verification
   IF NOT EXISTS (
     SELECT 1 FROM public.accounts 
     WHERE id = p_account_id AND user_id = p_user_id
@@ -137,7 +146,19 @@ BEGIN
   END IF;
 
   -- 1. Handle Internal Transfers (Account-to-Account)
-  IF p_is_transfer AND p_transfer_to_account_id IS NOT NULL THEN
+  -- Strict validation: If marked as transfer, destination account MUST be provided and valid.
+  -- NEVER fall through into expense or income creation!
+  IF p_is_transfer THEN
+    IF p_transfer_to_account_id IS NULL THEN
+      RAISE EXCEPTION 'Destination transfer account must be provided when transaction is marked as transfer'
+        USING ERRCODE = '22023';
+    END IF;
+
+    IF p_account_id = p_transfer_to_account_id THEN
+      RAISE EXCEPTION 'Transfer source account and destination account must be distinct'
+        USING ERRCODE = '22023';
+    END IF;
+
     -- Verify destination account belongs to the same user
     IF NOT EXISTS (
       SELECT 1 FROM public.accounts 
@@ -146,11 +167,6 @@ BEGIN
       RAISE EXCEPTION 'Destination transfer account (%) does not exist or does not belong to user (%)',
         p_transfer_to_account_id, p_user_id
         USING ERRCODE = '42501';
-    END IF;
-
-    IF p_account_id = p_transfer_to_account_id THEN
-      RAISE EXCEPTION 'Transfer source account and destination account must be distinct'
-        USING ERRCODE = '22023';
     END IF;
 
     INSERT INTO public.transfers (
@@ -183,7 +199,7 @@ BEGIN
     );
   END IF;
 
-  -- 2. Handle DEBIT -> Expense
+  -- 2. Handle DEBIT -> Expense (ONLY when NOT a transfer)
   IF upper(p_direction) = 'DEBIT' THEN
     INSERT INTO public.expenses (
       user_id,
@@ -219,7 +235,7 @@ BEGIN
     );
   END IF;
 
-  -- 3. Handle CREDIT -> Income
+  -- 3. Handle CREDIT -> Income (ONLY when NOT a transfer)
   IF upper(p_direction) = 'CREDIT' THEN
     INSERT INTO public.income (
       user_id,
@@ -267,7 +283,7 @@ GRANT EXECUTE ON FUNCTION public.fn_sync_canonical_transaction_to_ledger(text, u
 
 
 -- ----------------------------------------------------------------------------
--- 3. AUTOMATED INTERNAL TRANSFER RECONCILIATION FUNCTION
+-- 3. AUTOMATED EVIDENCE-BASED INTERNAL TRANSFER RECONCILIATION FUNCTION
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.fn_reconcile_internal_transfers(
   p_user_id text,
@@ -301,7 +317,11 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  IF v_calling_user IS NOT NULL AND v_calling_role <> 'service_role' THEN
+  IF v_calling_role <> 'service_role' THEN
+    IF v_calling_user IS NULL OR trim(v_calling_user) = '' THEN
+      RAISE EXCEPTION 'Unauthorized: Authenticated identity missing for transfer reconciliation'
+        USING ERRCODE = '42501';
+    END IF;
     IF v_calling_user <> p_user_id THEN
       RAISE EXCEPTION 'Forbidden: Cannot reconcile transfers for user (%)', p_user_id
         USING ERRCODE = '42501';
@@ -309,6 +329,8 @@ BEGIN
   END IF;
 
   -- B. Iterate through candidate pairs within settlement window (<= 3 days / 72 hours)
+  -- Enforce Evidence Requirement: Do not match based solely on amount and date!
+  -- Must have reference match OR explicit transfer keywords in narration.
   FOR v_pair IN
     SELECT DISTINCT ON (d.id)
       d.id AS debit_id,
@@ -332,20 +354,50 @@ BEGIN
       AND d.direction = 'DEBIT'
       AND d.transfer_counterpart_id IS NULL
       AND d.transaction_date >= current_date - (p_lookback_days || ' days')::interval
+      -- Evidence-based validation (no matching coincidental amounts without transfer evidence)
+      AND (
+        (d.transaction_reference IS NOT NULL AND c.transaction_reference IS NOT NULL AND length(trim(d.transaction_reference)) >= 6 AND d.transaction_reference = c.transaction_reference)
+        OR
+        (
+          d.original_narration ~* '\y(TRANSFER|TRF|SWEEP|FT|NEFT|RTGS|IMPS|SELF|OWN A/?C|TO A/?C|FROM A/?C)\y'
+          OR
+          c.original_narration ~* '\y(TRANSFER|TRF|SWEEP|FT|NEFT|RTGS|IMPS|SELF|OWN A/?C|TO A/?C|FROM A/?C)\y'
+        )
+      )
     ORDER BY d.id, abs(d.transaction_date - c.transaction_date) ASC
   LOOP
-    -- 1. Link Canonical Transactions
+    -- 1. Atomic Locking & Concurrency Protection:
+    -- Update debit only if still unmatched
     UPDATE public.canonical_transactions
     SET is_transfer = true,
         transfer_counterpart_id = v_pair.credit_id,
         updated_at = timezone('utc'::text, now())
-    WHERE id = v_pair.debit_id AND user_id = p_user_id;
+    WHERE id = v_pair.debit_id 
+      AND user_id = p_user_id 
+      AND transfer_counterpart_id IS NULL;
 
+    IF NOT FOUND THEN
+      -- Already claimed by a concurrent execution, skip
+      CONTINUE;
+    END IF;
+
+    -- Update credit only if still unmatched
     UPDATE public.canonical_transactions
     SET is_transfer = true,
         transfer_counterpart_id = v_pair.debit_id,
         updated_at = timezone('utc'::text, now())
-    WHERE id = v_pair.credit_id AND user_id = p_user_id;
+    WHERE id = v_pair.credit_id 
+      AND user_id = p_user_id 
+      AND transfer_counterpart_id IS NULL;
+
+    IF NOT FOUND THEN
+      -- Credit was claimed concurrently; roll back debit link
+      UPDATE public.canonical_transactions
+      SET is_transfer = false,
+          transfer_counterpart_id = NULL
+      WHERE id = v_pair.debit_id;
+      CONTINUE;
+    END IF;
 
     -- 2. Persist in Transfers Table
     INSERT INTO public.transfers (

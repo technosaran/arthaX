@@ -3,8 +3,11 @@ import {
   validateMonetaryAmount,
   InvalidMoneyError,
   toCentsStrict,
+  toPaise,
+  fromPaise,
   divMoneyStrict,
   percentMoneyStrict,
+  percentMoney,
   addMoneyStrict,
   subMoneyStrict,
   mulMoneyStrict,
@@ -49,21 +52,22 @@ describe("Strict Financial Precision & Validation Suite", () => {
       expect(validateMonetaryAmount("-100.50", { allowNegative: true })).toBe(-100.5);
     });
 
-    it("rejects amounts exceeding safety limits", () => {
+    it("rejects amounts exceeding safety limits and safe integer bounds", () => {
       expect(() => validateMonetaryAmount(200_000_000_000)).toThrow(InvalidMoneyError);
       expect(() => validateMonetaryAmount(5000, { maxLimit: 1000 })).toThrow(InvalidMoneyError);
       expect(() => validateMonetaryAmount(5, { minLimit: 10 })).toThrow(InvalidMoneyError);
     });
   });
 
-  describe("Strict Arithmetic Operations", () => {
-    it("toCentsStrict converts reliably and throws on invalid inputs", () => {
+  describe("Strict Arithmetic & Integer Paise Precision", () => {
+    it("toCentsStrict and toPaise convert reliably and throw on invalid inputs", () => {
       expect(toCentsStrict(125.75)).toBe(12575);
-      expect(toCentsStrict("₹ 1,000.00")).toBe(100000);
+      expect(toPaise("₹ 1,000.00")).toBe(100000);
+      expect(fromPaise(100000)).toBe(1000);
       expect(() => toCentsStrict(NaN)).toThrow(InvalidMoneyError);
     });
 
-    it("divMoneyStrict rejects division by zero and calculates exact quotient", () => {
+    it("divMoneyStrict rejects division by zero and calculates exact integer paise quotient", () => {
       expect(divMoneyStrict(100, 4)).toBe(25);
       expect(divMoneyStrict(100, 3)).toBe(33.33);
       expect(() => divMoneyStrict(100, 0)).toThrow(InvalidMoneyError);
@@ -71,17 +75,30 @@ describe("Strict Financial Precision & Validation Suite", () => {
       expect(() => divMoneyStrict("invalid", 5)).toThrow(InvalidMoneyError);
     });
 
-    it("percentMoneyStrict rejects total <= 0 and calculates clean percentages", () => {
-      expect(percentMoneyStrict(25, 100)).toBe(25);
-      expect(percentMoneyStrict(50, 200)).toBe(25);
+    it("percentMoneyStrict DOES NOT clamp legitimate financial percentages (>100% ROI or negative returns)", () => {
+      // 150% investment gain
+      expect(percentMoneyStrict(150, 100)).toBe(150);
+      expect(percentMoneyStrict(250, 100)).toBe(250);
+      // -20% portfolio drop
+      expect(percentMoneyStrict(-20, 100)).toBe(-20);
+      // Clamping is only applied when explicitly requested
+      expect(percentMoneyStrict(150, 100, undefined, { clamp: true })).toBe(100);
+      expect(percentMoneyStrict(-20, 100, undefined, { clamp: true })).toBe(0);
+      // Rejects total = 0
       expect(() => percentMoneyStrict(50, 0)).toThrow(InvalidMoneyError);
-      expect(() => percentMoneyStrict(50, -100)).toThrow(InvalidMoneyError);
     });
 
-    it("addMoneyStrict, subMoneyStrict, and mulMoneyStrict work reliably", () => {
+    it("percentMoney supports unclamped financial percentages via { clamp: false } while preserving UI defaults", () => {
+      expect(percentMoney(150, 100)).toBe(100); // UI default clamped
+      expect(percentMoney(150, 100, { clamp: false })).toBe(150); // Unclamped financial percentage
+      expect(percentMoney(-25, 100, { clamp: false })).toBe(-25); // Unclamped negative return
+    });
+
+    it("addMoneyStrict, subMoneyStrict, and mulMoneyStrict work with safe integer precision", () => {
       expect(addMoneyStrict(0.1, 0.2)).toBe(0.3);
       expect(subMoneyStrict(100.55, 50.25)).toBe(50.3);
       expect(mulMoneyStrict(100, 0.18)).toBe(18);
+      expect(mulMoneyStrict(1500.5, 3)).toBe(4501.5);
       expect(() => addMoneyStrict(NaN, 50)).toThrow(InvalidMoneyError);
       expect(() => subMoneyStrict("bad", 10)).toThrow(InvalidMoneyError);
     });

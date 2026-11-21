@@ -275,31 +275,43 @@ export async function syncUserGmailStatements(
     let totalDuplicates = 0;
 
     for (const stmt of statements) {
-      const messageId = stmt.email_metadata?.message_id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const attachmentId = stmt.file_hash || `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      // Compute stable, deterministic message and attachment IDs (no random strings)
+      const messageId =
+        stmt.email_metadata?.message_id ||
+        stmt.message_id ||
+        (stmt.file_hash ? `msg_${stmt.file_hash.substring(0, 16)}` : `msg_${Buffer.from(stmt.file_name || 'statement').toString('hex').substring(0, 16)}`);
+      const attachmentId =
+        stmt.attachment_id ||
+        stmt.file_hash ||
+        crypto.createHash("sha256").update(`${messageId}:${stmt.file_name || 'statement.pdf'}`).digest("hex");
       const fileName = stmt.file_name || "gmail_statement.pdf";
       const bankName = stmt.bank_name || stmt.detected_bank || "BANK";
 
       // If statement failed in extraction or decryption, record failed attachment job
       if (!stmt.success) {
-        try {
-          await supabaseAdmin.from("statement_attachment_jobs").upsert(
-            {
-              user_id: userId,
-              message_id: messageId,
-              attachment_id: attachmentId,
-              filename: fileName,
-              file_hash: stmt.file_hash || null,
-              bank_name: bankName,
-              status: "FAILED",
-              error_message: (stmt.errors || []).join("; ") || "Statement ingestion failed",
-              retry_count: 1,
-              metadata: stmt.email_metadata || {},
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,message_id,attachment_id" }
-          );
-        } catch {}
+        const { error: failJobErr } = await supabaseAdmin.from("statement_attachment_jobs").upsert(
+          {
+            user_id: userId,
+            message_id: messageId,
+            attachment_id: attachmentId,
+            filename: fileName,
+            file_hash: stmt.file_hash || null,
+            bank_name: bankName,
+            status: "FAILED",
+            error_message: (stmt.errors || []).join("; ") || "Statement ingestion failed",
+            retry_count: 1,
+            metadata: stmt.email_metadata || {},
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,message_id,attachment_id" }
+        );
+        if (failJobErr) {
+          logger.error("Failed to persist failed statement attachment job", "GmailService", failJobErr, {
+            userId,
+            messageId,
+            attachmentId,
+          });
+        }
         continue;
       }
 
@@ -309,17 +321,21 @@ export async function syncUserGmailStatements(
       const fileHash = stmt.file_hash;
 
       // Match or resolve user account
-      const { data: accounts } = await supabaseAdmin
+      const { data: accounts, error: accErr } = await supabaseAdmin
         .from("accounts")
         .select("id, name, type")
         .eq("user_id", userId);
+
+      if (accErr) {
+        logger.error("Failed to query accounts during Gmail sync", "GmailService", accErr, { userId });
+      }
 
       let targetAccountId = (accounts || []).find((a) =>
         a.name.toLowerCase().includes(bankName.toLowerCase())
       )?.id;
 
       if (!targetAccountId) {
-        const { data: newAcc } = await supabaseAdmin
+        const { data: newAcc, error: createAccErr } = await supabaseAdmin
           .from("accounts")
           .insert({
             user_id: userId,
@@ -330,11 +346,19 @@ export async function syncUserGmailStatements(
           })
           .select("id")
           .single();
+
+        if (createAccErr) {
+          logger.error("Failed to auto-create bank account during statement ingestion", "GmailService", createAccErr, {
+            userId,
+            bankName,
+          });
+          continue;
+        }
         targetAccountId = newAcc?.id;
       }
 
       // Insert statement record
-      const { data: stmtRecord } = await supabaseAdmin
+      const { data: stmtRecord, error: stmtErr } = await supabaseAdmin
         .from("bank_statements")
         .upsert(
           {
@@ -361,26 +385,40 @@ export async function syncUserGmailStatements(
         .select("id")
         .single();
 
+      if (stmtErr) {
+        logger.error("Failed to record bank statement in database", "GmailService", stmtErr, {
+          userId,
+          fileHash,
+        });
+        continue;
+      }
+
       const stmtId = stmtRecord?.id;
 
       // Record attachment job state
-      try {
-        await supabaseAdmin.from("statement_attachment_jobs").upsert(
-          {
-            user_id: userId,
-            message_id: messageId,
-            attachment_id: attachmentId,
-            filename: fileName,
-            file_hash: fileHash,
-            bank_name: bankName,
-            status: validation.is_valid ? "RECONCILED" : "IMPORTED",
-            statement_id: stmtId,
-            metadata: stmt.email_metadata || {},
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,message_id,attachment_id" }
-        );
-      } catch {}
+      const { error: attJobErr } = await supabaseAdmin.from("statement_attachment_jobs").upsert(
+        {
+          user_id: userId,
+          message_id: messageId,
+          attachment_id: attachmentId,
+          filename: fileName,
+          file_hash: fileHash,
+          bank_name: bankName,
+          status: validation.is_valid ? "RECONCILED" : "IMPORTED",
+          statement_id: stmtId,
+          metadata: stmt.email_metadata || {},
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,message_id,attachment_id" }
+      );
+
+      if (attJobErr) {
+        logger.error("Failed to update statement attachment job status", "GmailService", attJobErr, {
+          userId,
+          messageId,
+          attachmentId,
+        });
+      }
 
       // Prepare canonical transactions with strict monetary validation
       const canonicalRows = txs.map((t: any) => {
@@ -419,10 +457,17 @@ export async function syncUserGmailStatements(
       });
 
       if (canonicalRows.length > 0) {
-        const { data: inserted } = await supabaseAdmin
+        const { data: inserted, error: txErr } = await supabaseAdmin
           .from("canonical_transactions")
           .upsert(canonicalRows, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
           .select("id, dedup_hash");
+
+        if (txErr) {
+          logger.error("Failed to upsert canonical transactions", "GmailService", txErr, {
+            userId,
+            statementId: stmtId,
+          });
+        }
 
         const insertedList = (inserted || []) as Array<{ id: string; dedup_hash: string }>;
         const newCanonicalMap = new Map(insertedList.map((r) => [r.dedup_hash, r.id]));
@@ -440,7 +485,7 @@ export async function syncUserGmailStatements(
           }
 
           if (row.direction === "DEBIT") {
-            await supabaseAdmin
+            const { error: expErr } = await supabaseAdmin
               .from("expenses")
               .upsert({
                 user_id: userId,
@@ -453,8 +498,14 @@ export async function syncUserGmailStatements(
                 tags: ["statement_import", "verified"],
                 canonical_transaction_id: canonicalId,
               }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
+
+            if (expErr) {
+              logger.error("Failed to sync expense from canonical transaction", "GmailService", expErr, {
+                canonicalId,
+              });
+            }
           } else if (row.direction === "CREDIT") {
-            await supabaseAdmin
+            const { error: incErr } = await supabaseAdmin
               .from("income")
               .upsert({
                 user_id: userId,
@@ -467,6 +518,12 @@ export async function syncUserGmailStatements(
                 tags: ["statement_import", "verified"],
                 canonical_transaction_id: canonicalId,
               }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
+
+            if (incErr) {
+              logger.error("Failed to sync income from canonical transaction", "GmailService", incErr, {
+                canonicalId,
+              });
+            }
           }
         }
       }

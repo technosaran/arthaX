@@ -378,6 +378,8 @@ class GmailStatementIngestor:
                     stmt_dict["email_metadata"] = email_meta
                     stmt_dict["detected_bank"] = detected_bank
                     stmt_dict["file_hash"] = file_hash
+                    stmt_dict["message_id"] = msg_id
+                    stmt_dict["attachment_id"] = att_id
                     parsed_statements.append(stmt_dict)
                     total_transactions += len(enriched_txs)
 
@@ -386,6 +388,8 @@ class GmailStatementIngestor:
                             "success": False,
                             "file_name": fn,
                             "file_hash": file_hash,
+                            "message_id": msg_id,
+                            "attachment_id": att_id,
                             "errors": parse_res.errors,
                             "email_metadata": email_meta,
                         })
@@ -395,6 +399,8 @@ class GmailStatementIngestor:
                     fail_info = {
                         "success": False,
                         "file_name": fn,
+                        "message_id": msg_id,
+                        "attachment_id": att_id,
                         "errors": [str(parse_err)],
                         "email_metadata": email_meta,
                         "transactions": [],
