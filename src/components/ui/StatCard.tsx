@@ -37,11 +37,11 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const displayTitle = title || label || "";
   const colorMap = {
-    emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    sky: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-    violet: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/25",
+    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 dark:border-rose-500/25",
+    amber: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/25",
+    sky: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20 dark:border-sky-500/25",
+    violet: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20 dark:border-violet-500/25",
     neutral: "bg-[var(--app-track-bg)] text-[var(--app-muted)] border-[var(--app-border-subtle)]",
   };
 
@@ -79,13 +79,13 @@ export const StatCard: React.FC<StatCardProps> = ({
         {trend && (
           <div className="flex items-center gap-1.5 mt-2 text-xs font-medium">
             {trend.direction === "up" && (
-              <span className="text-emerald-400 inline-flex items-center gap-0.5">
+              <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-0.5">
                 <ArrowUpRight size={13} />
                 <span>{trend.value}</span>
               </span>
             )}
             {trend.direction === "down" && (
-              <span className="text-rose-400 inline-flex items-center gap-0.5">
+              <span className="text-rose-600 dark:text-rose-400 inline-flex items-center gap-0.5">
                 <ArrowDownRight size={13} />
                 <span>{trend.value}</span>
               </span>

@@ -39,44 +39,44 @@ export const Badge: React.FC<BadgeProps> = ({
   const sizeClass = sizeStyles[size] || sizeStyles.sm;
   const variantStyles: Record<string, { container: string; dotColor: string }> = {
     success: {
-      container: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      dotColor: "bg-emerald-400",
+      container: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25",
+      dotColor: "bg-emerald-600 dark:bg-emerald-400",
     },
     emerald: {
-      container: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      dotColor: "bg-emerald-400",
+      container: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25",
+      dotColor: "bg-emerald-600 dark:bg-emerald-400",
     },
     danger: {
-      container: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-      dotColor: "bg-rose-400",
+      container: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25",
+      dotColor: "bg-rose-600 dark:bg-rose-400",
     },
     rose: {
-      container: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-      dotColor: "bg-rose-400",
+      container: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25",
+      dotColor: "bg-rose-600 dark:bg-rose-400",
     },
     warning: {
-      container: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      dotColor: "bg-amber-400",
+      container: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/25",
+      dotColor: "bg-amber-600 dark:bg-amber-400",
     },
     amber: {
-      container: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      dotColor: "bg-amber-400",
+      container: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/25",
+      dotColor: "bg-amber-600 dark:bg-amber-400",
     },
     info: {
-      container: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-      dotColor: "bg-sky-400",
+      container: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/25",
+      dotColor: "bg-sky-600 dark:bg-sky-400",
     },
     sky: {
-      container: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-      dotColor: "bg-sky-400",
+      container: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/25",
+      dotColor: "bg-sky-600 dark:bg-sky-400",
     },
     accent: {
-      container: "bg-[var(--app-accent-subtle)] text-[var(--app-accent)] border-[var(--app-accent)]/20",
+      container: "bg-[var(--app-accent-subtle)] text-[var(--app-accent)] border-[var(--app-accent)]/25",
       dotColor: "bg-[var(--app-accent)]",
     },
     violet: {
-      container: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-      dotColor: "bg-violet-400",
+      container: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/25",
+      dotColor: "bg-violet-600 dark:bg-violet-400",
     },
     neutral: {
       container: "bg-[var(--app-track-bg)] text-[var(--app-muted)] border-[var(--app-border-subtle)]",
