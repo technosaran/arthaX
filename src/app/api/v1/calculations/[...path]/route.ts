@@ -3,10 +3,29 @@ import { getAuthenticatedUser } from "@/utils/auth";
 import { apiError, apiUnauthorized, extractRequestId } from "@/utils/apiResponse";
 import { logger } from "@/utils/logger";
 
-const PYTHON_SERVICE_URL =
-  process.env.PYTHON_BACKEND_URL ||
-  process.env.PYTHON_SERVICE_URL ||
-  "http://127.0.0.1:8000";
+function getPythonServiceUrl(req: NextRequest): string {
+  if (process.env.PYTHON_BACKEND_URL) return process.env.PYTHON_BACKEND_URL;
+  if (process.env.PYTHON_SERVICE_URL) return process.env.PYTHON_SERVICE_URL;
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    return req.nextUrl.origin;
+  }
+  return "http://127.0.0.1:8000";
+}
+
+function formatEngineResponse(data: any) {
+  const isWrapped = data && typeof data === "object" && data.data && typeof data.data === "object";
+  return {
+    success: true,
+    ...data,
+    ...(isWrapped ? data.data : {}),
+    ...(data?.metadata && typeof data.metadata === "object"
+      ? {
+          execution_time_ms: data.metadata.execution_time_ms,
+          calculation_version: data.metadata.version,
+        }
+      : {}),
+  };
+}
 
 export async function GET(
   req: NextRequest,
@@ -28,8 +47,10 @@ export async function GET(
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
 
+  const baseUrl = getPythonServiceUrl(req);
+  const targetUrl = `${baseUrl}/api/py/calculations/${subPath}${search}`;
+
   try {
-    const targetUrl = `${PYTHON_SERVICE_URL}/api/py/calculations/${subPath}${search}`;
     const res = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -41,22 +62,31 @@ export async function GET(
     });
 
     if (!res.ok) {
-      const errText = await res.text();
+      let errDetail = "Calculation engine error";
+      try {
+        const text = await res.text();
+        const json = JSON.parse(text);
+        errDetail = json.detail || json.error || text;
+      } catch {
+        // use default
+      }
       return NextResponse.json(
-        { success: false, error: errText || "Calculation engine error", status: res.status },
+        { success: false, error: errDetail, status: res.status },
         { status: res.status }
       );
     }
 
     const data = await res.json();
-    return NextResponse.json({ success: true, ...data });
+    return NextResponse.json(formatEngineResponse(data));
   } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     logger.warn("Calculation engine bridge error (GET)", "CalculationEngineBridge", {
       subPath,
       userId,
+      error: errMsg,
     }, err);
     return apiError(
-      "Calculation engine unreachable or processing error",
+      `Calculation engine unreachable at ${baseUrl}. Ensure the Python analytics microservice is running.`,
       "SERVICE_UNAVAILABLE",
       503,
       undefined,
@@ -78,12 +108,14 @@ export async function POST(
   const { path } = await context.params;
   const subPath = path ? path.join("/") : "";
 
+  const baseUrl = getPythonServiceUrl(req);
+  const targetUrl = `${baseUrl}/api/py/calculations/${subPath}`;
+
   try {
     const body = await req.json().catch(() => ({}));
     // Securely enforce authenticated user_id
     body.user_id = userId;
 
-    const targetUrl = `${PYTHON_SERVICE_URL}/api/py/calculations/${subPath}`;
     const internalKey =
       process.env.INTERNAL_SERVICE_KEY ||
       process.env.CRON_SECRET ||
@@ -103,22 +135,31 @@ export async function POST(
     });
 
     if (!res.ok) {
-      const errText = await res.text();
+      let errDetail = "Calculation engine execution error";
+      try {
+        const text = await res.text();
+        const json = JSON.parse(text);
+        errDetail = json.detail || json.error || text;
+      } catch {
+        // use default
+      }
       return NextResponse.json(
-        { success: false, error: errText || "Calculation engine execution error", status: res.status },
+        { success: false, error: errDetail, status: res.status },
         { status: res.status }
       );
     }
 
     const data = await res.json();
-    return NextResponse.json({ success: true, ...data });
+    return NextResponse.json(formatEngineResponse(data));
   } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     logger.warn("Calculation engine bridge error (POST)", "CalculationEngineBridge", {
       subPath,
       userId,
+      error: errMsg,
     }, err);
     return apiError(
-      "Calculation engine execution failed",
+      `Calculation engine unreachable at ${baseUrl}. Ensure the Python analytics microservice is running.`,
       "SERVICE_UNAVAILABLE",
       503,
       undefined,
