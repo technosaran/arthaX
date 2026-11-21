@@ -45,6 +45,35 @@ async function handleAutomationCron(req: NextRequest) {
   logger.info(`[Automation Cron] Initiating universal automation cycle at ${new Date().toISOString()}`, "AutomationCron");
 
   try {
+    // 2b. Recover abandoned RUNNING jobs older than 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    try {
+      const { data: abandonedJobs } = await supabaseAdmin
+        .from("automation_jobs")
+        .select("id, retry_count")
+        .eq("status", "RUNNING")
+        .lt("started_at", fifteenMinutesAgo);
+
+      if (abandonedJobs && abandonedJobs.length > 0) {
+        for (const job of abandonedJobs) {
+          const nextRetry = (job.retry_count || 0) + 1;
+          const newStatus = nextRetry >= 3 ? "FAILED" : "QUEUED"; // Retry if < 3, else permanently FAILED
+          await supabaseAdmin
+            .from("automation_jobs")
+            .update({
+              status: newStatus,
+              error_message: "Job timed out or worker abandoned execution after 15 minutes",
+              retry_count: nextRetry,
+              completed_at: newStatus === "FAILED" ? new Date().toISOString() : null,
+            })
+            .eq("id", job.id);
+        }
+        logger.info(`[Automation Cron] Recovered ${abandonedJobs.length} abandoned running jobs`, "AutomationCron");
+      }
+    } catch (recErr) {
+      logger.warn("Failed to check or recover abandoned jobs", "AutomationCron", { error: String(recErr) });
+    }
+
     // 3. Query all users with active Gmail integrations
     const { data: integrations, error: fetchErr } = await supabaseAdmin
       .from("gmail_integrations")
@@ -80,10 +109,14 @@ async function handleAutomationCron(req: NextRequest) {
       });
     }
 
-    logger.info(`[Automation Cron] Completed automation cycle for ${results.length} integrations.`, "AutomationCron");
+    const hasFailures = results.some((r) => !r.success);
+    const allFailed = results.length > 0 && results.every((r) => !r.success);
+    const overallStatus = allFailed ? "failed" : hasFailures ? "partial_failure" : "completed";
+
+    logger.info(`[Automation Cron] Completed automation cycle: status=${overallStatus}, processed=${results.length} integrations.`, "AutomationCron");
 
     return NextResponse.json({
-      status: "completed",
+      status: overallStatus,
       processedUsers: results.length,
       timestamp: new Date().toISOString(),
       results,

@@ -17,7 +17,7 @@ from .base_adapter import BaseBankAdapter
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem
 from .pdf_decryptor import open_pdf_document, compute_file_hash
 from .statement_validator import validate_statement_math
-from .sbi_adapter import parse_date, parse_amount
+from .sbi_adapter import parse_date, parse_amount, InvalidAmountError
 
 
 class IndianBankAdapter(BaseBankAdapter):
@@ -91,6 +91,7 @@ class IndianBankAdapter(BaseBankAdapter):
         header = None
         transactions: List[ParsedTransactionItem] = []
         raw_row_idx = 0
+        parsing_errors: List[str] = []
 
         for row in reader:
             if not row or not any(row):
@@ -139,9 +140,13 @@ class IndianBankAdapter(BaseBankAdapter):
                 or (row[5].strip() if len(row) > 5 else "")
             )
 
-            debit_amt = parse_amount(withdrawal_str)
-            credit_amt = parse_amount(deposit_str)
-            bal_amt = parse_amount(balance_str) if balance_str else None
+            try:
+                debit_amt = parse_amount(withdrawal_str)
+                credit_amt = parse_amount(deposit_str)
+                bal_amt = parse_amount(balance_str) if balance_str else None
+            except InvalidAmountError as ae:
+                parsing_errors.append(f"Row {raw_row_idx}: {str(ae)}")
+                continue
 
             if debit_amt > Decimal("0.00"):
                 direction = "DEBIT"
@@ -173,7 +178,10 @@ class IndianBankAdapter(BaseBankAdapter):
             )
 
         if not transactions:
-            return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from Indian Bank CSV.")
+            err_msg = "No valid transactions parsed from Indian Bank CSV."
+            if parsing_errors:
+                err_msg += f" Encountered {len(parsing_errors)} malformed amount error(s)."
+            return self._build_empty_failure(filename, file_hash, err_msg)
 
         transactions.sort(key=lambda t: t.transaction_date)
         period_start = transactions[0].transaction_date
@@ -203,6 +211,9 @@ class IndianBankAdapter(BaseBankAdapter):
         )
 
         validation = validate_statement_math(metadata, transactions)
+        if parsing_errors:
+            validation.errors.extend(parsing_errors)
+            validation.is_valid = False
 
         return StatementParseResult(
             success=validation.is_valid,
@@ -372,7 +383,13 @@ class IndianBankAdapter(BaseBankAdapter):
             raw_row_index=tx_dict["raw_idx"],
         )
 
-    def _build_empty_failure(self, filename: str, file_hash: str, error_msg: str) -> StatementParseResult:
+    def _build_empty_failure(
+        self,
+        filename: str,
+        file_hash: str,
+        error_msg: str,
+        error_code: Optional[str] = None,
+    ) -> StatementParseResult:
         empty_meta = StatementMetadata(
             bank_name=self.BANK_NAME,
             statement_period_start=date.today(),
@@ -382,7 +399,8 @@ class IndianBankAdapter(BaseBankAdapter):
         )
         empty_val = validate_statement_math(empty_meta, [])
         empty_val.is_valid = False
-        empty_val.errors.append(error_msg)
+        err_list = [error_code, error_msg] if error_code else [error_msg]
+        empty_val.errors.extend(err_list)
         return StatementParseResult(
             success=False,
             bank_name=self.BANK_NAME,
@@ -392,5 +410,5 @@ class IndianBankAdapter(BaseBankAdapter):
             parser_version=self.PARSER_VERSION,
             file_hash=file_hash,
             file_name=filename,
-            errors=[error_msg],
+            errors=err_list,
         )

@@ -9,8 +9,10 @@ import base64
 import json
 import logging
 import re
+import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timezone, date
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
@@ -66,8 +68,11 @@ class GmailStatementIngestor:
             q += f" after:{after_date}"
         return q
 
-    def _make_api_request(self, endpoint_url: str) -> Dict[str, Any]:
-        """Performs authenticated HTTP GET to Gmail API using standard library urllib."""
+    def _make_api_request(self, endpoint_url: str, max_retries: int = 3) -> Dict[str, Any]:
+        """
+        Performs authenticated HTTP GET to Gmail API using standard library urllib
+        with exponential backoff retries for transient failures (HTTP 429, 500, 502, 503, 504).
+        """
         if not self.access_token:
             raise ValueError("Gmail API access token is required")
 
@@ -78,26 +83,84 @@ class GmailStatementIngestor:
                 "Accept": "application/json",
             },
         )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = resp.read()
-                return json.loads(data.decode("utf-8"))
-        except urllib.error.HTTPError as err:
-            err_body = err.read().decode("utf-8", errors="ignore")
-            logger.error(f"Gmail API HTTP error {err.code}: {err_body}")
-            raise RuntimeError(f"Gmail API error {err.code}: {err_body}")
-        except Exception as e:
-            logger.error(f"Gmail API request failure: {str(e)}")
-            raise
 
-    def search_messages(self, max_results: int = 15, query: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Searches user mailbox for statement emails matching query."""
-        import urllib.parse
+        for attempt in range(max_retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    data = resp.read()
+                    return json.loads(data.decode("utf-8"))
+            except urllib.error.HTTPError as err:
+                err_body = err.read().decode("utf-8", errors="ignore")
+                is_retryable = err.code in (429, 500, 502, 503, 504)
+                if is_retryable and attempt < max_retries:
+                    backoff = 0.25 * (2 ** attempt)
+                    logger.warning(
+                        f"Gmail API HTTP {err.code} on {endpoint_url}. Retrying in {backoff:.2f}s (attempt {attempt+1}/{max_retries})..."
+                    )
+                    time.sleep(backoff)
+                    continue
+                logger.error(f"Gmail API HTTP error {err.code}: {err_body}")
+                raise RuntimeError(f"Gmail API error {err.code}: {err_body}")
+            except Exception as e:
+                if attempt < max_retries:
+                    backoff = 0.25 * (2 ** attempt)
+                    time.sleep(backoff)
+                    continue
+                logger.error(f"Gmail API request failure: {str(e)}")
+                raise
+
+    def search_messages(
+        self,
+        max_results: int = 15,
+        query: Optional[str] = None,
+        page_token: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Searches user mailbox for statement emails matching query.
+        Returns list of message summaries.
+        """
+        msgs, _ = self.search_messages_page(max_results=max_results, query=query, page_token=page_token)
+        return msgs
+
+    def search_messages_page(
+        self,
+        max_results: int = 15,
+        query: Optional[str] = None,
+        page_token: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """
+        Searches user mailbox and returns a tuple: (messages, next_page_token).
+        """
         q = self.build_query(query)
         encoded_q = urllib.parse.quote(q)
         url = f"{GMAIL_API_BASE_URL}/messages?q={encoded_q}&maxResults={min(max_results, 50)}"
+        if page_token:
+            url += f"&pageToken={urllib.parse.quote(page_token)}"
         res = self._make_api_request(url)
-        return res.get("messages", [])
+        return res.get("messages", []), res.get("nextPageToken")
+
+    def search_all_messages(
+        self,
+        max_total_messages: int = 50,
+        query: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Paginates through Gmail messages up to max_total_messages using page tokens.
+        """
+        all_messages: List[Dict[str, Any]] = []
+        page_token: Optional[str] = None
+
+        while len(all_messages) < max_total_messages:
+            batch_size = min(max_total_messages - len(all_messages), 25)
+            msgs, next_token = self.search_messages_page(max_results=batch_size, query=query, page_token=page_token)
+            if not msgs:
+                break
+            all_messages.extend(msgs)
+            page_token = next_token
+            if not page_token:
+                break
+
+        return all_messages
 
     def fetch_message_detail(self, message_id: str) -> Dict[str, Any]:
         """Fetches full MIME message payload for a given message ID."""
@@ -204,19 +267,31 @@ class GmailStatementIngestor:
     ) -> Dict[str, Any]:
         """
         Full end-to-end automated pipeline:
-        Gmail search -> message detail -> attachment extract -> download -> parse -> classify -> transfer match.
+        Gmail search (paginated) -> message detail -> attachment extract -> download -> parse -> classify -> transfer match.
+        Never marks sync successful if individual statements failed.
         """
-        messages = self.search_messages(max_results=max_messages, query=self.build_query(custom_query, after_date))
+        messages = self.search_all_messages(
+            max_total_messages=max_messages,
+            query=self.build_query(custom_query, after_date),
+        )
+
         if not messages:
             return {
                 "success": True,
+                "status": "COMPLETED",
+                "has_failures": False,
+                "failed_count": 0,
+                "failed_statements": [],
                 "messages_scanned": 0,
                 "statements_processed": 0,
+                "total_transactions_extracted": 0,
+                "transfers_matched": 0,
                 "statements": [],
-                "checkpoint": self.compute_sync_checkpoint(None, 0),
+                "checkpoint": self.compute_sync_checkpoint(None, 0, status="COMPLETED"),
             }
 
         parsed_statements: List[Dict[str, Any]] = []
+        failed_statements: List[Dict[str, Any]] = []
         total_transactions = 0
         all_transactions_for_matching: List[Dict[str, Any]] = []
 
@@ -228,7 +303,13 @@ class GmailStatementIngestor:
             try:
                 msg_detail = self.fetch_message_detail(msg_id)
             except Exception as err:
-                logger.warn(f"Failed to fetch message detail for {msg_id}: {err}")
+                logger.warning(f"Failed to fetch message detail for {msg_id}: {err}")
+                failed_statements.append({
+                    "success": False,
+                    "message_id": msg_id,
+                    "error_code": "MESSAGE_FETCH_FAILED",
+                    "errors": [f"Failed to fetch message details: {str(err)}"],
+                })
                 continue
 
             # Extract email headers
@@ -300,38 +381,62 @@ class GmailStatementIngestor:
                     parsed_statements.append(stmt_dict)
                     total_transactions += len(enriched_txs)
 
+                    if not parse_res.success:
+                        failed_statements.append({
+                            "success": False,
+                            "file_name": fn,
+                            "file_hash": file_hash,
+                            "errors": parse_res.errors,
+                            "email_metadata": email_meta,
+                        })
+
                 except Exception as parse_err:
                     logger.error(f"Error processing attachment {fn} from msg {msg_id}: {parse_err}")
-                    parsed_statements.append({
+                    fail_info = {
                         "success": False,
                         "file_name": fn,
                         "errors": [str(parse_err)],
                         "email_metadata": email_meta,
                         "transactions": [],
-                    })
+                    }
+                    parsed_statements.append(fail_info)
+                    failed_statements.append(fail_info)
 
         # Match internal transfers across all extracted transactions
         transfer_matches = match_internal_transfers(all_transactions_for_matching)
 
+        has_failures = len(failed_statements) > 0
+        overall_status = "FAILED" if (has_failures and len(failed_statements) == len(parsed_statements)) else ("PARTIAL_FAILURE" if has_failures else "COMPLETED")
+        overall_success = not has_failures
+
         return {
-            "success": True,
+            "success": overall_success,
+            "status": overall_status,
+            "has_failures": has_failures,
+            "failed_count": len(failed_statements),
+            "failed_statements": failed_statements,
             "messages_scanned": len(messages),
             "statements_processed": len(parsed_statements),
             "total_transactions_extracted": total_transactions,
             "transfers_matched": len(transfer_matches),
             "statements": parsed_statements,
-            "checkpoint": self.compute_sync_checkpoint(None, len(parsed_statements)),
+            "checkpoint": self.compute_sync_checkpoint(
+                None,
+                len(parsed_statements),
+                status=overall_status,
+            ),
         }
 
     def compute_sync_checkpoint(
         self,
         new_history_id: Optional[str],
         items_processed: int,
+        status: str = "COMPLETED",
     ) -> Dict[str, Any]:
         """Returns structured JSON checkpoint state for database persistence."""
         return {
             "last_sync_timestamp": datetime.now(timezone.utc).isoformat(),
             "history_id": new_history_id,
             "items_processed": items_processed,
-            "status": "COMPLETED",
+            "status": status,
         }

@@ -46,21 +46,36 @@ def parse_date(date_str: str) -> Optional[date]:
     return None
 
 
+class InvalidAmountError(ValueError):
+    """Raised when an amount string is present but cannot be parsed as a valid finite Decimal."""
+    pass
+
+
 def parse_amount(val: Any) -> Decimal:
-    """Parses string or numeric amount into Decimal."""
+    """
+    Parses string or numeric amount into Decimal.
+    Returns Decimal('0.00') only when val is None or empty/placeholder (e.g. '', '-', 'NA').
+    Raises InvalidAmountError when val contains invalid/malformed non-empty data or NaN/Infinity.
+    """
     if val is None:
         return Decimal("0.00")
     if isinstance(val, (int, float, Decimal)):
-        return Decimal(str(val)).quantize(Decimal("0.01"))
+        d = Decimal(str(val))
+        if d.is_nan() or d.is_infinite():
+            raise InvalidAmountError(f"Amount cannot be NaN or Infinite: {val}")
+        return d.quantize(Decimal("0.01"))
     s = str(val).strip().replace(",", "").replace("₹", "").replace("INR", "").strip()
     if not s or s in ("-", "--", "NA", "N/A", "Nil", "None"):
         return Decimal("0.00")
     # Clean trailing Cr / Dr notations
     s = re.sub(r"(?i)\s*(cr|dr)$", "", s).strip()
     try:
-        return Decimal(s).quantize(Decimal("0.01"))
-    except Exception:
-        return Decimal("0.00")
+        d = Decimal(s)
+        if d.is_nan() or d.is_infinite():
+            raise InvalidAmountError(f"Amount cannot be NaN or Infinite: {val}")
+        return d.quantize(Decimal("0.01"))
+    except Exception as e:
+        raise InvalidAmountError(f"Invalid monetary amount format: '{val}'")
 
 
 class SbiBankAdapter(BaseBankAdapter):
@@ -136,6 +151,7 @@ class SbiBankAdapter(BaseBankAdapter):
         header = None
         transactions: List[ParsedTransactionItem] = []
         raw_row_idx = 0
+        parsing_errors: List[str] = []
 
         for row in reader:
             if not row or not any(row):
@@ -176,9 +192,13 @@ class SbiBankAdapter(BaseBankAdapter):
             credit_str = row_dict.get("CREDIT") or (row[6].strip() if len(row) > 6 else "")
             bal_str = row_dict.get("BALANCE") or (row[7].strip() if len(row) > 7 else "")
 
-            debit_amt = parse_amount(debit_str)
-            credit_amt = parse_amount(credit_str)
-            bal_amt = parse_amount(bal_str) if bal_str else None
+            try:
+                debit_amt = parse_amount(debit_str)
+                credit_amt = parse_amount(credit_str)
+                bal_amt = parse_amount(bal_str) if bal_str else None
+            except InvalidAmountError as ae:
+                parsing_errors.append(f"Row {raw_row_idx}: {str(ae)}")
+                continue
 
             if debit_amt > Decimal("0.00"):
                 direction = "DEBIT"
@@ -205,7 +225,10 @@ class SbiBankAdapter(BaseBankAdapter):
             )
 
         if not transactions:
-            return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from SBI CSV.")
+            err_msg = "No valid transactions parsed from SBI CSV."
+            if parsing_errors:
+                err_msg += f" Encountered {len(parsing_errors)} malformed amount error(s)."
+            return self._build_empty_failure(filename, file_hash, err_msg)
 
         transactions.sort(key=lambda t: t.transaction_date)
         period_start = transactions[0].transaction_date
@@ -235,6 +258,9 @@ class SbiBankAdapter(BaseBankAdapter):
         )
 
         validation = validate_statement_math(metadata, transactions)
+        if parsing_errors:
+            validation.errors.extend(parsing_errors)
+            validation.is_valid = False
 
         return StatementParseResult(
             success=validation.is_valid,
@@ -417,7 +443,13 @@ class SbiBankAdapter(BaseBankAdapter):
             raw_row_index=tx_dict["raw_idx"],
         )
 
-    def _build_empty_failure(self, filename: str, file_hash: str, error_msg: str) -> StatementParseResult:
+    def _build_empty_failure(
+        self,
+        filename: str,
+        file_hash: str,
+        error_msg: str,
+        error_code: Optional[str] = None,
+    ) -> StatementParseResult:
         empty_meta = StatementMetadata(
             bank_name=self.BANK_NAME,
             statement_period_start=date.today(),
@@ -427,7 +459,8 @@ class SbiBankAdapter(BaseBankAdapter):
         )
         empty_val = validate_statement_math(empty_meta, [])
         empty_val.is_valid = False
-        empty_val.errors.append(error_msg)
+        err_list = [error_code, error_msg] if error_code else [error_msg]
+        empty_val.errors.extend(err_list)
         return StatementParseResult(
             success=False,
             bank_name=self.BANK_NAME,
@@ -437,5 +470,5 @@ class SbiBankAdapter(BaseBankAdapter):
             parser_version=self.PARSER_VERSION,
             file_hash=file_hash,
             file_name=filename,
-            errors=[error_msg],
+            errors=err_list,
         )

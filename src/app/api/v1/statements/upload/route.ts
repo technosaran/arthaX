@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
     const internalKey =
       process.env.INTERNAL_SERVICE_KEY ||
       process.env.CRON_SECRET ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
       "";
 
     const base64Content = buffer.toString("base64");
@@ -204,19 +203,29 @@ export async function POST(req: NextRequest) {
       const { data: inserted, error: txError } = await supabaseAdmin
         .from("canonical_transactions")
         .upsert(rowsToInsert, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
-        .select("id");
+        .select("id, dedup_hash");
 
       if (txError) {
         logger.warn("Warning inserting canonical transactions", "StatementUpload", { error: txError.message });
       }
-      importedCount = inserted?.length || rowsToInsert.length;
+
+      // Track exact newly inserted records
+      const insertedList = (inserted || []) as Array<{ id: string; dedup_hash: string }>;
+      const newCanonicalMap = new Map(insertedList.map((r) => [r.dedup_hash, r.id]));
+      importedCount = insertedList.length;
       duplicateCount = rowsToInsert.length - importedCount;
 
-      // 5b. Synchronize verified non-transfer canonical records into expenses and income
+      // 5b. Synchronize ONLY newly inserted, non-transfer canonical records into expenses and income
       for (const row of rowsToInsert) {
-        if (row.is_transfer) continue;
+        if (row.is_transfer) continue; // Exclude internal transfers from income/expenses
+        const canonicalId = newCanonicalMap.get(row.dedup_hash);
+        if (!canonicalId) {
+          // Transaction already exists in database; skip to prevent duplicate insertion
+          continue;
+        }
+
         if (row.direction === "DEBIT") {
-          await supabaseAdmin.from("expenses").insert({
+          await supabaseAdmin.from("expenses").upsert({
             user_id: userId,
             account_id: targetAccountId,
             amount: row.amount,
@@ -225,9 +234,10 @@ export async function POST(req: NextRequest) {
             title: row.merchant_name || row.normalized_narration,
             notes: `Statement import: ${row.original_narration}`,
             tags: ["statement_import", "verified"],
-          });
+            canonical_transaction_id: canonicalId,
+          }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
         } else if (row.direction === "CREDIT") {
-          await supabaseAdmin.from("income").insert({
+          await supabaseAdmin.from("income").upsert({
             user_id: userId,
             account_id: targetAccountId,
             amount: row.amount,
@@ -236,7 +246,8 @@ export async function POST(req: NextRequest) {
             title: row.counterparty_name || row.normalized_narration,
             notes: `Statement import: ${row.original_narration}`,
             tags: ["statement_import", "verified"],
-          });
+            canonical_transaction_id: canonicalId,
+          }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
         }
       }
     }

@@ -9,6 +9,7 @@ vi.mock("@/utils/supabase/admin", () => ({
       insert: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      lt: vi.fn().mockResolvedValue({ data: [], error: null }),
       neq: vi.fn().mockResolvedValue({
         data: [
           {
@@ -89,5 +90,30 @@ describe("Universal Automation Cron Route Suite", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.status).toBe("completed");
+  });
+
+  it("reports failed status when all user synchronizations fail", async () => {
+    const { syncUserGmailStatements } = await import("@/utils/gmail");
+    vi.mocked(syncUserGmailStatements).mockResolvedValueOnce({
+      success: false,
+      statementsCount: 1,
+      transactionsImported: 0,
+      duplicatesSkipped: 0,
+      error: "PASSWORD_REQUIRED: Decryption password missing",
+    });
+
+    const req = new NextRequest("http://localhost:3000/api/v1/automation/cron", {
+      method: "GET",
+      headers: {
+        authorization: "Bearer test-cron-secret-12345",
+      },
+    });
+
+    const res = await handleAutomationCronGet(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.status).toBe("failed");
+    expect(json.results[0].success).toBe(false);
+    expect(json.results[0].error).toContain("PASSWORD_REQUIRED");
   });
 });

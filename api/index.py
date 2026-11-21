@@ -76,7 +76,6 @@ def verify_auth_dependency(
     internal_key = (
         os.getenv("INTERNAL_SERVICE_KEY")
         or os.getenv("CRON_SECRET")
-        or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     )
     if internal_key and x_internal_service_key:
         if hmac.compare_digest(x_internal_service_key.strip(), internal_key.strip()):

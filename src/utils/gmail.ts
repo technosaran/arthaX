@@ -187,8 +187,18 @@ export async function syncUserGmailStatements(userId: string): Promise<{
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
     process.env.CRON_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
+
+  // Determine checkpoint after_date with safety margin to avoid reprocessing entire mailbox
+  let afterDateStr: string | undefined = undefined;
+  if (integration.last_sync_at) {
+    const lastSync = new Date(integration.last_sync_at);
+    lastSync.setDate(lastSync.getDate() - 1); // 1-day safety buffer
+    const yyyy = lastSync.getFullYear();
+    const mm = String(lastSync.getMonth() + 1).padStart(2, "0");
+    const dd = String(lastSync.getDate()).padStart(2, "0");
+    afterDateStr = `${yyyy}/${mm}/${dd}`;
+  }
 
   try {
     const pyRes = await fetch(`${pythonServiceUrl}/api/py/statements/gmail/sync`, {
@@ -203,6 +213,7 @@ export async function syncUserGmailStatements(userId: string): Promise<{
         user_id: userId,
         access_token: accessToken,
         password_candidates: passwordCandidates,
+        after_date: afterDateStr,
         max_messages: 15,
       }),
     });
@@ -317,19 +328,27 @@ export async function syncUserGmailStatements(userId: string): Promise<{
         const { data: inserted } = await supabaseAdmin
           .from("canonical_transactions")
           .upsert(canonicalRows, { onConflict: "user_id,dedup_hash", ignoreDuplicates: true })
-          .select("id");
+          .select("id, dedup_hash");
 
-        const insertedCount = inserted?.length || 0;
+        const insertedList = (inserted || []) as Array<{ id: string; dedup_hash: string }>;
+        const newCanonicalMap = new Map(insertedList.map((r) => [r.dedup_hash, r.id]));
+        const insertedCount = insertedList.length;
         totalImported += insertedCount;
         totalDuplicates += canonicalRows.length - insertedCount;
 
-        // Synchronize verified non-transfer canonical records into expenses and income
+        // Synchronize ONLY newly inserted non-transfer canonical records into expenses and income
         for (const row of canonicalRows) {
           if (row.is_transfer) continue; // Transfers are handled separately
+          const canonicalId = newCanonicalMap.get(row.dedup_hash);
+          if (!canonicalId) {
+            // Already imported in a previous statement run; skip to prevent duplication
+            continue;
+          }
+
           if (row.direction === "DEBIT") {
             await supabaseAdmin
               .from("expenses")
-              .insert({
+              .upsert({
                 user_id: userId,
                 account_id: targetAccountId,
                 amount: row.amount,
@@ -338,11 +357,12 @@ export async function syncUserGmailStatements(userId: string): Promise<{
                 title: row.merchant_name || row.normalized_narration,
                 notes: `Bank statement import: ${row.original_narration}`,
                 tags: ["statement_import", "verified"],
-              });
+                canonical_transaction_id: canonicalId,
+              }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
           } else if (row.direction === "CREDIT") {
             await supabaseAdmin
               .from("income")
-              .insert({
+              .upsert({
                 user_id: userId,
                 account_id: targetAccountId,
                 amount: row.amount,
@@ -351,7 +371,8 @@ export async function syncUserGmailStatements(userId: string): Promise<{
                 title: row.counterparty_name || row.normalized_narration,
                 notes: `Bank statement import: ${row.original_narration}`,
                 tags: ["statement_import", "verified"],
-              });
+                canonical_transaction_id: canonicalId,
+              }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
           }
         }
       }
@@ -366,6 +387,16 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       }
     }
 
+    const failedStatements = statements.filter((s: any) => !s.success);
+    const hasFailures = failedStatements.length > 0;
+    const finalJobStatus = hasFailures
+      ? (failedStatements.length === statements.length ? "FAILED" : "PARTIAL")
+      : "COMPLETED";
+
+    const failureSummary = hasFailures
+      ? failedStatements.map((f: any) => `${f.file_name || 'attachment'}: ${(f.errors || []).join(', ')}`).join("; ")
+      : null;
+
     // Invalidate affected caches
     await invalidateCachedData([
       getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
@@ -375,15 +406,17 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       getUserCacheKey(userId, CACHE_KEYS.LEDGER),
     ]);
 
-    // Update job record to COMPLETED
+    // Update job record
     if (jobRecord) {
       await supabaseAdmin
         .from("automation_jobs")
         .update({
-          status: "COMPLETED",
+          status: finalJobStatus,
           completed_at: new Date().toISOString(),
+          error_message: failureSummary,
           stats: {
             statementsCount: statements.length,
+            failedCount: failedStatements.length,
             transactionsImported: totalImported,
             duplicatesSkipped: totalDuplicates,
           },
@@ -396,16 +429,17 @@ export async function syncUserGmailStatements(userId: string): Promise<{
       .from("gmail_integrations")
       .update({
         last_sync_at: new Date().toISOString(),
-        sync_status: "ACTIVE",
-        error_details: null,
+        sync_status: hasFailures && failedStatements.length === statements.length ? "FAILED" : "ACTIVE",
+        error_details: failureSummary,
       })
       .eq("id", integration.id);
 
     return {
-      success: true,
+      success: !hasFailures,
       statementsCount: statements.length,
       transactionsImported: totalImported,
       duplicatesSkipped: totalDuplicates,
+      error: failureSummary || undefined,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
