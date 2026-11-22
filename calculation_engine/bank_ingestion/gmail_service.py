@@ -23,7 +23,7 @@ from ..intelligence import classifier, match_internal_transfers, TransactionClas
 
 logger = logging.getLogger("arthax.gmail_ingestion")
 
-# Comprehensive Gmail search query for statement discovery across major banks and brokers
+# Comprehensive Gmail search query for statement discovery across major banks
 DEFAULT_GMAIL_STATEMENT_QUERY = (
     "(subject:statement OR subject:estatement OR subject:e-statement OR subject:passbook "
     "OR subject:\"account statement\" OR subject:\"statement of account\" OR subject:\"bank statement\" "
@@ -37,6 +37,7 @@ DEFAULT_GMAIL_STATEMENT_QUERY = (
     "OR from:indusind.com OR from:idfcfirstbank.com OR from:federalbank.co.in "
     "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in OR from:sc.com "
     "OR from:camsonline.com OR from:kfintech.com) "
+    "-from:reportsmailer.zerodha.net -from:zerodha.com -from:cdslstatement.com -from:nsdl.co.in "
     "has:attachment (filename:pdf OR filename:csv)"
 )
 
@@ -385,6 +386,12 @@ class GmailStatementIngestor:
             subject = header_map.get("subject", "")
             email_date = header_map.get("date", "")
 
+            # Skip non-bank broker and depository statement emails (handled by dedicated broker integrations)
+            sender_lower = sender.lower()
+            if any(b in sender_lower for b in ("zerodha", "reportsmailer", "cdslstatement", "nsdl.co")):
+                logger.info(f"Skipping non-bank broker/depository message {msg_id} from {sender}")
+                continue
+
             email_meta = {
                 "message_id": msg_id,
                 "sender": sender,
@@ -398,6 +405,12 @@ class GmailStatementIngestor:
                 fn = att_meta.get("filename", "statement.pdf")
                 inline_bytes = att_meta.get("data")
                 if not att_id and not inline_bytes:
+                    continue
+
+                # Skip non-bank broker reports (e.g. securities holdings, funds ledgers, margin statements)
+                fn_lower = fn.lower()
+                if any(nb in fn_lower for nb in ("-funds.pdf", "-securities.pdf", "margin-statement", "cas_statement")):
+                    logger.info(f"Skipping non-bank broker attachment {fn} from msg {msg_id}")
                     continue
 
                 try:

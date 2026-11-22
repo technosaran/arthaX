@@ -932,7 +932,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        showToast("Gmail Sync Failed", json.error?.message || (typeof json.error === "string" ? json.error : "Failed to sync Gmail bank statements."), "error");
+        const rawErr = json.error?.message || (typeof json.error === "string" ? json.error : "Failed to sync Gmail bank statements.");
+        const cleanErr = rawErr.length > 250 ? `${rawErr.slice(0, 247)}...` : rawErr;
+        showToast("Gmail Sync Notice", cleanErr, "error");
         return;
       }
 

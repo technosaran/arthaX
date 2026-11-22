@@ -926,12 +926,46 @@ export async function syncUserGmailStatements(
     const failedStatements = statements.filter((s: any) => !s.success);
     const hasFailures = failedStatements.length > 0;
     const finalJobStatus: "COMPLETED" | "PARTIAL" | "FAILED" = hasFailures
-      ? (failedStatements.length === statements.length ? "FAILED" : "PARTIAL")
+      ? (failedStatements.length === statements.length && totalImported === 0 ? "FAILED" : "PARTIAL")
       : "COMPLETED";
 
-    const failureSummary = hasFailures
-      ? failedStatements.map((f: any) => `${f.file_name || 'attachment'}: ${(f.errors || []).join(', ')}`).join("; ")
-      : null;
+    let failureSummary: string | null = null;
+    if (hasFailures) {
+      const passwordBanks: string[] = [];
+      const unparseableFiles: string[] = [];
+      const otherErrors: string[] = [];
+
+      for (const f of failedStatements) {
+        const errsStr = (f.errors || []).join(" ").toLowerCase();
+        const fName = f.file_name || "Statement";
+        if (errsStr.includes("password") || f.error_code === "PASSWORD_REQUIRED" || f.error_code === "PASSWORD_INCORRECT") {
+          const bank = f.bank_name || f.detected_bank || "Bank";
+          if (!passwordBanks.includes(bank)) passwordBanks.push(bank);
+        } else if (errsStr.includes("unsupported") || f.error_code === "UNSUPPORTED_FORMAT") {
+          unparseableFiles.push(fName);
+        } else {
+          otherErrors.push(fName);
+        }
+      }
+
+      const summaryParts: string[] = [];
+      if (passwordBanks.length > 0) {
+        summaryParts.push(
+          `Password required for ${passwordBanks.join(", ")} statement(s). Add your statement password in Settings > Bank Passwords.`
+        );
+      }
+      if (unparseableFiles.length > 0) {
+        const uniqueFiles = [...new Set(unparseableFiles)];
+        summaryParts.push(
+          `${uniqueFiles.length} non-standard statement(s) could not be parsed.`
+        );
+      }
+      if (otherErrors.length > 0) {
+        summaryParts.push(`${otherErrors.length} file(s) encountered processing issues.`);
+      }
+
+      failureSummary = summaryParts.join(" ") || "Some statements could not be processed.";
+    }
 
     // Durable Checkpoint Determination:
     // If statements failed, do not advance last_sync_at past that failed message's date
