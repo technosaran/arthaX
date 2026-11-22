@@ -64,6 +64,28 @@ describe("Action Messages and Toast Resolution Suite", () => {
     expect(res.type).toBe("warning");
   });
 
+  it("calculates appropriate duration and styling properties per toast type", async () => {
+    const { getToastDuration, getToastThemeConfig } = await import("@/context/ToastContext");
+    expect(getToastDuration("error")).toBe(4800);
+    expect(getToastDuration("warning")).toBe(4800);
+    expect(getToastDuration("success")).toBe(3800);
+    expect(getToastDuration("info")).toBe(3800);
+
+    const successTheme = getToastThemeConfig("success");
+    expect(successTheme.progressBar).toContain("emerald");
+    expect(successTheme.glowColor).toContain("16, 185, 129");
+
+    const errorTheme = getToastThemeConfig("error");
+    expect(errorTheme.progressBar).toContain("rose");
+    expect(errorTheme.glowColor).toContain("244, 63, 94");
+
+    const warningTheme = getToastThemeConfig("warning");
+    expect(warningTheme.progressBar).toContain("amber");
+
+    const infoTheme = getToastThemeConfig("info");
+    expect(infoTheme.progressBar).toContain("sky");
+  });
+
   it("handles info toast type for informational and reverse actions", () => {
     const res = resolveToast("Transaction Reversed", '"Dinner with friends" deleted and balance restored.', "info");
     expect(res.title).toBe("Transaction Reversed");
