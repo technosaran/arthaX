@@ -2919,6 +2919,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </div>
                       <p className="opacity-70 text-[11px]">
                         Client ID: <span className="font-mono text-xs font-semibold">{zerodhaStatus.userProfile?.client_id || "ZERODHA"}</span>
+                        {zerodhaStatus.apiKeyMasked && (
+                          <span> • API Key: <span className="font-mono font-semibold text-emerald-400">{zerodhaStatus.apiKeyMasked}</span></span>
+                        )}
                         {zerodhaStatus.userProfile?.email && <span> • {zerodhaStatus.userProfile.email}</span>}
                         {zerodhaStatus.lastSyncAt && (
                           <span> • Last Synced: <span className="font-mono">{new Date(zerodhaStatus.lastSyncAt).toLocaleTimeString()}</span></span>
@@ -3004,25 +3007,39 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   {/* Credentials Input Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold">Kite API Key</label>
+                      <label className="text-xs font-semibold flex items-center justify-between">
+                        <span>Kite API Key</span>
+                        {zerodhaStatus.configured && zerodhaStatus.apiKeyMasked && (
+                          <span className="text-[10px] text-emerald-400 font-normal">
+                            Saved ({zerodhaStatus.apiKeyMasked})
+                          </span>
+                        )}
+                      </label>
                       <Input
                         name="kite_api_key_custom"
                         autoComplete="off"
                         data-form-type="other"
-                        placeholder="e.g. 24-character API Key"
+                        placeholder={zerodhaStatus.apiKeyMasked || "e.g. 24-character API Key"}
                         value={zerodhaApiKey}
                         onChange={(e) => setZerodhaApiKey(e.target.value)}
                         className="font-mono text-xs"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold">Kite API Secret</label>
+                      <label className="text-xs font-semibold flex items-center justify-between">
+                        <span>Kite API Secret</span>
+                        {zerodhaStatus.configured && (
+                          <span className="text-[10px] text-emerald-400 font-normal">
+                            Saved &amp; Encrypted
+                          </span>
+                        )}
+                      </label>
                       <Input
                         type="password"
                         name="kite_api_secret_custom"
                         autoComplete="new-password"
                         data-form-type="other"
-                        placeholder="e.g. 32-character API Secret"
+                        placeholder={zerodhaStatus.configured ? "•••••••••••••••• (Saved)" : "e.g. 32-character API Secret"}
                         value={zerodhaApiSecret}
                         onChange={(e) => setZerodhaApiSecret(e.target.value)}
                         className="font-mono text-xs"
@@ -3060,7 +3077,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         disabled={savingZerodha || !zerodhaApiKey.trim() || !zerodhaApiSecret.trim()}
                         onClick={handleSaveZerodha}
                       >
-                        {savingZerodha ? "Saving..." : "Save Credentials"}
+                        {savingZerodha ? "Saving..." : zerodhaStatus.configured ? "Update Credentials" : "Save Credentials"}
                       </Button>
                     </div>
                   </div>

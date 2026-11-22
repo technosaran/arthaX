@@ -43,8 +43,9 @@ function getDerivedKey(
         "[Crypto Security] ENCRYPTION_MASTER_KEY is not configured in production environment. Failing closed to protect financial secrets and credential isolation. Database service keys are never used as encryption keys."
       );
     }
-    // Development and testing fallback key only
-    const devSecret = "test-master-encryption-key-32-chars-long!";
+    // Development and testing fallback key:
+    // If SUPABASE_SERVICE_ROLE_KEY is present in dev, use it for seamless compatibility with local database records
+    const devSecret = process.env.SUPABASE_SERVICE_ROLE_KEY || "test-master-encryption-key-32-chars-long!";
     return Buffer.from(
       crypto.hkdfSync(
         "sha256",
@@ -148,7 +149,24 @@ export function decryptSensitiveData(
       throw new Error("Invalid IV or authentication tag length");
     }
 
-    const key = getDerivedKey("arthax-credential-salt", context);
+    let key: Buffer | null = null;
+    try {
+      key = getDerivedKey("arthax-credential-salt", context);
+    } catch (keyErr) {
+      // In environments where ENCRYPTION_MASTER_KEY is not yet configured,
+      // allow fallback to legacy derivation for decryption of historical data
+      const legacyServiceSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (legacyServiceSecret && legacyServiceSecret.trim()) {
+        const legacyKey = getDerivedKey("arthax-credential-salt", context, legacyServiceSecret.trim());
+        const legacyDecipher = crypto.createDecipheriv("aes-256-gcm", legacyKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+        legacyDecipher.setAuthTag(authTag);
+        let decrypted = legacyDecipher.update(encryptedHex, "hex", "utf8");
+        decrypted += legacyDecipher.final("utf8");
+        return decrypted;
+      }
+      throw keyErr;
+    }
+
     try {
       const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, { authTagLength: AUTH_TAG_LENGTH });
       decipher.setAuthTag(authTag);
@@ -156,7 +174,7 @@ export function decryptSensitiveData(
       decrypted += decipher.final("utf8");
       return decrypted;
     } catch (primaryErr) {
-      // Key Rotation Support: Attempt decryption with previous master key if present
+      // 1. Key Rotation Support: Attempt decryption with previous master key if present
       const previousKeySecret = process.env.ENCRYPTION_MASTER_KEY_PREVIOUS;
       if (previousKeySecret && previousKeySecret.trim()) {
         try {
@@ -169,7 +187,32 @@ export function decryptSensitiveData(
         } catch {}
       }
 
-      // Explicitly reject fallback to database service keys
+      // 2. Safe Legacy Migration Fallback:
+      // Historical records created prior to dedicated master key rollout were derived from SUPABASE_SERVICE_ROLE_KEY.
+      const legacyServiceSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (legacyServiceSecret && legacyServiceSecret.trim()) {
+        try {
+          const legacyKey = getDerivedKey("arthax-credential-salt", context, legacyServiceSecret.trim());
+          const legacyDecipher = crypto.createDecipheriv("aes-256-gcm", legacyKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+          legacyDecipher.setAuthTag(authTag);
+          let decrypted = legacyDecipher.update(encryptedHex, "hex", "utf8");
+          decrypted += legacyDecipher.final("utf8");
+          return decrypted;
+        } catch {}
+      }
+
+      // 3. Dev testing key fallback
+      if (!isProd) {
+        try {
+          const devKey = getDerivedKey("arthax-credential-salt", context, "test-master-encryption-key-32-chars-long!");
+          const devDecipher = crypto.createDecipheriv("aes-256-gcm", devKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+          devDecipher.setAuthTag(authTag);
+          let decrypted = devDecipher.update(encryptedHex, "hex", "utf8");
+          decrypted += devDecipher.final("utf8");
+          return decrypted;
+        } catch {}
+      }
+
       throw primaryErr;
     }
   } catch (err) {

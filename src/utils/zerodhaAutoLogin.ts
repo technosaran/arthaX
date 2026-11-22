@@ -144,7 +144,9 @@ export function getAutoLoginCredentials(
   const totpSecret = (process.env.ZERODHA_TOTP_SECRET || "").trim();
   const apiKey = (process.env.ZERODHA_API_KEY || integration?.api_key || "").trim();
   const rawApiSecret = (process.env.ZERODHA_API_SECRET || integration?.api_secret || "").trim();
-  const apiSecret = decryptSensitiveData(rawApiSecret, "broker-credentials") || "";
+  const apiSecret = rawApiSecret.startsWith("enc:v1:")
+    ? decryptSensitiveData(rawApiSecret, "broker-credentials", { allowPlaintextFallback: true }) || ""
+    : rawApiSecret;
 
   if (userId && password && totpSecret && apiKey && apiSecret) {
     return {
