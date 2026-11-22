@@ -220,78 +220,78 @@ export default function HomeClient() {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 h-full overflow-hidden relative w-full min-w-0 outline-hidden"
+          className="flex-1 h-full overflow-hidden relative w-full min-w-0 outline-hidden touch-smooth-scroll"
         >
-          <div className={`h-full w-full ${activeTab === "dashboard" ? "block" : "hidden"}`}>
+          <div className={`h-full w-full ${activeTab === "dashboard" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
             <DashboardSection onNavigate={handleTabChange} />
           </div>
           {visitedTabs.accounts && (
-            <div className={`h-full w-full ${activeTab === "accounts" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "accounts" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <AccountsSection />
             </div>
           )}
           {visitedTabs.stocks && (
-            <div className={`h-full w-full ${activeTab === "stocks" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "stocks" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <StocksSection />
             </div>
           )}
           {visitedTabs.bonds && (
-            <div className={`h-full w-full ${activeTab === "bonds" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "bonds" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <BondsSection />
             </div>
           )}
           {visitedTabs["mutual-funds"] && (
-            <div className={`h-full w-full ${activeTab === "mutual-funds" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "mutual-funds" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <MutualFundsSection />
             </div>
           )}
           {visitedTabs["gold-silver"] && (
-            <div className={`h-full w-full ${activeTab === "gold-silver" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "gold-silver" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <GoldSilverSection />
             </div>
           )}
           {visitedTabs.fno && (
-            <div className={`h-full w-full ${activeTab === "fno" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "fno" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <FnoSection />
             </div>
           )}
           {visitedTabs.crypto && (
-            <div className={`h-full w-full ${activeTab === "crypto" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "crypto" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <CryptoSection onNavigate={handleTabChange} />
             </div>
           )}
           {visitedTabs.income && (
-            <div className={`h-full w-full ${activeTab === "income" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "income" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <IncomeSection />
             </div>
           )}
           {visitedTabs.expenses && (
-            <div className={`h-full w-full ${activeTab === "expenses" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "expenses" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <ExpensesSection />
             </div>
           )}
           {visitedTabs.budgets && (
-            <div className={`h-full w-full ${activeTab === "budgets" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "budgets" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <BudgetsSection />
             </div>
           )}
           {visitedTabs.goals && (
-            <div className={`h-full w-full ${activeTab === "goals" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "goals" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <GoalsSection />
             </div>
           )}
           {visitedTabs.family && (
-            <div className={`h-full w-full ${activeTab === "family" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "family" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <FamilySection />
             </div>
           )}
           {visitedTabs.ledger && (
-            <div className={`h-full w-full ${activeTab === "ledger" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "ledger" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <LedgerSection />
             </div>
           )}
           {(visitedTabs.tax || visitedTabs["tax-harvesting"]) && (
-            <div className={`h-full w-full ${activeTab === "tax" || activeTab === "tax-harvesting" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "tax" || activeTab === "tax-harvesting" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <TaxSection
                 initialTab={activeTab === "tax" ? "overview" : "harvesting"}
                 onNavigate={handleTabChange}
@@ -299,17 +299,17 @@ export default function HomeClient() {
             </div>
           )}
           {(visitedTabs.settings || visitedTabs.profile) && (
-            <div className={`h-full w-full ${activeTab === "settings" || activeTab === "profile" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "settings" || activeTab === "profile" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <SettingsSection initialTab={activeTab === "profile" ? "profile" : "statements"} />
             </div>
           )}
           {visitedTabs.reconciliation && (
-            <div className={`h-full w-full ${activeTab === "reconciliation" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "reconciliation" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <ReconciliationSection />
             </div>
           )}
           {visitedTabs.forecast && (
-            <div className={`h-full w-full ${activeTab === "forecast" ? "block" : "hidden"}`}>
+            <div className={`h-full w-full ${activeTab === "forecast" ? "block tab-content-enter pb-20 md:pb-0" : "hidden"}`}>
               <CashflowForecastSection />
             </div>
           )}
