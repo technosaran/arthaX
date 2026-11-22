@@ -365,3 +365,70 @@ input::-ms-reveal,
 input::-ms-clear {
   display: none;
 }
+
+/* ==========================================================================
+   Hardware-Accelerated Fluid Motion & Responsive Ergonomics
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@keyframes tabEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.tab-content-enter {
+  animation: tabEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes sheetSlideUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.sheet-slide-up {
+  animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.card-hover-dynamic {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.card-hover-dynamic:hover {
+  transform: translate3d(0, -3px, 0);
+  box-shadow: 0 14px 34px -8px rgba(0, 0, 0, 0.45), 0 0 20px -4px rgba(16, 185, 129, 0.15);
+  border-color: var(--app-border-hover);
+}
+
+.safe-bottom-nav {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.touch-smooth-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
