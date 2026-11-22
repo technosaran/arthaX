@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Optional, List, Dict, Any
 import pymupdf
 
-from .base_adapter import BaseBankAdapter
+from .base_adapter import BaseBankAdapter, detect_account_type_from_text, is_non_financial_document
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem
 from .pdf_decryptor import open_pdf_document, compute_file_hash
 from .statement_validator import validate_statement_math
@@ -322,9 +322,12 @@ class SbiBankAdapter(BaseBankAdapter):
 
         closing_balance = last_bal if last_bal is not None else Decimal("0.00")
 
+        account_type = detect_account_type_from_text(text)
+
         metadata = StatementMetadata(
             bank_name=self.BANK_NAME,
             account_number_masked=f"******{account_number[-4:]}" if account_number else None,
+            account_type=account_type,
             statement_period_start=period_start,
             statement_period_end=period_end,
             opening_balance=opening_balance,
@@ -356,7 +359,7 @@ class SbiBankAdapter(BaseBankAdapter):
         file_hash: str,
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
-        doc, _ = open_pdf_document(content, passwords)
+        doc, _ = open_pdf_document(content, passwords, bank_hint=self.BANK_NAME)
 
         try:
             full_text = ""
@@ -423,6 +426,13 @@ class SbiBankAdapter(BaseBankAdapter):
                     transactions.append(tx_item)
 
             if not transactions:
+                if is_non_financial_document(full_text):
+                    return self._build_empty_failure(
+                        filename,
+                        file_hash,
+                        f"Document '{filename}' appears to be a non-financial document (terms & conditions, schedule of charges, or brochure) rather than an account statement.",
+                        error_code="NON_FINANCIAL_DOCUMENT",
+                    )
                 # Fall back to vertical cell layout (standard in SBI YONO e-statements)
                 return self._parse_vertical_pdf(doc, filename, file_hash, account_number, ifsc)
 
@@ -443,9 +453,11 @@ class SbiBankAdapter(BaseBankAdapter):
 
             closing_balance = last_bal if last_bal is not None else Decimal("0.00")
 
+            account_type = detect_account_type_from_text(full_text)
             metadata = StatementMetadata(
                 bank_name=self.BANK_NAME,
                 account_number_masked=f"******{account_number[-4:]}" if account_number else None,
+                account_type=account_type,
                 statement_period_start=period_start,
                 statement_period_end=period_end,
                 opening_balance=opening_balance,
@@ -650,6 +662,13 @@ class SbiBankAdapter(BaseBankAdapter):
                     i += 1
 
         if not transactions:
+            if is_non_financial_document(full_text):
+                return self._build_empty_failure(
+                    filename,
+                    file_hash,
+                    f"Document '{filename}' appears to be a non-financial document (terms & conditions, schedule of charges, or brochure) rather than an account statement.",
+                    error_code="NON_FINANCIAL_DOCUMENT",
+                )
             return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from SBI PDF.")
 
         transactions.sort(key=lambda t: t.transaction_date)
@@ -669,10 +688,11 @@ class SbiBankAdapter(BaseBankAdapter):
 
         closing_balance = last_bal if last_bal is not None else Decimal("0.00")
 
+        account_type = detect_account_type_from_text(full_text)
         metadata = StatementMetadata(
             bank_name=self.BANK_NAME,
             account_number_masked=f"******{account_number[-4:]}" if account_number else None,
-            account_type="SAVINGS",
+            account_type=account_type,
             statement_period_start=period_start,
             statement_period_end=period_end,
             opening_balance=opening_balance,

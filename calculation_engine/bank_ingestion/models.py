@@ -25,7 +25,7 @@ class ParsedTransactionItem(BaseModel):
 class StatementMetadata(BaseModel):
     bank_name: str
     account_number_masked: Optional[str] = None
-    account_type: Optional[str] = None
+    account_type: Optional[str] = None  # SAVINGS, CURRENT, CREDIT_CARD, OVERDRAFT, LOAN, SALARY
     statement_period_start: date
     statement_period_end: date
     opening_balance: Decimal = Field(..., decimal_places=2)

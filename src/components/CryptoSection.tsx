@@ -17,12 +17,8 @@ import {
   ArrowDownRight,
   ArrowRightLeft,
   BarChart2,
-  Activity,
-  Clock,
-  Cpu,
   History,
   DollarSign,
-  ChevronRight,
   Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -33,16 +29,12 @@ import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { Skeleton } from "@/components/ui/Skeleton";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import InteractiveCandlestickChart from "@/components/charts/InteractiveCandlestickChart";
 import CryptoLogo from "@/components/CryptoLogo";
 import {
   CalculatedCryptoAsset,
   CalculatedCryptoTrade,
   CryptoTradeStats,
   ExitedCryptoAsset,
-  BinanceKline,
-  CalculatedMarketDepth,
-  BinancePublicTrade,
   calculateCryptoSwap,
   SwapQuoteResult,
 } from "@/utils/binance";
@@ -60,19 +52,6 @@ const DONUT_COLORS = [
   "#A855F7", // Purple
 ];
 
-const POPULAR_SYMBOLS = [
-  "BTCUSDT",
-  "ETHUSDT",
-  "SOLUSDT",
-  "BNBUSDT",
-  "XRPUSDT",
-  "DOGEUSDT",
-  "AVAXUSDT",
-  "SUIUSDT",
-  "LINKUSDT",
-  "NEARUSDT",
-];
-
 const SWAP_COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "USDT", "USDC"];
 
 interface CryptoSectionProps {
@@ -85,20 +64,15 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
 
   // Navigation view within CryptoSection
   const [activeView, setActiveView] = useState<
-    "holdings" | "markets" | "terminal" | "swap" | "trades" | "exited" | "system"
+    "holdings" | "swap" | "trades" | "exited"
   >("holdings");
 
   // Loading & syncing states
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // Search & filter states
+  // Search state
   const [searchQuery, setSearchQuery] = useState("");
-  const [marketFilter, setMarketFilter] = useState<"all" | "gainers" | "losers" | "volume">("all");
-
-  // Terminal states
-  const [selectedSymbol, setSelectedSymbol] = useState("BTCUSDT");
-  const [klineInterval, setKlineInterval] = useState("1h");
 
   // Swap converter states
   const [swapFrom, setSwapFrom] = useState("BTC");
@@ -138,21 +112,8 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
     canDeposit: false,
   });
 
-  // Market & Terminal data
+  // Market data
   const [marketData, setMarketData] = useState<{
-    selectedSymbol: {
-      symbol: string;
-      baseAsset: string;
-      quoteAsset: string;
-      name: string;
-      ticker: any;
-      avgPrice: { mins: number; price: number };
-      bookTicker: { bidPrice: number; bidQty: number; askPrice: number; askQty: number; spread: number; spreadPercent: number };
-      depth: CalculatedMarketDepth;
-      klines: BinanceKline[];
-      recentTrades: BinancePublicTrade[];
-      tradingRules: { minNotionalUsd: number; tickSize: string; stepSize: string };
-    } | null;
     marketSummary: {
       totalListedPairs: number;
       activeQuoteAsset: string;
@@ -161,19 +122,8 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
       highVolume: any[];
       allTickers: any[];
     } | null;
-    systemStatus: {
-      status: string;
-      statusCode: number;
-      msg: string;
-      serverTime: number;
-      localTime: number;
-      clockDriftMs: number;
-      rateLimits: { type: string; limit: number; interval: string }[];
-    } | null;
   }>({
-    selectedSymbol: null,
     marketSummary: null,
-    systemStatus: null,
   });
 
   // Trades state
@@ -254,9 +204,9 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   }, []);
 
   // Fetch Market data
-  const fetchMarket = useCallback(async (symbol = selectedSymbol, interval = klineInterval) => {
+  const fetchMarket = useCallback(async () => {
     try {
-      const url = `/api/v1/crypto/market?symbol=${symbol}&interval=${interval}`;
+      const url = "/api/v1/crypto/market";
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Market HTTP error ${res.status}`);
       const json = await res.json();
@@ -266,7 +216,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
     } catch (err) {
       console.warn("Failed to fetch market data:", err);
     }
-  }, [selectedSymbol, klineInterval]);
+  }, []);
 
   // Fetch Trades data
   const fetchTrades = useCallback(async () => {
@@ -286,10 +236,10 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   useEffect(() => {
     if (user) {
       fetchHoldings(true);
-      fetchMarket(selectedSymbol, klineInterval);
+      fetchMarket();
       fetchTrades();
     }
-  }, [user, fetchHoldings, fetchMarket, fetchTrades, selectedSymbol, klineInterval]);
+  }, [user, fetchHoldings, fetchMarket, fetchTrades]);
 
   // Sync Binance portfolio
   const handleSyncBinance = async () => {
@@ -380,26 +330,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
 
     return segments;
   }, [portfolio.assets, formatUSD]);
-
-  // Filtered Market Tickers for Markets Tab
-  const displayedTickers = useMemo(() => {
-    if (!marketData.marketSummary) return [];
-    let list = marketData.marketSummary.allTickers;
-
-    if (marketFilter === "gainers") {
-      list = marketData.marketSummary.topGainers;
-    } else if (marketFilter === "losers") {
-      list = marketData.marketSummary.topLosers;
-    } else if (marketFilter === "volume") {
-      list = marketData.marketSummary.highVolume;
-    }
-
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(
-      (t) => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
-    );
-  }, [marketData.marketSummary, marketFilter, searchQuery]);
 
   // Swap Quote computation
   const swapQuote: SwapQuoteResult = useMemo(() => {
@@ -497,30 +427,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </button>
 
         <button
-          onClick={() => setActiveView("markets")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-            activeView === "markets"
-              ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          <BarChart2 size={14} className={activeView === "markets" ? "text-emerald-400" : ""} />
-          <span>Live Markets</span>
-        </button>
-
-        <button
-          onClick={() => setActiveView("terminal")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-            activeView === "terminal"
-              ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          <Activity size={14} className={activeView === "terminal" ? "text-sky-400" : ""} />
-          <span>Trading Terminal</span>
-        </button>
-
-        <button
           onClick={() => setActiveView("swap")}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
             activeView === "swap"
@@ -530,18 +436,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         >
           <ArrowRightLeft size={14} className={activeView === "swap" ? "text-indigo-400" : ""} />
           <span>Swap Converter</span>
-        </button>
-
-        <button
-          onClick={() => setActiveView("system")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-            activeView === "system"
-              ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          <Cpu size={14} className={activeView === "system" ? "text-rose-400" : ""} />
-          <span>Exchange Health</span>
         </button>
       </div>
 
@@ -918,448 +812,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: LIVE 24H MARKETS */}
-      {/* ========================================================================= */}
-      {activeView === "markets" && (
-        <div
-          className="rounded-2xl border p-5 sm:p-6 space-y-5"
-          style={{
-            backgroundColor: "var(--app-card)",
-            borderColor: "var(--app-border)",
-          }}
-        >
-          {/* Market Navigation Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--app-border)]">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-[var(--app-fg)] flex items-center gap-2">
-                <BarChart2 size={20} className="text-emerald-400" />
-                <span>Binance 24h Ticker Board</span>
-              </h2>
-              <p className="text-xs text-[var(--app-muted)]">
-                Live prices, 24h price percentage changes, high/low spread, and trading turnover via /api/v3/ticker/24hr
-              </p>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Category pills */}
-              <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-xs">
-                <button
-                  onClick={() => setMarketFilter("all")}
-                  className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                    marketFilter === "all" ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs" : "text-[var(--app-muted)]"
-                  }`}
-                >
-                  All Pairs
-                </button>
-                <button
-                  onClick={() => setMarketFilter("gainers")}
-                  className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                    marketFilter === "gainers" ? "bg-emerald-500/20 text-emerald-400" : "text-[var(--app-muted)]"
-                  }`}
-                >
-                  🔥 Gainers
-                </button>
-                <button
-                  onClick={() => setMarketFilter("losers")}
-                  className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                    marketFilter === "losers" ? "bg-rose-500/20 text-rose-400" : "text-[var(--app-muted)]"
-                  }`}
-                >
-                  🔻 Losers
-                </button>
-                <button
-                  onClick={() => setMarketFilter("volume")}
-                  className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                    marketFilter === "volume" ? "bg-sky-500/20 text-sky-400" : "text-[var(--app-muted)]"
-                  }`}
-                >
-                  💎 High Volume
-                </button>
-              </div>
-
-              {/* Search */}
-              <div className="relative w-44">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--app-muted)]" />
-                <input
-                  type="text"
-                  placeholder="Filter ticker..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-[var(--app-fg)]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Markets Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="text-[10px] uppercase font-mono tracking-wider text-[var(--app-muted)] border-b border-[var(--app-border)]">
-                  <th className="pb-3 font-semibold">Pair</th>
-                  <th className="pb-3 font-semibold text-right">Last Price</th>
-                  <th className="pb-3 font-semibold text-right">24h Change</th>
-                  <th className="pb-3 font-semibold text-right">24h High</th>
-                  <th className="pb-3 font-semibold text-right">24h Low</th>
-                  <th className="pb-3 font-semibold text-right">24h Volume (USDT)</th>
-                  <th className="pb-3 font-semibold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border-subtle)]">
-                {displayedTickers.map((t) => (
-                  <tr key={t.symbol} className="hover:bg-[var(--app-card-hover)] transition-colors group">
-                    <td className="py-3 pr-2">
-                      <div className="flex items-center gap-2.5">
-                        <CryptoLogo
-                          symbol={t.baseAsset || t.symbol}
-                          name={t.name}
-                          size={28}
-                          className="rounded-lg border border-[var(--app-border-subtle)]"
-                        />
-                        <div>
-                          <div className="font-bold text-[var(--app-fg)]">{t.symbol}</div>
-                          <div className="text-[10px] text-[var(--app-muted)]">{t.name}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-2 text-right font-mono font-bold text-[var(--app-fg)] tabular-nums">
-                      ${t.lastPrice >= 1 ? t.lastPrice.toLocaleString("en-US", { maximumFractionDigits: 2 }) : t.lastPrice.toFixed(4)}
-                    </td>
-
-                    <td className="py-3 px-2 text-right font-mono tabular-nums">
-                      <span
-                        className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                          t.change24h >= 0
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                        }`}
-                      >
-                        {t.change24h >= 0 ? "+" : ""}
-                        {t.change24h.toFixed(2)}%
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-2 text-right font-mono text-[var(--app-muted)] tabular-nums">
-                      ${t.high24h >= 1 ? t.high24h.toLocaleString("en-US", { maximumFractionDigits: 2 }) : t.high24h.toFixed(4)}
-                    </td>
-
-                    <td className="py-3 px-2 text-right font-mono text-[var(--app-muted)] tabular-nums">
-                      ${t.low24h >= 1 ? t.low24h.toLocaleString("en-US", { maximumFractionDigits: 2 }) : t.low24h.toFixed(4)}
-                    </td>
-
-                    <td className="py-3 px-2 text-right font-mono text-[var(--app-fg)] tabular-nums">
-                      ${t.quoteVolumeUsd >= 1000000000
-                        ? `${(t.quoteVolumeUsd / 1000000000).toFixed(2)}B`
-                        : `${(t.quoteVolumeUsd / 1000000).toFixed(2)}M`}
-                    </td>
-
-                    <td className="py-3 pl-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => {
-                          setSelectedSymbol(t.symbol);
-                          setActiveView("terminal");
-                        }}
-                        className="gap-1 text-xs"
-                      >
-                        <span>Terminal</span>
-                        <ChevronRight size={12} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 3: TRADING TERMINAL (CANDLESTICKS, DEPTH & TAPE) */}
-      {/* ========================================================================= */}
-      {activeView === "terminal" && (
-        <div className="space-y-6">
-          {/* Symbol Selector Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {POPULAR_SYMBOLS.map((sym) => (
-              <button
-                key={sym}
-                onClick={() => setSelectedSymbol(sym)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap ${
-                  selectedSymbol === sym
-                    ? "bg-amber-400 text-black shadow-md shadow-amber-400/20"
-                    : "bg-[var(--app-card)] border border-[var(--app-border)] text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                }`}
-              >
-                {sym.replace("USDT", "")}/USDT
-              </button>
-            ))}
-          </div>
-
-          {/* Terminal Banner / Header */}
-          <div
-            className="rounded-2xl border p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <CryptoLogo
-                symbol={selectedSymbol.replace("USDT", "")}
-                name={marketData.selectedSymbol?.name}
-                size={40}
-                className="rounded-xl border border-[var(--app-border-subtle)]"
-              />
-              <div>
-                <div className="text-base sm:text-lg font-bold text-[var(--app-fg)] flex items-center gap-2">
-                  <span>{selectedSymbol}</span>
-                  <Badge variant="outline" className="text-[10px] font-mono">
-                    Binance Spot
-                  </Badge>
-                </div>
-                <div className="text-xs text-[var(--app-muted)]">
-                  {marketData.selectedSymbol?.name || "Cryptocurrency"}
-                </div>
-              </div>
-            </div>
-
-            {/* Price & Rolling Stats */}
-            <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
-              <div>
-                <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">Last Price</div>
-                <div className="text-base sm:text-lg font-bold font-mono text-[var(--app-fg)]">
-                  ${parseFloat(marketData.selectedSymbol?.ticker?.lastPrice || "96420.5").toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">24h Change</div>
-                <div
-                  className={`font-mono font-bold ${
-                    parseFloat(marketData.selectedSymbol?.ticker?.priceChangePercent || "0") >= 0
-                      ? "text-emerald-400"
-                      : "text-rose-400"
-                  }`}
-                >
-                  {parseFloat(marketData.selectedSymbol?.ticker?.priceChangePercent || "0") >= 0 ? "+" : ""}
-                  {parseFloat(marketData.selectedSymbol?.ticker?.priceChangePercent || "0").toFixed(2)}%
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">24h High / Low</div>
-                <div className="font-mono text-[var(--app-fg)]">
-                  <span className="text-emerald-400">${parseFloat(marketData.selectedSymbol?.ticker?.highPrice || "0").toLocaleString()}</span>
-                  <span className="mx-1 text-[var(--app-muted)]">/</span>
-                  <span className="text-rose-400">${parseFloat(marketData.selectedSymbol?.ticker?.lowPrice || "0").toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">5m Avg Price (VWAP)</div>
-                <div className="font-mono text-sky-400 font-semibold">
-                  ${(marketData.selectedSymbol?.avgPrice?.price || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Candlestick Chart with Interval Selector */}
-          <div
-            className="rounded-2xl border p-4 sm:p-5 space-y-4"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity size={16} className="text-amber-400" />
-                <h3 className="text-sm font-bold text-[var(--app-fg)]">
-                  Binance OHLCV Candlestick Feed
-                </h3>
-              </div>
-
-              {/* Intervals */}
-              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-[11px] font-mono">
-                {["15m", "1h", "4h", "1d", "1w"].map((iv) => (
-                  <button
-                    key={iv}
-                    onClick={() => setKlineInterval(iv)}
-                    className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                      klineInterval === iv
-                        ? "bg-amber-400 text-black"
-                        : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-                    }`}
-                  >
-                    {iv.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <InteractiveCandlestickChart
-              klines={marketData.selectedSymbol?.klines || []}
-              symbol={selectedSymbol}
-              height={310}
-            />
-          </div>
-
-          {/* Lower Terminal: L2 Order Book Depth & Public Trade Flow */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* L2 Order Book Depth (7 cols) */}
-            <div
-              className="lg:col-span-7 rounded-2xl border p-4 sm:p-5 space-y-4"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border)]">
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--app-fg)]">
-                    Level-2 Order Book & Depth Ladder
-                  </h3>
-                  <p className="text-[11px] text-[var(--app-muted)]">
-                    Real-time market liquidity via /api/v3/depth
-                  </p>
-                </div>
-
-                {/* Spread & Ratio */}
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    Spread: ${marketData.selectedSymbol?.depth?.spread || 0} ({marketData.selectedSymbol?.depth?.spreadPercent || 0}%)
-                  </span>
-                </div>
-              </div>
-
-              {/* Depth Ratio Bar */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-mono text-[var(--app-muted)]">
-                  <span className="text-emerald-400 font-semibold">
-                    Buyers: {marketData.selectedSymbol?.depth?.bidAskRatio || 50}%
-                  </span>
-                  <span className="text-rose-400 font-semibold">
-                    Sellers: {(100 - (marketData.selectedSymbol?.depth?.bidAskRatio || 50)).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-rose-500/30 overflow-hidden flex">
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-300"
-                    style={{ width: `${marketData.selectedSymbol?.depth?.bidAskRatio || 50}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Order Book Grid (Bids vs Asks) */}
-              <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                {/* Bids (Green) */}
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase text-emerald-400 font-semibold flex justify-between pb-1 border-b border-[var(--app-border-subtle)]">
-                    <span>Bid Price ($)</span>
-                    <span>Qty</span>
-                  </div>
-                  {(marketData.selectedSymbol?.depth?.bids || []).slice(0, 10).map((b, i) => (
-                    <div
-                      key={`bid-${i}`}
-                      className="relative flex items-center justify-between py-0.5 px-1 rounded overflow-hidden"
-                    >
-                      <div
-                        className="absolute inset-y-0 right-0 bg-emerald-500/15 pointer-events-none"
-                        style={{
-                          width: `${Math.min(100, (b.quantity / (marketData.selectedSymbol?.depth?.totalBidVolume || 1)) * 300)}%`,
-                        }}
-                      />
-                      <span className="text-emerald-400 font-bold tabular-nums z-10">
-                        ${b.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                      </span>
-                      <span className="text-[var(--app-fg)] tabular-nums z-10">{b.quantity.toFixed(4)}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Asks (Red) */}
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase text-rose-400 font-semibold flex justify-between pb-1 border-b border-[var(--app-border-subtle)]">
-                    <span>Ask Price ($)</span>
-                    <span>Qty</span>
-                  </div>
-                  {(marketData.selectedSymbol?.depth?.asks || []).slice(0, 10).map((a, i) => (
-                    <div
-                      key={`ask-${i}`}
-                      className="relative flex items-center justify-between py-0.5 px-1 rounded overflow-hidden"
-                    >
-                      <div
-                        className="absolute inset-y-0 left-0 bg-rose-500/15 pointer-events-none"
-                        style={{
-                          width: `${Math.min(100, (a.quantity / (marketData.selectedSymbol?.depth?.totalAskVolume || 1)) * 300)}%`,
-                        }}
-                      />
-                      <span className="text-rose-400 font-bold tabular-nums z-10">
-                        ${a.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                      </span>
-                      <span className="text-[var(--app-fg)] tabular-nums z-10">{a.quantity.toFixed(4)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Public Recent Trades Flow (5 cols) */}
-            <div
-              className="lg:col-span-5 rounded-2xl border p-4 sm:p-5 space-y-4"
-              style={{
-                backgroundColor: "var(--app-card)",
-                borderColor: "var(--app-border)",
-              }}
-            >
-              <div className="pb-3 border-b border-[var(--app-border)]">
-                <h3 className="text-sm font-bold text-[var(--app-fg)]">
-                  Live Public Market Tape
-                </h3>
-                <p className="text-[11px] text-[var(--app-muted)]">
-                  Executed trades stream via /api/v3/trades
-                </p>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs font-mono">
-                  <thead>
-                    <tr className="text-[10px] uppercase text-[var(--app-muted)] border-b border-[var(--app-border-subtle)]">
-                      <th className="pb-2 text-left font-semibold">Price ($)</th>
-                      <th className="pb-2 text-right font-semibold">Qty</th>
-                      <th className="pb-2 text-right font-semibold">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--app-border-subtle)]">
-                    {(marketData.selectedSymbol?.recentTrades || []).slice(0, 12).map((tr) => (
-                      <tr key={tr.id} className="py-1">
-                        <td
-                          className={`py-1.5 font-bold tabular-nums ${
-                            tr.isBuyerMaker ? "text-rose-400" : "text-emerald-400"
-                          }`}
-                        >
-                          ${tr.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-1.5 text-right text-[var(--app-fg)] tabular-nums">
-                          {tr.qty.toFixed(4)}
-                        </td>
-                        <td className="py-1.5 text-right text-[var(--app-muted)] text-[11px] tabular-nums">
-                          {new Date(tr.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* TAB 4: SWAP CONVERTER */}
@@ -1666,88 +1119,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 6: EXCHANGE HEALTH & SYSTEM STATUS */}
-      {/* ========================================================================= */}
-      {activeView === "system" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              label="System Health"
-              value={marketData.systemStatus?.status || "Operational"}
-              icon={<ShieldCheck size={18} />}
-              iconColor="emerald"
-              subtitle="Binance Core Matching Engine"
-            />
-
-            <StatCard
-              label="Clock Drift"
-              value={`${marketData.systemStatus?.clockDriftMs || 0} ms`}
-              icon={<Clock size={18} />}
-              iconColor="sky"
-              subtitle="Local vs Server Time synchronization"
-            />
-
-            <StatCard
-              label="Rate Limit Tier"
-              value="6,000 W/min"
-              icon={<Cpu size={18} />}
-              iconColor="amber"
-              subtitle="IP Request Weight capacity"
-            />
-          </div>
-
-          <div
-            className="rounded-2xl border p-5 sm:p-6 space-y-4"
-            style={{
-              backgroundColor: "var(--app-card)",
-              borderColor: "var(--app-border)",
-            }}
-          >
-            <div className="pb-3 border-b border-[var(--app-border)]">
-              <h3 className="text-base font-bold text-[var(--app-fg)]">
-                Active Symbol Trading Filters & Rules ({selectedSymbol})
-              </h3>
-              <p className="text-xs text-[var(--app-muted)]">
-                Precision specifications and lot requirements via /api/v3/exchangeInfo
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
-              <div className="p-4 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] space-y-1.5">
-                <div className="text-[10px] uppercase text-[var(--app-muted)]">PRICE_FILTER (Tick Size)</div>
-                <div className="text-sm font-bold text-[var(--app-fg)]">
-                  {marketData.selectedSymbol?.tradingRules?.tickSize || "0.01"}
-                </div>
-                <div className="text-[10px] text-[var(--app-muted)]">
-                  Minimum price movement increments
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] space-y-1.5">
-                <div className="text-[10px] uppercase text-[var(--app-muted)]">LOT_SIZE (Step Size)</div>
-                <div className="text-sm font-bold text-[var(--app-fg)]">
-                  {marketData.selectedSymbol?.tradingRules?.stepSize || "0.00001"}
-                </div>
-                <div className="text-[10px] text-[var(--app-muted)]">
-                  Minimum order quantity granularity
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] space-y-1.5">
-                <div className="text-[10px] uppercase text-[var(--app-muted)]">MIN_NOTIONAL</div>
-                <div className="text-sm font-bold text-emerald-400">
-                  ${marketData.selectedSymbol?.tradingRules?.minNotionalUsd || 5.0} USDT
-                </div>
-                <div className="text-[10px] text-[var(--app-muted)]">
-                  Minimum acceptable trade value
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </main>

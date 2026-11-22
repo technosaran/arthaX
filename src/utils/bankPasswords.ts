@@ -69,13 +69,25 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
   const rawName = (identity.name || "").trim().replace(/[^a-zA-Z]/g, "");
   const name4 = rawName.slice(0, 4);
 
-  // 1. Phone + DOB combinations (SBI standard, Indian Bank, Bank of Baroda)
+  // 1. Phone + DOB combinations (SBI standard, SBI YONO, Indian Bank, Bank of Baroda)
   if (dob) {
     const ddmm = `${dob.dd}${dob.mm}`;
     const mmdd = `${dob.mm}${dob.dd}`;
     const ddmmyyyy = `${dob.dd}${dob.mm}${dob.yyyy}`;
     const ddmmyy = `${dob.dd}${dob.mm}${dob.yy}`;
     const yyyymmdd = `${dob.yyyy}${dob.mm}${dob.dd}`;
+
+    // SBI YONO format: DDMM@phoneLast4, DDMM@phoneLast5, and reverse
+    if (phoneLast4) {
+      candidates.add(`${ddmm}@${phoneLast4}`);
+      candidates.add(`${phoneLast4}@${ddmm}`);
+      candidates.add(`${ddmmyyyy}@${phoneLast4}`);
+      candidates.add(`${phoneLast4}@${ddmmyyyy}`);
+    }
+    if (phoneLast5) {
+      candidates.add(`${ddmm}@${phoneLast5}`);
+      candidates.add(`${phoneLast5}@${ddmm}`);
+    }
 
     // SBI standard: DDMM + last 5 of mobile, and reverse (e.g. 150843210, 432101508)
     if (phoneLast5) {
@@ -88,7 +100,7 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
       // SBI & Indian Bank: DDMM + phoneLast4, phoneLast4 + DDMM
       candidates.add(`${ddmm}${phoneLast4}`);
       candidates.add(`${phoneLast4}${ddmm}`);
-      // Indian Bank standard: DDMMYYYY + phoneLast4, and reverse (e.g. 150819953210, 321015081995)
+      // SBI Credit Card & Indian Bank standard: DDMMYYYY + phoneLast4, and reverse (e.g. 150819953210, 321015081995)
       candidates.add(`${ddmmyyyy}${phoneLast4}`);
       candidates.add(`${phoneLast4}${ddmmyyyy}`);
       candidates.add(`${phoneLast4}${ddmmyy}`);
@@ -133,7 +145,7 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
     candidates.add(mmdd);
   }
 
-  // 5. Standalone PAN (HDFC, Kotak, Axis)
+  // 5. Standalone PAN (HDFC, Kotak, Axis, SBI Credit Card)
   if (pan) {
     candidates.add(pan);
     candidates.add(pan.toLowerCase());
@@ -147,13 +159,90 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
     candidates.add(phoneLast5);
   }
 
-  // 7. Standalone Account Number (Indian Bank Rule 1)
-  if (identity.accountNumber) {
-    const cleanAcc = identity.accountNumber.trim();
-    if (cleanAcc) {
-      candidates.add(cleanAcc);
+  // 7. Account Number permutations (Indian Bank, Axis, etc.)
+  const cleanAcc = (identity.accountNumber || "").trim();
+  const accDigits = cleanAcc.replace(/\D/g, "");
+  const accLast4 = accDigits.length >= 4 ? accDigits.slice(-4) : "";
+  const accLast5 = accDigits.length >= 5 ? accDigits.slice(-5) : "";
+
+  if (cleanAcc) {
+    candidates.add(cleanAcc);
+  }
+  if (accLast4) {
+    candidates.add(accLast4);
+  }
+  if (accLast5) {
+    candidates.add(accLast5);
+  }
+
+  // Account Number + DOB combinations
+  if (dob) {
+    const ddmm = `${dob.dd}${dob.mm}`;
+    const ddmmyyyy = `${dob.dd}${dob.mm}${dob.yyyy}`;
+    const ddmmyy = `${dob.dd}${dob.mm}${dob.yy}`;
+
+    if (accLast4) {
+      candidates.add(`${ddmm}${accLast4}`);
+      candidates.add(`${accLast4}${ddmm}`);
+      candidates.add(`${ddmmyyyy}${accLast4}`);
+      candidates.add(`${accLast4}${ddmmyyyy}`);
+      candidates.add(`${accLast4}${ddmmyy}`);
+    }
+    if (accLast5) {
+      candidates.add(`${ddmm}${accLast5}`);
+      candidates.add(`${accLast5}${ddmm}`);
+      candidates.add(`${ddmmyyyy}${accLast5}`);
+      candidates.add(`${accLast5}${ddmmyyyy}`);
     }
   }
 
+  // Account Number + PAN combinations
+  if (pan.length >= 5) {
+    const pan5 = pan.slice(0, 5);
+    if (accLast4) {
+      candidates.add(`${pan5}${accLast4}`);
+      candidates.add(`${accLast4}${pan5}`);
+      candidates.add(`${pan}${accLast4}`);
+    }
+    if (accLast5) {
+      candidates.add(`${pan5}${accLast5}`);
+      candidates.add(`${accLast5}${pan5}`);
+    }
+  }
+
+  // Axis Bank format: First 4 letters of name in uppercase + last 4 digits of account number
+  if (name4.length >= 4 && accLast4) {
+    candidates.add(`${name4.toUpperCase()}${accLast4}`);
+    candidates.add(`${name4.toLowerCase()}${accLast4}`);
+  }
+
   return Array.from(candidates);
+}
+
+/**
+ * Returns human-friendly instructions for common bank PDF password formats.
+ */
+export function getBankPasswordFormatDescription(bankName: string): string {
+  const norm = (bankName || "").trim().toUpperCase();
+
+  if (norm.includes("SBI") || norm.includes("STATE BANK")) {
+    return "SBI YONO format is 4 digits of DOB (DDMM) + '@' + last 4 digits of mobile (e.g., 0101@9876). SBI NetBanking format is DDMM + last 5 digits of mobile, or PAN.";
+  }
+  if (norm.includes("HDFC")) {
+    return "Customer ID, PAN (uppercase), or first 4 letters of name in lowercase + DDMM.";
+  }
+  if (norm.includes("ICICI")) {
+    return "First 4 letters of name in lowercase + DDMM (e.g. sara1508).";
+  }
+  if (norm.includes("AXIS")) {
+    return "10-digit PAN in uppercase, or first 4 letters of name in uppercase + last 4 digits of account number.";
+  }
+  if (norm.includes("INDIAN BANK") || norm === "INDIAN_BANK" || norm.includes("INDIANBANK")) {
+    return "Full account number, or DDMMYYYY + last 4 digits of mobile.";
+  }
+  if (norm.includes("KOTAK")) {
+    return "CRN (Customer Relationship Number) or DDMMYYYY.";
+  }
+
+  return "Standard formats include PAN (uppercase), DOB (DDMMYYYY or DDMM), or combinations of Name/DOB/mobile/account number.";
 }

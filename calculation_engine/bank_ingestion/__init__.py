@@ -22,7 +22,9 @@ from .pdf_decryptor import (
     generate_candidate_passwords,
     compute_file_hash,
     PasswordRequiredError,
+    PasswordIncorrectError,
     DecryptionError,
+    get_bank_password_format_hint,
 )
 from .statement_validator import validate_statement_math, validate_statement_continuity
 from .parser_registry import StatementParserRegistry, parser_registry
@@ -45,7 +47,9 @@ __all__ = [
     "generate_candidate_passwords",
     "compute_file_hash",
     "PasswordRequiredError",
+    "PasswordIncorrectError",
     "DecryptionError",
+    "get_bank_password_format_hint",
     "validate_statement_math",
     "validate_statement_continuity",
     "StatementParserRegistry",

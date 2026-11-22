@@ -233,7 +233,7 @@ class IndianBankAdapter(BaseBankAdapter):
         file_hash: str,
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
-        doc, _ = open_pdf_document(content, passwords)
+        doc, _ = open_pdf_document(content, passwords, bank_hint=self.BANK_NAME)
 
         try:
             full_text = ""

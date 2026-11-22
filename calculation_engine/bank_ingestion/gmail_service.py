@@ -6,8 +6,10 @@ validates balances, classifies transactions, and detects transfers.
 """
 
 import base64
+import html
 import json
 import logging
+import re
 import time
 import urllib.request
 import urllib.error
@@ -17,11 +19,298 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from .parser_registry import parser_registry
 from .models import StatementParseResult
-from .pdf_decryptor import compute_file_hash
+from .pdf_decryptor import compute_file_hash, prioritize_passwords_by_hint
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
 
 
 logger = logging.getLogger("arthax.gmail_ingestion")
+
+# Non-statement keywords for identifying informational leaflets, brochures, disclosures, etc.
+NON_STATEMENT_KEYWORDS = [
+    "terms",
+    "condition",
+    "mitc",
+    "charges",
+    "tariff",
+    "schedule",
+    "brochure",
+    "guideline",
+    "fair_practice",
+    "security_tips",
+    "advisory",
+    "welcome",
+    "disclosure",
+    "policy",
+    "faq",
+    "user_guide",
+    "form16",
+    "interest_cert",
+    "tds",
+    "circular",
+    "leaflet",
+    "notice",
+]
+
+
+def is_non_statement_attachment(filename: str) -> bool:
+    """
+    Checks for non-statement indicators in filename (case-insensitive).
+    Banks frequently attach informational pamphlets (e.g. Terms_and_Conditions.pdf, MITC.pdf,
+    Schedule_of_Charges.pdf, Fair_Practice_Code.pdf, Security_Tips.pdf, Brochure.pdf, Welcome_Kit.pdf,
+    Form16A.pdf, Interest_Cert.pdf).
+    Returns True if the attachment is an informational leaflet and should NOT be parsed as a bank statement.
+    """
+    if not filename:
+        return False
+
+    fn_lower = filename.lower()
+    fn_normalized = re.sub(r'[\s\-_]+', '_', fn_lower)
+    fn_alphanumeric = re.sub(r'[^a-z0-9]', '', fn_lower)
+
+    for kw in NON_STATEMENT_KEYWORDS:
+        kw_lower = kw.lower()
+        kw_norm = re.sub(r'[\s\-_]+', '_', kw_lower)
+        kw_alpha = re.sub(r'[^a-z0-9]', '', kw_lower)
+
+        if kw_lower in fn_lower or kw_norm in fn_normalized or kw_alpha in fn_alphanumeric:
+            return True
+
+    return False
+
+
+def extract_email_body(payload: Dict[str, Any]) -> str:
+    """
+    Recursively extracts and decodes text/plain and text/html bodies from MIME payload.
+    Handles URL-safe base64 decoding and cleans HTML tags with regex.
+    """
+    plain_parts: List[str] = []
+    html_parts: List[str] = []
+
+    def _decode_body_data(data_str: str) -> str:
+        if not data_str:
+            return ""
+        pad = len(data_str) % 4
+        if pad:
+            data_str += "=" * (4 - pad)
+        try:
+            raw_bytes = base64.urlsafe_b64decode(data_str.encode("utf-8"))
+            return raw_bytes.decode("utf-8", errors="replace")
+        except Exception as e:
+            logger.warning(f"Failed to decode message body data: {e}")
+            return ""
+
+    def _traverse(part: Dict[str, Any]):
+        mime_type = part.get("mimeType", "").lower()
+        body = part.get("body", {})
+        raw_data = body.get("data")
+
+        if raw_data:
+            if "text/plain" in mime_type:
+                decoded = _decode_body_data(raw_data)
+                if decoded.strip():
+                    plain_parts.append(decoded.strip())
+            elif "text/html" in mime_type:
+                decoded = _decode_body_data(raw_data)
+                if decoded.strip():
+                    cleaned = re.sub(r'<[^>]+>', ' ', decoded)
+                    cleaned = html.unescape(cleaned)
+                    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                    if cleaned:
+                        html_parts.append(cleaned)
+
+        for sub_part in part.get("parts", []):
+            _traverse(sub_part)
+
+    _traverse(payload)
+
+    if plain_parts and html_parts:
+        plain_combined = "\n".join(plain_parts)
+        html_combined = "\n".join(html_parts)
+        if html_combined.lower() in plain_combined.lower():
+            return plain_combined
+        elif plain_combined.lower() in html_combined.lower():
+            return html_combined
+        return f"{plain_combined}\n{html_combined}".strip()
+    elif plain_parts:
+        return "\n".join(plain_parts).strip()
+    elif html_parts:
+        return "\n".join(html_parts).strip()
+    return ""
+
+
+def extract_password_hint_from_email(snippet: str = "", body: str = "") -> Dict[str, Any]:
+    """
+    Inspects email snippet and body text for password instructions:
+    - Detects keywords: password, to open, protected, format, ddmm, mobile, pan, account number, @
+    - Identifies specific rule indicators:
+      * YONO SBI rule: presence of dob / ddmm AND @ AND mobile / phone
+      * Standard SBI / Indian Bank rule: dob / ddmm AND mobile (without @)
+      * PAN rule: pan / permanent account number
+      * Account number rule: account number / a/c no
+      * Name rule: name / first 4 letters
+    - Returns dictionary with detected rules, boolean flags, keywords, and extracted hint text.
+    """
+    snippet_str = snippet or ""
+    body_str = body or ""
+    combined = f"{snippet_str} {body_str}".strip()
+    combined_lower = combined.lower()
+
+    # Detect keywords
+    keywords_found: List[str] = []
+
+    if "password" in combined_lower or "passcode" in combined_lower:
+        keywords_found.append("password")
+    if "to open" in combined_lower or "to unlock" in combined_lower:
+        keywords_found.append("to open")
+    if "protected" in combined_lower or "encrypted" in combined_lower:
+        keywords_found.append("protected")
+    if "format" in combined_lower:
+        keywords_found.append("format")
+    if "ddmm" in combined_lower or "dd-mm" in combined_lower or "dd/mm" in combined_lower:
+        keywords_found.append("ddmm")
+    if "mobile" in combined_lower or "phone" in combined_lower:
+        keywords_found.append("mobile")
+    if re.search(r'\bpan\b', combined_lower) or "permanent account number" in combined_lower:
+        keywords_found.append("pan")
+    if "account number" in combined_lower or "account no" in combined_lower or re.search(r'\ba/c\s*(?:no|number)\b', combined_lower):
+        keywords_found.append("account number")
+    if "@" in combined:
+        keywords_found.append("@")
+
+    # Rule indicators
+    has_dob = any(k in combined_lower for k in ("dob", "ddmm", "date of birth"))
+    has_mobile = any(k in combined_lower for k in ("mobile", "phone"))
+    has_at = "@" in combined
+
+    # YONO SBI rule: presence of dob / ddmm AND @ AND mobile / phone
+    is_yono_sbi = bool(has_dob and has_at and has_mobile)
+
+    # Standard SBI / Indian Bank rule: dob / ddmm AND mobile (without @)
+    is_dob_mobile = bool(has_dob and has_mobile and not has_at)
+
+    # PAN rule: pan / permanent account number
+    is_pan = bool(re.search(r'\bpan\b', combined_lower) or "permanent account number" in combined_lower)
+
+    # Account number rule: account number / a/c no
+    is_account_number = bool(
+        "account number" in combined_lower
+        or "account no" in combined_lower
+        or re.search(r'\ba/c\s*(?:no|number)\b', combined_lower)
+    )
+
+    # Name rule: name / first 4 letters
+    is_name = bool(
+        "first 4 letters" in combined_lower
+        or "first 4 characters" in combined_lower
+        or "first four letters" in combined_lower
+        or ("name" in combined_lower and any(w in combined_lower for w in ("first", "letters", "characters")))
+    )
+
+    rules_detected: List[str] = []
+    if is_yono_sbi:
+        rules_detected.append("yono_sbi")
+    if is_dob_mobile:
+        rules_detected.append("dob_mobile")
+        rules_detected.append("standard_sbi")
+    if is_pan:
+        rules_detected.append("pan")
+    if is_account_number:
+        rules_detected.append("account_number")
+    if is_name:
+        rules_detected.append("name")
+
+    # Extract hint sentences
+    sentences = re.split(r'[\r\n]+|(?:(?<=[.!?])\s+)', combined)
+    relevant_sentences: List[str] = []
+    for s in sentences:
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+        s_lower = s_clean.lower()
+        if any(k in s_lower for k in ("password", "to open", "protected", "passcode", "format", "ddmm", "dob", "pan", "secret")):
+            if s_clean not in relevant_sentences:
+                relevant_sentences.append(s_clean)
+
+    hint_text = " ".join(relevant_sentences[:5]).strip()
+    if not hint_text and snippet_str:
+        hint_text = snippet_str.strip()
+
+    has_password_hint = bool(
+        rules_detected
+        or relevant_sentences
+        or any(k in combined_lower for k in ("password", "to open", "protected", "passcode"))
+    )
+
+    return {
+        "has_password_hint": has_password_hint,
+        "hint_text": hint_text,
+        "rules_detected": rules_detected,
+        "keywords_found": keywords_found,
+        "is_yono_sbi": is_yono_sbi,
+        "is_dob_mobile": is_dob_mobile,
+        "is_standard_sbi": is_dob_mobile,
+        "is_pan": is_pan,
+        "is_account_number": is_account_number,
+        "is_name": is_name,
+    }
+
+
+def detect_bank_from_metadata(
+    sender: str,
+    subject: str,
+    filename: str = "",
+    body: str = "",
+    snippet: str = "",
+) -> str:
+    """
+    Detects bank identifier from email headers, subject, attachment filename, and body/snippet.
+    Prioritizes headers/filename, falling back to body/snippet if generic.
+    """
+    def _match(text: str) -> str:
+        combined = text.lower()
+        if "sbi" in combined or "state bank of india" in combined or "sbin" in combined or "yonobysbi" in combined or "yono" in combined:
+            return "SBI"
+        if "indianbank" in combined or "indian bank" in combined or "indbank" in combined:
+            return "INDIAN_BANK"
+        if "hdfc" in combined:
+            return "HDFC"
+        if "icici" in combined:
+            return "ICICI"
+        if "axis" in combined or "utib" in combined:
+            return "AXIS"
+        if "kotak" in combined or "kkbk" in combined:
+            return "KOTAK"
+        if "pnb" in combined or "punjab national bank" in combined:
+            return "PNB"
+        if "baroda" in combined or "bob" in combined:
+            return "BANK_OF_BARODA"
+        if "canara" in combined:
+            return "CANARA_BANK"
+        if "union bank" in combined or "unionbank" in combined:
+            return "UNION_BANK"
+        if "standard chartered" in combined or "scbl" in combined:
+            return "STANDARD_CHARTERED"
+        if "indusind" in combined:
+            return "INDUSIND"
+        if "idfc" in combined:
+            return "IDFC_FIRST"
+        if "federal" in combined:
+            return "FEDERAL_BANK"
+        if "cams" in combined or "kfintech" in combined or "ecas" in combined:
+            return "MUTUAL_FUND_CAS"
+        return "GENERIC"
+
+    primary = _match(f"{sender} {subject} {filename}")
+    if primary != "GENERIC":
+        return primary
+
+    if body or snippet:
+        secondary = _match(f"{snippet} {body}")
+        if secondary != "GENERIC":
+            return secondary
+
+    return "GENERIC"
+
 
 # Comprehensive Gmail search query for statement discovery across major banks
 DEFAULT_GMAIL_STATEMENT_QUERY = (
@@ -42,44 +331,6 @@ DEFAULT_GMAIL_STATEMENT_QUERY = (
 )
 
 GMAIL_API_BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
-
-
-def detect_bank_from_metadata(sender: str, subject: str, filename: str = "") -> str:
-    """
-    Detects bank identifier from email headers, subject, and attachment filename.
-    """
-    combined = f"{sender} {subject} {filename}".lower()
-    if "sbi" in combined or "state bank of india" in combined or "sbin" in combined or "yonobysbi" in combined:
-        return "SBI"
-    if "indianbank" in combined or "indian bank" in combined or "indbank" in combined:
-        return "INDIAN_BANK"
-    if "hdfc" in combined:
-        return "HDFC"
-    if "icici" in combined:
-        return "ICICI"
-    if "axis" in combined or "utib" in combined:
-        return "AXIS"
-    if "kotak" in combined or "kkbk" in combined:
-        return "KOTAK"
-    if "pnb" in combined or "punjab national bank" in combined:
-        return "PNB"
-    if "baroda" in combined or "bob" in combined:
-        return "BANK_OF_BARODA"
-    if "canara" in combined:
-        return "CANARA_BANK"
-    if "union bank" in combined or "unionbank" in combined:
-        return "UNION_BANK"
-    if "standard chartered" in combined or "scbl" in combined:
-        return "STANDARD_CHARTERED"
-    if "indusind" in combined:
-        return "INDUSIND"
-    if "idfc" in combined:
-        return "IDFC_FIRST"
-    if "federal" in combined:
-        return "FEDERAL_BANK"
-    if "cams" in combined or "kfintech" in combined or "ecas" in combined:
-        return "MUTUAL_FUND_CAS"
-    return "GENERIC"
 
 
 class GmailStatementIngestor:
@@ -196,6 +447,10 @@ class GmailStatementIngestor:
         url = f"{GMAIL_API_BASE_URL}/messages/{message_id}?format=full"
         return self._make_api_request(url)
 
+    def extract_email_body(self, message_payload: Dict[str, Any]) -> str:
+        """Extracts and decodes plain/HTML text from message payload."""
+        return extract_email_body(message_payload)
+
     def extract_attachment_parts(self, message_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Recursively traverses MIME message structure to find PDF and CSV attachments (including inline data)."""
         attachments: List[Dict[str, Any]] = []
@@ -303,16 +558,38 @@ class GmailStatementIngestor:
         [ { "filename": "sbi_nov26.pdf", "content_bytes": b"...", "message_id": "..." }, ... ]
         """
         results: List[StatementParseResult] = []
+        password_hints = None
+        if email_metadata:
+            snippet = email_metadata.get("snippet", "")
+            body = email_metadata.get("email_body", "")
+            password_hints = extract_password_hint_from_email(snippet=snippet, body=body)
+            email_metadata["password_hints"] = password_hints
+
         for att in attachments:
             fname = att.get("filename", "statement.pdf")
             content = att.get("content_bytes", b"")
             if not content:
                 continue
 
+            # Intelligent Attachment Filtering: Skip non-statement brochures, terms, and notices
+            if is_non_statement_attachment(fname):
+                logger.info(f"Skipping non-statement informational attachment {fname}")
+                continue
+
             try:
-                res = parser_registry.parse_statement(content, fname, password_candidates)
+                prioritized_passwords = prioritize_passwords_by_hint(password_candidates, password_hints)
+                res = parser_registry.parse_statement(
+                    content=content,
+                    filename=fname,
+                    passwords=prioritized_passwords,
+                    metadata=email_metadata,
+                    password_hints=password_hints,
+                )
                 if email_metadata:
                     res.metadata.raw_metadata["email_metadata"] = email_metadata
+                    res.raw_metadata["email_metadata"] = email_metadata
+                if password_hints:
+                    res.raw_metadata["password_hints"] = password_hints
                 results.append(res)
             except Exception as e:
                 logger.error(f"Error parsing attachment {fname}: {e}")
@@ -321,6 +598,10 @@ class GmailStatementIngestor:
                     "unknown",
                     f"Exception during attachment ingestion: {str(e)}",
                 )
+                if email_metadata:
+                    err_res.raw_metadata["email_metadata"] = email_metadata
+                if password_hints:
+                    err_res.raw_metadata["password_hints"] = password_hints
                 results.append(err_res)
 
         return results
@@ -392,11 +673,22 @@ class GmailStatementIngestor:
                 logger.info(f"Skipping non-bank broker/depository message {msg_id} from {sender}")
                 continue
 
+            # Extract email snippet and body text
+            snippet = msg_detail.get("snippet", "")
+            payload = msg_detail.get("payload", {})
+            email_body = self.extract_email_body(payload)
+
+            # Detect password hints from snippet and body
+            password_hints = extract_password_hint_from_email(snippet=snippet, body=email_body)
+
             email_meta = {
                 "message_id": msg_id,
                 "sender": sender,
                 "subject": subject,
                 "date": email_date,
+                "snippet": snippet,
+                "email_body": email_body,
+                "password_hints": password_hints,
             }
 
             attachments = self.extract_attachment_parts(msg_detail)
@@ -413,6 +705,11 @@ class GmailStatementIngestor:
                     logger.info(f"Skipping non-bank broker attachment {fn} from msg {msg_id}")
                     continue
 
+                # Intelligent Attachment Filtering: Skip non-statement brochures, terms, and notices
+                if is_non_statement_attachment(fn):
+                    logger.info(f"Skipping non-statement informational attachment {fn} from msg {msg_id}")
+                    continue
+
                 try:
                     if inline_bytes:
                         content_bytes = inline_bytes
@@ -423,13 +720,19 @@ class GmailStatementIngestor:
                         continue
 
                     file_hash = compute_file_hash(content_bytes)
-                    detected_bank = detect_bank_from_metadata(sender, subject, fn)
+                    detected_bank = detect_bank_from_metadata(
+                        sender, subject, fn, body=email_body, snippet=snippet
+                    )
+
+                    prioritized_passwords = prioritize_passwords_by_hint(password_candidates, password_hints)
 
                     parse_res = parser_registry.parse_statement(
                         content=content_bytes,
                         filename=fn,
-                        passwords=password_candidates,
+                        passwords=prioritized_passwords,
                         bank_hint=detected_bank,
+                        metadata=email_meta,
+                        password_hints=password_hints,
                     )
 
                     # Enrich transactions with Transaction Intelligence
@@ -461,6 +764,7 @@ class GmailStatementIngestor:
                     stmt_dict = parse_res.model_dump()
                     stmt_dict["transactions"] = enriched_txs
                     stmt_dict["email_metadata"] = email_meta
+                    stmt_dict["password_hints"] = password_hints
                     stmt_dict["detected_bank"] = detected_bank
                     stmt_dict["file_hash"] = file_hash
                     stmt_dict["message_id"] = msg_id
@@ -477,6 +781,7 @@ class GmailStatementIngestor:
                             "attachment_id": att_id or "inline",
                             "errors": parse_res.errors,
                             "email_metadata": email_meta,
+                            "password_hints": password_hints,
                         })
 
                 except Exception as parse_err:
@@ -488,6 +793,7 @@ class GmailStatementIngestor:
                         "attachment_id": att_id,
                         "errors": [str(parse_err)],
                         "email_metadata": email_meta,
+                        "password_hints": password_hints,
                         "transactions": [],
                     }
                     parsed_statements.append(fail_info)

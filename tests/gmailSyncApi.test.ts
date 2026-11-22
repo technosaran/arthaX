@@ -139,6 +139,54 @@ describe("Gmail Statement Auto-Sync API Suite", () => {
     expect(json.transactionsImported).toBe(45);
   });
 
+  it("POST returns partial status with enhanced password guidance hint", async () => {
+    mockedAuth.mockResolvedValueOnce({
+      user: { id: "user_test_1" } as any,
+      userId: "user_test_1",
+      error: null,
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { sync_status: "ACTIVE", email_address: "finance@test.com" },
+            error: null,
+          }),
+        }),
+      }),
+    });
+    mockedSupabase.from = mockFrom as any;
+
+    const sbiPasswordHint =
+      "Password required for SBI statement(s). Hint: YONO uses DDMM@last 4 digits of mobile (e.g. 0101@9876); NetBanking uses DDMM + last 5 digits of mobile, or PAN. Add your details in Settings > Bank Passwords.";
+
+    mockedSync.mockResolvedValueOnce({
+      success: false,
+      statementsCount: 2,
+      transactionsImported: 12,
+      duplicatesSkipped: 0,
+      transfersMatched: 0,
+      accountsCreated: ["SBI Credit Card"],
+      failedCount: 1,
+      status: "PARTIAL",
+      error: sbiPasswordHint,
+    });
+
+    const req = new NextRequest("http://localhost:3000/api/v1/integrations/gmail/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.status).toBe("PARTIAL");
+    expect(json.error).toBe(sbiPasswordHint);
+    expect(json.accountsCreated).toContain("SBI Credit Card");
+  });
+
   it("GET returns current connection telemetry", async () => {
     mockedAuth.mockResolvedValueOnce({
       user: { id: "user_test_1" } as any,

@@ -16,7 +16,6 @@ import {
   FileSpreadsheet,
   User,
   ShieldCheck,
-  LogOut,
   Copy,
   AlertTriangle,
   Trash2,
@@ -29,6 +28,11 @@ import {
   KeyRound,
   Bitcoin,
   ChevronRight,
+  CreditCard,
+  Calendar,
+  Smartphone,
+  Lock,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -87,7 +91,7 @@ interface DataCounts {
   total: number;
 }
 
-type SettingsTab = "profile" | "statements" | "integrations" | "security" | "danger";
+type SettingsTab = "profile" | "statements" | "integrations" | "danger";
 
 interface SettingsSectionProps {
   initialTab?: SettingsTab;
@@ -118,7 +122,7 @@ interface ZerodhaStatus {
 }
 
 export default function SettingsSection({ initialTab }: SettingsSectionProps = {}) {
-  const { user, profile, refreshProfile, signOut, updateProfileLocally } = useAuth();
+  const { user, profile, refreshProfile, updateProfileLocally } = useAuth();
   const { theme } = useTheme();
   const { showToast } = useToast();
 
@@ -130,7 +134,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const sectionParam = params.get("section") as SettingsTab;
-      if (["profile", "statements", "integrations", "security", "engine", "danger"].includes(sectionParam)) {
+      if (["profile", "statements", "integrations", "danger"].includes(sectionParam)) {
         return sectionParam;
       }
     }
@@ -337,13 +341,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
     return source.substring(0, 2).toUpperCase();
   }, [greetingName, validProfileName, user]);
-
-  const timeGreeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour >= 12 && hour < 17) return "Good afternoon";
-    if (hour >= 17) return "Good evening";
-    return "Good morning";
-  }, []);
 
   // Sync greetingName when profile arrives from AuthContext
   useEffect(() => {
@@ -641,7 +638,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       window.history.replaceState({}, "", url.toString());
     }
 
-    if (section && ["profile", "statements", "integrations", "security", "danger"].includes(section)) {
+    if (section && ["profile", "statements", "integrations", "danger"].includes(section)) {
       if (activeTab !== section) {
         setActiveTab(section as SettingsTab);
       }
@@ -1050,6 +1047,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         "success"
       );
       setPanInput("");
+      setDobInput("");
       setPhoneInput("");
       await fetchGmailStatus(true);
     } catch (err: unknown) {
@@ -1903,7 +1901,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         {/* TOP HEADER */}
         <PageHeader
           title="Settings"
-          description="Personalize your workspace identity, export statements, and manage account security."
+          description="Personalize your workspace identity, export statements, and manage integrations."
         />
 
         {/* SUB-NAV TABS */}
@@ -1936,15 +1934,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                 <span className="flex items-center gap-2">
                   <Bot size={14} />
                   <span>Integrations & Bots</span>
-                </span>
-              ),
-            },
-            {
-              value: "security",
-              label: (
-                <span className="flex items-center gap-2">
-                  <ShieldCheck size={14} />
-                  <span>Security & Privacy</span>
                 </span>
               ),
             },
@@ -2078,127 +2067,312 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     {saveStatus === "saved" ? "Saved" : "Save Name"}
                   </Button>
                 </div>
-
-                {/* Live Greeting Preview Banner */}
-                <div
-                  className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                    <span className="opacity-60 text-[10px] font-mono uppercase tracking-wider">Dashboard Greeting Preview:</span>
-                    <span className="font-semibold truncate text-xs text-emerald-400">
-                      {timeGreeting}{greetingName.trim() ? `, ${greetingName.trim()}` : ""}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono opacity-50 hidden sm:inline">Active</span>
-                </div>
               </div>
             </Card>
 
             {/* Basic Personal & Banking Details Card */}
-            <Card className="p-6 sm:p-7 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border-subtle)] flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
-                    <Landmark size={16} />
+            {(() => {
+              const hasAnySaved = Boolean(
+                gmailStatus.bankingIdentity &&
+                (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone)
+              );
+              const hasAnyInput = Boolean(panInput.trim() || dobInput.trim() || phoneInput.trim());
+              const isPanValid = panInput.length === 10 ? /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(panInput.trim()) : null;
+
+              return (
+                <Card className="p-6 sm:p-7 space-y-6 relative overflow-hidden border border-[var(--app-border-subtle)] bg-[var(--app-card)] shadow-xs">
+                  {/* Subtle ambient decorative gradient glow */}
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                  {/* Header Area */}
+                  <div className="flex items-start sm:items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3 relative">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-cyan-500/10 text-emerald-400 border border-emerald-500/25 flex items-center justify-center flex-shrink-0 shadow-xs">
+                        <Landmark size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-sm sm:text-base font-bold tracking-tight text-[var(--app-fg)]">
+                            Personal &amp; Banking Identity Vault
+                          </h2>
+                        </div>
+                        <p className="text-xs opacity-60 mt-0.5">
+                          Zero-knowledge encrypted identity details for automated tax reconciliation and e-statement decryption
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--app-bg)] border border-[var(--app-border-subtle)] text-[10px] font-mono text-[var(--app-muted)]">
+                        <Lock size={10} className="text-emerald-400" />
+                        <span>AES-256 GCM</span>
+                      </div>
+                      {hasAnySaved ? (
+                        <Badge variant="emerald" dot size="sm">
+                          Vault Active &amp; Synced
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral" size="sm">
+                          Setup Required
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight">Basic Personal &amp; Banking Details</h2>
-                    <p className="text-xs opacity-60">Identity details used for tax verification and automatic bank statement decryption</p>
+
+                  {/* Current Active Credentials Display */}
+                  <div className="space-y-2 relative">
+                    <div className="flex items-center justify-between text-xs font-semibold text-[var(--app-fg)]">
+                      <span className="font-mono text-[11px] uppercase tracking-wider opacity-75">
+                        Current Vault Status
+                      </span>
+                      <span className="text-[11px] opacity-50 font-normal">
+                        {hasAnySaved ? "Active credentials are encrypted and ready" : "No credentials saved yet"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* PAN Card Status */}
+                      <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                              <CreditCard size={13} />
+                            </div>
+                            <span className="text-[11px] font-medium opacity-75">PAN Number</span>
+                          </div>
+                          {gmailStatus.bankingIdentity?.hasPan ? (
+                            <Badge variant="emerald" size="xs">Encrypted</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="xs">Not Configured</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="font-mono text-xs sm:text-sm font-semibold tracking-wider text-[var(--app-fg)]">
+                            {gmailStatus.bankingIdentity?.panMasked || "••••••••••"}
+                          </span>
+                          <span className="text-[10px] opacity-40 font-mono">10 chars</span>
+                        </div>
+                      </div>
+
+                      {/* DOB Status */}
+                      <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center">
+                              <Calendar size={13} />
+                            </div>
+                            <span className="text-[11px] font-medium opacity-75">Date of Birth (DOB)</span>
+                          </div>
+                          {gmailStatus.bankingIdentity?.hasDob ? (
+                            <Badge variant="emerald" size="xs">Configured</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="xs">Not Configured</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="font-mono text-xs sm:text-sm font-semibold tracking-wider text-[var(--app-fg)]">
+                            {gmailStatus.bankingIdentity?.dobMasked || "••••-••-••"}
+                          </span>
+                          <span className="text-[10px] opacity-40 font-mono">YYYY-MM-DD</span>
+                        </div>
+                      </div>
+
+                      {/* Mobile Status */}
+                      <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
+                              <Smartphone size={13} />
+                            </div>
+                            <span className="text-[11px] font-medium opacity-75">Registered Mobile</span>
+                          </div>
+                          {gmailStatus.bankingIdentity?.hasPhone ? (
+                            <Badge variant="emerald" size="xs">Linked</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="xs">Not Configured</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="font-mono text-xs sm:text-sm font-semibold tracking-wider text-[var(--app-fg)]">
+                            {gmailStatus.bankingIdentity?.phoneMasked ? `+91 ${gmailStatus.bankingIdentity.phoneMasked}` : "••••••••••"}
+                          </span>
+                          <span className="text-[10px] opacity-40 font-mono">10 digits</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) ? (
-                  <Badge variant="emerald" dot>
-                    Active Keys Ready
-                  </Badge>
-                ) : (
-                  <Badge variant="neutral">
-                    Not Configured
-                  </Badge>
-                )}
-              </div>
+                  {/* Zero-Touch Bank Statement Decryption Showcase */}
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/40 space-y-3 relative">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--app-fg)]">
+                        <Zap size={14} className="text-amber-400" />
+                        <span>Zero-Touch Bank Statement Decryption</span>
+                      </div>
+                      <span className="text-[11px] opacity-60 font-mono">Auto-Derived In Memory</span>
+                    </div>
 
-              {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2 flex-wrap">
-                  <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
-                  <span className="font-semibold">Current Saved Details:</span>
-                  {gmailStatus.bankingIdentity.panMasked && (
-                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
-                      PAN: {gmailStatus.bankingIdentity.panMasked}
-                    </span>
-                  )}
-                  {gmailStatus.bankingIdentity.dobMasked && (
-                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
-                      DOB: {gmailStatus.bankingIdentity.dobMasked}
-                    </span>
-                  )}
-                  {gmailStatus.bankingIdentity.phoneMasked && (
-                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
-                      Mobile: {gmailStatus.bankingIdentity.phoneMasked}
-                    </span>
-                  )}
-                </div>
-              )}
+                    <p className="text-xs opacity-70 leading-relaxed">
+                      ArthaX automatically compiles standard decryption passwords on-the-fly in memory when parsing PDF e-statements from supported banks. Statements unlock and ingest seamlessly without prompting you.
+                    </p>
 
-              <p className="text-xs opacity-70 leading-relaxed">
-                Save your basic details here alongside your profile name. ArthaX securely encrypts them and automatically computes standard decryption passwords for <strong>SBI (PAN+DOB or Phone+DOB), ICICI (Name+DOB), HDFC, Axis, Kotak, PNB &amp; Canara Bank</strong>, so your statements decrypt automatically without having to configure details in integrations.
-              </p>
+                    {/* Supported Bank Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
+                      {[
+                        { id: "sbi", name: "SBI", formula: "PAN/Mobile + DOB" },
+                        { id: "hdfc", name: "HDFC", formula: "PAN / Cust ID" },
+                        { id: "icici", name: "ICICI", formula: "Name + DOB" },
+                        { id: "axis", name: "Axis", formula: "Name + Mobile" },
+                        { id: "kotak", name: "Kotak", formula: "CRN or DOB" },
+                        { id: "pnb", name: "PNB", formula: "Auto-Derived" },
+                        { id: "canara", name: "Canara", formula: "Auto-Derived" },
+                      ].map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex flex-col items-center p-2 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card)]/80 text-center gap-1.5 hover:border-[var(--app-border)] transition-colors"
+                          title={`${b.name}: ${b.formula}`}
+                        >
+                          <div className="w-7 h-7 flex items-center justify-center">
+                            <BankLogo name={b.id} size={20} />
+                          </div>
+                          <span className="font-semibold text-[11px] text-[var(--app-fg)]">{b.name}</span>
+                          <span className="text-[9px] font-mono opacity-50 truncate max-w-full">{b.formula}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
-                    PAN Number
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder={gmailStatus.bankingIdentity?.panMasked || "e.g. ABCDE1234F"}
-                    value={panInput}
-                    maxLength={10}
-                    onChange={(e) => setPanInput(e.target.value.toUpperCase())}
-                    className="font-mono text-xs uppercase"
-                  />
-                </div>
+                  {/* Form Section */}
+                  <div className="space-y-3 pt-2 border-t border-[var(--app-border-subtle)] relative">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[var(--app-fg)]">
+                          {hasAnySaved ? "Update Identity Keys" : "Configure Identity Keys"}
+                        </h3>
+                        <p className="text-[11px] opacity-60 mt-0.5">
+                          Leave fields blank to keep their existing saved values. Only populated fields will be updated.
+                        </p>
+                      </div>
+                      {hasAnyInput && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPanInput("");
+                            setDobInput("");
+                            setPhoneInput("");
+                          }}
+                          className="text-[11px] text-[var(--app-muted)] hover:text-rose-400 transition-colors cursor-pointer"
+                        >
+                          Clear inputs
+                        </button>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
-                    Date of Birth (DOB)
-                  </label>
-                  <Input
-                    type="date"
-                    value={dobInput}
-                    onChange={(e) => setDobInput(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      {/* PAN Input */}
+                      <div>
+                        <Input
+                          label={
+                            <div className="flex items-center justify-between">
+                              <span>PAN Number</span>
+                              {panInput.length === 10 ? (
+                                isPanValid ? (
+                                  <span className="text-[10px] text-emerald-400 font-mono font-normal flex items-center gap-0.5">
+                                    <Check size={10} /> Valid PAN
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-amber-400 font-mono font-normal">
+                                    Format: 5L-4N-1L
+                                  </span>
+                                )
+                              ) : panInput.length > 0 ? (
+                                <span className="text-[10px] opacity-60 font-mono font-normal">
+                                  {panInput.length}/10
+                                </span>
+                              ) : null}
+                            </div>
+                          }
+                          type="text"
+                          leftIcon={<CreditCard size={14} />}
+                          placeholder={gmailStatus.bankingIdentity?.panMasked ? `Saved: ${gmailStatus.bankingIdentity.panMasked}` : "e.g. ABCDE1234F"}
+                          value={panInput}
+                          maxLength={10}
+                          onChange={(e) => setPanInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                          className="font-mono text-xs uppercase tracking-wider"
+                          helperText="10-character alphanumeric PAN"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
-                    Registered Mobile
-                  </label>
-                  <Input
-                    type="tel"
-                    placeholder={gmailStatus.bankingIdentity?.phoneMasked || "10-digit number"}
-                    value={phoneInput}
-                    maxLength={10}
-                    onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-                    className="font-mono text-xs"
-                  />
-                </div>
-              </div>
+                      {/* DOB Input */}
+                      <div>
+                        <Input
+                          label="Date of Birth (DOB)"
+                          type="date"
+                          leftIcon={<Calendar size={14} />}
+                          value={dobInput}
+                          max={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => setDobInput(e.target.value)}
+                          className="font-mono text-xs"
+                          helperText={gmailStatus.bankingIdentity?.dobMasked ? `Saved: ${gmailStatus.bankingIdentity.dobMasked}` : "Used for SBI & ICICI decryption"}
+                        />
+                      </div>
 
-              <div className="flex items-center justify-end pt-1">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim())}
-                  onClick={handleSaveBankingIdentity}
-                  className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
-                >
-                  {savingIdentity ? "Encrypting & Storing..." : "Save Basic Details"}
-                </Button>
-              </div>
-            </Card>
+                      {/* Mobile Input */}
+                      <div>
+                        <Input
+                          label={
+                            <div className="flex items-center justify-between">
+                              <span>Registered Mobile</span>
+                              {phoneInput.length === 10 ? (
+                                <span className="text-[10px] text-emerald-400 font-mono font-normal flex items-center gap-0.5">
+                                  <Check size={10} /> 10 digits
+                                </span>
+                              ) : phoneInput.length > 0 ? (
+                                <span className="text-[10px] opacity-60 font-mono font-normal">
+                                  {phoneInput.length}/10
+                                </span>
+                              ) : null}
+                            </div>
+                          }
+                          type="tel"
+                          leftIcon={<Smartphone size={14} />}
+                          placeholder={gmailStatus.bankingIdentity?.phoneMasked ? `Saved: ${gmailStatus.bankingIdentity.phoneMasked}` : "10-digit number"}
+                          value={phoneInput}
+                          maxLength={10}
+                          onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
+                          className="font-mono text-xs tracking-wider"
+                          helperText="Primary mobile linked with bank"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-[var(--app-border-subtle)] relative">
+                    <div className="flex items-center gap-2 text-xs text-[var(--app-muted)] max-w-md">
+                      <ShieldCheck size={15} className="text-emerald-400 flex-shrink-0" />
+                      <span className="leading-tight text-[11px]">
+                        Protected by AES-256 GCM client-level encryption. Your keys are never exposed in logs or network requests.
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="md"
+                        loading={savingIdentity}
+                        disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim())}
+                        onClick={handleSaveBankingIdentity}
+                        icon={savingIdentity ? undefined : <Lock size={13} />}
+                        className="min-w-[170px] shadow-sm font-semibold"
+                      >
+                        {savingIdentity ? "Encrypting & Storing..." : hasAnySaved ? "Update Identity Keys" : "Save & Encrypt Keys"}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })()}
 
             {/* Comprehensive Account Profile Details & Status Card */}
             <Card className="p-6 sm:p-7 space-y-5">
@@ -2288,119 +2462,119 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
         {/* TAB 2: STATEMENTS & DATA REPORTS */}
         {activeTab === "statements" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <Card className="p-4 sm:p-5 space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--app-border-subtle)]">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
-                    <FileText size={15} />
+          <div className="animate-in fade-in duration-200">
+            <Card className="p-3 sm:p-4 space-y-3">
+              {/* Compact Header & Quick Bulk Actions */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[var(--app-border-subtle)]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
+                    <FileText size={13} />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-semibold tracking-tight text-[var(--app-fg)] truncate">Statements & Data Reports</h2>
-                    <p className="text-xs text-[var(--app-fg-muted)] truncate">Download formal PDF statements or raw CSV / JSON datasets</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h2 className="text-xs font-semibold tracking-tight text-[var(--app-fg)] truncate">Statements & Reports</h2>
+                    <Badge variant="neutral" size="xs" className="font-mono text-[10px] px-1.5 py-0">
+                      {loadingCounts ? "..." : `${counts.total} items`}
+                    </Badge>
                   </div>
                 </div>
 
-                <Badge variant="neutral" size="sm" className="font-mono flex-shrink-0">
-                  {loadingCounts ? "Loading..." : `${counts.total} items recorded`}
-                </Badge>
-              </div>
+                {/* 1-Click Master Bulk Export Bar - Compact */}
+                <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    className="h-6.5 px-2.5 text-[11px] font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                    icon={exportingTarget === "master_pdf" ? <Loader2 size={11} className="animate-spin text-rose-400" /> : <FileText size={11} className="text-rose-400" />}
+                    disabled={exportingTarget !== null}
+                    onClick={handleExportMasterPDF}
+                    title="Export consolidated Master Portfolio PDF"
+                  >
+                    Portfolio PDF
+                  </Button>
 
-              {/* 1-Click Master Bulk Export Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
-                  icon={exportingTarget === "master_pdf" ? <Loader2 size={13} className="animate-spin text-rose-400" /> : <FileText size={13} className="text-rose-400" />}
-                  disabled={exportingTarget !== null}
-                  onClick={handleExportMasterPDF}
-                >
-                  Master Portfolio PDF
-                </Button>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    className="h-6.5 px-2.5 text-[11px] font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                    icon={exportingTarget === "all_csv" ? <Loader2 size={11} className="animate-spin text-emerald-400" /> : <FolderDown size={11} className="text-emerald-400" />}
+                    disabled={exportingTarget !== null}
+                    onClick={handleExportAllCSVs}
+                    title="Export all tables into CSV files"
+                  >
+                    All CSVs
+                  </Button>
 
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
-                  icon={exportingTarget === "all_csv" ? <Loader2 size={13} className="animate-spin text-emerald-400" /> : <FolderDown size={13} className="text-emerald-400" />}
-                  disabled={exportingTarget !== null}
-                  onClick={handleExportAllCSVs}
-                >
-                  All CSV Spreadsheets
-                </Button>
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 text-xs font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
-                  icon={exportingTarget === "all_json" ? <Loader2 size={13} className="animate-spin text-sky-400" /> : <Download size={13} className="text-sky-400" />}
-                  disabled={exportingTarget !== null}
-                  onClick={handleExportAllJSON}
-                >
-                  Backup All JSON
-                </Button>
-              </div>
-
-              {/* Individual Datasets Table */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[var(--app-fg-muted)] px-0.5">
-                  <span>Individual Datasets</span>
-                  <span className="hidden sm:inline">Exports</span>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    className="h-6.5 px-2.5 text-[11px] font-medium border-[var(--app-border-subtle)] hover:border-[var(--app-border)]"
+                    icon={exportingTarget === "all_json" ? <Loader2 size={11} className="animate-spin text-sky-400" /> : <Download size={11} className="text-sky-400" />}
+                    disabled={exportingTarget !== null}
+                    onClick={handleExportAllJSON}
+                    title="Full workspace JSON backup"
+                  >
+                    Backup JSON
+                  </Button>
                 </div>
+              </div>
 
-                <div className="divide-y divide-[var(--app-border-subtle)] rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] overflow-hidden">
-                  {DATASET_ROWS.map((ds) => {
-                    const Icon = ds.icon;
-                    return (
-                      <div
-                        key={ds.id}
-                        className="flex items-center justify-between p-2.5 sm:px-3.5 sm:py-2.5 gap-3 hover:bg-[var(--app-card-hover)] transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-7 h-7 rounded-lg border flex items-center justify-center flex-shrink-0 ${ds.iconColor}`}>
-                            <Icon size={13} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-xs tracking-tight truncate text-[var(--app-fg)]">{ds.name}</span>
-                              <Badge variant="neutral" size="xs">
-                                {ds.count} {ds.count === 1 ? "row" : "rows"}
-                              </Badge>
-                            </div>
-                            <p className="text-[11px] text-[var(--app-fg-muted)] truncate hidden sm:block">{ds.desc}</p>
-                          </div>
+              {/* Compact Individual Datasets Table */}
+              <div className="divide-y divide-[var(--app-border-subtle)] rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-bg)] overflow-hidden">
+                {DATASET_ROWS.map((ds) => {
+                  const Icon = ds.icon;
+                  return (
+                    <div
+                      key={ds.id}
+                      className="flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 gap-2 hover:bg-[var(--app-card-hover)] transition-colors"
+                      title={ds.desc}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${ds.iconColor}`}>
+                          <Icon size={11} />
                         </div>
-
-                        {/* Dual Action Buttons */}
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <Button
-                            variant="secondary"
-                            size="xs"
-                            className="h-7 px-2.5 text-xs text-[var(--app-fg-muted)] hover:text-[var(--app-fg)]"
-                            icon={exportingTarget === ds.pdfTarget ? <Loader2 size={11} className="animate-spin text-rose-400" /> : <FileText size={11} className="text-rose-400" />}
-                            disabled={exportingTarget !== null}
-                            onClick={ds.pdfFn}
-                          >
-                            PDF
-                          </Button>
-
-                          <Button
-                            variant="secondary"
-                            size="xs"
-                            className="h-7 px-2.5 text-xs text-[var(--app-fg-muted)] hover:text-[var(--app-fg)]"
-                            icon={exportingTarget === ds.csvTarget ? <Loader2 size={11} className="animate-spin text-emerald-400" /> : <FileSpreadsheet size={11} className="text-emerald-400" />}
-                            disabled={exportingTarget !== null}
-                            onClick={ds.csvFn}
-                          >
-                            CSV
-                          </Button>
-                        </div>
+                        <span className="font-medium text-xs tracking-tight truncate text-[var(--app-fg)]">
+                          {ds.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--app-fg-muted)] bg-[var(--app-card)] px-1.5 py-0.5 rounded border border-[var(--app-border-subtle)] flex-shrink-0">
+                          {ds.count} {ds.count === 1 ? "row" : "rows"}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Compact Dual Action Buttons */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 h-6 px-2 text-[10px] font-medium rounded-md border border-[var(--app-border-subtle)] hover:border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg-muted)] hover:text-[var(--app-fg)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-95"
+                          disabled={exportingTarget !== null}
+                          onClick={ds.pdfFn}
+                          title={`Export ${ds.name} as PDF`}
+                        >
+                          {exportingTarget === ds.pdfTarget ? (
+                            <Loader2 size={10} className="animate-spin text-rose-400" />
+                          ) : (
+                            <FileText size={10} className="text-rose-400" />
+                          )}
+                          <span>PDF</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 h-6 px-2 text-[10px] font-medium rounded-md border border-[var(--app-border-subtle)] hover:border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg-muted)] hover:text-[var(--app-fg)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none active:scale-95"
+                          disabled={exportingTarget !== null}
+                          onClick={ds.csvFn}
+                          title={`Export ${ds.name} as CSV`}
+                        >
+                          {exportingTarget === ds.csvTarget ? (
+                            <Loader2 size={10} className="animate-spin text-emerald-400" />
+                          ) : (
+                            <FileSpreadsheet size={10} className="text-emerald-400" />
+                          )}
+                          <span>CSV</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           </div>
@@ -2684,7 +2858,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           size="sm"
                           disabled={syncingGmail}
                           onClick={handleSyncGmail}
-                          className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
+                          className="gap-1.5 shadow-sm font-semibold"
                         >
                           <RefreshCw size={12} className={syncingGmail ? "animate-spin" : ""} />
                           <span>{syncingGmail ? "Scanning Statements..." : "Sync Bank Statements Now"}</span>
@@ -2750,65 +2924,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     );
                   })()}
 
-                  {/* Automated Statement PDF Decryption Status (Managed in Profile & Identity) */}
-                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2.5">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
-                        <KeyRound size={14} className="text-emerald-400" />
-                        <span>Automated Statement PDF Decryption</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setActiveTab("profile")}
-                        className="text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1 font-medium"
-                      >
-                        <span>Manage Basic Details</span>
-                        <ChevronRight size={12} />
-                      </Button>
-                    </div>
 
-                    <p className="text-[11px] opacity-70 leading-relaxed">
-                      Bank statement PDFs (SBI, HDFC, ICICI, Axis, Kotak, PNB &amp; Canara Bank) are decrypted automatically in the background using your basic details (Name, PAN, Date of Birth, Mobile) configured under <strong>Profile &amp; Identity</strong>.
-                    </p>
-
-                    {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) ? (
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] flex items-center gap-2 flex-wrap">
-                        <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
-                        <span>Active Keys Configured:</span>
-                        {gmailStatus.bankingIdentity.panMasked && (
-                          <span className="font-mono bg-[var(--app-bg)] px-1.5 py-0.5 rounded border border-emerald-500/30">
-                            PAN: {gmailStatus.bankingIdentity.panMasked}
-                          </span>
-                        )}
-                        {gmailStatus.bankingIdentity.dobMasked && (
-                          <span className="font-mono bg-[var(--app-bg)] px-1.5 py-0.5 rounded border border-emerald-500/30">
-                            DOB: {gmailStatus.bankingIdentity.dobMasked}
-                          </span>
-                        )}
-                        {gmailStatus.bankingIdentity.phoneMasked && (
-                          <span className="font-mono bg-[var(--app-bg)] px-1.5 py-0.5 rounded border border-emerald-500/30">
-                            Mobile: {gmailStatus.bankingIdentity.phoneMasked}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <AlertTriangle size={13} className="text-amber-400 flex-shrink-0" />
-                          <span>No basic details saved yet. Configure your PAN or DOB under Profile &amp; Identity for auto-decryption.</span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          onClick={() => setActiveTab("profile")}
-                          className="text-[11px] border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
-                        >
-                          Add Details in Profile
-                        </Button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2837,7 +2953,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         variant="primary"
                         size="md"
                         onClick={handleGoogleOAuthConnect}
-                        className="gap-2.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm px-4"
+                        className="gap-2.5 shadow-sm px-4 font-semibold"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
                           <path
@@ -3253,67 +3369,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               )}
             </Card>
 
-
-          </div>
-        )}
-
-        {/* TAB 4: VAULT SECURITY & CACHE SYNC */}
-        {activeTab === "security" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <Card className="p-6 sm:p-7 space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)]">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <ShieldCheck size={16} />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight">Account & Security</h2>
-                    <p className="text-xs opacity-60">Manage your account security and session</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Rows */}
-              <div
-                className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] space-y-3 text-xs"
-              >
-                <div
-                  className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]"
-                >
-                  <span className="opacity-60 text-xs">Primary Email</span>
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span>{user?.email || "Guest Session (Local Mode)"}</span>
-                    {user?.email && <CheckCircle2 size={13} className="text-emerald-400" />}
-                  </div>
-                </div>
-
-                <div
-                  className="flex items-center justify-between py-1.5 border-b border-[var(--app-border-subtle)]"
-                >
-                  <span className="opacity-60 text-xs">Data Protection</span>
-                  <span className="text-[11px] opacity-80 font-mono">Encrypted Database (Row-Level Security)</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="opacity-60 text-xs">Session Status</span>
-                  <Badge variant="emerald" dot>
-                    Active Session
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Action Buttons: Sign Out */}
-              <div className="flex items-center justify-end gap-3 pt-2 flex-wrap">
-                <Button
-                  variant="danger"
-                  size="md"
-                  icon={<LogOut size={13} />}
-                  onClick={signOut}
-                >
-                  Sign Out of arthaX
-                </Button>
-              </div>
-            </Card>
 
           </div>
         )}

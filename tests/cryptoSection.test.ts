@@ -71,4 +71,13 @@ describe("Crypto Navigation & Section Integration", () => {
     // Spot holdings row should NOT use generic slice avatar
     expect(cryptoSectionContent).not.toContain("{asset.asset.slice(0, 3)}");
   });
+
+  it("ensures Live Markets tab and view are completely removed from CryptoSection", () => {
+    const cryptoSectionPath = path.resolve(process.cwd(), "src/components/CryptoSection.tsx");
+    const cryptoSectionContent = fs.readFileSync(cryptoSectionPath, "utf-8");
+
+    expect(cryptoSectionContent).not.toContain("Live Markets");
+    expect(cryptoSectionContent).not.toContain('setActiveView("markets")');
+    expect(cryptoSectionContent).not.toContain("Binance 24h Ticker Board");
+  });
 });

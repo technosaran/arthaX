@@ -131,7 +131,7 @@ export default function PublicLandingView() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <TrendingUp size={22} />
               </div>
@@ -141,7 +141,7 @@ export default function PublicLandingView() {
               </p>
             </Card>
 
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
                 <RefreshCw size={22} />
               </div>
@@ -151,7 +151,7 @@ export default function PublicLandingView() {
               </p>
             </Card>
 
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
                 <PieChart size={22} />
               </div>
@@ -161,7 +161,7 @@ export default function PublicLandingView() {
               </p>
             </Card>
 
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                 <FileText size={22} />
               </div>
@@ -171,7 +171,7 @@ export default function PublicLandingView() {
               </p>
             </Card>
 
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Lock size={22} />
               </div>
@@ -181,7 +181,7 @@ export default function PublicLandingView() {
               </p>
             </Card>
 
-            <Card className="p-6 space-y-3">
+            <Card className="p-6 space-y-3 card-hover-dynamic">
               <div className="p-2.5 w-fit rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
                 <EyeOff size={22} />
               </div>

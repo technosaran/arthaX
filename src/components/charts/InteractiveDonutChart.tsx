@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useId } from "react";
 import { PieChart as PieChartIcon } from "lucide-react";
+import { ensureDistinctColors, pluralizeUnit } from "@/utils/chartColors";
 
 export interface DonutSegment {
   label: string;

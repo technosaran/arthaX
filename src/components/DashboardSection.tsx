@@ -769,9 +769,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           {/* Ambient Glow Gradient */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center relative z-10">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 xl:gap-12 items-center relative z-10">
             {/* Left Column: Total Net Worth Summary */}
-            <div className="xl:col-span-5 space-y-5 min-w-0">
+            <div className="xl:col-span-6 space-y-5 min-w-0">
               {/* Top Label & Segmented Currency View Toggle */}
               <div className="flex items-center justify-between gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
                 <div className="flex items-center gap-2">
@@ -973,9 +973,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             </div>
 
             {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
-            <div
-              className="xl:col-span-7 min-w-0 flex items-center justify-center xl:justify-end border-t xl:border-t-0 xl:border-l pt-6 xl:pt-0 xl:pl-8 border-[var(--app-border-subtle)]"
-            >
+            <div className="xl:col-span-6 min-w-0 flex items-center justify-center xl:justify-end">
               {loading ? (
                 <div className="flex items-center justify-center h-48 w-full">
                   <Skeleton className="w-40 h-40 rounded-full" />

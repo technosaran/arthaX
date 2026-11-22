@@ -782,9 +782,9 @@ export default function AccountsSection() {
         className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-[var(--app-border)] transition-colors shadow-sm mb-6 sm:mb-8"
         style={{ backgroundColor: "var(--app-card)" }}
       >
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 xl:gap-12 items-center">
           {/* Left Column: Total Portfolio Summary */}
-          <div className="xl:col-span-5 space-y-4 min-w-0">
+          <div className="xl:col-span-6 space-y-4 min-w-0">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--app-muted)]">
                 {totalLiabilities > 0 ? "Net Portfolio Value" : "Total Portfolio Value"}
@@ -860,7 +860,7 @@ export default function AccountsSection() {
           </div>
 
           {/* Right Column: Asset Allocation Donut Chart & Color Legend */}
-          <div className="xl:col-span-7 min-w-0 flex items-center justify-center xl:justify-end border-t xl:border-t-0 xl:border-l pt-6 xl:pt-0 xl:pl-8 border-[var(--app-border-subtle)]">
+          <div className="xl:col-span-6 min-w-0 flex items-center justify-center xl:justify-end">
             {loading ? (
               <div className="flex items-center justify-center h-44 w-full">
                 <Skeleton className="w-36 h-36 rounded-full" />

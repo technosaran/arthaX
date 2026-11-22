@@ -5,9 +5,16 @@ URL-safe base64 decoding, password decryptor, and error handling.
 """
 
 
+import base64
+from unittest.mock import MagicMock, patch
+
 from calculation_engine.bank_ingestion.gmail_service import (
     GmailStatementIngestor,
     detect_bank_from_metadata,
+    extract_email_body,
+    extract_password_hint_from_email,
+    is_non_statement_attachment,
+    prioritize_passwords_by_hint,
 )
 
 

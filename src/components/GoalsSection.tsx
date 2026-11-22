@@ -24,6 +24,7 @@ import {
   Pause,
   X,
   Target,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -95,6 +96,105 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   Target,
   TrendingUp,
 };
+
+export function getCategoryTheme(categoryName?: string): GoalCategoryPreset {
+  if (!categoryName) return GOAL_CATEGORIES[9]; // General Milestone
+  const match = GOAL_CATEGORIES.find(
+    (c) => c.name.toLowerCase() === categoryName.trim().toLowerCase()
+  );
+  if (match) return match;
+  const lower = categoryName.toLowerCase();
+  if (lower.includes("travel") || lower.includes("vacation") || lower.includes("flight") || lower.includes("trip"))
+    return GOAL_CATEGORIES[1];
+  if (lower.includes("home") || lower.includes("house") || lower.includes("flat") || lower.includes("real estate") || lower.includes("property"))
+    return GOAL_CATEGORIES[2];
+  if (lower.includes("car") || lower.includes("bike") || lower.includes("vehicle") || lower.includes("transport") || lower.includes("auto"))
+    return GOAL_CATEGORIES[3];
+  if (lower.includes("gadget") || lower.includes("tech") || lower.includes("laptop") || lower.includes("phone") || lower.includes("pc"))
+    return GOAL_CATEGORIES[4];
+  if (lower.includes("child") || lower.includes("education") || lower.includes("college") || lower.includes("school") || lower.includes("study") || lower.includes("kid"))
+    return GOAL_CATEGORIES[5];
+  if (lower.includes("health") || lower.includes("med") || lower.includes("hospital") || lower.includes("doctor"))
+    return GOAL_CATEGORIES[6];
+  if (lower.includes("retire") || lower.includes("fire") || lower.includes("pension"))
+    return GOAL_CATEGORIES[7];
+  if (lower.includes("wealth") || lower.includes("invest") || lower.includes("gold") || lower.includes("fund") || lower.includes("mutual"))
+    return GOAL_CATEGORIES[8];
+  if (lower.includes("emergency") || lower.includes("safety") || lower.includes("contingency") || lower.includes("shield"))
+    return GOAL_CATEGORIES[0];
+  return {
+    name: categoryName,
+    iconName: "Trophy",
+    color: "#0EA5E9",
+    icon: Trophy,
+    defaultTarget: 100000,
+  };
+}
+
+export function getProgressGradient(color: string, isCompleted: boolean, isPaused: boolean) {
+  if (isCompleted) {
+    return {
+      gradient: "linear-gradient(90deg, #059669 0%, #10B981 60%, #34D399 100%)",
+      glow: "rgba(16, 185, 129, 0.4)",
+    };
+  }
+  if (isPaused) {
+    return {
+      gradient: "linear-gradient(90deg, #64748B 0%, #94A3B8 100%)",
+      glow: "rgba(148, 163, 184, 0.2)",
+    };
+  }
+
+  const colorMap: Record<string, { gradient: string; glow: string }> = {
+    "#10B981": {
+      gradient: "linear-gradient(90deg, #059669 0%, #10B981 60%, #34D399 100%)",
+      glow: "rgba(16, 185, 129, 0.4)",
+    },
+    "#0EA5E9": {
+      gradient: "linear-gradient(90deg, #0284C7 0%, #0EA5E9 60%, #38BDF8 100%)",
+      glow: "rgba(14, 165, 233, 0.4)",
+    },
+    "#F59E0B": {
+      gradient: "linear-gradient(90deg, #D97706 0%, #F59E0B 60%, #FBBF24 100%)",
+      glow: "rgba(245, 158, 11, 0.4)",
+    },
+    "#8B5CF6": {
+      gradient: "linear-gradient(90deg, #7C3AED 0%, #8B5CF6 60%, #A78BFA 100%)",
+      glow: "rgba(139, 92, 246, 0.4)",
+    },
+    "#6366F1": {
+      gradient: "linear-gradient(90deg, #4F46E5 0%, #6366F1 60%, #818CF8 100%)",
+      glow: "rgba(99, 102, 241, 0.4)",
+    },
+    "#3B82F6": {
+      gradient: "linear-gradient(90deg, #1D4ED8 0%, #3B82F6 60%, #60A5FA 100%)",
+      glow: "rgba(59, 130, 246, 0.4)",
+    },
+    "#EC4899": {
+      gradient: "linear-gradient(90deg, #DB2777 0%, #EC4899 60%, #F472B6 100%)",
+      glow: "rgba(236, 72, 153, 0.4)",
+    },
+    "#F97316": {
+      gradient: "linear-gradient(90deg, #EA580C 0%, #F97316 60%, #FB923C 100%)",
+      glow: "rgba(249, 115, 22, 0.4)",
+    },
+    "#14B8A6": {
+      gradient: "linear-gradient(90deg, #0D9488 0%, #14B8A6 60%, #2DD4BF 100%)",
+      glow: "rgba(20, 184, 166, 0.4)",
+    },
+    "#EAB308": {
+      gradient: "linear-gradient(90deg, #CA8A04 0%, #EAB308 60%, #FDE047 100%)",
+      glow: "rgba(234, 179, 8, 0.4)",
+    },
+  };
+
+  if (colorMap[color]) return colorMap[color];
+
+  return {
+    gradient: `linear-gradient(90deg, ${color}CC 0%, ${color} 100%)`,
+    glow: `${color}66`,
+  };
+}
 
 export default function GoalsSection() {
   const { user } = useAuth();
@@ -699,7 +799,8 @@ export default function GoalsSection() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredGoals.map((goal) => {
-            const IconComponent = ICON_MAP[goal.icon] || Trophy;
+            const catTheme = getCategoryTheme(goal.category);
+            const IconComponent = ICON_MAP[goal.icon] || catTheme.icon || Trophy;
             const progress =
               goal.target_amount > 0
                 ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
@@ -707,56 +808,73 @@ export default function GoalsSection() {
             const isCompleted = goal.status === "completed" || progress >= 100;
             const isPaused = goal.status === "paused";
             const deadline = getDeadlineInfo(goal.target_date, goal.target_amount, goal.current_amount);
+            const remaining = Math.max(0, goal.target_amount - goal.current_amount);
 
-            // Harmonious Theme Colors matching progress bar and badge
-            let progressBg = "bg-sky-500";
-            let badgeVariant: "success" | "info" | "warning" | "neutral" = "info";
-
-            if (isCompleted) {
-              progressBg = "bg-emerald-500";
-              badgeVariant = "success";
-            } else if (isPaused) {
-              progressBg = "bg-slate-500";
-              badgeVariant = "neutral";
-            } else if (progress >= 70) {
-              progressBg = "bg-emerald-400";
-              badgeVariant = "success";
-            } else if (progress < 30) {
-              progressBg = "bg-amber-400";
-              badgeVariant = "warning";
-            }
+            // Progress Bar & Ambient Glow styling derived from category theme
+            const progressTheme = getProgressGradient(catTheme.color, isCompleted, isPaused);
+            const accentColor = isCompleted ? "#10B981" : catTheme.color;
 
             return (
               <div
                 key={goal.id}
-                className="group relative flex flex-col justify-between p-5 sm:p-6 rounded-2xl border transition-all duration-200 hover:shadow-md hover:border-[var(--app-border-hover)]"
+                className="group relative flex flex-col justify-between p-5 sm:p-6 rounded-2xl border transition-all duration-300 hover:shadow-xl hover:border-[var(--app-border-hover)] hover:-translate-y-1 overflow-hidden"
                 style={{
-                  borderColor: isCompleted ? "rgba(16, 185, 129, 0.35)" : "var(--app-border)",
+                  borderColor: isCompleted
+                    ? "rgba(16, 185, 129, 0.4)"
+                    : "var(--app-border)",
                   backgroundColor: "var(--app-card)",
                 }}
               >
-                {/* Top Row: Icon + Category + Title + Status Badge */}
-                <div>
-                  <div className="flex items-start justify-between gap-3 mb-3.5">
+                {/* Luminous Top-Edge Gradient Accent Line */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-[2px] opacity-40 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{
+                    background: isCompleted
+                      ? "linear-gradient(90deg, transparent, #10B981, transparent)"
+                      : `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+                  }}
+                />
+
+                {/* Ambient Radial Glow Orb in Top Corner */}
+                <div
+                  className="absolute -top-12 -right-12 w-44 h-44 rounded-full blur-3xl pointer-events-none transition-opacity duration-500 opacity-20 group-hover:opacity-35"
+                  style={{ backgroundColor: accentColor }}
+                />
+
+                {/* Top Section */}
+                <div className="relative z-10">
+                  {/* Top Row: Category Icon + Titles + Percentage / Status Pill */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Category-themed Squircle Icon */}
                       <div
-                        className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xs"
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xs transition-transform duration-300 group-hover:scale-105"
                         style={{
-                          backgroundColor: isCompleted
-                            ? "rgba(16, 185, 129, 0.15)"
-                            : "var(--app-card-subtle)",
-                          color: isCompleted ? "#10B981" : "var(--app-fg)",
-                          border: "1px solid var(--app-border)",
+                          backgroundColor: `${accentColor}18`,
+                          color: accentColor,
+                          border: `1px solid ${accentColor}35`,
+                          boxShadow: `0 4px 14px ${accentColor}15`,
                         }}
                       >
                         <IconComponent size={22} />
                       </div>
+
+                      {/* Category Label + Title */}
                       <div className="min-w-0 flex-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--app-muted)] block truncate mb-0.5">
-                          {goal.category}
-                        </span>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: accentColor }}
+                          />
+                          <span
+                            className="text-[10.5px] font-bold uppercase tracking-wider block truncate"
+                            style={{ color: accentColor }}
+                          >
+                            {goal.category}
+                          </span>
+                        </div>
                         <h3
-                          className="text-base sm:text-lg font-bold text-[var(--app-fg)] tracking-tight line-clamp-1 break-words"
+                          className="text-base sm:text-lg font-bold text-[var(--app-fg)] tracking-tight leading-snug line-clamp-2 break-words"
                           title={goal.title}
                         >
                           {goal.title}
@@ -764,156 +882,234 @@ export default function GoalsSection() {
                       </div>
                     </div>
 
-                    {/* Status / Percentage Badge */}
+                    {/* Status / Percentage Badge (Top Right) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
                       {isCompleted ? (
-                        <Badge variant="success" className="flex items-center gap-1 font-semibold text-[11px] px-2 py-0.5">
-                          <CheckCircle2 size={12} /> Achieved
-                        </Badge>
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-xs">
+                          <CheckCircle2 size={13} className="text-emerald-400" />
+                          <span>Achieved</span>
+                        </span>
                       ) : isPaused ? (
-                        <Badge variant="neutral" className="flex items-center gap-1 font-semibold text-[11px] px-2 py-0.5">
-                          <Pause size={12} /> Paused
-                        </Badge>
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-500/15 text-slate-400 border border-slate-500/30 shadow-xs">
+                          <Pause size={12} />
+                          <span>Paused</span>
+                        </span>
                       ) : (
-                        <Badge variant={badgeVariant} className="font-mono text-[11px] px-2 py-0.5 font-bold">
+                        <span
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-bold shadow-xs border"
+                          style={{
+                            backgroundColor: `${accentColor}14`,
+                            borderColor: `${accentColor}30`,
+                            color: accentColor,
+                          }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full animate-pulse"
+                            style={{ backgroundColor: accentColor }}
+                          />
                           {progress}%
-                        </Badge>
+                        </span>
                       )}
                     </div>
                   </div>
 
                   {/* Notes / Description */}
                   {goal.notes && (
-                    <p className="text-xs text-[var(--app-muted)] line-clamp-2 mb-4 leading-relaxed">
+                    <p className="text-xs text-[var(--app-muted)] line-clamp-2 mb-3.5 leading-relaxed">
                       {goal.notes}
                     </p>
                   )}
 
-                  {/* Amounts & Progress Track */}
+                  {/* Amounts & Visual Progress Section */}
                   <div className="space-y-2.5 my-4">
-                    <div className="flex items-baseline justify-between text-xs">
-                      <span className="text-[var(--app-muted)]">Saved so far</span>
-                      <span className="text-[var(--app-muted)]">Target Goal</span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xl sm:text-2xl font-extrabold font-mono text-[var(--app-fg)] tracking-tight">
-                        {formatINR(goal.current_amount)}
-                      </span>
-                      <span className="text-sm sm:text-base font-semibold font-mono text-[var(--app-muted)]">
-                        {formatINR(goal.target_amount)}
-                      </span>
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--app-muted)] block mb-0.5">
+                          Saved so far
+                        </span>
+                        <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--app-fg)] tracking-tight">
+                          {formatINR(goal.current_amount)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--app-muted)] block mb-0.5">
+                          Target Goal
+                        </span>
+                        <span className="text-sm sm:text-base font-bold font-mono text-[var(--app-muted)]">
+                          {formatINR(goal.target_amount)}
+                        </span>
+                        <div className="mt-0.5">
+                          {remaining > 0 ? (
+                            <span className="text-[11px] font-mono text-[var(--app-muted)]">
+                              <span className="text-amber-400 font-semibold">{formatINR(remaining)}</span> to go
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-mono font-semibold text-emerald-400">
+                              100% funded!
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Visual Progress Track */}
-                    <div className="w-full h-2.5 rounded-full bg-[var(--app-card-subtle)] border border-[var(--app-border)] overflow-hidden">
+                    {/* Progress Track with Milestone Ticks & Glossy Sheen */}
+                    <div className="relative w-full h-3 rounded-full bg-[var(--app-card-subtle)] border border-[var(--app-border)] p-0.5 overflow-hidden shadow-inner">
+                      {/* Milestone Ticks (25%, 50%, 75%) */}
+                      <div className="absolute left-1/4 top-0 bottom-0 w-[1px] bg-white/10 z-10 pointer-events-none" />
+                      <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/10 z-10 pointer-events-none" />
+                      <div className="absolute left-3/4 top-0 bottom-0 w-[1px] bg-white/10 z-10 pointer-events-none" />
+
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressBg}`}
-                        style={{ width: `${progress}%` }}
-                      />
+                        className="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                        style={{
+                          width: `${progress}%`,
+                          background: progressTheme.gradient,
+                          boxShadow: `0 0 10px ${progressTheme.glow}`,
+                        }}
+                      >
+                        {/* Glossy top sheen highlight */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-black/10 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Deadline & Velocity Insights Box */}
+                  {/* Deadline & Velocity Split Insights Capsule */}
                   <div
-                    className="p-3 rounded-xl border text-xs space-y-1.5 mb-5 shadow-xs"
+                    className="grid grid-cols-2 gap-2 p-3 rounded-xl border text-xs mb-5 shadow-xs"
                     style={{
                       borderColor: "var(--app-border)",
                       backgroundColor: "var(--app-card-subtle)",
                     }}
                   >
-                    {deadline ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-[var(--app-muted)]">
-                            <Calendar size={13} /> Target Date:
-                          </span>
+                    {/* Left Tile: Deadline */}
+                    <div className="flex flex-col justify-between space-y-1 min-w-0 pr-2 border-r border-[var(--app-border)]">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--app-muted)]">
+                        <Calendar size={12} className="text-[var(--app-muted)] flex-shrink-0" />
+                        <span className="truncate">Target Date</span>
+                      </div>
+                      {deadline ? (
+                        <>
                           <span
-                            className={`font-semibold ${
+                            className={`font-semibold font-mono text-xs sm:text-sm truncate ${
                               deadline.isOverdue && !isCompleted ? "text-rose-400" : "text-[var(--app-fg)]"
                             }`}
                           >
                             {deadline.formattedDate}
                           </span>
-                        </div>
-                        {!isCompleted && (
-                          <div className="flex items-center justify-between pt-1.5 border-t border-[var(--app-border)]">
-                            <span className="text-[var(--app-muted)]">
-                              {deadline.isOverdue ? (
-                                <span className="text-rose-400 flex items-center gap-1 font-medium">
-                                  <AlertTriangle size={12} /> Target date passed
-                                </span>
-                              ) : (
-                                <span>{deadline.friendlyRemaining}</span>
-                              )}
-                            </span>
-                            {!deadline.isOverdue && deadline.requiredPerMonth > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-[11px] text-[var(--app-muted)]">Need:</span>
-                                <span className="text-emerald-400 font-mono font-bold">
-                                  {formatINR(deadline.requiredPerMonth)}/mo
-                                </span>
-                              </div>
+                          <div>
+                            {deadline.isOverdue && !isCompleted ? (
+                              <span className="text-[10px] font-medium text-rose-400 flex items-center gap-1">
+                                <AlertTriangle size={11} /> Overdue
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md inline-block ${
+                                  deadline.diffDays <= 30
+                                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                                    : "bg-[var(--app-card)] text-[var(--app-muted)] border border-[var(--app-border)]"
+                                }`}
+                              >
+                                {deadline.friendlyRemaining}
+                              </span>
                             )}
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-between text-[var(--app-muted)]">
-                        <span>No fixed deadline set</span>
-                        <span>Open milestone</span>
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-[var(--app-muted)]">Open milestone</span>
+                      )}
+                    </div>
+
+                    {/* Right Tile: Monthly Velocity */}
+                    <div className="flex flex-col justify-between space-y-1 min-w-0 pl-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--app-muted)]">
+                        <TrendingUp
+                          size={12}
+                          className={isCompleted ? "text-emerald-400" : "text-[var(--app-accent)]"}
+                        />
+                        <span className="truncate">{isCompleted ? "Status" : "Monthly Pace"}</span>
                       </div>
-                    )}
+                      {isCompleted ? (
+                        <>
+                          <span className="font-bold text-xs sm:text-sm text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 size={13} /> Fully Funded
+                          </span>
+                          <span className="text-[10px] text-[var(--app-muted)]">Goal achieved! 🎉</span>
+                        </>
+                      ) : deadline && !deadline.isOverdue && deadline.requiredPerMonth > 0 ? (
+                        <>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-xs sm:text-sm font-extrabold font-mono text-emerald-400 truncate">
+                              {formatINR(deadline.requiredPerMonth)}
+                            </span>
+                            <span className="text-[10px] font-semibold text-[var(--app-muted)]">/mo</span>
+                          </div>
+                          <span className="text-[10px] text-[var(--app-muted)]">Needed to hit date</span>
+                        </>
+                      ) : deadline?.isOverdue ? (
+                        <>
+                          <span className="text-xs sm:text-sm font-bold text-rose-400">Date Passed</span>
+                          <span className="text-[10px] text-[var(--app-muted)]">Update deadline</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs sm:text-sm font-mono font-medium text-[var(--app-muted)]">
+                            Flexible
+                          </span>
+                          <span className="text-[10px] text-[var(--app-muted)]">Save at your own pace</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Bottom Action Footer with Clean Framed Toolcapsules */}
-                <div className="pt-3 border-t border-[var(--app-border)] flex items-center justify-between gap-2">
+                <div className="pt-3 border-t border-[var(--app-border)] flex items-center justify-between gap-2 relative z-10">
                   <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      icon={<Plus size={14} />}
+                    <button
+                      type="button"
                       onClick={() => openDepositModal(goal, "add")}
-                      className="cursor-pointer font-semibold shadow-xs"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer active:scale-95"
                     >
-                      Add Funds
-                    </Button>
+                      <Plus size={14} />
+                      <span>Add Funds</span>
+                    </button>
                     {goal.current_amount > 0 && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
+                      <button
+                        type="button"
                         onClick={() => openDepositModal(goal, "withdraw")}
-                        className="text-xs px-2.5 py-1.5 rounded-xl cursor-pointer text-[var(--app-muted)] hover:text-[var(--app-fg)] border-[var(--app-border)]"
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-[var(--app-border)] bg-[var(--app-card-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)] hover:text-[var(--app-fg)] transition-all cursor-pointer shadow-xs active:scale-95"
                         title="Withdraw or adjust saved funds"
                       >
                         Adjust
-                      </Button>
+                      </button>
                     )}
                   </div>
 
-                  {/* Micro Icon Toolbar with Framed Buttons */}
-                  <div className="flex items-center gap-1">
+                  {/* Unified Micro Icon Toolbar */}
+                  <div className="flex items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] p-0.5 shadow-xs">
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(goal)}
-                      title={isPaused ? "Resume Goal" : "Pause Goal"}
-                      className="w-8 h-8 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)] hover:text-[var(--app-fg)] flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                      title={isPaused ? "Resume Goal tracking" : "Pause Goal tracking"}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)] transition-all cursor-pointer active:scale-95"
                     >
                       {isPaused ? <Play size={14} className="text-emerald-400" /> : <Pause size={14} />}
                     </button>
+                    <div className="w-[1px] h-3.5 bg-[var(--app-border)]" />
                     <button
                       type="button"
                       onClick={() => openEditModal(goal)}
-                      title="Edit Goal"
-                      className="w-8 h-8 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)] hover:text-[var(--app-fg)] flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                      title="Edit Goal milestones & details"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--app-muted)] hover:text-[var(--app-fg)] hover:bg-[var(--app-card-hover)] transition-all cursor-pointer active:scale-95"
                     >
                       <Pencil size={14} />
                     </button>
+                    <div className="w-[1px] h-3.5 bg-[var(--app-border)]" />
                     <button
                       type="button"
                       onClick={() => setDeleteConfirmationId(goal.id)}
                       title="Delete Goal"
-                      className="w-8 h-8 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-400 flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--app-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer active:scale-95"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -928,16 +1124,19 @@ export default function GoalsSection() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-[var(--app-border)] hover:border-[var(--app-accent)] hover:bg-[var(--app-card-subtle)] transition-all duration-200 cursor-pointer min-h-[260px] text-center"
+              className="group relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-[var(--app-border)] hover:border-[var(--app-accent)] hover:bg-[var(--app-card-subtle)] transition-all duration-300 cursor-pointer min-h-[300px] text-center overflow-hidden"
             >
-              <div className="w-12 h-12 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] flex items-center justify-center text-[var(--app-muted)] group-hover:text-[var(--app-accent)] group-hover:scale-110 transition-all mb-3 shadow-xs">
+              <div
+                className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-[var(--app-accent)]"
+              />
+              <div className="w-12 h-12 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] flex items-center justify-center text-[var(--app-muted)] group-hover:text-[var(--app-accent)] group-hover:scale-110 group-hover:border-[var(--app-accent-border)] transition-all duration-300 mb-3 shadow-xs">
                 <Plus size={22} />
               </div>
               <span className="text-sm font-bold text-[var(--app-fg)] group-hover:text-[var(--app-accent)] transition-colors">
                 Add Another Goal
               </span>
-              <span className="text-xs text-[var(--app-muted)] mt-1 max-w-[210px] leading-relaxed">
-                Set milestones for vehicles, education, gadgets, or emergency funds.
+              <span className="text-xs text-[var(--app-muted)] mt-1.5 max-w-[220px] leading-relaxed">
+                Set milestones for vehicles, education, gadgets, or emergency reserves.
               </span>
             </button>
           )}

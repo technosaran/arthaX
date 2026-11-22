@@ -1,13 +1,17 @@
 """
 Financial Calculation Engine - PDF Security & Hardened Decryption Unit Tests
-Verifies password attempt limits (<= 10), specific internal error codes (PASSWORD_REQUIRED,
-PASSWORD_INCORRECT, CORRUPTED_PDF), memory-buffered handling, and zero plaintext leakage.
+Verifies password attempt limits (<= 25), specific internal error codes (PASSWORD_REQUIRED,
+PASSWORD_INCORRECT, CORRUPTED_PDF), memory-buffered handling, bank-specific prioritization,
+and zero plaintext leakage.
 """
 
 import pytest
 import pymupdf
 from calculation_engine.bank_ingestion.pdf_decryptor import (
     open_pdf_document,
+    generate_candidate_passwords,
+    get_bank_password_format_hint,
+    prioritize_candidates_by_bank,
     PasswordRequiredError,
     PasswordIncorrectError,
     CorruptedPdfError,
@@ -74,16 +78,16 @@ def test_open_encrypted_pdf_with_valid_password_succeeds():
 
 
 def test_max_password_attempts_enforced():
-    raw_pdf = create_mock_pdf_bytes(password="ValidAt15")
-    # 15 candidate passwords where valid password is at index 14 (> MAX_PASSWORD_ATTEMPTS)
-    many_candidates = [f"attempt_{i}" for i in range(14)] + ["ValidAt15"]
-    assert len(many_candidates) == 15
-    assert MAX_PASSWORD_ATTEMPTS == 10
+    raw_pdf = create_mock_pdf_bytes(password="ValidAt30")
+    # 30 candidate passwords where valid password is at index 29 (> MAX_PASSWORD_ATTEMPTS = 25)
+    many_candidates = [f"attempt_{i}" for i in range(29)] + ["ValidAt30"]
+    assert len(many_candidates) == 30
+    assert MAX_PASSWORD_ATTEMPTS == 25
 
-    # Because only first 10 are tried, ValidAt15 should never be reached
+    # Because only first 25 are tried, ValidAt30 should never be reached
     with pytest.raises(PasswordIncorrectError) as exc_info:
         open_pdf_document(raw_pdf, passwords=many_candidates)
-    assert "10 candidate password(s)" in str(exc_info.value)
+    assert "25 candidate password(s)" in str(exc_info.value)
 
 
 def test_corrupted_pdf_stream_raises_corrupted_pdf_error():
@@ -105,3 +109,90 @@ def test_parser_registry_surfaces_password_incorrect_error():
     result = parser_registry.parse_statement(raw_pdf, "sbi_statement.pdf", passwords=["WrongPass"])
     assert result.success is False
     assert "PASSWORD_INCORRECT" in result.errors
+
+
+def test_generate_candidate_passwords_sbi_yono_and_credit_card():
+    """Validates SBI YONO '@' rule, reverse patterns, credit card, and account number rules."""
+    cands = generate_candidate_passwords(
+        dob_ddmmyyyy="15081995",
+        mobile_last5="43210",
+        pan="ABCDE1234F",
+        account_number="50100412345678",
+    )
+
+    # SBI YONO formats
+    assert "1508@3210" in cands
+    assert "3210@1508" in cands
+    assert "1508@43210" in cands
+    assert "43210@1508" in cands
+    assert "15081995@3210" in cands
+    assert "3210@15081995" in cands
+
+    # SBI Standard & Credit Card formats
+    assert "150843210" in cands
+    assert "432101508" in cands
+    assert "150819953210" in cands
+    assert "321015081995" in cands
+
+    # PAN formats
+    assert "ABCDE1234F" in cands
+    assert "abcde1234f" in cands
+    assert "ABCDE1508" in cands
+
+    # Account number formats
+    assert "50100412345678" in cands
+    assert "5678" in cands
+    assert "15085678" in cands
+    assert "56781508" in cands
+    assert "ABCDE5678" in cands
+
+
+def test_sbi_candidate_prioritization_with_bank_hint():
+    """Validates that candidate passwords matching SBI formulas (@ and 9-digit) are tried first."""
+    yono_password = "1508@4321"
+    raw_pdf = create_mock_pdf_bytes(password=yono_password)
+
+    # Place yono_password after multiple generic candidates
+    candidates = [
+        "generic_pass_1",
+        "random_guess_2",
+        "not_a_bank_pw",
+        "another_try_4",
+        "user_secret_5",
+        yono_password,
+    ]
+
+    # Without bank hint, order is preserved
+    without_hint = prioritize_candidates_by_bank(list(candidates), None)
+    assert without_hint[0] == "generic_pass_1"
+
+    # With SBI bank hint, YONO '@' candidate must be reordered to first
+    with_hint = prioritize_candidates_by_bank(list(candidates), "SBI")
+    assert with_hint[0] == yono_password
+
+    # open_pdf_document unlocks successfully using prioritized password
+    doc, matched = open_pdf_document(raw_pdf, passwords=candidates, bank_hint="SBI")
+    assert doc is not None
+    assert matched == yono_password
+    doc.close()
+
+
+def test_password_errors_include_bank_name_and_format_hint():
+    """Validates that bank_name and format_hint are attached when errors are raised."""
+    raw_pdf = create_mock_pdf_bytes(password="Secret@999")
+
+    # PasswordRequiredError with bank hint
+    with pytest.raises(PasswordRequiredError) as exc_req:
+        open_pdf_document(raw_pdf, passwords=None, bank_hint="SBI")
+    assert exc_req.value.bank_name == "SBI"
+    assert exc_req.value.format_hint is not None
+    assert "YONO" in exc_req.value.format_hint
+    assert "Expected format:" in str(exc_req.value)
+
+    # PasswordIncorrectError with bank hint
+    with pytest.raises(PasswordIncorrectError) as exc_inc:
+        open_pdf_document(raw_pdf, passwords=["wrong1", "wrong2"], bank_hint="HDFC")
+    assert exc_inc.value.bank_name == "HDFC"
+    assert exc_inc.value.format_hint is not None
+    assert "Customer ID" in exc_inc.value.format_hint
+    assert "Expected format:" in str(exc_inc.value)

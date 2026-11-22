@@ -18,6 +18,7 @@ from .models import StatementParseResult
 from .pdf_decryptor import (
     compute_file_hash,
     open_pdf_document,
+    prioritize_passwords_by_hint,
     PasswordRequiredError,
     PasswordIncorrectError,
     CorruptedPdfError,
@@ -48,6 +49,9 @@ class StatementParserRegistry:
         filename: str,
         passwords: Optional[List[str]] = None,
         bank_hint: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        password_hints: Optional[dict] = None,
+        **kwargs,
     ) -> StatementParseResult:
         """
         Detects appropriate adapter and executes full parse with validation.
@@ -55,10 +59,21 @@ class StatementParserRegistry:
         PASSWORD_INCORRECT, CORRUPTED_PDF) without masking them as generic format failures.
         Uses bank_hint from email metadata and inspects decrypted PDF content headers
         to reliably route statements to dedicated bank adapters even when filenames are generic.
+        Prioritizes decryption passwords if password_hints are provided from the email.
         """
         file_hash = compute_file_hash(content)
         fallback_adapter = self.adapters[0]
         best_candidate: Optional[StatementParseResult] = None
+
+        if password_hints and passwords:
+            passwords = prioritize_passwords_by_hint(passwords, password_hints)
+
+        def _enrich_result(res: StatementParseResult) -> StatementParseResult:
+            if metadata:
+                res.raw_metadata["email_metadata"] = metadata
+            if password_hints:
+                res.raw_metadata["password_hints"] = password_hints
+            return res
 
         def _update_best_candidate(cand: Optional[StatementParseResult]):
             nonlocal best_candidate
@@ -70,7 +85,7 @@ class StatementParserRegistry:
         fn_lower = filename.lower()
         if fn_lower.endswith(".pdf") or content.startswith(b"%PDF"):
             try:
-                doc, _ = open_pdf_document(content, passwords)
+                doc, _ = open_pdf_document(content, passwords, bank_hint=bank_hint)
                 try:
                     text_sample = ""
                     for i in range(min(2, doc.page_count)):
@@ -90,17 +105,17 @@ class StatementParserRegistry:
                         try:
                             result = target_adapter.parse(content, filename, passwords)
                             if result.success:
-                                return result
+                                return _enrich_result(result)
                             _update_best_candidate(result)
                         except Exception:
                             pass
             except (PasswordRequiredError, PasswordIncorrectError, CorruptedPdfError, UnsupportedEncryptionError) as pe:
-                return fallback_adapter._build_empty_failure(
+                return _enrich_result(fallback_adapter._build_empty_failure(
                     filename,
                     file_hash,
                     str(pe),
                     error_code=pe.code,
-                )
+                ))
             except Exception:
                 pass
 
@@ -114,7 +129,7 @@ class StatementParserRegistry:
                 try:
                     result = hint_adapter.parse(content, filename, passwords)
                     if result.success:
-                        return result
+                        return _enrich_result(result)
                     _update_best_candidate(result)
                 except Exception:
                     pass
@@ -126,19 +141,19 @@ class StatementParserRegistry:
                 try:
                     result = adapter.parse(content, filename, passwords)
                     if result.success:
-                        return result
+                        return _enrich_result(result)
                     _update_best_candidate(result)
                     if result.errors:
                         for err in result.errors:
                             if err in ("PASSWORD_REQUIRED", "PASSWORD_INCORRECT", "CORRUPTED_PDF", "UNSUPPORTED_ENCRYPTION"):
-                                return result
+                                return _enrich_result(result)
                 except (PasswordRequiredError, PasswordIncorrectError, CorruptedPdfError, UnsupportedEncryptionError) as pe:
-                    return fallback_adapter._build_empty_failure(
+                    return _enrich_result(fallback_adapter._build_empty_failure(
                         filename,
                         file_hash,
                         str(pe),
                         error_code=pe.code,
-                    )
+                    ))
                 except Exception as e:
                     last_error = str(e)
                     continue
@@ -149,7 +164,7 @@ class StatementParserRegistry:
                 generic_csv = GenericCsvBankAdapter()
                 result = generic_csv.parse(content, filename, passwords)
                 if result.success:
-                    return result
+                    return _enrich_result(result)
                 _update_best_candidate(result)
             except Exception as e:
                 last_error = str(e)
@@ -158,7 +173,7 @@ class StatementParserRegistry:
                 generic_pdf = GenericPdfBankAdapter()
                 result = generic_pdf.parse(content, filename, passwords)
                 if result.success:
-                    return result
+                    return _enrich_result(result)
                 _update_best_candidate(result)
             except Exception as e:
                 last_error = str(e)
@@ -167,19 +182,19 @@ class StatementParserRegistry:
         if best_candidate is not None:
             if not best_candidate.errors and best_candidate.validation and best_candidate.validation.errors:
                 best_candidate.errors = list(best_candidate.validation.errors)
-            return best_candidate
+            return _enrich_result(best_candidate)
 
         # Standard failure response for unsupported or unparseable format
         err_msg = f"Unsupported or unparseable bank statement format for '{filename}'."
         if last_error:
             err_msg += f" Last error: {last_error}"
 
-        return fallback_adapter._build_empty_failure(
+        return _enrich_result(fallback_adapter._build_empty_failure(
             filename,
             file_hash,
             err_msg,
             error_code="UNSUPPORTED_FORMAT",
-        )
+        ))
 
 
 # Global Singleton Registry

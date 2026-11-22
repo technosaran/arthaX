@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Optional, List, Dict, Any
 import pymupdf
 
-from .base_adapter import BaseBankAdapter
+from .base_adapter import BaseBankAdapter, detect_account_type_from_text, is_non_financial_document
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem
 from .pdf_decryptor import open_pdf_document, compute_file_hash
 from .statement_validator import validate_statement_math
@@ -197,9 +197,12 @@ class HdfcBankAdapter(BaseBankAdapter):
         op_bal = reported_opening if reported_opening is not None else Decimal("0.00")
         cl_bal = closing_balance if closing_balance is not None else op_bal
 
+        account_type = detect_account_type_from_text(text)
+
         metadata = StatementMetadata(
             bank_name=self.BANK_NAME,
             account_number_masked=f"******{account_number[-4:]}" if account_number else None,
+            account_type=account_type,
             statement_period_start=p_start,
             statement_period_end=p_end,
             opening_balance=op_bal,
@@ -228,7 +231,7 @@ class HdfcBankAdapter(BaseBankAdapter):
         file_hash: str,
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
-        doc, _ = open_pdf_document(content, passwords)
+        doc, _ = open_pdf_document(content, passwords, bank_hint=self.BANK_NAME)
         try:
             full_text = ""
             for i in range(doc.page_count):
@@ -289,6 +292,13 @@ class HdfcBankAdapter(BaseBankAdapter):
                 transactions.append(parsed)
 
         if not transactions:
+            if is_non_financial_document(full_text):
+                return self._build_empty_failure(
+                    filename,
+                    file_hash,
+                    f"Document '{filename}' appears to be a non-financial document (terms & conditions, schedule of charges, or brochure) rather than an account statement.",
+                    error_code="NON_FINANCIAL_DOCUMENT",
+                )
             return self._build_empty_failure(filename, file_hash, "No valid transactions parsed from HDFC PDF.")
 
         # Determine balances
@@ -323,9 +333,12 @@ class HdfcBankAdapter(BaseBankAdapter):
             total_dr = sum(t.amount for t in transactions if t.direction == "DEBIT")
             op_bal = cl_bal - total_cr + total_dr
 
+        account_type = detect_account_type_from_text(full_text)
+
         metadata = StatementMetadata(
             bank_name=self.BANK_NAME,
             account_number_masked=f"******{account_number[-4:]}" if account_number else None,
+            account_type=account_type,
             statement_period_start=p_start,
             statement_period_end=p_end,
             opening_balance=op_bal,

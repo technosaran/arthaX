@@ -4,7 +4,7 @@ import { logger } from "@/utils/logger";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
-import { generateBankPasswordPermutations, BankingIdentityDetails } from "@/utils/bankPasswords";
+import { generateBankPasswordPermutations, BankingIdentityDetails, getBankPasswordFormatDescription } from "@/utils/bankPasswords";
 import crypto from "crypto";
 
 export interface GoogleTokenRefreshResult {
@@ -641,6 +641,10 @@ export async function syncUserGmailStatements(
       const bankNorm = normalizeBankName(bankName);
       const maskedLastFour = meta.account_number_masked?.replace(/\D/g, "").slice(-4) || null;
 
+      const rawAccType = String(meta.account_type || "").toUpperCase();
+      const bankNameLower = (bankName || "").toLowerCase();
+      const isCreditCard = rawAccType === "CREDIT_CARD" || bankNameLower.includes("card");
+
       // Match existing account by last_four & bank keyword, or bank name
       let targetAccountId = (accounts || []).find((a) => {
         if (maskedLastFour && a.last_four && a.last_four === maskedLastFour) {
@@ -653,7 +657,8 @@ export async function syncUserGmailStatements(
       })?.id;
 
       if (!targetAccountId) {
-        targetAccountId = (accounts || []).find((a) => {
+        // Find matching accounts by bank keywords, prioritizing account classification/type if card
+        const candidates = (accounts || []).filter((a) => {
           const aLower = a.name.toLowerCase();
           return (
             aLower.includes(bankNorm.key) ||
@@ -663,7 +668,17 @@ export async function syncUserGmailStatements(
             (bankNorm.key === "axis" && aLower.includes("axis")) ||
             (bankNorm.key === "kotak" && aLower.includes("kotak"))
           );
-        })?.id;
+        });
+
+        if (isCreditCard) {
+          targetAccountId = candidates.find(
+            (a) => a.type === "Credit Card" || a.classification === "liability" || a.name.toLowerCase().includes("card")
+          )?.id || candidates[0]?.id;
+        } else {
+          targetAccountId = candidates.find(
+            (a) => a.type !== "Credit Card" && a.classification !== "liability"
+          )?.id || candidates[0]?.id;
+        }
       }
 
       // If not found, AUTOMATICALLY CREATE THE ACCOUNT CARD IN ACCOUNTS!
@@ -673,15 +688,58 @@ export async function syncUserGmailStatements(
           allowNegative: false,
         });
 
+        let accountType: string = "Savings Account";
+        let classification: "asset" | "liability" = "asset";
+
+        if (rawAccType === "CREDIT_CARD" || bankNameLower.includes("card")) {
+          accountType = "Credit Card";
+          classification = "liability";
+        } else if (rawAccType === "CURRENT") {
+          accountType = "Current Account";
+          classification = "asset";
+        } else if (rawAccType === "SALARY") {
+          accountType = "Salary Account";
+          classification = "asset";
+        } else if (rawAccType === "OVERDRAFT") {
+          accountType = "Overdraft Account";
+          classification = "liability";
+        } else if (rawAccType === "LOAN") {
+          accountType = "Loan Account";
+          classification = "liability";
+        } else {
+          accountType = "Savings Account";
+          classification = "asset";
+        }
+
+        const finalLastFour = maskedLastFour || (meta.account_number_masked ? meta.account_number_masked.slice(-4) : null);
+
+        let accountName = bankNorm.displayName;
+        if (accountType === "Credit Card") {
+          accountName = accountName
+            .replace(/Savings\s*Account/i, "Credit Card")
+            .replace(/Bank\s*Account/i, "Credit Card");
+          if (!accountName.toLowerCase().includes("card")) {
+            accountName = `${accountName} Credit Card`;
+          }
+        } else if (accountType === "Current Account") {
+          accountName = accountName.replace(/Savings\s*Account/i, "Current Account");
+        } else if (accountType === "Salary Account") {
+          accountName = accountName.replace(/Savings\s*Account/i, "Salary Account");
+        } else if (accountType === "Overdraft Account") {
+          accountName = accountName.replace(/Savings\s*Account/i, "Overdraft Account");
+        } else if (accountType === "Loan Account") {
+          accountName = accountName.replace(/Savings\s*Account/i, "Loan Account");
+        }
+
         const { data: newAcc, error: createAccErr } = await supabaseAdmin
           .from("accounts")
           .insert({
             user_id: userId,
-            name: bankNorm.displayName,
-            type: "Savings Account",
-            classification: "asset",
+            name: accountName,
+            type: accountType,
+            classification,
             balance: initialBal,
-            last_four: maskedLastFour || "4821",
+            last_four: finalLastFour,
           })
           .select("id, name")
           .single();
@@ -697,10 +755,13 @@ export async function syncUserGmailStatements(
         if (newAcc?.name) {
           accountsCreated.push(newAcc.name);
         }
-        logger.info(`Auto-created account card "${bankNorm.displayName}" from ${bankName} statement`, "GmailService", {
+        logger.info(`Auto-created account card "${accountName}" from ${bankName} statement`, "GmailService", {
           userId,
           accountId: targetAccountId,
+          type: accountType,
+          classification,
           balance: initialBal,
+          lastFour: finalLastFour,
         });
       }
 
@@ -923,14 +984,25 @@ export async function syncUserGmailStatements(
       logger.warn("Transfer reconciliation notice during Gmail sync", "GmailService", { error: String(recErr) });
     }
 
+    const isNonFinancialFailure = (f: any) => {
+      const errsStr = (f.errors || []).join(" ").toLowerCase();
+      return (
+        f.error_code === "NON_FINANCIAL_DOCUMENT" ||
+        errsStr.includes("non-financial") ||
+        errsStr.includes("informational")
+      );
+    };
+
     const failedStatements = statements.filter((s: any) => !s.success);
-    const hasFailures = failedStatements.length > 0;
+    const actionableFailedStatements = failedStatements.filter((f: any) => !isNonFinancialFailure(f));
+    const financialStatements = statements.filter((s: any) => !isNonFinancialFailure(s));
+    const hasFailures = actionableFailedStatements.length > 0;
     const finalJobStatus: "COMPLETED" | "PARTIAL" | "FAILED" = hasFailures
-      ? (failedStatements.length === statements.length && totalImported === 0 ? "FAILED" : "PARTIAL")
+      ? (actionableFailedStatements.length === financialStatements.length && totalImported === 0 ? "FAILED" : "PARTIAL")
       : "COMPLETED";
 
     let failureSummary: string | null = null;
-    if (hasFailures) {
+    if (hasFailures || failedStatements.length > 0) {
       const passwordBanks: string[] = [];
       const unparseableFiles: string[] = [];
       const otherErrors: string[] = [];
@@ -938,6 +1010,17 @@ export async function syncUserGmailStatements(
       for (const f of failedStatements) {
         const errsStr = (f.errors || []).join(" ").toLowerCase();
         const fName = f.file_name || "Statement";
+
+        // Non-financial leaflets/brochures: skip from unparseable files and log
+        if (isNonFinancialFailure(f)) {
+          logger.info(`Skipped non-financial attachment "${fName}" from statement error summary`, "GmailService", {
+            userId,
+            fileName: fName,
+            errorCode: f.error_code,
+          });
+          continue;
+        }
+
         if (errsStr.includes("password") || f.error_code === "PASSWORD_REQUIRED" || f.error_code === "PASSWORD_INCORRECT") {
           const bank = f.bank_name || f.detected_bank || "Bank";
           if (!passwordBanks.includes(bank)) passwordBanks.push(bank);
@@ -950,8 +1033,22 @@ export async function syncUserGmailStatements(
 
       const summaryParts: string[] = [];
       if (passwordBanks.length > 0) {
+        const hints = passwordBanks
+          .map((b) => {
+            const desc = getBankPasswordFormatDescription(b);
+            if (!desc) return null;
+            if (b.toUpperCase().includes("SBI") || b.toUpperCase().includes("STATE BANK")) {
+              return "YONO uses DDMM@last 4 digits of mobile (e.g. 0101@9876); NetBanking uses DDMM + last 5 digits of mobile, or PAN";
+            }
+            return desc.replace(/\.$/, "");
+          })
+          .filter(Boolean);
+        const hintStr = hints.length > 0 ? ` Hint: ${hints.join("; ")}.` : "";
+        const cta = hints.length > 0
+          ? "Add your details in Settings > Bank Passwords."
+          : "Add your statement password in Settings > Bank Passwords.";
         summaryParts.push(
-          `Password required for ${passwordBanks.join(", ")} statement(s). Add your statement password in Settings > Bank Passwords.`
+          `Password required for ${passwordBanks.join(", ")} statement(s).${hintStr} ${cta}`
         );
       }
       if (unparseableFiles.length > 0) {
@@ -964,7 +1061,7 @@ export async function syncUserGmailStatements(
         summaryParts.push(`${otherErrors.length} file(s) encountered processing issues.`);
       }
 
-      failureSummary = summaryParts.join(" ") || "Some statements could not be processed.";
+      failureSummary = summaryParts.length > 0 ? summaryParts.join(" ") : null;
     }
 
     // Durable Checkpoint Determination:
@@ -972,11 +1069,11 @@ export async function syncUserGmailStatements(
     let nextSyncTimestamp: string;
     if (!hasFailures) {
       nextSyncTimestamp = new Date().toISOString();
-    } else if (failedStatements.length === statements.length) {
+    } else if (actionableFailedStatements.length === financialStatements.length) {
       nextSyncTimestamp = integration.last_sync_at || new Date(0).toISOString();
     } else {
       let earliestFailedDate: Date | null = null;
-      for (const f of failedStatements) {
+      for (const f of actionableFailedStatements) {
         const dateStr = f.email_metadata?.date;
         if (dateStr) {
           const parsedD = new Date(dateStr);
@@ -1016,7 +1113,7 @@ export async function syncUserGmailStatements(
           error_message: failureSummary,
           stats: {
             statementsCount: statements.length,
-            failedCount: failedStatements.length,
+            failedCount: actionableFailedStatements.length,
             transactionsImported: totalImported,
             duplicatesSkipped: totalDuplicates,
             transfersMatched: transfersMatchedCount,
@@ -1030,7 +1127,7 @@ export async function syncUserGmailStatements(
       .from("gmail_integrations")
       .update({
         last_sync_at: nextSyncTimestamp,
-        sync_status: hasFailures && failedStatements.length === statements.length ? "FAILED" : "ACTIVE",
+        sync_status: hasFailures && actionableFailedStatements.length === financialStatements.length ? "FAILED" : "ACTIVE",
         error_details: failureSummary,
       })
       .eq("id", integration.id);
@@ -1045,7 +1142,7 @@ export async function syncUserGmailStatements(
       duplicatesSkipped: totalDuplicates,
       transfersMatched: transfersMatchedCount,
       accountsCreated,
-      failedCount: failedStatements.length,
+      failedCount: actionableFailedStatements.length,
       status: finalJobStatus,
       error: failureSummary || undefined,
     };
