@@ -79,23 +79,7 @@ export async function POST(req: NextRequest) {
       realizedPnL = +((price - currentAvg) * quantity - brokerage_charges).toFixed(2);
     }
 
-    // Update holding quantity and avg price
-    const { error: updateErr } = await supabaseAdmin
-      .from("stock_holdings")
-      .update({
-        quantity: newQty,
-        avg_buy_price: newAvgPrice,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", holding_id)
-      .eq("user_id", userId);
-
-    if (updateErr) {
-      console.error("[Stock Txn] Error updating holding:", updateErr);
-      return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-    }
-
-    // Insert transaction
+    // 1. Insert transaction record first
     const { data: txn, error: insertErr } = await supabaseAdmin
       .from("stock_transactions")
       .insert({
@@ -120,6 +104,24 @@ export async function POST(req: NextRequest) {
     if (insertErr) {
       console.error("[Stock Txn] Insert error:", insertErr);
       return apiError(insertErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+
+    // 2. Update holding quantity and avg price
+    const { error: updateErr } = await supabaseAdmin
+      .from("stock_holdings")
+      .update({
+        quantity: newQty,
+        avg_buy_price: newAvgPrice,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", holding_id)
+      .eq("user_id", userId);
+
+    if (updateErr) {
+      console.error("[Stock Txn] Error updating holding, rolling back transaction record:", updateErr);
+      // Compensate: delete the newly inserted transaction record
+      await supabaseAdmin.from("stock_transactions").delete().eq("id", txn.id);
+      return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
     await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);

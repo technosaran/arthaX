@@ -218,6 +218,37 @@ class RebalancingEngine(BaseCalculator):
                     "description": f"{order['asset'].capitalize()} has drifted by {order['drift_percentage']:+.1f}% from target. Execute {order['action']} of ₹{order['adjustment_amount']:,.2f}.",
                 })
 
+        # 4. Tax-Free Cash Flow / Infusion Rebalancing
+        # Calculates new capital injection to bring underweight assets to target without selling
+        tax_free_orders = []
+        total_infusion_required = Decimal("0.00")
+
+        if total_assets > Decimal("0.00"):
+            # Find the minimum required new total assets where no asset needs to be sold
+            new_total_candidates = []
+            for asset, val in asset_values.items():
+                tgt = target_allocation.get(asset, Decimal("0.00"))
+                if tgt > Decimal("0.00"):
+                    # Required total if this asset is not sold: val / (tgt / 100)
+                    candidate_total = (val * Decimal("100.00")) / tgt
+                    new_total_candidates.append(candidate_total)
+
+            if new_total_candidates:
+                required_new_total = max(new_total_candidates)
+                for asset, val in asset_values.items():
+                    tgt = target_allocation.get(asset, Decimal("0.00"))
+                    target_rupees_new = (required_new_total * tgt) / Decimal("100.00")
+                    buy_amt = max(Decimal("0.00"), target_rupees_new - val)
+                    if buy_amt > Decimal("100.00"):
+                        tax_free_orders.append({
+                            "asset": asset,
+                            "action": "BUY",
+                            "injection_amount": float(quantize_currency(buy_amt)),
+                            "post_injection_value": float(quantize_currency(val + buy_amt)),
+                            "target_allocation_percent": float(tgt),
+                        })
+                        total_infusion_required += buy_amt
+
         return {
             "currency": currency,
             "total_portfolio_value": float(quantize_currency(total_assets)),
@@ -240,5 +271,10 @@ class RebalancingEngine(BaseCalculator):
             "target_allocation": {k: float(v) for k, v in target_allocation.items()},
             "drift_percentage": {k: float(v) for k, v in drift_percentage.items()},
             "rebalance_orders": rebalance_orders,
+            "tax_free_cash_rebalancing": {
+                "description": "Restore target allocation by deploying new capital without selling any assets or triggering capital gains taxes.",
+                "total_new_capital_required": float(quantize_currency(total_infusion_required)),
+                "allocation_orders": tax_free_orders,
+            },
             "remediation_checklist": checklist,
         }

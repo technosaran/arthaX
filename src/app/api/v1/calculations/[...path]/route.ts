@@ -7,6 +7,11 @@ import {
   executeNetWorthTS,
   executeFireTS,
   executeRebalancingTS,
+  executeDebtPayoffTS,
+  executeStressTestTS,
+  executeGoalPlannerTS,
+  executePortfolioAnalyticsTS,
+  executeTaxRegimesTS,
 } from "@/lib/engine/embeddedEngine";
 
 function isDeveloperOrAdmin(req: NextRequest, userId: string): boolean {
@@ -144,6 +149,8 @@ export async function GET(
           "TaxEngine",
           "FireEngine",
           "RebalancingEngine",
+          "DebtPayoffEngine",
+          "FinancialStressTestEngine",
         ],
         _engine: "ts_embedded_fallback",
       }, { headers: { "X-Request-Id": requestId } });
@@ -250,6 +257,41 @@ export async function POST(
 
     if (subPath === "rebalancing") {
       const result = executeRebalancingTS(body);
+      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
+        headers: { "X-Request-Id": requestId },
+      });
+    }
+
+    if (subPath === "debt-payoff") {
+      const result = executeDebtPayoffTS(body);
+      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
+        headers: { "X-Request-Id": requestId },
+      });
+    }
+
+    if (subPath === "stress-test") {
+      const result = executeStressTestTS(body);
+      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
+        headers: { "X-Request-Id": requestId },
+      });
+    }
+
+    if (subPath === "goal-planner") {
+      const result = executeGoalPlannerTS(body);
+      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
+        headers: { "X-Request-Id": requestId },
+      });
+    }
+
+    if (subPath === "portfolio-analytics") {
+      const result = executePortfolioAnalyticsTS(body);
+      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
+        headers: { "X-Request-Id": requestId },
+      });
+    }
+
+    if (subPath === "tax/regimes") {
+      const result = executeTaxRegimesTS(body);
       return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
         headers: { "X-Request-Id": requestId },
       });

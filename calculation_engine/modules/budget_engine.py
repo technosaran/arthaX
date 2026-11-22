@@ -153,6 +153,68 @@ class BudgetEngine(BaseCalculator):
                 if rem > Decimal("0.00"):
                     rollover_surplus += rem
 
+        # 5. Pacing Velocity & Month-End Burn Projection
+        pacing_index = Decimal("1.00")
+        month_elapsed_percent = Decimal("0.00")
+        projected_month_end_spend = total_actual_spent
+        safe_daily_allowance = Decimal("0.00")
+        days_in_month = 30
+        days_elapsed = 15
+        days_remaining = 15
+
+        if target_month:
+            try:
+                from datetime import date, timedelta
+                y_num, m_num = map(int, target_month.split("-"))
+                if m_num == 12:
+                    next_month_start = date(y_num + 1, 1, 1)
+                else:
+                    next_month_start = date(y_num, m_num + 1, 1)
+                days_in_month = (next_month_start - timedelta(days=1)).day
+                today = date.today()
+                is_curr_m = (today.year == y_num and today.month == m_num)
+                days_elapsed = today.day if is_curr_m else days_in_month
+                days_remaining = max(1, days_in_month - days_elapsed)
+
+                month_elapsed_percent = safe_percentage(Decimal(days_elapsed), Decimal(days_in_month))
+                # Pacing Index = % Budget Used / % Month Elapsed
+                if month_elapsed_percent > Decimal("0.00"):
+                    pacing_index = safe_divide(overall_utilization, month_elapsed_percent)
+
+                # Month-end burn projection
+                daily_burn = safe_divide(total_actual_spent, Decimal(max(1, days_elapsed)))
+                projected_month_end_spend = quantize_currency(daily_burn * Decimal(days_in_month))
+
+                # Safe daily allowance for remaining days
+                if total_remaining > Decimal("0.00") and days_remaining > 0:
+                    safe_daily_allowance = quantize_currency(safe_divide(total_remaining, Decimal(days_remaining)))
+            except Exception:
+                pass
+
+        pacing_status = "ON_TRACK"
+        if pacing_index > Decimal("1.25"):
+            pacing_status = "OVERPACING_BURNING_FAST"
+        elif pacing_index < Decimal("0.75"):
+            pacing_status = "UNDERPACING_THRIFTY"
+
+        # 6. 50/30/20 Budget Rule Categorization
+        needs_cats = {"groceries", "grocery", "rent", "utilities", "bills", "electricity", "water", "gas", "health", "medical", "insurance", "education", "emi", "fuel", "commute", "maintenance"}
+        savings_cats = {"savings", "investment", "sip", "stocks", "mutual_fund", "emergency", "ppf", "nps"}
+        
+        needs_budgeted = Decimal("0.00")
+        wants_budgeted = Decimal("0.00")
+        savings_budgeted = Decimal("0.00")
+
+        for card in category_cards:
+            b_val = Decimal(card["budget_amount"])
+            c_name = card["category"].lower()
+            if any(k in c_name for k in needs_cats):
+                needs_budgeted += b_val
+            elif any(k in c_name for k in savings_cats):
+                savings_budgeted += b_val
+            else:
+                wants_budgeted += b_val
+
         category_cards.sort(key=lambda x: x["utilization_percent"], reverse=True)
 
         return {
@@ -170,6 +232,24 @@ class BudgetEngine(BaseCalculator):
             "warning_categories_count": warning_categories_count,
             "on_track_categories_count": on_track_categories_count,
             "rollover_surplus_available": str(quantize_currency(rollover_surplus)),
+            "pacing_analytics": {
+                "days_in_month": days_in_month,
+                "days_elapsed": days_elapsed,
+                "days_remaining": days_remaining,
+                "month_elapsed_percent": float(month_elapsed_percent),
+                "pacing_index": float(round(pacing_index, 2)),
+                "pacing_status": pacing_status,
+                "projected_month_end_spend": str(projected_month_end_spend),
+                "safe_daily_allowance_remaining": str(safe_daily_allowance),
+            },
+            "rule_50_30_20_allocation": {
+                "needs_budgeted": str(quantize_currency(needs_budgeted)),
+                "needs_percent": float(safe_percentage(needs_budgeted, total_budgeted)),
+                "wants_budgeted": str(quantize_currency(wants_budgeted)),
+                "wants_percent": float(safe_percentage(wants_budgeted, total_budgeted)),
+                "savings_budgeted": str(quantize_currency(savings_budgeted)),
+                "savings_percent": float(safe_percentage(savings_budgeted, total_budgeted)),
+            },
             "category_budgets": category_cards,
             "unbudgeted_categories": unbudgeted_cards,
         }

@@ -143,10 +143,19 @@ export async function POST(req: NextRequest) {
         .eq("id", holding_id);
     }
 
-    // If SELL, reduce holding quantity
+    // If SELL, validate holding quantity and reduce
     if (type === "SELL") {
       const currentQty = Number(holding.quantity) || 0;
-      const remainingQty = Math.max(0, currentQty - quantity);
+      if (quantity > currentQty) {
+        return apiError(
+          `Cannot sell ${quantity} bonds. Current holding has only ${currentQty} units.`,
+          "BAD_REQUEST",
+          400,
+          undefined,
+          req
+        );
+      }
+      const remainingQty = currentQty - quantity;
       const newInvested = remainingQty * (Number(holding.avg_buy_price) || 0);
 
       if (remainingQty === 0) {

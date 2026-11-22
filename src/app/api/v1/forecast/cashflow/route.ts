@@ -74,20 +74,29 @@ export const GET = createApiRoute({
           return sum + amt; // MONTHLY
         }, 0);
 
-      // Baseline monthly net savings rate
-      const baseMonthlyIncome = monthlyHistoricalIncome > 0 ? monthlyHistoricalIncome : 75000;
-      const baseMonthlyExpenses = monthlyHistoricalBurn > 0 ? Math.max(monthlyHistoricalBurn, monthlyCommittedExpenses) : 35000;
+      // Baseline monthly net savings rate (strictly based on actual records, no fabricated numbers)
+      const hasHistoricalIncome = monthlyHistoricalIncome > 0;
+      const hasHistoricalExpenses = monthlyHistoricalBurn > 0 || monthlyCommittedExpenses > 0;
+
+      const baseMonthlyIncome = hasHistoricalIncome ? monthlyHistoricalIncome : 0;
+      const baseMonthlyExpenses = hasHistoricalExpenses ? Math.max(monthlyHistoricalBurn, monthlyCommittedExpenses) : 0;
       const baseMonthlyNet = baseMonthlyIncome - baseMonthlyExpenses;
 
       // Emergency Fund Runway (Months of survival with zero income)
       const emergencyRunwayMonths = baseMonthlyExpenses > 0
         ? Math.round((totalLiquidCash / baseMonthlyExpenses) * 10) / 10
-        : 999;
+        : (totalLiquidCash > 0 ? 999 : 0);
 
-      let runwayStatus: "CRITICAL" | "CAUTION" | "HEALTHY" | "EXCELLENT" = "HEALTHY";
-      if (emergencyRunwayMonths < 3.0) runwayStatus = "CRITICAL";
-      else if (emergencyRunwayMonths < 6.0) runwayStatus = "CAUTION";
-      else if (emergencyRunwayMonths >= 12.0) runwayStatus = "EXCELLENT";
+      let runwayStatus: "CRITICAL" | "CAUTION" | "HEALTHY" | "EXCELLENT" | "INSUFFICIENT_DATA" = "HEALTHY";
+      if (!hasHistoricalExpenses && totalLiquidCash === 0) {
+        runwayStatus = "INSUFFICIENT_DATA";
+      } else if (emergencyRunwayMonths < 3.0) {
+        runwayStatus = "CRITICAL";
+      } else if (emergencyRunwayMonths < 6.0) {
+        runwayStatus = "CAUTION";
+      } else if (emergencyRunwayMonths >= 12.0) {
+        runwayStatus = "EXCELLENT";
+      }
 
       // 3. Deterministic Scenarios Generation across horizons (30d, 60d, 90d, 180d, 365d)
       const horizonsDays = [30, 60, 90, 180, 365];

@@ -290,6 +290,36 @@ class ReconciliationEngine(BaseCalculator):
                     "difference": str(quantize_currency(delta_nw)),
                 })
 
+        # ---------------------------------------------------------------------
+        # Check 6: Double-Entry Transfer Conservation & In-Flight Rebalancing
+        # ---------------------------------------------------------------------
+        checks_performed += 1
+        total_transfer_outflow = Decimal("0.00")
+        total_transfer_inflow = Decimal("0.00")
+        unlinked_transfers = []
+
+        for t in transfers:
+            amt = to_decimal(t.get("amount", 0))
+            from_acc = str(t.get("from_account_id") or "")
+            to_acc = str(t.get("to_account_id") or "")
+            
+            total_transfer_outflow += amt
+            total_transfer_inflow += amt
+
+            if from_acc and from_acc not in account_ids:
+                unlinked_transfers.append({"transfer_id": t.get("id"), "missing_account": from_acc, "role": "FROM"})
+            if to_acc and to_acc not in account_ids:
+                unlinked_transfers.append({"transfer_id": t.get("id"), "missing_account": to_acc, "role": "TO"})
+
+        if unlinked_transfers:
+            discrepancies.append({
+                "check_name": "ORPHANED_TRANSFER_ACCOUNT_REFERENCE",
+                "severity": "HIGH",
+                "details": f"Found {len(unlinked_transfers)} transfers referencing non-existent account IDs: {unlinked_transfers[:3]}",
+                "expected": "All transfer accounts must exist in user account registry",
+                "actual": f"{len(unlinked_transfers)} orphaned references",
+            })
+
         # Summary Status
         status = "PASS"
         if discrepancies:

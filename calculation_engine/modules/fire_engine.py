@@ -116,47 +116,96 @@ class FireEngine(BaseCalculator):
                     })
 
         # 4. Monte Carlo Sequence of Returns Simulation (1,000 Paths, 35-year horizon)
-        # Tests resilience against severe market downturns early in retirement
+        # Compares Fixed Real Withdrawals vs Guyton-Klinger Dynamic Guardrail Rules
         sim_years = 35
         n_paths = 1000
         sim_corpus_start = max(current_nw_f, standard_fire_target) if standard_fire_target > 0 else 1000000.0
-        annual_withdrawal = sim_corpus_start * swr
+        annual_withdrawal_base = sim_corpus_start * swr
 
         # Lognormal distribution parameters calibrated to Indian balanced portfolio
         # Mean real return 4.5%, std dev 12.0%
         mean_ret = 0.045
         std_ret = 0.12
-        survived_count = 0
-        terminal_values = []
+        survived_count_fixed = 0
+        survived_count_guardrails = 0
+        terminal_values_fixed = []
+        terminal_values_guardrails = []
+
+        # Guyton-Klinger triggers
+        gk_upper_ceiling_rate = swr * 1.20   # e.g. 4.2% -> trigger 10% spending cut
+        gk_lower_floor_rate = swr * 0.80     # e.g. 2.8% -> trigger 10% spending raise
 
         import random
         random.seed(101)
 
         for _ in range(n_paths):
-            corpus = sim_corpus_start
-            depleted = False
+            # Simulation A: Fixed real withdrawal
+            corpus_a = sim_corpus_start
+            depleted_a = False
+
+            # Simulation B: Guyton-Klinger dynamic guardrails
+            corpus_b = sim_corpus_start
+            withdrawal_b = annual_withdrawal_base
+            depleted_b = False
+
             for y in range(sim_years):
-                # Annual withdrawal adjusted for inflation
-                corpus -= annual_withdrawal
-                if corpus <= 0:
-                    depleted = True
-                    break
-                # Market shock / growth factor
                 shock = random.gauss(mean_ret, std_ret)
-                corpus *= (1.0 + shock)
 
-            if not depleted:
-                survived_count += 1
-                terminal_values.append(corpus)
+                # --- Path A: Fixed ---
+                if not depleted_a:
+                    corpus_a -= annual_withdrawal_base
+                    if corpus_a <= 0:
+                        depleted_a = True
+                    else:
+                        corpus_a *= (1.0 + shock)
+
+                # --- Path B: Guyton-Klinger Guardrails ---
+                if not depleted_b:
+                    # Check current withdrawal rate against guardrails
+                    if corpus_b > 0:
+                        curr_rate_b = withdrawal_b / corpus_b
+                        if curr_rate_b > gk_upper_ceiling_rate:
+                            # Capital Preservation Rule: reduce spending by 10%
+                            withdrawal_b *= 0.90
+                        elif curr_rate_b < gk_lower_floor_rate:
+                            # Prosperity Rule: increase spending by 10%
+                            withdrawal_b *= 1.10
+
+                    corpus_b -= withdrawal_b
+                    if corpus_b <= 0:
+                        depleted_b = True
+                    else:
+                        corpus_b *= (1.0 + shock)
+
+            if not depleted_a:
+                survived_count_fixed += 1
+                terminal_values_fixed.append(corpus_a)
             else:
-                terminal_values.append(0.0)
+                terminal_values_fixed.append(0.0)
 
-        terminal_values.sort()
-        survival_rate_pct = round((survived_count / n_paths) * 100.0, 1)
-        median_terminal = terminal_values[n_paths // 2] if terminal_values else 0.0
+            if not depleted_b:
+                survived_count_guardrails += 1
+                terminal_values_guardrails.append(corpus_b)
+            else:
+                terminal_values_guardrails.append(0.0)
+
+        terminal_values_fixed.sort()
+        terminal_values_guardrails.sort()
+
+        survival_rate_pct = round((survived_count_fixed / n_paths) * 100.0, 1)
+        gk_survival_rate_pct = round((survived_count_guardrails / n_paths) * 100.0, 1)
+        median_terminal = terminal_values_fixed[n_paths // 2] if terminal_values_fixed else 0.0
+        gk_median_terminal = terminal_values_guardrails[n_paths // 2] if terminal_values_guardrails else 0.0
 
         # Current progress percentage towards standard FIRE
         progress_pct = round(min(100.0, (current_nw_f / standard_fire_target) * 100.0), 1) if standard_fire_target > 0 else 0.0
+
+        # Longevity Spending Curve
+        retirement_phases = [
+            {"phase": "Go-Go Years (Ages 50-65)", "expense_factor_percent": 100.0, "annual_budget": round(ann_exp_f, 2), "description": "Active lifestyle, global travel, and early retirement hobbies."},
+            {"phase": "Slow-Go Years (Ages 65-75)", "expense_factor_percent": 82.0, "annual_budget": round(ann_exp_f * 0.82, 2), "description": "Settled lifestyle, domestic focus, and reduced travel expenditure."},
+            {"phase": "No-Go Years (Ages 75+)", "expense_factor_percent": 90.0, "annual_budget": round(ann_exp_f * 0.90, 2), "description": "Minimal lifestyle spending offset by higher private healthcare and nursing care."},
+        ]
 
         return {
             "currency": currency,
@@ -181,10 +230,20 @@ class FireEngine(BaseCalculator):
             "monte_carlo_resilience": {
                 "simulated_paths": n_paths,
                 "horizon_years": sim_years,
+                "fixed_withdrawal_survival_percent": survival_rate_pct,
                 "survival_rate_percent": survival_rate_pct,
+                "guardrail_survival_percent": gk_survival_rate_pct,
                 "median_terminal_corpus": round(median_terminal, 2),
-                "is_bulletproof": survival_rate_pct >= 90.0,
+                "guardrail_median_terminal_corpus": round(gk_median_terminal, 2),
+                "is_bulletproof": gk_survival_rate_pct >= 95.0 or survival_rate_pct >= 90.0,
+                "guardrail_rules": {
+                    "initial_swr_percent": float(swr_pct),
+                    "capital_preservation_ceiling_rate_percent": round(gk_upper_ceiling_rate * 100.0, 2),
+                    "prosperity_floor_rate_percent": round(gk_lower_floor_rate * 100.0, 2),
+                    "action_on_trigger": "10% spending cut if rate exceeds ceiling; 10% spending raise if rate drops below floor",
+                },
             },
+            "longevity_spending_phases": retirement_phases,
             "savings_rate_sensitivity": sensitivity_milestones,
             "parameters_used": {
                 "nominal_annual_return_percent": float(nom_return_pct),

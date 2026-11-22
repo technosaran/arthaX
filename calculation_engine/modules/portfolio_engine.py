@@ -190,9 +190,15 @@ class PortfolioEngine(BaseCalculator):
             total_invested += inv
             computed_current_value += val
 
-            # Earliest date tracking
+            # Earliest date tracking and holding status
             p_date = parse_iso_date(h.get("purchase_date") or h.get("created_at"))
+            days_held = None
+            tax_status = "UNKNOWN"
+            days_to_ltcg = None
             if p_date:
+                days_held = (date.today() - p_date).days
+                tax_status = "LTCG_QUALIFIED" if days_held >= 365 else "STCG_ACTIVE"
+                days_to_ltcg = max(0, 365 - days_held)
                 if earliest_buy_date is None or p_date < earliest_buy_date:
                     earliest_buy_date = p_date
 
@@ -209,6 +215,9 @@ class PortfolioEngine(BaseCalculator):
                 "unrealized_pnl": str(quantize_currency(unrealized)),
                 "return_percent": float(ret_pct),
                 "is_price_fallback": is_price_fallback,
+                "days_held": days_held,
+                "tax_holding_status": tax_status,
+                "days_to_ltcg": days_to_ltcg,
             })
 
         final_portfolio_value = to_decimal(current_valuation_in) if current_valuation_in is not None else computed_current_value
@@ -257,6 +266,27 @@ class PortfolioEngine(BaseCalculator):
         total_pnl = final_portfolio_value - total_invested
         absolute_return_pct = safe_percentage(total_pnl, total_invested) if total_invested > Decimal("0") else Decimal("0.00")
 
+        # 5. Top Winners & Laggards Attribution
+        sorted_by_pnl = sorted(holding_summaries, key=lambda x: Decimal(x["unrealized_pnl"]), reverse=True)
+        top_winners = [h for h in sorted_by_pnl if Decimal(h["unrealized_pnl"]) > Decimal("0.00")][:3]
+        top_laggards = [h for h in reversed(sorted_by_pnl) if Decimal(h["unrealized_pnl"]) < Decimal("0.00")][:3]
+
+        # 6. Concentration Analysis (Herfindahl-Hirschman Index)
+        hhi_score = Decimal("0.00")
+        effective_bets = Decimal("0.00")
+        concentration_tier = "WELL_DIVERSIFIED"
+
+        if final_portfolio_value > Decimal("0.00") and holding_summaries:
+            weights = [(Decimal(h["current_value"]) / final_portfolio_value) * Decimal("100.00") for h in holding_summaries]
+            hhi_score = quantize_currency(sum(w * w for w in weights))
+            sum_sq_dec = sum((w / Decimal("100.00")) ** 2 for w in weights)
+            effective_bets = quantize_currency(Decimal("1.00") / sum_sq_dec) if sum_sq_dec > Decimal("0.00") else Decimal(str(len(weights)))
+
+            if hhi_score > Decimal("2500.00"):
+                concentration_tier = "HEAVILY_CONCENTRATED"
+            elif hhi_score >= Decimal("1500.00"):
+                concentration_tier = "MODERATELY_CONCENTRATED"
+
         return {
             "currency": preferred_currency,
             "total_invested": str(quantize_currency(total_invested)),
@@ -268,6 +298,17 @@ class PortfolioEngine(BaseCalculator):
             "xirr_percent": float(xirr_rate * Decimal("100")) if xirr_rate is not None else None,
             "holdings_count": len(holdings),
             "unpriced_holdings_count": unpriced_holdings_count,
+            "performance_attribution": {
+                "top_winners": top_winners,
+                "top_laggards": top_laggards,
+                "profitable_holdings_count": len([h for h in holding_summaries if Decimal(h["unrealized_pnl"]) > Decimal("0.00")]),
+                "loss_making_holdings_count": len([h for h in holding_summaries if Decimal(h["unrealized_pnl"]) < Decimal("0.00")]),
+            },
+            "concentration_analytics": {
+                "herfindahl_index_hhi": float(hhi_score),
+                "effective_number_of_bets": float(effective_bets),
+                "concentration_tier": concentration_tier,
+            },
             "holdings": holding_summaries,
             "cash_flows_count": len(cash_flows),
         }

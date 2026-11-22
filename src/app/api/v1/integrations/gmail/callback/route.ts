@@ -3,8 +3,7 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { encryptSensitiveData } from "@/utils/crypto";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { getAuthenticatedUser } from "@/utils/auth";
-import { getTrustedOrigin, getOAuthStateSigningSecret } from "../oauth/route";
-import crypto from "crypto";
+import { getTrustedOrigin, verifySignedOAuthState } from "@/utils/oauthSecurity";
 
 export async function GET(req: NextRequest) {
   const baseOrigin = getTrustedOrigin(req);
@@ -37,71 +36,82 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 2. Validate cryptographic signature, expiration, and one-time nonce consumption
+  // 2. Validate cryptographic signature, expiration, and format using shared utility
   let userId: string;
-  let nonce: string | undefined;
+  let nonce: string;
 
   try {
-    const signingSecret = getOAuthStateSigningSecret();
-    const rawState = Buffer.from(state, "base64url").toString("utf-8");
-    const parsedState = JSON.parse(rawState);
-
-    const expectedSig = crypto.createHmac("sha256", signingSecret).update(parsedState.payload).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(parsedState.sig || ""), Buffer.from(expectedSig))) {
-      throw new Error("Invalid state signature");
-    }
-
-    const payload = JSON.parse(parsedState.payload);
-    if (!payload.userId) {
-      throw new Error("Invalid user ID in state");
-    }
-    if (payload.exp && Date.now() > payload.exp) {
-      throw new Error("OAuth state expired. Please try connecting again.");
-    }
-
-    userId = payload.userId;
-    nonce = payload.nonce;
-
-    // 2b. Session Binding: Validate current session matches initiating user if session exists
-    const currentAuth = await getAuthenticatedUser(req);
-    if (currentAuth.userId && currentAuth.userId !== userId) {
-      throw new Error("Security Alert: User session mismatch. Re-authentication required.");
-    }
-
-    // 2c. Enforce one-time state consumption
-    const cookieNonce = req.cookies.get("arthax_oauth_nonce")?.value;
-    if (nonce) {
-      if (cookieNonce && cookieNonce !== nonce) {
-        throw new Error("CSRF state nonce mismatch between cookie and state payload.");
-      }
-
-      // Check server-side one-time consumption RPC if table is present
-      try {
-        const { data: consumed, error: nonceRpcErr } = await supabaseAdmin.rpc("fn_consume_oauth_nonce", {
-          p_user_id: userId,
-          p_nonce: nonce,
-        });
-
-        if (!nonceRpcErr && consumed === false) {
-          throw new Error("OAuth state has already been used or has expired. Please initiate a new connection.");
-        }
-      } catch (rpcErr: unknown) {
-        if (rpcErr instanceof Error && rpcErr.message.includes("OAuth state has already been used")) {
-          throw rpcErr;
-        }
-      }
-    }
+    const verified = verifySignedOAuthState(state);
+    userId = verified.userId;
+    nonce = verified.nonce;
   } catch (stateErr: unknown) {
     const msg = stateErr instanceof Error ? stateErr.message : "Invalid OAuth state";
     console.error("[Gmail OAuth Callback] State verification failed:", msg);
     return buildRedirectResponse(`${baseOrigin}/?tab=settings&error=${encodeURIComponent(msg)}`);
   }
 
-  // 3. Exchange code for Google OAuth tokens using PKCE verifier if available
+  // 2b. Session Binding: Validate current session matches initiating user if session exists
+  const currentAuth = await getAuthenticatedUser(req);
+  if (currentAuth.userId && currentAuth.userId !== userId) {
+    console.error("[Gmail OAuth Callback] Session mismatch:", currentAuth.userId, "expected:", userId);
+    return buildRedirectResponse(
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent("Security Alert: User session mismatch. Re-authentication required.")}`
+    );
+  }
+
+  // 2c. Enforce one-time state consumption & CSRF Nonce Cookie (Fail Closed)
+  const cookieNonce = req.cookies.get("arthax_oauth_nonce")?.value;
+  if (!cookieNonce) {
+    console.error("[Gmail OAuth Callback] Missing CSRF nonce cookie");
+    return buildRedirectResponse(
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent("Security Alert: Missing CSRF nonce cookie. Connection aborted.")}`
+    );
+  }
+  if (cookieNonce !== nonce) {
+    console.error("[Gmail OAuth Callback] CSRF nonce cookie mismatch");
+    return buildRedirectResponse(
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent("CSRF state nonce mismatch between cookie and state payload.")}`
+    );
+  }
+
+  // 2d. Atomic Server-Side Nonce Consumption (Fail Closed)
+  try {
+    const { data: consumed, error: nonceRpcErr } = await supabaseAdmin.rpc("fn_consume_oauth_nonce", {
+      p_user_id: userId,
+      p_nonce: nonce,
+    });
+
+    if (nonceRpcErr) {
+      console.error("[Gmail OAuth Callback] Nonce consumption RPC error:", nonceRpcErr);
+      return buildRedirectResponse(
+        `${baseOrigin}/?tab=settings&error=${encodeURIComponent("Database error during security verification: nonce validation failed")}`
+      );
+    }
+
+    if (consumed !== true) {
+      console.error("[Gmail OAuth Callback] Nonce already consumed or expired");
+      return buildRedirectResponse(
+        `${baseOrigin}/?tab=settings&error=${encodeURIComponent("OAuth state has already been used or has expired. Please initiate a new connection.")}`
+      );
+    }
+  } catch (rpcErr: unknown) {
+    const msg = rpcErr instanceof Error ? rpcErr.message : "Security verification failed";
+    console.error("[Gmail OAuth Callback] Nonce consumption exception:", msg);
+    return buildRedirectResponse(`${baseOrigin}/?tab=settings&error=${encodeURIComponent(msg)}`);
+  }
+
+  // 3. Exchange code for Google OAuth tokens using PKCE verifier (Fail Closed on missing verifier)
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
   const redirectUri = `${baseOrigin}/api/v1/integrations/gmail/callback`;
   const codeVerifier = req.cookies.get("arthax_oauth_verifier")?.value;
+
+  if (!codeVerifier) {
+    console.error("[Gmail OAuth Callback] Missing PKCE code verifier cookie");
+    return buildRedirectResponse(
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent("Security Alert: Missing PKCE code verifier cookie. Connection aborted.")}`
+    );
+  }
 
   if (!clientId || !clientSecret) {
     console.error("[Gmail OAuth Callback] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing on server");
@@ -117,11 +127,8 @@ export async function GET(req: NextRequest) {
       code,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
     };
-
-    if (codeVerifier) {
-      tokenRequestBody.code_verifier = codeVerifier;
-    }
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",

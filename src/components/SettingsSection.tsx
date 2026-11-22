@@ -55,11 +55,14 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
 
-// Utility function to escape CSV values according to RFC 4180
+// Utility function to escape CSV values according to RFC 4180 and mitigate Formula Injection (CWE-1236)
 function escapeCSV(val: unknown): string {
   if (val === null || val === undefined) return '""';
-  const str = String(val).replace(/"/g, '""');
-  return `"${str}"`;
+  let str = String(val);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
 }
 
 // Utility to trigger client-side file downloads with UTF-8 BOM support

@@ -18,6 +18,10 @@ from ..modules.reconciliation_engine import ReconciliationEngine
 from ..modules.tax_engine import TaxEngine
 from ..modules.fire_engine import FireEngine
 from ..modules.rebalancing_engine import RebalancingEngine
+from ..modules.debt_engine import DebtPayoffEngine
+from ..modules.stress_test_engine import FinancialStressTestEngine
+from ..modules.goal_engine import GoalWealthEngine
+from ..modules.portfolio_analytics_engine import PortfolioAnalyticsEngine
 from ..bank_ingestion import parser_registry, validate_statement_continuity
 from ..bank_ingestion.gmail_service import GmailStatementIngestor
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
@@ -39,6 +43,10 @@ reconciliation_engine = ReconciliationEngine()
 tax_engine = TaxEngine()
 fire_engine = FireEngine()
 rebalancing_engine = RebalancingEngine()
+debt_engine = DebtPayoffEngine()
+stress_test_engine = FinancialStressTestEngine()
+goal_engine = GoalWealthEngine()
+portfolio_analytics_engine = PortfolioAnalyticsEngine()
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +127,7 @@ class TaxRegimeComparisonRequest(CalculationBaseRequest):
     deductions_80c: Optional[float] = 0.0
     deductions_80d: Optional[float] = 0.0
     nps_80ccd_1b: Optional[float] = 0.0
+    nps_80ccd_2: Optional[float] = 0.0
     home_loan_interest_24b: Optional[float] = 0.0
     hra_exemption: Optional[float] = 0.0
     other_deductions: Optional[float] = 0.0
@@ -141,6 +150,42 @@ class RebalancingCalculationRequest(CalculationBaseRequest):
     liabilities: Optional[float] = 0.0
     monthly_expenses: Optional[float] = 0.0
     monthly_income: Optional[float] = 0.0
+
+
+class DebtPayoffCalculationRequest(CalculationBaseRequest):
+    debts: List[Dict[str, Any]] = Field(default_factory=list)
+    monthly_extra_payment: Optional[float] = 0.0
+
+
+class StressTestCalculationRequest(CalculationBaseRequest):
+    liquid_cash: float = 0.0
+    semi_liquid_assets: float = 0.0
+    monthly_income: float = 0.0
+    monthly_mandatory_expenses: float = 0.0
+    monthly_discretionary_expenses: float = 0.0
+    total_debt: float = 0.0
+    emergency_shock_amount: Optional[float] = 500000.0
+
+
+class GoalPlannerCalculationRequest(CalculationBaseRequest):
+    goal_name: Optional[str] = "Financial Goal"
+    target_amount_today: float
+    horizon_years: int
+    current_savings: Optional[float] = 0.0
+    category: Optional[str] = "general"
+    custom_inflation_pct: Optional[float] = None
+    custom_expected_return_pct: Optional[float] = None
+    annual_step_up_pct: Optional[float] = 10.0
+
+
+class PortfolioAnalyticsCalculationRequest(CalculationBaseRequest):
+    portfolio_returns: Optional[List[float]] = None
+    portfolio_snapshots: Optional[List[Dict[str, Any]]] = None
+    benchmark_returns: Optional[List[float]] = None
+    current_portfolio_value: Optional[float] = 0.0
+    risk_free_rate_pct: Optional[float] = 6.75
+    period_frequency: Optional[str] = "monthly"
+    holdings: Optional[List[Dict[str, Any]]] = None
 
 
 class StatementParseRequest(CalculationBaseRequest):
@@ -235,6 +280,7 @@ def calculate_tax_regimes(payload: TaxRegimeComparisonRequest, x_user_id: Option
         deductions_80c=Decimal(str(payload.deductions_80c or 0)),
         deductions_80d=Decimal(str(payload.deductions_80d or 0)),
         nps_80ccd_1b=Decimal(str(payload.nps_80ccd_1b or 0)),
+        nps_80ccd_2=Decimal(str(payload.nps_80ccd_2 or 0)),
         home_loan_interest_24b=Decimal(str(payload.home_loan_interest_24b or 0)),
         hra_exemption=Decimal(str(payload.hra_exemption or 0)),
         other_deductions=Decimal(str(payload.other_deductions or 0)),
@@ -256,12 +302,40 @@ def calculate_rebalancing(payload: RebalancingCalculationRequest, x_user_id: Opt
     return rebalancing_engine.execute(inputs, user_id=user_id)
 
 
+@router.post("/calculations/debt-payoff")
+def calculate_debt_payoff(payload: DebtPayoffCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return debt_engine.execute(inputs, user_id=user_id)
+
+
+@router.post("/calculations/stress-test")
+def calculate_stress_test(payload: StressTestCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return stress_test_engine.execute(inputs, user_id=user_id)
+
+
+@router.post("/calculations/goal-planner")
+def calculate_goal_planner(payload: GoalPlannerCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return goal_engine.execute(inputs, user_id=user_id)
+
+
+@router.post("/calculations/portfolio-analytics")
+def calculate_portfolio_analytics(payload: PortfolioAnalyticsCalculationRequest, x_user_id: Optional[str] = Header(None)):
+    user_id = resolve_user_id(payload.user_id, x_user_id)
+    inputs = payload.model_dump()
+    return portfolio_analytics_engine.execute(inputs, user_id=user_id)
+
+
 @router.get("/calculations/health")
 def calculation_engine_health():
     return {
         "status": "healthy",
         "engine": "ArthaX Financial Calculation Engine (AFCE)",
-        "version": "2.0.0",
+        "version": "2.2.0",
         "precision_engine": "Python Decimal (Zero Floating-Point Error)",
         "active_modules": [
             "ExpenseEngine",
@@ -274,6 +348,10 @@ def calculation_engine_health():
             "TaxEngine",
             "FireEngine",
             "RebalancingEngine",
+            "DebtPayoffEngine",
+            "FinancialStressTestEngine",
+            "GoalWealthEngine",
+            "PortfolioAnalyticsEngine",
         ],
     }
 

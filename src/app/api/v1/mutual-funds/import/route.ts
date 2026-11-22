@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { inferCategoryAndAsset, inferFundHouse } from "../search/route";
 
 interface ParsedImportRow {
@@ -132,11 +133,18 @@ export async function POST(req: NextRequest) {
       const rawIsin = getVal(["isin"]);
       const rawSchemeCode = getVal(["schemecode", "code", "amficode"]);
 
-      const units = parseFloat(rawUnits.replace(/,/g, "")) || 0;
-      const avgNav = parseFloat(rawAvgNav.replace(/,/g, "")) || 0;
-      const currentNav = parseFloat(rawCurrentNav.replace(/,/g, "")) || avgNav;
+      const parsedUnits = parseFloat(rawUnits.replace(/,/g, ""));
+      const parsedAvgNav = parseFloat(rawAvgNav.replace(/,/g, ""));
+      const parsedCurrentNav = parseFloat(rawCurrentNav.replace(/,/g, ""));
+      const parsedInvested = parseFloat(rawInvested.replace(/,/g, ""));
+
+      const units = !isNaN(parsedUnits) && isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : 0;
+      const avgNav = !isNaN(parsedAvgNav) && isFinite(parsedAvgNav) && parsedAvgNav > 0 ? parsedAvgNav : 0;
+      const currentNav = !isNaN(parsedCurrentNav) && isFinite(parsedCurrentNav) && parsedCurrentNav > 0 ? parsedCurrentNav : avgNav;
       const invested =
-        parseFloat(rawInvested.replace(/,/g, "")) || (units > 0 && avgNav > 0 ? +(units * avgNav).toFixed(2) : 0);
+        !isNaN(parsedInvested) && isFinite(parsedInvested) && parsedInvested > 0
+          ? parsedInvested
+          : (units > 0 && avgNav > 0 ? +(units * avgNav).toFixed(2) : 0);
 
       if (units <= 0 && invested <= 0) continue;
 
@@ -247,6 +255,10 @@ export async function POST(req: NextRequest) {
           finalHoldings.push(inserted);
         }
       }
+    }
+
+    if (importedCount > 0 || updatedCount > 0) {
+      await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
     }
 
     return apiSuccess(

@@ -43,6 +43,8 @@ INDIAN_ENTITIES: Dict[str, Dict[str, Any]] = {
     "UBER": {"name": "Uber", "category": "Transportation", "type": "TRAVEL", "vpas": ["uber@axisbank", "uber@icici", "uberindia@hdfc"]},
     "OLA": {"name": "Ola Cabs", "category": "Transportation", "type": "TRAVEL", "vpas": ["olacabs@icici", "olamoney@icici"]},
     "RAPIDO": {"name": "Rapido", "category": "Transportation", "type": "TRAVEL", "vpas": ["rapido@icici"]},
+    "BLUSMART": {"name": "BluSmart", "category": "Transportation", "type": "TRAVEL", "vpas": ["blusmart@icici", "blusmart@axis"]},
+    "NAMMA YATRI": {"name": "Namma Yatri", "category": "Transportation", "type": "TRAVEL", "vpas": ["nammayatri@icici"]},
     "IRCTC": {"name": "IRCTC", "category": "Travel", "type": "TRAVEL", "vpas": ["irctc@icici", "irctc@sbi", "irctcpay@icici"]},
     "MAKEMYTRIP": {"name": "MakeMyTrip", "category": "Travel", "type": "TRAVEL", "vpas": ["makemytrip@icici", "mmt@icici"]},
     "GOIBIBO": {"name": "Goibibo", "category": "Travel", "type": "TRAVEL", "vpas": ["goibibo@icici"]},
@@ -52,6 +54,20 @@ INDIAN_ENTITIES: Dict[str, Dict[str, Any]] = {
     "RED BUS": {"name": "RedBus", "category": "Travel", "type": "TRAVEL", "vpas": ["redbus@icici"]},
     "REDBUS": {"name": "RedBus", "category": "Travel", "type": "TRAVEL", "vpas": ["redbus@icici"]},
     "FASTAG": {"name": "NETC FASTag", "category": "Transportation", "type": "TRAVEL", "vpas": ["netc.fastag@icici"]},
+
+    # Software, SaaS & AI
+    "OPENAI": {"name": "OpenAI / ChatGPT", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "CHATGPT": {"name": "OpenAI / ChatGPT", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "GITHUB": {"name": "GitHub", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "CURSOR": {"name": "Cursor AI", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "CLAUDE": {"name": "Anthropic Claude", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "VERCEL": {"name": "Vercel", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "AWS": {"name": "Amazon Web Services", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "GOOGLE CLOUD": {"name": "Google Cloud Platform", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "CANVA": {"name": "Canva", "category": "Software & Services", "type": "MERCHANT_EXPENSE", "vpas": []},
+    "URBAN COMPANY": {"name": "Urban Company", "category": "Home & Personal Care", "type": "MERCHANT_EXPENSE", "vpas": ["urbancompany@icici", "urbanclap@icici"]},
+    "LENSKART": {"name": "Lenskart", "category": "Shopping", "type": "SHOPPING", "vpas": ["lenskart@icici"]},
+    "PEPPERFRY": {"name": "Pepperfry", "category": "Home & Real Estate", "type": "SHOPPING", "vpas": ["pepperfry@icici"]},
 
     # Utilities & Bills
     "BESCOM": {"name": "BESCOM Electricity", "category": "Utilities", "type": "UTILITIES", "vpas": []},

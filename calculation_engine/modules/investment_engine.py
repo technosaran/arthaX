@@ -110,6 +110,26 @@ class InvestmentEngine(BaseCalculator):
         total_pnl = total_unrealized_pnl + total_realized_pnl + total_dividends_interest
         total_absolute_return = total_pnl
         total_return_percent = safe_percentage(total_unrealized_pnl, total_invested) if total_invested > Decimal("0") else Decimal("0.00")
+        dividend_yield_pct = safe_percentage(total_dividends_interest, total_invested) if total_invested > Decimal("0") else Decimal("0.00")
+
+        # Win rate & Profit factor
+        gross_profits = Decimal("0.00")
+        gross_losses = Decimal("0.00")
+        winning_count = 0
+        losing_count = 0
+
+        for h in holding_details:
+            pnl_val = to_decimal(h["unrealized_pnl"])
+            if pnl_val > Decimal("0.00"):
+                gross_profits += pnl_val
+                winning_count += 1
+            elif pnl_val < Decimal("0.00"):
+                gross_losses += abs(pnl_val)
+                losing_count += 1
+
+        total_rated_holdings = winning_count + losing_count
+        win_rate_pct = safe_percentage(Decimal(winning_count), Decimal(total_rated_holdings)) if total_rated_holdings > 0 else Decimal("0.00")
+        profit_factor = safe_divide(gross_profits, gross_losses) if gross_losses > Decimal("0.00") else (Decimal("99.00") if gross_profits > Decimal("0.00") else Decimal("1.00"))
 
         # 3. Allocation Breakdown
         allocation = {}
@@ -132,9 +152,16 @@ class InvestmentEngine(BaseCalculator):
             "total_unrealized_pnl": str(quantize_currency(total_unrealized_pnl)),
             "total_realized_pnl": str(quantize_currency(total_realized_pnl)),
             "total_dividends_interest": str(quantize_currency(total_dividends_interest)),
+            "dividend_yield_percent": float(dividend_yield_pct),
             "total_absolute_return": str(quantize_currency(total_absolute_return)),
             "total_return_percent": float(total_return_percent),
             "is_profit": total_unrealized_pnl >= Decimal("0.00"),
+            "portfolio_health": {
+                "win_rate_percent": float(win_rate_pct),
+                "profit_factor": float(round(profit_factor, 2)),
+                "profitable_holdings_count": winning_count,
+                "loss_making_holdings_count": losing_count,
+            },
             "holdings_count": len(holdings),
             "asset_class_allocation": allocation,
             "holdings": holding_details,

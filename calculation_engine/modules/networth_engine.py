@@ -249,6 +249,63 @@ class NetWorthEngine(BaseCalculator):
         # Debt to Asset ratio
         debt_to_asset_ratio = safe_percentage(total_liabilities, total_assets) if total_assets > Decimal("0") else Decimal("0.00")
 
+        # Solvency & Leverage Ratios
+        net_cash_cushion = liquid_assets - credit_card_debt
+        leverage_multiplier = safe_divide(total_assets, net_worth) if net_worth > Decimal("0.00") else Decimal("1.00")
+        debt_to_equity_pct = safe_percentage(total_liabilities, net_worth) if net_worth > Decimal("0.00") else Decimal("0.00")
+
+        # Indian Wealth Milestone Tiering
+        # Milestones: 10L, 25L, 50L, 1 Crore (100L), 2.5 Crores, 5 Crores, 10 Crores
+        milestones = [
+            (Decimal("1000000.00"), "10 Lakhs (First Financial Foothold)"),
+            (Decimal("2500000.00"), "25 Lakhs (Quarter Crore)"),
+            (Decimal("5000000.00"), "50 Lakhs (Half Crore Milestone)"),
+            (Decimal("10000000.00"), "1 Crore (Crorepati Club / HNI Tier)"),
+            (Decimal("25000000.00"), "2.5 Crores (Multi-Crore Wealth)"),
+            (Decimal("50000000.00"), "5 Crores (Mid-HNI Freedom Tier)"),
+            (Decimal("100000000.00"), "10 Crores (Deca-Crorepati / UHNI Tier)"),
+        ]
+
+        current_tier = "ACCUMULATOR_TIER"
+        next_milestone_target = milestones[0][0]
+        next_milestone_label = milestones[0][1]
+        distance_to_milestone = max(Decimal("0.00"), next_milestone_target - net_worth)
+
+        if net_worth >= Decimal("100000000.00"):
+            current_tier = "UHNI_TIER"
+            next_milestone_target = Decimal("250000000.00")
+            next_milestone_label = "25 Crores (Centimillionaire)"
+            distance_to_milestone = max(Decimal("0.00"), next_milestone_target - net_worth)
+        elif net_worth >= Decimal("10000000.00"):
+            current_tier = "HNI_TIER"
+            for m_val, m_lbl in milestones[4:]:
+                if net_worth < m_val:
+                    next_milestone_target = m_val
+                    next_milestone_label = m_lbl
+                    distance_to_milestone = m_val - net_worth
+                    break
+        elif net_worth >= Decimal("5000000.00"):
+            current_tier = "AFFLUENT_TIER"
+            next_milestone_target = Decimal("10000000.00")
+            next_milestone_label = "1 Crore (Crorepati Club / HNI Tier)"
+            distance_to_milestone = Decimal("10000000.00") - net_worth
+        elif net_worth >= Decimal("1000000.00"):
+            current_tier = "BUILDER_TIER"
+            for m_val, m_lbl in milestones[1:3]:
+                if net_worth < m_val:
+                    next_milestone_target = m_val
+                    next_milestone_label = m_lbl
+                    distance_to_milestone = m_val - net_worth
+                    break
+
+        wealth_milestone = {
+            "current_wealth_tier": current_tier,
+            "next_milestone_target": str(quantize_currency(next_milestone_target)),
+            "next_milestone_label": next_milestone_label,
+            "distance_to_next_milestone": str(quantize_currency(distance_to_milestone)),
+            "progress_to_next_milestone_percent": float(safe_percentage(net_worth, next_milestone_target)) if next_milestone_target > Decimal("0") else 100.0,
+        }
+
         total_unpriced = (
             unpriced_stocks_count
             + unpriced_mf_count
@@ -283,6 +340,13 @@ class NetWorthEngine(BaseCalculator):
             "allocation_percentages": allocation_percentages,
             "liquidity_percentage": float(liquidity_percentage),
             "debt_to_asset_ratio_percent": float(debt_to_asset_ratio),
+            "solvency_metrics": {
+                "net_cash_cushion": str(quantize_currency(net_cash_cushion)),
+                "leverage_multiplier": float(round(leverage_multiplier, 2)),
+                "debt_to_net_worth_percent": float(debt_to_equity_pct),
+                "is_credit_card_debt_free": credit_card_debt == Decimal("0.00"),
+            },
+            "wealth_milestones": wealth_milestone,
             "is_solvent": net_worth >= Decimal("0.00"),
             "valuation_metadata": valuation_metadata,
         }

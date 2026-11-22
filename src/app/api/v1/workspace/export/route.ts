@@ -3,6 +3,17 @@ import { createApiRoute } from "@/lib/backend/routeHandler";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiSuccess, apiError } from "@/utils/apiResponse";
 
+function sanitizeCsvField(val: unknown): string {
+  if (val === null || val === undefined) return '""';
+  let str = String(val);
+  // Mitigate CSV Formula Injection (CWE-1236):
+  // Disarm executable formula triggers: =, +, -, @, tab, or carriage return
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
 export const GET = createApiRoute({
   auth: "required",
   rateLimit: { limit: 10, windowSeconds: 60 },
@@ -37,14 +48,14 @@ export const GET = createApiRoute({
       };
 
       if (format === "csv") {
-        let csvContent = "";
+        let csvContent = "\uFEFF"; // UTF-8 BOM for Microsoft Excel compatibility
         const nowStr = new Date().toISOString().split("T")[0];
 
         if (entity === "expenses" || entity === "all") {
           csvContent += "=== EXPENSES ===\n";
           csvContent += "ID,Date,Title,Category,Amount,Account_ID,Merchant,Notes\n";
           for (const e of exportBundle.expenses) {
-            csvContent += `"${e.id}","${e.expense_date}","${(e.title || "").replace(/"/g, '""')}","${e.category}","${e.amount}","${e.account_id || ''}","${(e.merchant || '').replace(/"/g, '""')}","${(e.notes || '').replace(/"/g, '""')}"\n`;
+            csvContent += `${sanitizeCsvField(e.id)},${sanitizeCsvField(e.expense_date)},${sanitizeCsvField(e.title)},${sanitizeCsvField(e.category)},${sanitizeCsvField(e.amount)},${sanitizeCsvField(e.account_id)},${sanitizeCsvField(e.merchant)},${sanitizeCsvField(e.notes)}\n`;
           }
         }
 
@@ -52,7 +63,7 @@ export const GET = createApiRoute({
           csvContent += "\n=== INCOME ===\n";
           csvContent += "ID,Date,Title,Category,Amount,Account_ID,Notes\n";
           for (const i of exportBundle.income) {
-            csvContent += `"${i.id}","${i.received_date}","${(i.title || "").replace(/"/g, '""')}","${i.category}","${i.amount}","${i.account_id || ''}","${(i.notes || '').replace(/"/g, '""')}"\n`;
+            csvContent += `${sanitizeCsvField(i.id)},${sanitizeCsvField(i.received_date)},${sanitizeCsvField(i.title)},${sanitizeCsvField(i.category)},${sanitizeCsvField(i.amount)},${sanitizeCsvField(i.account_id)},${sanitizeCsvField(i.notes)}\n`;
           }
         }
 
@@ -60,7 +71,7 @@ export const GET = createApiRoute({
           csvContent += "\n=== ACCOUNTS ===\n";
           csvContent += "ID,Name,Type,Classification,Balance,Last_Four,Active\n";
           for (const a of exportBundle.accounts) {
-            csvContent += `"${a.id}","${(a.name || '').replace(/"/g, '""')}","${a.type}","${a.classification || ''}","${a.balance}","${a.last_four || ''}","${a.is_active}"\n`;
+            csvContent += `${sanitizeCsvField(a.id)},${sanitizeCsvField(a.name)},${sanitizeCsvField(a.type)},${sanitizeCsvField(a.classification)},${sanitizeCsvField(a.balance)},${sanitizeCsvField(a.last_four)},${sanitizeCsvField(a.is_active)}\n`;
           }
         }
 

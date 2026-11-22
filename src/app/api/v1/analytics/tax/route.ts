@@ -289,15 +289,15 @@ export const GET = createApiRoute({
               equityStcgGain = addMoney(equityStcgGain, gain);
             }
 
-            currentLot.quantity -= matchedQty;
-            unfilled -= matchedQty;
+            currentLot.quantity = Math.max(0, +(currentLot.quantity - matchedQty).toFixed(6));
+            unfilled = Math.max(0, +(unfilled - matchedQty).toFixed(6));
 
-            if (currentLot.quantity <= 0) {
+            if (currentLot.quantity <= 0.000001) {
               lots.shift();
             }
           }
 
-          if (unfilled > 0) {
+          if (unfilled > 0.000001) {
             const saleProceeds = mulMoney(unfilled, price);
             const costBasis = mulMoney(saleProceeds, 0.85);
             const gain = subMoney(saleProceeds, costBasis);
@@ -343,15 +343,15 @@ export const GET = createApiRoute({
               cryptoLosses = addMoney(cryptoLosses, Math.abs(gain));
             }
 
-            currentLot.qty -= matchedQty;
-            unfilled -= matchedQty;
+            currentLot.qty = Math.max(0, +(currentLot.qty - matchedQty).toFixed(8));
+            unfilled = Math.max(0, +(unfilled - matchedQty).toFixed(8));
 
-            if (currentLot.qty <= 0) {
+            if (currentLot.qty <= 0.00000001) {
               lots.shift();
             }
           }
 
-          if (unfilled > 0) {
+          if (unfilled > 0.00000001) {
             const saleProceeds = mulMoney(unfilled, price);
             const costBasis = mulMoney(saleProceeds, 0.90);
             const gain = subMoney(saleProceeds, costBasis);

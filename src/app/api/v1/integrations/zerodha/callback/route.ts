@@ -3,13 +3,14 @@ import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { exchangeRequestToken } from "@/utils/zerodha";
 import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
+import { getTrustedOrigin } from "@/utils/oauthSecurity";
 import { logger } from "@/utils/logger";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const requestToken = url.searchParams.get("request_token");
   const status = url.searchParams.get("status");
-  const baseUrl = url.origin;
+  const baseUrl = getTrustedOrigin(req);
 
   if (status !== "success" || !requestToken) {
     const errorMsg = url.searchParams.get("message") || "Authentication was denied or failed";

@@ -435,66 +435,157 @@ class TaxEngine(BaseCalculator):
             "advice": advice,
         }
 
+    def _calculate_new_regime_base_tax(self, taxable_income: Decimal) -> Decimal:
+        """Calculates New Regime (Section 115BAC) slab tax before rebate, surcharge and cess."""
+        if taxable_income <= Decimal("300000.00"):
+            return Decimal("0.00")
+        tax = Decimal("0.00")
+        rem = taxable_income
+        # 3L - 7L (4 Lakhs @ 5% = 20,000)
+        s1 = min(rem - Decimal("300000.00"), Decimal("400000.00"))
+        if s1 > Decimal("0.00"):
+            tax += s1 * Decimal("0.05")
+        # 7L - 10L (3 Lakhs @ 10% = 30,000)
+        if rem > Decimal("700000.00"):
+            s2 = min(rem - Decimal("700000.00"), Decimal("300000.00"))
+            tax += s2 * Decimal("0.10")
+        # 10L - 12L (2 Lakhs @ 15% = 30,000)
+        if rem > Decimal("1000000.00"):
+            s3 = min(rem - Decimal("1000000.00"), Decimal("200000.00"))
+            tax += s3 * Decimal("0.15")
+        # 12L - 15L (3 Lakhs @ 20% = 60,000)
+        if rem > Decimal("1200000.00"):
+            s4 = min(rem - Decimal("1200000.00"), Decimal("300000.00"))
+            tax += s4 * Decimal("0.20")
+        # > 15L @ 30%
+        if rem > Decimal("1500000.00"):
+            s5 = rem - Decimal("1500000.00")
+            tax += s5 * Decimal("0.30")
+        return tax
+
+    def _calculate_old_regime_base_tax(self, taxable_income: Decimal) -> Decimal:
+        """Calculates Old Regime slab tax before rebate, surcharge and cess."""
+        if taxable_income <= Decimal("250000.00"):
+            return Decimal("0.00")
+        tax = Decimal("0.00")
+        rem = taxable_income
+        # 2.5L - 5L (2.5 Lakhs @ 5% = 12,500)
+        s1 = min(rem - Decimal("250000.00"), Decimal("250000.00"))
+        if s1 > Decimal("0.00"):
+            tax += s1 * Decimal("0.05")
+        # 5L - 10L (5 Lakhs @ 20% = 100,000)
+        if rem > Decimal("500000.00"):
+            s2 = min(rem - Decimal("500000.00"), Decimal("500000.00"))
+            tax += s2 * Decimal("0.20")
+        # > 10L @ 30%
+        if rem > Decimal("1000000.00"):
+            s3 = rem - Decimal("1000000.00")
+            tax += s3 * Decimal("0.30")
+        return tax
+
+    def _calculate_surcharge_with_marginal_relief(
+        self,
+        taxable_income: Decimal,
+        base_tax: Decimal,
+        is_new_regime: bool,
+    ) -> Tuple[Decimal, Decimal]:
+        """
+        Calculates Surcharge on high net worth incomes and applies statutory Marginal Relief.
+        Returns (final_surcharge, marginal_relief_amount).
+        """
+        if taxable_income <= Decimal("5000000.00"):
+            return Decimal("0.00"), Decimal("0.00")
+
+        base_calc = self._calculate_new_regime_base_tax if is_new_regime else self._calculate_old_regime_base_tax
+
+        # 1. Determine nominal surcharge rate
+        if taxable_income <= Decimal("10000000.00"):
+            nominal_rate = Decimal("0.10")
+            threshold = Decimal("5000000.00")
+            tax_at_threshold = base_calc(threshold)
+            prior_surcharge_at_threshold = Decimal("0.00")
+        elif taxable_income <= Decimal("20000000.00"):
+            nominal_rate = Decimal("0.15")
+            threshold = Decimal("10000000.00")
+            tax_at_threshold = base_calc(threshold)
+            prior_surcharge_at_threshold = tax_at_threshold * Decimal("0.10")
+        elif taxable_income <= Decimal("50000000.00"):
+            nominal_rate = Decimal("0.25")
+            threshold = Decimal("20000000.00")
+            tax_at_threshold = base_calc(threshold)
+            prior_surcharge_at_threshold = tax_at_threshold * Decimal("0.15")
+        else:
+            # > 5 Crores: New Regime caps surcharge at 25%; Old Regime charges 37%
+            nominal_rate = Decimal("0.25") if is_new_regime else Decimal("0.37")
+            threshold = Decimal("50000000.00")
+            tax_at_threshold = base_calc(threshold)
+            prior_surcharge_at_threshold = tax_at_threshold * Decimal("0.25")
+
+        nominal_surcharge = base_tax * nominal_rate
+
+        # Marginal Relief Rule:
+        # Total (tax + surcharge) shall not exceed (tax + surcharge on threshold) + (income - threshold)
+        max_payable = (tax_at_threshold + prior_surcharge_at_threshold) + (taxable_income - threshold)
+        total_under_nominal = base_tax + nominal_surcharge
+
+        if total_under_nominal > max_payable:
+            surcharge_relief = total_under_nominal - max_payable
+            final_surcharge = max(Decimal("0.00"), nominal_surcharge - surcharge_relief)
+            return quantize_currency(final_surcharge), quantize_currency(surcharge_relief)
+        else:
+            return quantize_currency(nominal_surcharge), Decimal("0.00")
+
     def compare_regimes(
         self,
         gross_income: Decimal,
         deductions_80c: Decimal = Decimal("0.00"),
         deductions_80d: Decimal = Decimal("0.00"),
         nps_80ccd_1b: Decimal = Decimal("0.00"),
+        nps_80ccd_2: Decimal = Decimal("0.00"),
         home_loan_interest_24b: Decimal = Decimal("0.00"),
         hra_exemption: Decimal = Decimal("0.00"),
         other_deductions: Decimal = Decimal("0.00"),
     ) -> Dict[str, Any]:
         """
         Comprehensive Union Budget 2024 Old vs New Tax Regime Comparator.
-        Calculates tax liability under both regimes and recommends the optimal strategy.
+        Calculates tax liability under both regimes with Section 87A rebate,
+        Section 87A marginal relief, Section 80CCD(2) Corporate NPS deductions,
+        and High-Net-Worth Surcharge with Marginal Relief.
         """
         cess_rate = Decimal("0.04")
 
         # ---------------------------------------------------------
         # 1. New Tax Regime (Section 115BAC - Union Budget 2024)
         # ---------------------------------------------------------
-        # Standard deduction increased to ₹75,000
+        # Standard deduction ₹75,000 + Section 80CCD(2) employer NPS
         new_std_deduction = Decimal("75000.00")
-        new_taxable_income = max(Decimal("0.00"), gross_income - new_std_deduction)
+        new_taxable_income = max(Decimal("0.00"), gross_income - new_std_deduction - nps_80ccd_2)
 
-        new_tax = Decimal("0.00")
-        if new_taxable_income <= Decimal("300000.00"):
-            new_tax = Decimal("0.00")
-        else:
-            # Slabs: 0-3L: 0%, 3-7L: 5%, 7-10L: 10%, 10-12L: 15%, 12-15L: 20%, >15L: 30%
-            rem = new_taxable_income
-            # 3L - 7L (4 Lakhs @ 5% = 20,000)
-            taxable_slab_1 = min(rem - Decimal("300000.00"), Decimal("400000.00"))
-            if taxable_slab_1 > 0:
-                new_tax += taxable_slab_1 * Decimal("0.05")
+        new_base_tax = self._calculate_new_regime_base_tax(new_taxable_income)
+        new_marginal_relief_87a = Decimal("0.00")
+        new_rebate_87a = Decimal("0.00")
 
-            # 7L - 10L (3 Lakhs @ 10% = 30,000)
-            if rem > Decimal("700000.00"):
-                taxable_slab_2 = min(rem - Decimal("700000.00"), Decimal("300000.00"))
-                new_tax += taxable_slab_2 * Decimal("0.10")
-
-            # 10L - 12L (2 Lakhs @ 15% = 30,000)
-            if rem > Decimal("1000000.00"):
-                taxable_slab_3 = min(rem - Decimal("1000000.00"), Decimal("200000.00"))
-                new_tax += taxable_slab_3 * Decimal("0.15")
-
-            # 12L - 15L (3 Lakhs @ 20% = 60,000)
-            if rem > Decimal("1200000.00"):
-                taxable_slab_4 = min(rem - Decimal("1200000.00"), Decimal("300000.00"))
-                new_tax += taxable_slab_4 * Decimal("0.20")
-
-            # > 15L @ 30%
-            if rem > Decimal("1500000.00"):
-                taxable_slab_5 = rem - Decimal("1500000.00")
-                new_tax += taxable_slab_5 * Decimal("0.30")
-
-        # Section 87A Rebate for New Regime: Income up to ₹7,00,000 pays zero tax
+        # Section 87A Rebate & Marginal Relief
         if new_taxable_income <= Decimal("700000.00"):
-            new_tax = Decimal("0.00")
+            new_rebate_87a = new_base_tax
+            new_tax_after_87a = Decimal("0.00")
+        else:
+            # Proviso to Section 87A: tax payable shall not exceed (taxable_income - 7,00,000)
+            excess_income_over_7l = new_taxable_income - Decimal("700000.00")
+            if new_base_tax > excess_income_over_7l:
+                new_marginal_relief_87a = new_base_tax - excess_income_over_7l
+                new_tax_after_87a = excess_income_over_7l
+            else:
+                new_tax_after_87a = new_base_tax
 
-        new_cess = new_tax * cess_rate
-        new_total_tax = new_tax + new_cess
+        # Surcharge on High Net Worth Incomes
+        new_surcharge, new_surcharge_relief = self._calculate_surcharge_with_marginal_relief(
+            new_taxable_income, new_tax_after_87a, is_new_regime=True
+        )
+
+        new_tax_with_surcharge = new_tax_after_87a + new_surcharge
+        new_cess = quantize_currency(new_tax_with_surcharge * cess_rate)
+        new_total_tax = new_tax_with_surcharge + new_cess
 
         # ---------------------------------------------------------
         # 2. Old Tax Regime
@@ -510,40 +601,31 @@ class TaxEngine(BaseCalculator):
             + capped_80c
             + capped_80d
             + capped_nps
+            + nps_80ccd_2
             + capped_24b
             + hra_exemption
             + other_deductions
         )
 
         old_taxable_income = max(Decimal("0.00"), gross_income - total_old_deductions)
+        old_base_tax = self._calculate_old_regime_base_tax(old_taxable_income)
+        old_rebate_87a = Decimal("0.00")
 
-        old_tax = Decimal("0.00")
-        if old_taxable_income <= Decimal("250000.00"):
-            old_tax = Decimal("0.00")
-        else:
-            # Slabs: 0-2.5L: 0%, 2.5L-5L: 5%, 5L-10L: 20%, >10L: 30%
-            rem = old_taxable_income
-            # 2.5L - 5L (2.5 Lakhs @ 5% = 12,500)
-            slab1 = min(rem - Decimal("250000.00"), Decimal("250000.00"))
-            if slab1 > 0:
-                old_tax += slab1 * Decimal("0.05")
-
-            # 5L - 10L (5 Lakhs @ 20% = 100,000)
-            if rem > Decimal("500000.00"):
-                slab2 = min(rem - Decimal("500000.00"), Decimal("500000.00"))
-                old_tax += slab2 * Decimal("0.20")
-
-            # > 10L @ 30%
-            if rem > Decimal("1000000.00"):
-                slab3 = rem - Decimal("1000000.00")
-                old_tax += slab3 * Decimal("0.30")
-
-        # Section 87A Rebate for Old Regime: Income up to ₹5,00,000 gets up to ₹12,500 rebate
+        # Section 87A Rebate for Old Regime (up to 5L)
         if old_taxable_income <= Decimal("500000.00"):
-            old_tax = Decimal("0.00")
+            old_rebate_87a = min(old_base_tax, Decimal("12500.00"))
+            old_tax_after_87a = Decimal("0.00")
+        else:
+            old_tax_after_87a = old_base_tax
 
-        old_cess = old_tax * cess_rate
-        old_total_tax = old_tax + old_cess
+        # Surcharge on High Net Worth Incomes (Old Regime)
+        old_surcharge, old_surcharge_relief = self._calculate_surcharge_with_marginal_relief(
+            old_taxable_income, old_tax_after_87a, is_new_regime=False
+        )
+
+        old_tax_with_surcharge = old_tax_after_87a + old_surcharge
+        old_cess = quantize_currency(old_tax_with_surcharge * cess_rate)
+        old_total_tax = old_tax_with_surcharge + old_cess
 
         # ---------------------------------------------------------
         # 3. Recommendation & Savings
@@ -553,15 +635,15 @@ class TaxEngine(BaseCalculator):
             recommended_regime = "NEW_REGIME"
             savings_amount = old_total_tax - new_total_tax
             advice_summary = (
-                f"New Tax Regime saves ₹{savings_amount:,.2f} in taxes under Union Budget 2024 revisions "
-                f"(₹75,000 standard deduction + revised tax slabs)."
+                f"New Tax Regime saves ₹{savings_amount:,.2f} in taxes under Union Budget 2024 provisions "
+                f"(₹75,000 standard deduction, revised Section 115BAC slabs, and 87A relief)."
             )
         elif old_total_tax < new_total_tax:
             recommended_regime = "OLD_REGIME"
             savings_amount = new_total_tax - old_total_tax
             advice_summary = (
                 f"Old Tax Regime saves ₹{savings_amount:,.2f} due to high deductions "
-                f"(₹{total_old_deductions:,.2f} total claimed)."
+                f"(₹{total_old_deductions:,.2f} total claimed across 80C, 80D, HRA, and Home Loan)."
             )
         else:
             recommended_regime = "EQUAL"
@@ -575,8 +657,14 @@ class TaxEngine(BaseCalculator):
             "newRegime": {
                 "grossIncome": float(quantize_currency(gross_income)),
                 "standardDeduction": float(quantize_currency(new_std_deduction)),
+                "corporateNpsDeduction": float(quantize_currency(nps_80ccd_2)),
                 "taxableIncome": float(quantize_currency(new_taxable_income)),
-                "incomeTax": float(quantize_currency(new_tax)),
+                "baseIncomeTax": float(quantize_currency(new_base_tax)),
+                "section87aRebate": float(quantize_currency(new_rebate_87a)),
+                "section87aMarginalRelief": float(quantize_currency(new_marginal_relief_87a)),
+                "taxAfterRebate": float(quantize_currency(new_tax_after_87a)),
+                "surcharge": float(quantize_currency(new_surcharge)),
+                "surchargeMarginalRelief": float(quantize_currency(new_surcharge_relief)),
                 "cess": float(quantize_currency(new_cess)),
                 "totalTax": float(quantize_currency(new_total_tax)),
                 "effectiveRatePercent": float(safe_percentage(new_total_tax, gross_income)),
@@ -584,9 +672,14 @@ class TaxEngine(BaseCalculator):
             "oldRegime": {
                 "grossIncome": float(quantize_currency(gross_income)),
                 "standardDeduction": float(quantize_currency(old_std_deduction)),
+                "corporateNpsDeduction": float(quantize_currency(nps_80ccd_2)),
                 "totalDeductions": float(quantize_currency(total_old_deductions)),
                 "taxableIncome": float(quantize_currency(old_taxable_income)),
-                "incomeTax": float(quantize_currency(old_tax)),
+                "baseIncomeTax": float(quantize_currency(old_base_tax)),
+                "section87aRebate": float(quantize_currency(old_rebate_87a)),
+                "taxAfterRebate": float(quantize_currency(old_tax_after_87a)),
+                "surcharge": float(quantize_currency(old_surcharge)),
+                "surchargeMarginalRelief": float(quantize_currency(old_surcharge_relief)),
                 "cess": float(quantize_currency(old_cess)),
                 "totalTax": float(quantize_currency(old_total_tax)),
                 "effectiveRatePercent": float(safe_percentage(old_total_tax, gross_income)),

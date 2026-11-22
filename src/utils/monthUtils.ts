@@ -33,6 +33,9 @@ export function formatMonthDisplay(monthYear: string): string {
   const [yearStr, monthStr] = monthYear.split("-");
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10) - 1;
+  if (isNaN(year) || isNaN(month) || month < 0 || month > 11) {
+    return formatMonthDisplay(getCurrentMonthYear());
+  }
   const date = new Date(year, month, 1);
   return date.toLocaleString("en-US", { month: "long", year: "numeric" });
 }
@@ -55,12 +58,15 @@ export function getEarliestDataMonth(
 }
 
 export function computeNextMonth(monthYear: string, currentMonthYear: string = getCurrentMonthYear()): string {
-  if (monthYear >= currentMonthYear) {
+  if (!monthYear || monthYear >= currentMonthYear) {
     return currentMonthYear;
   }
   const [yearStr, monthStr] = monthYear.split("-");
   let year = parseInt(yearStr, 10);
   let month = parseInt(monthStr, 10) - 1;
+  if (isNaN(year) || isNaN(month)) {
+    return currentMonthYear;
+  }
   month += 1;
   if (month > 11) {
     month = 0;
@@ -71,12 +77,15 @@ export function computeNextMonth(monthYear: string, currentMonthYear: string = g
 }
 
 export function computePrevMonth(monthYear: string, earliestMonthYear: string): string {
-  if (monthYear <= earliestMonthYear) {
+  if (!monthYear || monthYear <= earliestMonthYear) {
     return earliestMonthYear;
   }
   const [yearStr, monthStr] = monthYear.split("-");
   let year = parseInt(yearStr, 10);
   let month = parseInt(monthStr, 10) - 1;
+  if (isNaN(year) || isNaN(month)) {
+    return earliestMonthYear;
+  }
   month -= 1;
   if (month < 0) {
     month = 11;

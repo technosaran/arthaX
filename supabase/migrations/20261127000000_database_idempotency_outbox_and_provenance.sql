@@ -189,9 +189,16 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_caller_id text := auth.uid()::text;
+  v_caller_role text := coalesce(current_setting('request.jwt.claim.role', true), '');
   v_rec record;
   v_now timestamptz := timezone('utc'::text, now());
 BEGIN
+  -- Strict caller authorization: must be service_role OR the matching authenticated user
+  IF v_caller_role != 'service_role' AND (v_caller_id IS NULL OR v_caller_id != p_user_id) THEN
+    RAISE EXCEPTION 'fn_consume_oauth_nonce: Unauthorized caller % attempting to consume nonce for %', v_caller_id, p_user_id;
+  END IF;
+
   SELECT * INTO v_rec
   FROM public.oauth_state_nonces
   WHERE nonce = p_nonce AND user_id = p_user_id
@@ -271,9 +278,15 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_caller_role text := coalesce(current_setting('request.jwt.claim.role', true), '');
   v_now timestamptz := timezone('utc'::text, now());
   v_lease_until timestamptz := v_now + (p_lease_seconds || ' seconds')::interval;
 BEGIN
+  -- Strict worker daemon authorization: only service_role workers can claim jobs
+  IF v_caller_role != 'service_role' THEN
+    RAISE EXCEPTION 'fn_claim_outbox_jobs: Access denied. Only service_role worker processes may claim outbox jobs.';
+  END IF;
+
   RETURN QUERY
   WITH candidate_jobs AS (
     SELECT j.id
@@ -317,7 +330,13 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_caller_role text := coalesce(current_setting('request.jwt.claim.role', true), '');
 BEGIN
+  IF v_caller_role != 'service_role' THEN
+    RAISE EXCEPTION 'fn_complete_outbox_job: Access denied. Only service_role worker processes may complete outbox jobs.';
+  END IF;
+
   UPDATE public.job_outbox
   SET status = 'COMPLETED',
       result = p_result,
@@ -340,9 +359,14 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_caller_role text := coalesce(current_setting('request.jwt.claim.role', true), '');
   v_job record;
   v_now timestamptz := timezone('utc'::text, now());
 BEGIN
+  IF v_caller_role != 'service_role' THEN
+    RAISE EXCEPTION 'fn_fail_outbox_job: Access denied. Only service_role worker processes may fail outbox jobs.';
+  END IF;
+
   SELECT * INTO v_job FROM public.job_outbox WHERE id = p_job_id FOR UPDATE;
   IF NOT FOUND THEN RETURN; END IF;
 
@@ -379,9 +403,14 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_caller_role text := coalesce(current_setting('request.jwt.claim.role', true), '');
   v_recovered_count integer := 0;
   v_now timestamptz := timezone('utc'::text, now());
 BEGIN
+  IF v_caller_role != 'service_role' THEN
+    RAISE EXCEPTION 'fn_recover_stale_outbox_jobs: Access denied. Only service_role worker processes may recover outbox jobs.';
+  END IF;
+
   WITH stale_candidates AS (
     SELECT id
     FROM public.job_outbox
@@ -430,14 +459,27 @@ CREATE INDEX IF NOT EXISTS idx_income_source_statement ON public.income(source_s
 CREATE INDEX IF NOT EXISTS idx_transfers_source_statement ON public.transfers(source_statement_id) WHERE source_statement_id IS NOT NULL;
 
 -- ----------------------------------------------------------------------------
--- 5. GRANT PERMISSIONS TO AUTHENTICATED & SERVICE ROLES
+-- 5. REVOKE DEFAULT PRIVILEGES & GRANT ACCORDING TO LEAST PRIVILEGE
 -- ----------------------------------------------------------------------------
+-- Revoke all default execution privileges from PUBLIC and anon
+REVOKE ALL ON FUNCTION public.fn_claim_idempotency_key(TEXT, TEXT, TEXT, TEXT, INTEGER) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.fn_complete_idempotency_key(TEXT, TEXT, INTEGER, JSONB) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.fn_consume_oauth_nonce(TEXT, TEXT) FROM PUBLIC, anon;
+
+REVOKE ALL ON FUNCTION public.fn_claim_outbox_jobs(TEXT, INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.fn_complete_outbox_job(UUID, JSONB) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.fn_fail_outbox_job(UUID, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.fn_recover_stale_outbox_jobs(INTEGER) FROM PUBLIC, anon, authenticated;
+
+-- User-safe procedures granted to authenticated callers and service_role
 GRANT EXECUTE ON FUNCTION public.fn_claim_idempotency_key(TEXT, TEXT, TEXT, TEXT, INTEGER) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.fn_complete_idempotency_key(TEXT, TEXT, INTEGER, JSONB) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.fn_consume_oauth_nonce(TEXT, TEXT) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.fn_claim_outbox_jobs(TEXT, INTEGER, INTEGER, INTEGER) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.fn_complete_outbox_job(UUID, JSONB) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.fn_fail_outbox_job(UUID, TEXT, INTEGER) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.fn_recover_stale_outbox_jobs(INTEGER) TO authenticated, service_role;
+
+-- Worker daemon procedures restricted STRICTLY to service_role
+GRANT EXECUTE ON FUNCTION public.fn_claim_outbox_jobs(TEXT, INTEGER, INTEGER, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.fn_complete_outbox_job(UUID, JSONB) TO service_role;
+GRANT EXECUTE ON FUNCTION public.fn_fail_outbox_job(UUID, TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.fn_recover_stale_outbox_jobs(INTEGER) TO service_role;
 
 COMMIT;

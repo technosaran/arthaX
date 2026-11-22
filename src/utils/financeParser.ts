@@ -1,4 +1,4 @@
-import { parseExpenseMessage, matchAccount, AccountSummary, ParsedExpense } from "./expenseParser";
+import { parseExpenseMessage, matchAccount, AccountSummary, ParsedExpense, escapeRegExp } from "./expenseParser";
 
 export type { AccountSummary };
 
@@ -162,7 +162,7 @@ export function classifyFinancialMessage(
 
       // 1. Check last four of accounts
       for (const acc of userAccounts) {
-        if (acc.last_four && new RegExp(`\\b${acc.last_four}\\b`, "i").test(clean)) {
+        if (acc.last_four && new RegExp(`\\b${escapeRegExp(acc.last_four)}\\b`, "i").test(clean)) {
           matchedAcc = acc.name;
           break;
         }
@@ -171,7 +171,7 @@ export function classifyFinancialMessage(
       // 2. Check full account name
       if (!matchedAcc) {
         for (const acc of userAccounts) {
-          if (new RegExp(`\\b${acc.name}\\b`, "i").test(clean)) {
+          if (new RegExp(`\\b${escapeRegExp(acc.name)}\\b`, "i").test(clean)) {
             matchedAcc = acc.name;
             break;
           }
@@ -188,7 +188,7 @@ export function classifyFinancialMessage(
             .filter((w) => w.length >= 3 && !["bank", "account", "card", "salary"].includes(w));
 
           for (const word of distinctWords) {
-            if (new RegExp(`\\b${word}\\b`, "i").test(clean)) {
+            if (new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(clean)) {
               matchedAcc = acc.name;
               break;
             }

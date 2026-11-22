@@ -13,33 +13,53 @@ const AUTH_TAG_LENGTH = 16; // 128-bit authentication tag
 /**
  * Derives a deterministic 256-bit AES encryption key using HKDF (RFC 5869)
  * from the dedicated environment master key with domain separation.
+ * In production, strictly requires ENCRYPTION_MASTER_KEY and fails closed.
  * Never uses database administrative credentials (e.g. Supabase service role key)
- * as an implicit encryption key in production.
+ * as an implicit encryption key.
  */
 function getDerivedKey(
   salt: string = "arthax-credential-salt",
   info: string = "broker-credentials",
   customSecret?: string
 ): Buffer {
-  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
-  const masterSecret =
-    customSecret ||
-    process.env.ENCRYPTION_MASTER_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    (!isProd && (process.env.NODE_ENV === "test" || process.env.VITEST || process.env.NODE_ENV === "development")
-      ? "test-master-encryption-key-32-chars-long!"
-      : "");
+  if (customSecret && customSecret.trim().length > 0) {
+    return Buffer.from(
+      crypto.hkdfSync(
+        "sha256",
+        Buffer.from(customSecret.trim()),
+        Buffer.from(salt),
+        Buffer.from(`arthax-key-derivation:${info}`),
+        32
+      )
+    );
+  }
 
-  if (!masterSecret) {
-    throw new Error(
-      "[Crypto Security] Neither ENCRYPTION_MASTER_KEY nor SUPABASE_SERVICE_ROLE_KEY is configured. Failing closed to protect financial secrets."
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  const masterSecret = process.env.ENCRYPTION_MASTER_KEY;
+
+  if (!masterSecret || !masterSecret.trim()) {
+    if (isProd) {
+      throw new Error(
+        "[Crypto Security] ENCRYPTION_MASTER_KEY is not configured in production environment. Failing closed to protect financial secrets and credential isolation. Database service keys are never used as encryption keys."
+      );
+    }
+    // Development and testing fallback key only
+    const devSecret = "test-master-encryption-key-32-chars-long!";
+    return Buffer.from(
+      crypto.hkdfSync(
+        "sha256",
+        Buffer.from(devSecret),
+        Buffer.from(salt),
+        Buffer.from(`arthax-key-derivation:${info}`),
+        32
+      )
     );
   }
 
   return Buffer.from(
     crypto.hkdfSync(
       "sha256",
-      Buffer.from(masterSecret),
+      Buffer.from(masterSecret.trim()),
       Buffer.from(salt),
       Buffer.from(`arthax-key-derivation:${info}`),
       32
@@ -80,21 +100,37 @@ export function encryptSensitiveData(
   }
 }
 
+export interface DecryptOptions {
+  allowPlaintextFallback?: boolean;
+}
+
 /**
  * Decrypts AES-256-GCM ciphertext created by encryptSensitiveData.
- * Validates the 128-bit authentication tag. Gracefully passes through
- * unencrypted legacy values for seamless zero-downtime migration.
+ * Validates the 128-bit authentication tag.
+ * Rejects unencrypted plaintext in production to prevent silent security degradation,
+ * unless explicitly invoked with allowPlaintextFallback: true during a controlled migration job.
  */
 export function decryptSensitiveData(
   ciphertext: string | null | undefined,
-  context: string = "broker-credentials"
+  context: string = "broker-credentials",
+  options?: DecryptOptions
 ): string | null {
   if (ciphertext === null || ciphertext === undefined || ciphertext === "") {
     return null;
   }
 
-  // Graceful fallback for unencrypted legacy records
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+  // Check for unencrypted legacy records
   if (!ciphertext.startsWith("enc:v1:")) {
+    if (isProd && !options?.allowPlaintextFallback) {
+      console.error(
+        `[Crypto Security Alert] Plaintext credential detected in production where encrypted envelope was expected (context=${context}). Refusing silent plaintext return.`
+      );
+      throw new Error(
+        `[Crypto Security] Plaintext fallback is forbidden in production for financial credentials (context=${context}). Record must be migrated to an encrypted envelope.`
+      );
+    }
     return ciphertext;
   }
 
@@ -120,11 +156,11 @@ export function decryptSensitiveData(
       decrypted += decipher.final("utf8");
       return decrypted;
     } catch (primaryErr) {
-      // 1. Key Rotation Support: Attempt decryption with previous master key if present
+      // Key Rotation Support: Attempt decryption with previous master key if present
       const previousKeySecret = process.env.ENCRYPTION_MASTER_KEY_PREVIOUS;
-      if (previousKeySecret) {
+      if (previousKeySecret && previousKeySecret.trim()) {
         try {
-          const prevKey = getDerivedKey("arthax-credential-salt", context, previousKeySecret);
+          const prevKey = getDerivedKey("arthax-credential-salt", context, previousKeySecret.trim());
           const prevDecipher = crypto.createDecipheriv("aes-256-gcm", prevKey, iv, { authTagLength: AUTH_TAG_LENGTH });
           prevDecipher.setAuthTag(authTag);
           let decrypted = prevDecipher.update(encryptedHex, "hex", "utf8");
@@ -133,18 +169,7 @@ export function decryptSensitiveData(
         } catch {}
       }
 
-      // 2. Safe migration fallback: if master key fails, attempt legacy derivation from SUPABASE_SERVICE_ROLE_KEY
-      const fallbackSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (fallbackSecret && process.env.ENCRYPTION_MASTER_KEY && fallbackSecret !== process.env.ENCRYPTION_MASTER_KEY) {
-        try {
-          const fallbackKey = getDerivedKey("arthax-credential-salt", context, fallbackSecret);
-          const fallbackDecipher = crypto.createDecipheriv("aes-256-gcm", fallbackKey, iv, { authTagLength: AUTH_TAG_LENGTH });
-          fallbackDecipher.setAuthTag(authTag);
-          let decrypted = fallbackDecipher.update(encryptedHex, "hex", "utf8");
-          decrypted += fallbackDecipher.final("utf8");
-          return decrypted;
-        } catch {}
-      }
+      // Explicitly reject fallback to database service keys
       throw primaryErr;
     }
   } catch (err) {
@@ -154,6 +179,41 @@ export function decryptSensitiveData(
       }`
     );
   }
+}
+
+/**
+ * Explicit migration utility for legacy unencrypted credentials.
+ * Encrypts unencrypted plaintext into a versioned AES-256-GCM envelope,
+ * performs an immediate round-trip decryption verification,
+ * and emits a structured audit log (without exposing secrets).
+ */
+export function migrateLegacyPlaintextToEncrypted(
+  rawCredential: string | null | undefined,
+  context: string = "broker-credentials"
+): { status: "empty" | "already_encrypted" | "migrated"; value: string | null } {
+  if (!rawCredential) {
+    return { status: "empty", value: null };
+  }
+
+  if (rawCredential.startsWith("enc:v1:")) {
+    return { status: "already_encrypted", value: rawCredential };
+  }
+
+  const encrypted = encryptSensitiveData(rawCredential, context);
+  if (!encrypted) {
+    throw new Error(`[Crypto Migration] Failed to encrypt legacy credential for context=${context}`);
+  }
+
+  // Immediate round-trip verification check
+  const verified = decryptSensitiveData(encrypted, context, { allowPlaintextFallback: false });
+  if (verified !== rawCredential) {
+    throw new Error(
+      `[Crypto Migration] Round-trip verification failed during legacy credential migration for context=${context}`
+    );
+  }
+
+  console.info(`[Crypto Audit] Successfully migrated legacy credential to encrypted envelope for context=${context}`);
+  return { status: "migrated", value: encrypted };
 }
 
 /**

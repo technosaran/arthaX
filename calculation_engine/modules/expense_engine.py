@@ -100,6 +100,24 @@ class ExpenseEngine(BaseCalculator):
         recurring_totals = Decimal("0.00")
         recurring_count = 0
 
+        # Day-of-week and weekend tracking (0 = Monday, ..., 6 = Sunday)
+        day_of_week_totals = defaultdict(Decimal)
+        day_of_week_counts = defaultdict(int)
+        weekend_spending = Decimal("0.00")
+        weekday_spending = Decimal("0.00")
+
+        # Mandatory vs Discretionary tracking
+        mandatory_categories = {
+            "groceries", "grocery", "rent", "utilities", "bills", "bill", "electricity",
+            "water", "gas", "health", "healthcare", "medical", "pharmacy", "insurance",
+            "education", "school", "tuition", "emi", "loan", "maintenance", "fuel",
+            "commute", "transport", "tax", "taxes"
+        }
+        mandatory_spending = Decimal("0.00")
+        discretionary_spending = Decimal("0.00")
+
+        valid_tx_amounts = []
+
         earliest_date: Optional[date] = None
         latest_date: Optional[date] = None
 
@@ -122,7 +140,18 @@ class ExpenseEngine(BaseCalculator):
                 if latest_date is None or parsed_d > latest_date:
                     latest_date = parsed_d
 
+                # Track day of week
+                weekday_idx = parsed_d.weekday()
+                day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][weekday_idx]
+                day_of_week_totals[day_name] += amt
+                day_of_week_counts[day_name] += 1
+                if weekday_idx in (5, 6):
+                    weekend_spending += amt
+                else:
+                    weekday_spending += amt
+
             cat = str(tx.get("category") or "Other").strip()
+            cat_lower = cat.lower()
             tx_type = str(tx.get("transaction_type") or "expense").lower()
 
             is_refund = (
@@ -154,6 +183,13 @@ class ExpenseEngine(BaseCalculator):
                 monthly_totals[month_key] += amt
                 year_key = date_str[:4]
                 yearly_totals[year_key] += amt
+
+                valid_tx_amounts.append((amt, tx))
+
+                if cat_lower in mandatory_categories:
+                    mandatory_spending += amt
+                else:
+                    discretionary_spending += amt
 
                 if tx.get("is_recurring") or tx.get("recurring_rule_id"):
                     recurring_totals += amt
@@ -216,6 +252,48 @@ class ExpenseEngine(BaseCalculator):
             except Exception:
                 pass
 
+        # 6. Statistical Outlier / Spike Detection
+        outliers = []
+        if len(valid_tx_amounts) >= 3:
+            sorted_amts = sorted([a[0] for a in valid_tx_amounts])
+            q1_idx = len(sorted_amts) // 4
+            q1_amt = sorted_amts[q1_idx]
+            median_amt = sorted_amts[len(sorted_amts) // 2]
+            # Anomaly threshold: 2.5x median or 3x Q1 baseline (minimum ₹1,000)
+            baseline = q1_amt if q1_amt > Decimal("0.00") else median_amt
+            outlier_threshold = max(Decimal("1000.00"), min(median_amt * Decimal("2.50"), baseline * Decimal("3.00")))
+            for amt, tx in valid_tx_amounts:
+                if amt >= outlier_threshold:
+                    outliers.append({
+                        "id": str(tx.get("id") or ""),
+                        "title": str(tx.get("title") or "Transaction"),
+                        "amount": str(quantize_currency(amt)),
+                        "date": str(tx.get("transaction_date") or tx.get("expense_date") or ""),
+                        "category": str(tx.get("category") or "Other"),
+                        "spike_multiplier": float(round(safe_divide(amt, baseline), 1)) if baseline > Decimal("0") else 3.0,
+                    })
+
+        # 7. Month-over-Month (MoM) Growth
+        mom_growth = []
+        sorted_month_keys = sorted(monthly_totals.keys())
+        for i in range(1, len(sorted_month_keys)):
+            prev_m = sorted_month_keys[i - 1]
+            curr_m = sorted_month_keys[i]
+            prev_val = monthly_totals[prev_m]
+            curr_val = monthly_totals[curr_m]
+            pct_change = safe_percentage(curr_val - prev_val, prev_val) if prev_val > Decimal("0") else Decimal("0.00")
+            mom_growth.append({
+                "from_month": prev_m,
+                "to_month": curr_m,
+                "previous_amount": str(quantize_currency(prev_val)),
+                "current_amount": str(quantize_currency(curr_val)),
+                "growth_percent": float(pct_change),
+                "is_increased": curr_val > prev_val,
+            })
+
+        mandatory_pct = safe_percentage(mandatory_spending, total_net_expense) if total_net_expense > Decimal("0") else Decimal("0.00")
+        discretionary_pct = safe_percentage(discretionary_spending, total_net_expense) if total_net_expense > Decimal("0") else Decimal("0.00")
+
         return {
             "total_gross_expense": str(quantize_currency(total_gross_expense)),
             "total_refunds": str(quantize_currency(total_refunds)),
@@ -239,4 +317,16 @@ class ExpenseEngine(BaseCalculator):
             "category_breakdown": category_breakdown,
             "monthly_totals": {k: str(quantize_currency(v)) for k, v in monthly_totals.items()},
             "yearly_totals": {k: str(quantize_currency(v)) for k, v in yearly_totals.items()},
+            "spending_behavior": {
+                "mandatory_needs_total": str(quantize_currency(mandatory_spending)),
+                "mandatory_needs_percent": float(mandatory_pct),
+                "discretionary_wants_total": str(quantize_currency(discretionary_spending)),
+                "discretionary_wants_percent": float(discretionary_pct),
+                "weekend_spending_total": str(quantize_currency(weekend_spending)),
+                "weekday_spending_total": str(quantize_currency(weekday_spending)),
+                "weekend_spending_percent": float(safe_percentage(weekend_spending, total_net_expense)),
+                "day_of_week_distribution": {k: str(quantize_currency(v)) for k, v in day_of_week_totals.items()},
+            },
+            "statistical_outliers": outliers[:10],
+            "month_over_month_velocity": mom_growth,
         }

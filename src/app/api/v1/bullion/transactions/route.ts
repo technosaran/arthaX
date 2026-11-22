@@ -28,6 +28,14 @@ export async function GET(req: NextRequest) {
     return apiUnauthorized(authError || "Unauthorized", req);
   }
 
+  const rl = await rateLimit(`bullion_tx_get:${userId}`, 120, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 200);
 
@@ -60,6 +68,14 @@ export async function POST(req: NextRequest) {
 
   if (!user || !userId) {
     return apiUnauthorized(authError || "Unauthorized", req);
+  }
+
+  const rl = await rateLimit(`bullion_tx_post:${userId}`, 30, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
   }
 
   try {

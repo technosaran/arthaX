@@ -83,6 +83,13 @@ const ACCOUNT_STOP_WORDS = new Set([
 ]);
 
 /**
+ * Escapes special characters for safe use in a dynamic RegExp
+ */
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Intelligent parser that extracts amount, account, category, and title from chat messages,
  * voice shortcuts, and bank SMS debit alerts.
  */
@@ -105,8 +112,11 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
     const smsAmountMatch = clean.match(smsAmountRegex);
 
     if (smsAmountMatch) {
-      amount = parseFloat(smsAmountMatch[1].replace(/,/g, ""));
-      remainingText = remainingText.replace(smsAmountMatch[0], " ");
+      const parsedVal = parseFloat(smsAmountMatch[1].replace(/,/g, ""));
+      if (!isNaN(parsedVal) && isFinite(parsedVal) && parsedVal > 0) {
+        amount = parsedVal;
+        remainingText = remainingText.replace(smsAmountMatch[0], " ");
+      }
     }
 
     // 1B. Account last four in SMS: e.g. "ending 1234", "**1234", "A/C ...1234"
@@ -139,8 +149,11 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
     // 2A. Check multiplier format: "2k", "1.5k", "10k"
     const kMatch = remainingText.match(/(?:^|\s)(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]+)?)\s*k\b/i);
     if (kMatch) {
-      amount = parseFloat(kMatch[1]) * 1000;
-      remainingText = remainingText.replace(kMatch[0], " ").trim();
+      const parsedVal = parseFloat(kMatch[1]) * 1000;
+      if (!isNaN(parsedVal) && isFinite(parsedVal) && parsedVal > 0) {
+        amount = parsedVal;
+        remainingText = remainingText.replace(kMatch[0], " ").trim();
+      }
     }
   }
 
@@ -151,8 +164,11 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
 
     if (explicitMatch) {
       const rawNum = (explicitMatch[1] || explicitMatch[2]).replace(/,/g, "");
-      amount = parseFloat(rawNum);
-      remainingText = remainingText.replace(explicitMatch[0], " ").trim();
+      const parsedVal = parseFloat(rawNum);
+      if (!isNaN(parsedVal) && isFinite(parsedVal) && parsedVal > 0) {
+        amount = parsedVal;
+        remainingText = remainingText.replace(explicitMatch[0], " ").trim();
+      }
     }
   }
 
@@ -165,6 +181,9 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
     while ((match = genericNumberRegex.exec(remainingText)) !== null) {
       const rawNum = match[1].replace(/,/g, "");
       const numVal = parseFloat(rawNum);
+      if (isNaN(numVal) || !isFinite(numVal) || numVal <= 0) {
+        continue;
+      }
       const matchIndex = match.index;
       const matchLen = match[0].length;
       const afterText = remainingText.slice(matchIndex + matchLen, matchIndex + matchLen + 6).toLowerCase();
@@ -200,16 +219,17 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
       const lastFour = acc.last_four;
 
       // Check last four explicitly
-      if (lastFour && new RegExp(`\\b${lastFour}\\b`, "i").test(remainingText)) {
+      if (lastFour && new RegExp(`\\b${escapeRegExp(lastFour)}\\b`, "i").test(remainingText)) {
         matchedAccountQuery = acc.name;
-        remainingText = remainingText.replace(new RegExp(`\\b${lastFour}\\b`, "i"), " ");
+        remainingText = remainingText.replace(new RegExp(`\\b${escapeRegExp(lastFour)}\\b`, "i"), " ");
         break;
       }
 
       // Check full account name
-      if (new RegExp(`\\b${accNameClean}\\b`, "i").test(remainingText)) {
+      const safeAccName = escapeRegExp(accNameClean);
+      if (new RegExp(`\\b${safeAccName}\\b`, "i").test(remainingText)) {
         matchedAccountQuery = acc.name;
-        remainingText = remainingText.replace(new RegExp(`\\b${accNameClean}\\b`, "i"), " ");
+        remainingText = remainingText.replace(new RegExp(`\\b${safeAccName}\\b`, "i"), " ");
         break;
       }
 
@@ -220,7 +240,7 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
         .filter((w) => w.length >= 3 && !ACCOUNT_STOP_WORDS.has(w));
 
       for (const word of distinctWords) {
-        const wordRegex = new RegExp(`\\b${word}\\b`, "i");
+        const wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`, "i");
         if (wordRegex.test(remainingText)) {
           matchedAccountQuery = acc.name;
           remainingText = remainingText.replace(wordRegex, " ");
@@ -284,7 +304,7 @@ export function parseExpenseMessage(text: string, knownAccounts: AccountSummary[
   }
 
   return {
-    amount: Number(amount.toFixed(2)),
+    amount: isNaN(amount) || !isFinite(amount) ? 0 : Number(amount.toFixed(2)),
     title: cleanTitle,
     category,
     accountQuery: matchedAccountQuery,

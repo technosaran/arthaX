@@ -63,6 +63,11 @@ class IncomeEngine(BaseCalculator):
         recurring_income_total = Decimal("0.00")
         recurring_count = 0
 
+        # Active vs Passive income classification
+        passive_keywords = {"dividend", "dividends", "interest", "rental", "rent", "royalty", "capital_gains", "staking", "yield", "coupon", "fd", "bonds"}
+        active_income_total = Decimal("0.00")
+        passive_income_total = Decimal("0.00")
+
         target_month_income = Decimal("0.00")
         target_year_income = Decimal("0.00")
 
@@ -73,8 +78,14 @@ class IncomeEngine(BaseCalculator):
 
             total_income += amt
             src = str(inc.get("category") or inc.get("source") or "Salary").strip()
+            src_lower = src.lower()
             source_breakdown[src] += amt
             source_counts[src] += 1
+
+            if any(k in src_lower for k in passive_keywords):
+                passive_income_total += amt
+            else:
+                active_income_total += amt
 
             d_val = inc.get("received_date") or inc.get("date")
             parsed_d = parse_iso_date(d_val)
@@ -134,6 +145,31 @@ class IncomeEngine(BaseCalculator):
         target_month_net_cash_flow = target_month_income - target_month_expense
         target_month_savings_rate = safe_percentage(target_month_net_cash_flow, target_month_income) if target_month_income > 0 else Decimal("0.00")
 
+        # Passive Income Coverage Ratio (% of expenses covered completely passively)
+        passive_coverage_pct = safe_percentage(passive_income_total, total_expense) if total_expense > Decimal("0.00") else Decimal("0.00")
+        is_fire_crossover = passive_coverage_pct >= Decimal("100.00")
+
+        # Income Stability & Volatility Analysis
+        month_vals = [float(v) for v in monthly_income.values()]
+        if len(month_vals) >= 2:
+            import math
+            mean_m = sum(month_vals) / len(month_vals)
+            var_m = sum((v - mean_m) ** 2 for v in month_vals) / (len(month_vals) - 1)
+            std_m = math.sqrt(var_m)
+            cv = (std_m / mean_m) if mean_m > 0 else 0.0
+            stability_tier = "PREDICTABLE_SALARIED" if cv < 0.15 else "MODERATELY_VARIABLE" if cv <= 0.40 else "HIGHLY_IRREGULAR"
+            income_volatility = {
+                "coefficient_of_variation": round(cv, 3),
+                "stability_tier": stability_tier,
+                "average_monthly_income": str(quantize_currency(Decimal(str(round(mean_m, 2))))),
+            }
+        else:
+            income_volatility = {
+                "coefficient_of_variation": 0.0,
+                "stability_tier": "SINGLE_PERIOD_BASELINE",
+                "average_monthly_income": str(quantize_currency(total_income)),
+            }
+
         return {
             "total_income": str(quantize_currency(total_income)),
             "currency": preferred_currency,
@@ -143,6 +179,15 @@ class IncomeEngine(BaseCalculator):
             "target_year_income": str(quantize_currency(target_year_income)),
             "recurring_income_total": str(quantize_currency(recurring_income_total)),
             "recurring_income_count": recurring_count,
+            "active_passive_split": {
+                "active_earned_income": str(quantize_currency(active_income_total)),
+                "active_percent": float(safe_percentage(active_income_total, total_income)),
+                "passive_investment_income": str(quantize_currency(passive_income_total)),
+                "passive_percent": float(safe_percentage(passive_income_total, total_income)),
+                "passive_income_coverage_percent": float(passive_coverage_pct),
+                "is_fire_crossover_achieved": is_fire_crossover,
+            },
+            "income_stability": income_volatility,
             "sources_breakdown": sources_list,
             "monthly_income": {k: str(quantize_currency(v)) for k, v in monthly_income.items()},
             "yearly_income": {k: str(quantize_currency(v)) for k, v in yearly_income.items()},
