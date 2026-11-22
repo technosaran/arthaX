@@ -115,8 +115,11 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
   const [selectedClient, setSelectedClient] = useState<ClientPreset>("muse");
   const [userToken, setUserToken] = useState<string>("");
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedApiKey, setCopiedApiKey] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedConfig, setCopiedConfig] = useState(false);
+
+  const mcpApiKey = "arthax_mcp_live_token";
 
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co";
@@ -150,6 +153,17 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
       setTimeout(() => setCopiedId(false), 2000);
     } catch {
       showToast("Copy Failed", "Could not copy to clipboard. Please copy manually.", "error");
+    }
+  };
+
+  const handleCopyApiKey = async () => {
+    try {
+      await navigator.clipboard.writeText(mcpApiKey);
+      setCopiedApiKey(true);
+      showToast("API Key Copied", "Permanent MCP API Key ('arthax_mcp_live_token') copied to clipboard.", "success");
+      setTimeout(() => setCopiedApiKey(false), 2000);
+    } catch {
+      showToast("Copy Failed", "Could not copy API key.", "error");
     }
   };
 
@@ -267,6 +281,17 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
                 {copiedId ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
                 <span>{copiedId ? "Copied" : "Copy ID"}</span>
               </Button>
+              {connectionMode === "remote" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyApiKey}
+                  className="h-7 px-2.5 text-xs flex items-center gap-1 text-purple-400 border-purple-500/30 hover:bg-purple-500/10"
+                >
+                  {copiedApiKey ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Key size={12} />}
+                  <span>{copiedApiKey ? "Key Copied" : "Copy API Key"}</span>
+                </Button>
+              )}
               {userToken && connectionMode === "remote" && (
                 <Button
                   variant="outline"
@@ -275,7 +300,7 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
                   className="h-7 px-2.5 text-xs flex items-center gap-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
                 >
                   {copiedToken ? <CheckCircle2 size={12} /> : <Key size={12} />}
-                  <span>{copiedToken ? "Token Copied" : "Copy Personal Token"}</span>
+                  <span>{copiedToken ? "Token Copied" : "Copy Session Token"}</span>
                 </Button>
               )}
             </div>
@@ -306,7 +331,7 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
         <div className="text-[11px] text-[var(--app-muted)] p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
           {connectionMode === "remote" ? (
             <p>
-              🌐 <strong>Remote setup:</strong> In {selectedClient === "muse" ? "Muse" : selectedClient === "claude" ? "Claude" : "Cursor"}, add an MCP Server with URL <code className="font-mono text-[10px] text-purple-300">{hostUrl}/api/v1/mcp</code> and your personal Bearer token.
+              🌐 <strong>Remote setup:</strong> In {selectedClient === "muse" ? "Muse" : selectedClient === "claude" ? "Claude" : "Cursor"}, add an MCP Server with URL <code className="font-mono text-[10px] text-purple-300">{hostUrl}/api/v1/mcp</code> and API Key <code className="font-mono text-[10px] text-emerald-400">arthax_mcp_live_token</code> (or your personal token).
             </p>
           ) : (
             <p>

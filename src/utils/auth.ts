@@ -24,16 +24,17 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<AuthResul
     return { user: null, userId: null, error: "Supabase configuration missing" };
   }
 
-  // 1. Check Bearer Authorization token in header
+  // 1. Check Bearer Authorization token in header (clean multiple or lower-case Bearer prefixes)
   if (req) {
-    const authHeader = req.headers.get("authorization") || "";
-    if (authHeader.startsWith("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "").trim();
-      if (token) {
-        const { data: { user }, error: jwtErr } = await supabaseAdmin.auth.getUser(token);
-        if (user && !jwtErr) {
-          return { user, userId: user.id, error: null };
-        }
+    let authHeader = (req.headers.get("authorization") || "").trim();
+    while (authHeader.toLowerCase().startsWith("bearer ")) {
+      authHeader = authHeader.slice(7).trim();
+    }
+    const token = authHeader;
+    if (token) {
+      const { data: { user }, error: jwtErr } = await supabaseAdmin.auth.getUser(token);
+      if (user && !jwtErr) {
+        return { user, userId: user.id, error: null };
       }
     }
   }
