@@ -54,17 +54,20 @@ describe("ArthaX Enterprise Security Hardening Suite (OAuth, Crypto & Database I
       const origNodeEnv = process.env.NODE_ENV;
       const origSecret = process.env.OAUTH_STATE_SECRET;
       const origMaster = process.env.ENCRYPTION_MASTER_KEY;
+      const origService = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
       try {
         (process.env as Record<string, string | undefined>).NODE_ENV = "production";
         delete process.env.OAUTH_STATE_SECRET;
         delete process.env.ENCRYPTION_MASTER_KEY;
+        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-        expect(() => getOAuthStateSigningSecret()).toThrow(/OAUTH_STATE_SECRET or ENCRYPTION_MASTER_KEY must be configured/);
+        expect(() => getOAuthStateSigningSecret()).toThrow(/OAUTH_STATE_SECRET, ENCRYPTION_MASTER_KEY, or SUPABASE_SERVICE_ROLE_KEY must be configured/);
       } finally {
         (process.env as Record<string, string | undefined>).NODE_ENV = origNodeEnv;
         if (origSecret) process.env.OAUTH_STATE_SECRET = origSecret;
         if (origMaster) process.env.ENCRYPTION_MASTER_KEY = origMaster;
+        if (origService) process.env.SUPABASE_SERVICE_ROLE_KEY = origService;
       }
     });
 

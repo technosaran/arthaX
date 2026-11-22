@@ -28,16 +28,20 @@ export function getTrustedOrigin(req: NextRequest): string {
 }
 
 export function getOAuthStateSigningSecret(): string {
-  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
   const secret = process.env.OAUTH_STATE_SECRET || process.env.ENCRYPTION_MASTER_KEY;
+  if (secret) return secret;
 
-  if (!secret) {
-    if (isProd) {
-      throw new Error("OAUTH_STATE_SECRET or ENCRYPTION_MASTER_KEY must be configured in production.");
-    }
-    return "dev-testing-oauth-state-secret-32-chars-long!";
+  // Gracefully derive a secure 256-bit signing key from server-side SUPABASE_SERVICE_ROLE_KEY if present
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey) {
+    return crypto.createHmac("sha256", "arthax-oauth-state-signing-salt-2026").update(serviceKey).digest("hex");
   }
-  return secret;
+
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  if (isProd) {
+    throw new Error("OAUTH_STATE_SECRET, ENCRYPTION_MASTER_KEY, or SUPABASE_SERVICE_ROLE_KEY must be configured in production.");
+  }
+  return "dev-testing-oauth-state-secret-32-chars-long!";
 }
 
 export async function GET(req: NextRequest) {
@@ -49,7 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${baseOrigin}/login?next=/?tab=settings`);
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
   if (!clientId) {
     console.error("[Gmail OAuth] GOOGLE_CLIENT_ID is not configured in environment variables.");
     return NextResponse.redirect(

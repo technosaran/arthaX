@@ -98,8 +98,8 @@ export async function GET(req: NextRequest) {
   }
 
   // 3. Exchange code for Google OAuth tokens using PKCE verifier if available
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
   const redirectUri = `${baseOrigin}/api/v1/integrations/gmail/callback`;
   const codeVerifier = req.cookies.get("arthax_oauth_verifier")?.value;
 
