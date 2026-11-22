@@ -58,16 +58,24 @@ export async function GET(request: Request) {
           const { encryptSensitiveData } = await import("@/utils/crypto");
           const encAccess = encryptSensitiveData(providerToken, "gmail-tokens");
           const encRefresh = providerRefreshToken ? encryptSensitiveData(providerRefreshToken, "gmail-tokens") : null;
+
+          const payload: Record<string, any> = {
+            user_id: user.id,
+            email_address: user.email?.toLowerCase() || "",
+            access_token_encrypted: encAccess,
+            token_expiry: new Date(Date.now() + 3500 * 1000).toISOString(),
+            sync_status: "ACTIVE",
+            error_details: null,
+            updated_at: new Date().toISOString(),
+          };
+
+          // Only update refresh token if Google provided a new one (prevents wiping existing refresh token on re-login)
+          if (encRefresh) {
+            payload.refresh_token_encrypted = encRefresh;
+          }
+
           await supabaseAdmin.from("gmail_integrations").upsert(
-            {
-              user_id: user.id,
-              email_address: user.email?.toLowerCase() || "",
-              access_token_encrypted: encAccess,
-              refresh_token_encrypted: encRefresh,
-              sync_status: "ACTIVE",
-              error_details: null,
-              updated_at: new Date().toISOString(),
-            },
+            payload,
             { onConflict: "user_id" }
           );
         } catch (tokenErr) {

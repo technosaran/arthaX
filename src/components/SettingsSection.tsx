@@ -2578,9 +2578,15 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       <span>Checking...</span>
                     </Badge>
                   ) : gmailStatus.connected ? (
-                    <Badge variant="emerald" dot>
-                      Connected: {gmailStatus.email}
-                    </Badge>
+                    gmailStatus.syncStatus === "EXPIRED" ? (
+                      <Badge variant="amber" dot>
+                        Session Expired: {gmailStatus.email}
+                      </Badge>
+                    ) : (
+                      <Badge variant="emerald" dot>
+                        Connected: {gmailStatus.email}
+                      </Badge>
+                    )
                   ) : (
                     <Badge variant="neutral">Not Linked</Badge>
                   )}
@@ -2590,6 +2596,24 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               {/* Status or Configuration */}
               {gmailStatus.connected ? (
                 <div className="space-y-4">
+                  {gmailStatus.syncStatus === "EXPIRED" && (
+                    <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2.5 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={15} className="flex-shrink-0 text-amber-400" />
+                        <span>Google OAuth session expired. Re-authenticate to renew bank statement scanning authorization.</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGoogleOAuthConnect}
+                        className="border-amber-500/40 text-amber-300 hover:bg-amber-500/20 text-[11px] gap-1.5 font-medium"
+                      >
+                        <RefreshCw size={11} />
+                        <span>Reconnect Google</span>
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] space-y-3">
                     <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
                       <div>
@@ -2605,6 +2629,18 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {gmailStatus.syncStatus === "EXPIRED" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={syncingGmail}
+                            onClick={handleGoogleOAuthConnect}
+                            className="gap-1.5 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs shadow-sm"
+                          >
+                            <RefreshCw size={12} />
+                            <span>Reconnect Google</span>
+                          </Button>
+                        )}
                         <Button
                           variant="primary"
                           size="sm"
