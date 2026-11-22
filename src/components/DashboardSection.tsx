@@ -287,15 +287,16 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         (sum: number, bul: any) => sum + (Number(bul.total_buy_price) || 0),
         0
       );
-      const cryptoInr = cryptoUsdTotal * 84.5;
-      const totalInvestments = stocksTotal + mfTotal + bondsTotal + bullionTotal + cryptoInr;
+      // Strict Currency Separation: INR investments are strictly INR (Stocks, MFs, Bonds, Bullion).
+      // Crypto holdings are denominated in USD and kept independent for the USD currency view.
+      const totalInvestments = stocksTotal + mfTotal + bondsTotal + bullionTotal;
 
       setInvestmentsBreakdown({
         stocks: stocksTotal,
         mutualFunds: mfTotal,
         bonds: bondsTotal,
         bullion: bullionTotal,
-        cryptoInr,
+        cryptoInr: 0,
         total: totalInvestments,
       });
 
@@ -611,9 +612,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     }
     if (investmentsBreakdown?.bullion && investmentsBreakdown.bullion > 0) {
       map["Gold & Silver"] = (map["Gold & Silver"] || 0) + investmentsBreakdown.bullion;
-    }
-    if (investmentsBreakdown?.cryptoInr && investmentsBreakdown.cryptoInr > 0) {
-      map["Crypto"] = (map["Crypto"] || 0) + investmentsBreakdown.cryptoInr;
     }
 
     return map;

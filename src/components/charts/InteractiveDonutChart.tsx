@@ -489,7 +489,12 @@ export default function InteractiveDonutChart({
               </span>
               <span className="text-[9px] font-mono opacity-60 flex items-center justify-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {validSegments.length} {validSegments.length === 1 ? unitLabel : `${unitLabel}s`}
+                {validSegments.length}{" "}
+                {validSegments.length === 1
+                  ? unitLabel
+                  : unitLabel === "Class"
+                  ? "Classes"
+                  : `${unitLabel}s`}
               </span>
             </div>
           )}
@@ -537,7 +542,11 @@ export default function InteractiveDonutChart({
                 }}
               >
                 {validSegments.length}{" "}
-                {validSegments.length === 1 ? unitLabel : `${unitLabel}s`}
+                {validSegments.length === 1
+                  ? unitLabel
+                  : unitLabel === "Class"
+                  ? "Classes"
+                  : `${unitLabel}s`}
               </span>
             </div>
           </div>
