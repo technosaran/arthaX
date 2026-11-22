@@ -299,7 +299,7 @@ export async function syncUserGmailStatements(
   const pythonServiceUrl =
     process.env.PYTHON_BACKEND_URL ||
     process.env.PYTHON_SERVICE_URL ||
-    "http://127.0.0.1:8000";
+    (process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://arthax.vercel.app"));
 
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
@@ -309,14 +309,15 @@ export async function syncUserGmailStatements(
   // Determine bounded batch size (min 5, max 100, default 25)
   const batchLimit = Math.min(Math.max(options?.maxMessages ?? 25, 5), 100);
 
-  // Determine checkpoint after_date with safety margin to avoid reprocessing entire mailbox
+  // Determine checkpoint after_date.
+  // For on-demand sync, search up to 60 days back so recent monthly statements are discovered.
   let afterDateStr: string | undefined = options?.afterDate;
-  if (!afterDateStr && integration.last_sync_at) {
-    const lastSync = new Date(integration.last_sync_at);
-    lastSync.setDate(lastSync.getDate() - 1); // 1-day safety buffer
-    const yyyy = lastSync.getFullYear();
-    const mm = String(lastSync.getMonth() + 1).padStart(2, "0");
-    const dd = String(lastSync.getDate()).padStart(2, "0");
+  if (!afterDateStr) {
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - 60);
+    const yyyy = lookbackDate.getFullYear();
+    const mm = String(lookbackDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(lookbackDate.getDate()).padStart(2, "0");
     afterDateStr = `${yyyy}/${mm}/${dd}`;
   }
 
@@ -346,9 +347,58 @@ export async function syncUserGmailStatements(
       } else {
         const errText = await pyRes.text();
         logger.warn(`Calculation engine Gmail sync returned ${pyRes.status}: ${errText}`, "GmailService");
+        let parsedDetail = errText;
+        try {
+          const parsed = JSON.parse(errText);
+          parsedDetail = parsed.detail || parsed.message || parsed.error || errText;
+        } catch {}
+
+        if (parsedDetail.includes("insufficient") || parsedDetail.includes("SCOPE") || parsedDetail.includes("403") || pyRes.status === 403) {
+          await supabaseAdmin
+            .from("gmail_integrations")
+            .update({
+              sync_status: "EXPIRED",
+              error_details: "Insufficient Gmail permissions. Please click 'Reconnect Google' to grant statement read access.",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", integration.id);
+          return {
+            success: false,
+            statementsCount: 0,
+            transactionsImported: 0,
+            duplicatesSkipped: 0,
+            transfersMatched: 0,
+            failedCount: 1,
+            status: "FAILED",
+            error: "Gmail read permission not granted. Please click 'Reconnect Google' to authorize statement access.",
+          };
+        }
+
+        return {
+          success: false,
+          statementsCount: 0,
+          transactionsImported: 0,
+          duplicatesSkipped: 0,
+          transfersMatched: 0,
+          failedCount: 1,
+          status: "FAILED",
+          error: `Bank statement sync failed: ${parsedDetail}`,
+        };
       }
     } catch (fetchErr) {
-      logger.info("Calculation engine service offline or unreachable during Gmail sync", "GmailService");
+      logger.warn("Calculation engine service unreachable during Gmail sync", "GmailService", { error: String(fetchErr) });
+      if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+        return {
+          success: false,
+          statementsCount: 0,
+          transactionsImported: 0,
+          duplicatesSkipped: 0,
+          transfersMatched: 0,
+          failedCount: 1,
+          status: "FAILED",
+          error: "Calculation engine service unreachable. Please ensure service is online and try again.",
+        };
+      }
     }
 
     const statements: any[] = pyData?.statements || [];

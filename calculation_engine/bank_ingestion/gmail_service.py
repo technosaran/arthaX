@@ -25,17 +25,18 @@ from ..intelligence import classifier, match_internal_transfers, TransactionClas
 
 logger = logging.getLogger("arthax.gmail_ingestion")
 
-# Targeted Gmail search query for statement discovery across major Indian banks and brokers
+# Comprehensive Gmail search query for statement discovery across major banks and brokers
 DEFAULT_GMAIL_STATEMENT_QUERY = (
-    "(from:sbi.co.in OR from:alerts.sbi.bank.in OR from:sbi.bank.in OR from:communications.sbi "
-    "OR from:indianbank.co.in OR from:hdfcbank.net OR from:hdfcbank.com "
-    "OR from:icicibank.com OR from:axisbank.com OR from:kotak.com OR from:pnb.co.in "
+    "(subject:statement OR subject:e-statement OR subject:\"account statement\" "
+    "OR subject:\"statement of account\" OR subject:\"bank statement\" "
+    "OR subject:eCAS OR subject:\"consolidated account statement\" "
+    "OR from:sbi.co.in OR from:sbi.bank.in OR from:alerts.sbi.bank.in "
+    "OR from:hdfcbank.net OR from:hdfcbank.com OR from:icicibank.com "
+    "OR from:axisbank.com OR from:kotak.com OR from:pnb.co.in "
     "OR from:bankofbaroda.com OR from:canarabank.com OR from:unionbankofindia.co.in "
-    "OR from:standardchartered.co.in OR from:indusind.com OR from:idfcfirstbank.com "
-    "OR from:federalbank.co.in OR from:camsonline.com OR from:kfintech.com) "
-    "AND (subject:statement OR subject:e-statement OR subject:\"account statement\" "
-    "OR subject:\"statement of account\" OR subject:\"eCAS\" OR subject:\"consolidated account statement\" "
-    "OR subject:\"Email Statement\") "
+    "OR from:indianbank.co.in OR from:indusind.com OR from:idfcfirstbank.com "
+    "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in "
+    "OR from:camsonline.com OR from:kfintech.com) "
     "AND has:attachment"
 )
 

@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     const rules = [
       {
         source: "/api/py/:path*",
-        destination: isDev ? "http://127.0.0.1:8000/api/py/:path*" : "/api/:path*",
+        destination: isDev ? "http://127.0.0.1:8000/api/py/:path*" : "/api/",
       },
     ];
 

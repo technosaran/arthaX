@@ -256,7 +256,7 @@ export default function LoginClient() {
         provider: "google",
         options: {
           redirectTo: `${origin}/auth/callback?next=/`,
-          scopes: "email profile openid",
+          scopes: "email profile openid https://www.googleapis.com/auth/gmail.readonly",
           queryParams: {
             access_type: "offline",
             prompt: "consent",
