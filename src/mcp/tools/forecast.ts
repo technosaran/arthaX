@@ -48,9 +48,10 @@ export async function handleGetForecast(
 
   for (const rule of recurringRes.data || []) {
     if (rule.is_active) {
-      if (rule.transaction_type === "EXPENSE") {
+      const type = (rule.transaction_type || "").toLowerCase();
+      if (type === "expense") {
         monthlyRecurringExpenses += Number(rule.amount);
-      } else if (rule.transaction_type === "INCOME") {
+      } else if (type === "income") {
         monthlyRecurringIncome += Number(rule.amount);
       }
     }

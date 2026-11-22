@@ -97,6 +97,9 @@ describe("User Identity & Basic Details API Suite", () => {
     const mockFrom = vi.fn().mockImplementation((table: string) => {
       if (table === "statement_password_hints") {
         return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
           upsert: upsertSpy,
         };
       }

@@ -83,12 +83,15 @@ export async function handleQueryTransactions(
     }
   }
 
-  if (targetType === "all" || targetType === "transfer") {
+  if ((targetType === "all" || targetType === "transfer") && !filters.category) {
     let q = db
       .from("transfers")
       .select("id, from_account_id, to_account_id, amount, transfer_date, notes, created_at")
       .eq("user_id", userId);
 
+    if (filters.accountId) {
+      q = q.or(`from_account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`);
+    }
     if (filters.startDate) q = q.gte("transfer_date", filters.startDate);
     if (filters.endDate) q = q.lte("transfer_date", filters.endDate);
 

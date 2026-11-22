@@ -56,6 +56,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
+import { McpIntegrationCard } from "@/components/McpIntegrationCard";
 
 // Utility function to escape CSV values according to RFC 4180 and mitigate Formula Injection (CWE-1236)
 function escapeCSV(val: unknown): string {
@@ -247,6 +248,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       dobMasked: string | null;
       hasPhone: boolean;
       phoneMasked: string | null;
+      hasAccountNumber?: boolean;
+      accountNumberMasked?: string | null;
     };
     latestJob: any | null;
   }>({
@@ -264,6 +267,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   const [panInput, setPanInput] = useState("");
   const [dobInput, setDobInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
+  const [accountNumberInput, setAccountNumberInput] = useState("");
   const [savingIdentity, setSavingIdentity] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<{
     statementsCount: number;
@@ -1011,8 +1015,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   };
 
   const handleSaveBankingIdentity = async () => {
-    if (!panInput.trim() && !dobInput.trim() && !phoneInput.trim()) {
-      showToast("Missing Details", "Please enter your PAN, DOB, or Mobile Number to save your basic details.", "error");
+    if (!panInput.trim() && !dobInput.trim() && !phoneInput.trim() && !accountNumberInput.trim()) {
+      showToast("Missing Details", "Please enter your PAN, DOB, Mobile Number, or Account Number to save your identity details.", "error");
       return;
     }
     setSavingIdentity(true);
@@ -1032,6 +1036,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
           pan: panInput.trim().toUpperCase() || undefined,
           dob: dobInput.trim() || undefined,
           phone: phoneInput.trim() || undefined,
+          accountNumber: accountNumberInput.trim() || undefined,
         }),
       });
 
@@ -1043,12 +1048,13 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
       showToast(
         "Basic Profile Details Saved!",
-        "Identity details encrypted & saved. Bank statement decryption passwords automatically configured for SBI, HDFC, ICICI, Axis, Kotak, PNB & Canara Bank.",
+        "Identity details encrypted & saved. Bank statement decryption passwords automatically configured for Indian Bank, SBI, HDFC, ICICI, Axis, Kotak, PNB & Canara Bank.",
         "success"
       );
       setPanInput("");
       setDobInput("");
       setPhoneInput("");
+      setAccountNumberInput("");
       await fetchGmailStatus(true);
     } catch (err: unknown) {
       showToast("Error", err instanceof Error ? err.message : "Failed to save identity.", "error");
@@ -2074,9 +2080,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
             {(() => {
               const hasAnySaved = Boolean(
                 gmailStatus.bankingIdentity &&
-                (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone)
+                (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone || gmailStatus.bankingIdentity.hasAccountNumber)
               );
-              const hasAnyInput = Boolean(panInput.trim() || dobInput.trim() || phoneInput.trim());
+              const hasAnyInput = Boolean(panInput.trim() || dobInput.trim() || phoneInput.trim() || accountNumberInput.trim());
               const isPanValid = panInput.length === 10 ? /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(panInput.trim()) : null;
 
               return (
@@ -2130,7 +2136,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       {/* PAN Card Status */}
                       <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
                         <div className="flex items-center justify-between">
@@ -2199,6 +2205,29 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           <span className="text-[10px] opacity-40 font-mono">10 digits</span>
                         </div>
                       </div>
+
+                      {/* Account Number Status */}
+                      <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                              <Landmark size={13} />
+                            </div>
+                            <span className="text-[11px] font-medium opacity-75">Account Number</span>
+                          </div>
+                          {gmailStatus.bankingIdentity?.hasAccountNumber ? (
+                            <Badge variant="emerald" size="xs">Encrypted</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="xs">Not Configured</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="font-mono text-xs sm:text-sm font-semibold tracking-wider text-[var(--app-fg)]">
+                            {gmailStatus.bankingIdentity?.accountNumberMasked || "••••••••••••"}
+                          </span>
+                          <span className="text-[10px] opacity-40 font-mono">Indian Bank</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -2220,12 +2249,12 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
                       {[
                         { id: "sbi", name: "SBI", formula: "PAN/Mobile + DOB" },
+                        { id: "indian_bank", name: "Indian Bank", formula: "Account Number" },
                         { id: "hdfc", name: "HDFC", formula: "PAN / Cust ID" },
                         { id: "icici", name: "ICICI", formula: "Name + DOB" },
                         { id: "axis", name: "Axis", formula: "Name + Mobile" },
                         { id: "kotak", name: "Kotak", formula: "CRN or DOB" },
                         { id: "pnb", name: "PNB", formula: "Auto-Derived" },
-                        { id: "canara", name: "Canara", formula: "Auto-Derived" },
                       ].map((b) => (
                         <div
                           key={b.id}
@@ -2260,6 +2289,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                             setPanInput("");
                             setDobInput("");
                             setPhoneInput("");
+                            setAccountNumberInput("");
                           }}
                           className="text-[11px] text-[var(--app-muted)] hover:text-rose-400 transition-colors cursor-pointer"
                         >
@@ -2268,7 +2298,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
                       {/* PAN Input */}
                       <div>
                         <Input
@@ -2344,6 +2374,34 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           helperText="Primary mobile linked with bank"
                         />
                       </div>
+
+                      {/* Account Number Input */}
+                      <div>
+                        <Input
+                          label={
+                            <div className="flex items-center justify-between">
+                              <span>Account Number</span>
+                              {accountNumberInput.length >= 9 ? (
+                                <span className="text-[10px] text-emerald-400 font-mono font-normal flex items-center gap-0.5">
+                                  <Check size={10} /> Valid Digits
+                                </span>
+                              ) : accountNumberInput.length > 0 ? (
+                                <span className="text-[10px] opacity-60 font-mono font-normal">
+                                  {accountNumberInput.length} digits
+                                </span>
+                              ) : null}
+                            </div>
+                          }
+                          type="text"
+                          leftIcon={<Landmark size={14} />}
+                          placeholder={gmailStatus.bankingIdentity?.accountNumberMasked ? `Saved: ${gmailStatus.bankingIdentity.accountNumberMasked}` : "e.g. 11-16 digits"}
+                          value={accountNumberInput}
+                          maxLength={25}
+                          onChange={(e) => setAccountNumberInput(e.target.value.replace(/[^0-9]/g, ""))}
+                          className="font-mono text-xs tracking-wider"
+                          helperText="Used for Indian Bank statement"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -2361,7 +2419,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         variant="primary"
                         size="md"
                         loading={savingIdentity}
-                        disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim())}
+                        disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim() && !accountNumberInput.trim())}
                         onClick={handleSaveBankingIdentity}
                         icon={savingIdentity ? undefined : <Lock size={13} />}
                         className="min-w-[170px] shadow-sm font-semibold"
@@ -2583,6 +2641,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         {/* TAB 3: INTEGRATIONS & BOTS */}
         {activeTab === "integrations" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* MODEL CONTEXT PROTOCOL (MCP) CARD */}
+            <McpIntegrationCard userId={userId} />
+
             {/* TELEGRAM BOT CARD */}
             <Card className="p-6 sm:p-7 space-y-6">
               <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">

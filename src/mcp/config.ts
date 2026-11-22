@@ -32,7 +32,13 @@ export function getMcpConfig(): McpConfig {
   const userId =
     process.env.ARTHAX_USER_ID ||
     process.env.USER_ID ||
-    "default-arthax-user";
+    "";
+
+  if (!userId) {
+    throw new Error(
+      "ARTHAX_USER_ID is not configured. Please set the ARTHAX_USER_ID environment variable in your MCP client settings (e.g. claude_desktop_config.json, muse.json, or .env.local) to connect your arthaX account. You can find your User ID in the arthaX Web UI under Settings > Integrations."
+    );
+  }
 
   return {
     supabaseUrl,

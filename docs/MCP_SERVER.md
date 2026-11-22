@@ -1,35 +1,39 @@
 # arthaX Model Context Protocol (MCP) Server
 
-The **arthaX MCP Server** connects conversational AI assistants (Claude Desktop, Antigravity, Cursor, Windsurf) directly to your arthaX sovereign wealth intelligence layer. Agents can query portfolio valuations, check account balances, analyze budget variances, forecast cash runway, and atomically record expenses, incomes, and transfers using natural language.
+The **arthaX MCP Server** connects conversational AI assistants (Muse, Claude Desktop, Cursor, Antigravity) directly to your arthaX sovereign wealth intelligence layer. Agents can query portfolio valuations, check account balances, analyze budget variances, forecast cash runway, and atomically record expenses, incomes, and transfers using natural language.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Two Connection Modes
 
-### 1. Prerequisites
-Ensure your `.env.local` contains valid Supabase credentials and an optional user identifier:
+arthaX supports two connection methods depending on whether you are an end user or a local developer:
+
+### 1. Remote HTTP Connection (Recommended for All Users)
+Zero database keys, zero local files needed. Any logged-in user can connect directly over secure HTTPS using their personal session token.
+
+**In Muse / Claude / Cursor:**
+Add an MCP server with **HTTP / SSE Transport**:
+- **URL:** `https://your-domain.com/api/v1/mcp`
+- **Headers:**
+  ```json
+  {
+    "Authorization": "Bearer <YOUR_ARTHAX_SESSION_TOKEN>"
+  }
+  ```
+
+In the arthaX Web UI, users simply open **Settings → Integrations → Model Context Protocol (MCP)** and click **"Copy 1-Click Config"** to copy their pre-authenticated configuration!
+
+---
+
+### 2. Local Stdio Connection (For Developers / Self-Hosting)
+For local testing or standalone single-tenant CLI development:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="your-supabase-service-role-key"
-ARTHAX_USER_ID="your-user-uuid" # optional, defaults to 'default-arthax-user'
-```
-
-### 2. Run Locally via Stdio
-```bash
+# Start local stdio MCP server
 npm run mcp
 ```
-*(Runs `npx tsx src/mcp/server.ts` over standard input/output).*
 
----
-
-## 🔌 Client Configuration
-
-### Claude Desktop
-Add this entry to your `claude_desktop_config.json`:
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
+**Client Configuration (`claude_desktop_config.json` or `muse.json`):**
 ```json
 {
   "mcpServers": {
@@ -39,24 +43,9 @@ Add this entry to your `claude_desktop_config.json`:
       "cwd": "C:/Users/saran/Desktop/arthaX",
       "env": {
         "NEXT_PUBLIC_SUPABASE_URL": "https://fvpfzbuoizzjwgekuhot.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "YOUR_SERVICE_ROLE_KEY",
-        "ARTHAX_USER_ID": "YOUR_USER_ID"
+        "SUPABASE_SERVICE_ROLE_KEY": "YOUR_SUPABASE_SERVICE_ROLE_KEY",
+        "ARTHAX_USER_ID": "YOUR_USER_UUID"
       }
-    }
-  }
-}
-```
-
-### Antigravity / Cursor
-Add to your project or workspace MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "arthax": {
-      "command": "npx",
-      "args": ["-y", "tsx", "src/mcp/server.ts"],
-      "cwd": "C:/Users/saran/Desktop/arthaX"
     }
   }
 }
@@ -68,10 +57,10 @@ Add to your project or workspace MCP settings:
 
 | Tool Name | Parameters | Description |
 |---|---|---|
-| `get_net_worth` | `currency?: string` (default: `"INR"`) | Calculates total net worth, liquid cash, liabilities, and asset class breakdown using arthaX's precision calculation engine. |
+| `get_net_worth` | `currency?: string` (default: `"INR"`) | Calculates total net worth, liquid cash, liabilities, and asset class breakdown using arthaX's precision calculation engine (supports automatic INR/USD exchange rates). |
 | `list_accounts` | `includeArchived?: boolean` | Lists bank accounts, credit cards, and cash wallets with current balances and asset/liability classifications. |
 | `get_portfolio_holdings` | `assetClass?: "all" \| "stocks" \| "mutual_funds" \| "bullion" \| "bonds" \| "crypto"` | Returns granular holdings, quantities, invested amounts, current prices, and P&L. |
-| `get_budget_status` | `month?: string` (`YYYY-MM`) | Inspects monthly budgets, limits, actual category spending, remaining balances, and over-budget warnings. |
+| `get_budget_status` | `month?: string` (`YYYY-MM`) | Inspects monthly budgets, limits, actual category spending, remaining balances, and over-budget warnings (with dynamic month-end calendar bounds). |
 | `get_cash_flow_forecast` | `monthsAhead?: number` (1 to 12) | Projects liquid cash runway and monthly balance burn based on historical expenses and active recurring rules. |
 | `query_transactions` | `type`, `accountId`, `category`, `startDate`, `endDate`, `limit` | Searches expenses, incomes, and transfers with pagination and date filtering. |
 | `record_expense` | `accountId`, `amount`, `category`, `title`, `date?`, `notes?`, `tags?` | **Atomically** logs an expense and decrements account balance via PostgreSQL stored procedure (`fn_record_expense_atomic`). |

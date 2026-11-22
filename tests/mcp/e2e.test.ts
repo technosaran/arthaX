@@ -1,6 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+
+vi.mock("../../src/mcp/db", () => ({
+  getMcpDb: () => ({
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockResolvedValue({ data: [], error: null }),
+    })),
+    rpc: vi.fn().mockResolvedValue({ data: "ok", error: null }),
+  }),
+}));
+
 import { createMcpServer } from "../../src/mcp/server";
 
 describe("ArthaX MCP Server Protocol E2E", () => {
@@ -53,6 +65,24 @@ describe("ArthaX MCP Server Protocol E2E", () => {
     expect(resourceUris).toContain("arthax://portfolio/summary");
     expect(resourceUris).toContain("arthax://accounts");
     expect(resourceUris).toContain("arthax://budgets");
+
+    // 4. Verify Tool Execution over Protocol
+    const toolCallRes: any = await client.callTool({
+      name: "get_net_worth",
+      arguments: { currency: "INR" },
+    });
+    expect(toolCallRes).toHaveProperty("content");
+    expect(Array.isArray(toolCallRes.content)).toBe(true);
+    const parsedNetWorth = JSON.parse(toolCallRes.content[0].text);
+    expect(parsedNetWorth).toHaveProperty("totalNetWorth");
+    expect(parsedNetWorth).toHaveProperty("currency", "INR");
+
+    // 5. Verify Resource Read over Protocol
+    const resourceReadRes: any = await client.readResource({
+      uri: "arthax://portfolio/summary",
+    });
+    expect(resourceReadRes).toHaveProperty("contents");
+    expect(resourceReadRes.contents[0].uri).toBe("arthax://portfolio/summary");
 
     // Clean up
     await client.close();

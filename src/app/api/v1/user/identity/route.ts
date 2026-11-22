@@ -11,6 +11,7 @@ const IdentitySchema = z.object({
   pan: z.string().max(20).optional().nullable(),
   dob: z.string().max(30).optional().nullable(),
   phone: z.string().max(25).optional().nullable(),
+  accountNumber: z.string().max(50).optional().nullable(),
 });
 
 /**
@@ -37,6 +38,8 @@ export const GET = createApiRoute({
       dobMasked: null as string | null,
       hasPhone: false,
       phoneMasked: null as string | null,
+      hasAccountNumber: false,
+      accountNumberMasked: null as string | null,
     };
 
     if (identityHint?.encrypted_secret) {
@@ -58,6 +61,11 @@ export const GET = createApiRoute({
             bankingIdentity.hasPhone = true;
             bankingIdentity.phoneMasked = `******${cleanPhone.slice(-4)}`;
           }
+          if (parsed.accountNumber) {
+            const cleanAcc = parsed.accountNumber.trim();
+            bankingIdentity.hasAccountNumber = true;
+            bankingIdentity.accountNumberMasked = cleanAcc.length > 4 ? `••••••••${cleanAcc.slice(-4)}` : "••••";
+          }
         }
       } catch {
         // Safe decryption ignore
@@ -69,14 +77,14 @@ export const GET = createApiRoute({
 });
 
 /**
- * POST: Save or update user's banking identity details (PAN, DOB, Phone, Name)
+ * POST: Save or update user's banking identity details (PAN, DOB, Phone, Account Number, Name)
  */
 export const POST = createApiRoute({
   auth: "required",
   rateLimit: { limit: 20, windowSeconds: 60 },
   schema: IdentitySchema,
   handler: async ({ userId, body, req }) => {
-    const { name, pan, dob, phone } = body;
+    const { name, pan, dob, phone, accountNumber } = body;
 
     // Optional name update on user_settings
     if (name && name.trim()) {
@@ -87,11 +95,38 @@ export const POST = createApiRoute({
       });
     }
 
-    if ((pan && pan.trim()) || (dob && dob.trim()) || (phone && phone.trim())) {
+    // Retrieve existing identity to allow partial updates
+    let existingIdentity: BankingIdentityDetails = {};
+    const hintsQuery = supabaseAdmin.from("statement_password_hints");
+    if (hintsQuery && typeof hintsQuery.select === "function") {
+      try {
+        const { data: existingHint } = await hintsQuery
+          .select("encrypted_secret")
+          .eq("user_id", userId!)
+          .eq("hint_pattern", "BANKING_IDENTITY")
+          .maybeSingle();
+
+        if (existingHint?.encrypted_secret) {
+          const decrypted = decryptSensitiveData(existingHint.encrypted_secret, "statement-passwords");
+          if (decrypted) existingIdentity = JSON.parse(decrypted);
+        }
+      } catch {
+        // Safe ignore
+      }
+    }
+
+    const hasNewInput =
+      (pan && pan.trim()) ||
+      (dob && dob.trim()) ||
+      (phone && phone.trim()) ||
+      (accountNumber && accountNumber.trim());
+
+    if (hasNewInput || Object.keys(existingIdentity).length > 0) {
       const identityObj: BankingIdentityDetails = {
-        pan: pan?.trim().toUpperCase() || null,
-        dob: dob?.trim() || null,
-        phone: phone?.trim() || null,
+        pan: pan !== undefined ? (pan?.trim().toUpperCase() || null) : (existingIdentity.pan || null),
+        dob: dob !== undefined ? (dob?.trim() || null) : (existingIdentity.dob || null),
+        phone: phone !== undefined ? (phone?.trim() || null) : (existingIdentity.phone || null),
+        accountNumber: accountNumber !== undefined ? (accountNumber?.trim() || null) : (existingIdentity.accountNumber || null),
       };
 
       const encryptedIdentity = encryptSensitiveData(JSON.stringify(identityObj), "statement-passwords");
@@ -106,7 +141,22 @@ export const POST = createApiRoute({
         { onConflict: "user_id,bank_name,account_id" }
       );
 
-      // Auto-generate permutations for SBI, HDFC, ICICI, Axis, Kotak, etc.
+      // Store specific Account Number candidate for Indian Bank & Axis auto-decryption
+      if (identityObj.accountNumber) {
+        const encryptedAcc = encryptSensitiveData(identityObj.accountNumber, "statement-passwords");
+        await supabaseAdmin.from("statement_password_hints").upsert(
+          {
+            user_id: userId!,
+            bank_name: "INDIAN_BANK",
+            hint_pattern: "ACCOUNT_NUMBER",
+            encrypted_secret: encryptedAcc,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,bank_name,account_id" }
+        );
+      }
+
+      // Auto-generate permutations for SBI, HDFC, ICICI, Axis, Kotak, Indian Bank, etc.
       const permutations = generateBankPasswordPermutations(identityObj);
       if (permutations.length > 0) {
         const primaryHint = permutations[0];
@@ -114,7 +164,7 @@ export const POST = createApiRoute({
         await supabaseAdmin.from("statement_password_hints").upsert(
           {
             user_id: userId!,
-            bank_name: "SBI",
+            bank_name: "ALL",
             hint_pattern: "AUTO_PERMUTATION",
             encrypted_secret: encryptedPrimary,
             updated_at: new Date().toISOString(),

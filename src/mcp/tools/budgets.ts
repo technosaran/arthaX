@@ -12,8 +12,10 @@ export async function handleGetBudgets(
   month?: string
 ) {
   const currentMonth = month || new Date().toISOString().slice(0, 7); // YYYY-MM
+  const [year, monthNum] = currentMonth.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
   const startDate = `${currentMonth}-01`;
-  const endDate = `${currentMonth}-31`;
+  const endDate = `${currentMonth}-${String(lastDay).padStart(2, "0")}`;
 
   const [budgetsRes, expensesRes] = await Promise.all([
     db.from("budgets").select("*").eq("user_id", userId),

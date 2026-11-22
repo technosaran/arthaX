@@ -69,17 +69,22 @@ export async function handleGetNetWorth(
     currency,
   });
 
+  const isUsd = currency.toUpperCase() === "USD";
+  const rate = 84.5;
+  const toCurr = (val: number) => (isUsd ? Number((val / rate).toFixed(2)) : val);
+
   return {
-    totalNetWorth: Number(calc.net_worth),
-    liquidCash: Number(calc.total_liquid_accounts),
-    totalLiabilities: Number(calc.total_liabilities),
-    totalInvestments: Number(calc.total_investments),
-    stocksValuation: Number(calc.assets_breakdown.stocks),
-    mutualFundsValuation: Number(calc.assets_breakdown.mutual_funds),
-    bondsValuation: Number(calc.assets_breakdown.bonds),
-    bullionValuation: Number(calc.assets_breakdown.bullion),
-    cryptoValuation: Number(calc.assets_breakdown.crypto_inr),
+    totalNetWorth: toCurr(Number(calc.net_worth)),
+    liquidCash: toCurr(Number(calc.total_liquid_accounts)),
+    totalLiabilities: toCurr(Number(calc.total_liabilities)),
+    totalInvestments: toCurr(Number(calc.total_investments)),
+    stocksValuation: toCurr(Number(calc.assets_breakdown.stocks)),
+    mutualFundsValuation: toCurr(Number(calc.assets_breakdown.mutual_funds)),
+    bondsValuation: toCurr(Number(calc.assets_breakdown.bonds)),
+    bullionValuation: toCurr(Number(calc.assets_breakdown.bullion)),
+    cryptoValuation: toCurr(Number(calc.assets_breakdown.crypto_inr)),
     allocationPercentages: calc.allocation_percentages,
-    currency: calc.currency,
+    currency: isUsd ? "USD" : "INR",
+    exchangeRate: isUsd ? rate : 1,
   };
 }
