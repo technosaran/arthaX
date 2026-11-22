@@ -28,15 +28,15 @@ export async function handleQueryTransactions(
   if (targetType === "all" || targetType === "expense") {
     let q = db
       .from("expenses")
-      .select("id, title, amount, category, date, notes, account_id, created_at")
+      .select("id, title, amount, category, expense_date, notes, account_id, created_at")
       .eq("user_id", userId);
 
     if (filters.accountId) q = q.eq("account_id", filters.accountId);
     if (filters.category) q = q.eq("category", filters.category);
-    if (filters.startDate) q = q.gte("date", filters.startDate);
-    if (filters.endDate) q = q.lte("date", filters.endDate);
+    if (filters.startDate) q = q.gte("expense_date", filters.startDate);
+    if (filters.endDate) q = q.lte("expense_date", filters.endDate);
 
-    const { data: expenses, error } = await q.order("date", { ascending: false }).limit(limit);
+    const { data: expenses, error } = await q.order("expense_date", { ascending: false }).limit(limit);
     if (error) throw new Error(`Failed to query expenses: ${error.message}`);
 
     for (const exp of expenses || []) {
@@ -46,7 +46,7 @@ export async function handleQueryTransactions(
         title: exp.title,
         amount: Number(exp.amount),
         category: exp.category,
-        date: exp.date,
+        date: exp.expense_date,
         notes: exp.notes,
         accountId: exp.account_id,
         createdAt: exp.created_at,

@@ -32,7 +32,7 @@ export async function handleGetForecast(
     .from("expenses")
     .select("amount")
     .eq("user_id", userId)
-    .gte("date", sixtyDaysAgo);
+    .gte("expense_date", sixtyDaysAgo);
 
   const pastExpensesTotal = (expensesRes.data || []).reduce((sum, e) => sum + Number(e.amount), 0);
   const estimatedMonthlyBurn = pastExpensesTotal > 0 ? (pastExpensesTotal / 2) : 25000; // fallback to 25k if no historical data
@@ -40,7 +40,7 @@ export async function handleGetForecast(
   // 3. Fetch active recurring rules
   const recurringRes = await db
     .from("recurring_rules")
-    .select("type, amount, is_active")
+    .select("transaction_type, amount, is_active")
     .eq("user_id", userId);
 
   let monthlyRecurringExpenses = 0;
@@ -48,9 +48,9 @@ export async function handleGetForecast(
 
   for (const rule of recurringRes.data || []) {
     if (rule.is_active) {
-      if (rule.type === "EXPENSE") {
+      if (rule.transaction_type === "EXPENSE") {
         monthlyRecurringExpenses += Number(rule.amount);
-      } else if (rule.type === "INCOME") {
+      } else if (rule.transaction_type === "INCOME") {
         monthlyRecurringIncome += Number(rule.amount);
       }
     }

@@ -19,10 +19,10 @@ export async function handleGetBudgets(
     db.from("budgets").select("*").eq("user_id", userId),
     db
       .from("expenses")
-      .select("id, category, amount, date")
+      .select("id, category, amount, expense_date")
       .eq("user_id", userId)
-      .gte("date", startDate)
-      .lte("date", endDate),
+      .gte("expense_date", startDate)
+      .lte("expense_date", endDate),
   ]);
 
   if (budgetsRes.error) throw new Error(`Failed to fetch budgets: ${budgetsRes.error.message}`);
