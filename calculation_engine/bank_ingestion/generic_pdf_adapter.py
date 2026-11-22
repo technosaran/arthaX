@@ -73,12 +73,46 @@ class GenericPdfBankAdapter(BaseBankAdapter):
         file_hash = compute_file_hash(content)
         doc, _ = open_pdf_document(content, passwords)
 
+        is_ocr = False
+        ocr_confidence = 0.0
         try:
             full_text = ""
             for i in range(doc.page_count):
                 full_text += doc[i].get_text() + "\n"
+
+            # Check if document appears to be a scanned bitmap PDF with no text layer
+            if len(full_text.strip()) < 30 and doc.page_count > 0:
+                ocr_text = ""
+                try:
+                    for i in range(doc.page_count):
+                        tp = doc[i].get_textpage_ocr(language="eng")
+                        ocr_text += doc[i].get_text(textpage=tp) + "\n"
+                    if len(ocr_text.strip()) > 30:
+                        full_text = ocr_text
+                        is_ocr = True
+                        ocr_confidence = min(0.85, 0.5 + (len(ocr_text.splitlines()) * 0.02))
+                except Exception as ocr_err:
+                    doc.close()
+                    return self._build_empty_failure(
+                        filename=filename,
+                        file_hash=file_hash,
+                        error_msg=(
+                            "Scanned document detected: PDF contains bitmap images with no embedded text layer. "
+                            f"OCR extraction notice: {str(ocr_err)}"
+                        ),
+                        error_code="SCANNED_PDF_OCR_FAILED",
+                    )
         finally:
-            doc.close()
+            if not doc.is_closed:
+                doc.close()
+
+        if len(full_text.strip()) < 30:
+            return self._build_empty_failure(
+                filename=filename,
+                file_hash=file_hash,
+                error_msg="Document contains no readable text or transaction data.",
+                error_code="EMPTY_DOCUMENT_TEXT",
+            )
 
         detected_bank = detect_bank_name_from_text(full_text)
         lines = full_text.splitlines()
@@ -193,6 +227,7 @@ class GenericPdfBankAdapter(BaseBankAdapter):
             parser_version=self.PARSER_VERSION,
             file_hash=file_hash,
             file_name=filename,
+            raw_metadata={"ocr_applied": is_ocr, "ocr_confidence": ocr_confidence} if is_ocr else {},
         )
 
     def _finalize_generic_tx(self, tx_dict: Dict[str, Any]) -> Optional[ParsedTransactionItem]:

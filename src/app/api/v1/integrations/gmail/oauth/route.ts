@@ -1,12 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
+import { supabaseAdmin } from "@/utils/supabase/admin";
 import crypto from "crypto";
 
-export async function GET(req: NextRequest) {
+export function getTrustedOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_APP_URL).origin;
+    } catch {}
+  }
   const { origin } = new URL(req.url);
   const forwardedHost = req.headers.get("x-forwarded-host");
   const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
-  const baseOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : origin;
+
+  if (forwardedHost) {
+    const hostOnly = forwardedHost.split(":")[0].toLowerCase();
+    const isAllowed =
+      hostOnly === "localhost" ||
+      hostOnly === "127.0.0.1" ||
+      hostOnly === "arthax.vercel.app" ||
+      hostOnly.endsWith(".vercel.app");
+    if (isAllowed) {
+      return `${forwardedProto}://${forwardedHost}`;
+    }
+  }
+  return origin;
+}
+
+export function getOAuthStateSigningSecret(): string {
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  const secret = process.env.OAUTH_STATE_SECRET || process.env.ENCRYPTION_MASTER_KEY;
+
+  if (!secret) {
+    if (isProd) {
+      throw new Error("OAUTH_STATE_SECRET or ENCRYPTION_MASTER_KEY must be configured in production.");
+    }
+    return "dev-testing-oauth-state-secret-32-chars-long!";
+  }
+  return secret;
+}
+
+export async function GET(req: NextRequest) {
+  const baseOrigin = getTrustedOrigin(req);
 
   // 1. Authenticate user from session cookies or authorization header
   const auth = await getAuthenticatedUser(req);
@@ -22,16 +57,46 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 2. Generate cryptographically signed state containing userId and expiration (15 minutes)
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || "arthax-oauth-state-signing-secret";
+  let signingSecret: string;
+  try {
+    signingSecret = getOAuthStateSigningSecret();
+  } catch (err: unknown) {
+    console.error("[Gmail OAuth] Server secret configuration error:", err);
+    return NextResponse.redirect(
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent("Server security configuration missing: OAUTH_STATE_SECRET required")}`
+    );
+  }
+
+  // 2. Generate PKCE code_verifier and code_challenge (RFC 7636)
+  const codeVerifier = crypto.randomBytes(32).toString("base64url");
+  const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+
+  // 3. Generate cryptographically unpredictable nonce for one-time state consumption
+  const nonce = crypto.randomBytes(24).toString("hex");
+
+  // Store in database for server-side one-time consumption
+  try {
+    await supabaseAdmin.from("oauth_state_nonces").insert({
+      user_id: auth.userId,
+      nonce,
+      code_challenge: codeChallenge,
+      code_verifier_hash: crypto.createHash("sha256").update(codeVerifier).digest("hex"),
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    });
+  } catch {
+    // Graceful fallback for test or unmigrated environments
+  }
+
+  // 4. Generate cryptographically signed state containing userId, nonce, and expiration (15 minutes)
   const statePayload = JSON.stringify({
     userId: auth.userId,
+    nonce,
     exp: Date.now() + 15 * 60 * 1000,
   });
-  const sig = crypto.createHmac("sha256", secret).update(statePayload).digest("hex");
+  const sig = crypto.createHmac("sha256", signingSecret).update(statePayload).digest("hex");
   const state = Buffer.from(JSON.stringify({ payload: statePayload, sig })).toString("base64url");
 
-  // 3. Construct direct Google OAuth authorization URL
+  // 5. Construct direct Google OAuth authorization URL with PKCE
   const redirectUri = `${baseOrigin}/api/v1/integrations/gmail/callback`;
   const scopes = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -48,6 +113,27 @@ export async function GET(req: NextRequest) {
   googleAuthUrl.searchParams.set("access_type", "offline");
   googleAuthUrl.searchParams.set("prompt", "consent");
   googleAuthUrl.searchParams.set("state", state);
+  googleAuthUrl.searchParams.set("code_challenge", codeChallenge);
+  googleAuthUrl.searchParams.set("code_challenge_method", "S256");
 
-  return NextResponse.redirect(googleAuthUrl.toString());
+  const response = NextResponse.redirect(googleAuthUrl.toString());
+
+  // Bind PKCE verifier and nonce to HTTP-only secure cookies
+  const isSecure = process.env.NODE_ENV === "production";
+  response.cookies.set("arthax_oauth_verifier", codeVerifier, {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 900, // 15 minutes
+  });
+  response.cookies.set("arthax_oauth_nonce", nonce, {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 900,
+  });
+
+  return response;
 }

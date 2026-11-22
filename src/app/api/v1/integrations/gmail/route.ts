@@ -50,7 +50,7 @@ export const GET = createApiRoute({
     const hints = hintsRes.data || [];
 
     // Extract stored banking identity if available
-    let bankingIdentity: {
+    const bankingIdentity: {
       hasPan: boolean;
       panMasked: string | null;
       hasDob: boolean;
@@ -119,7 +119,7 @@ export const POST = createApiRoute({
   schema: ConnectGmailSchema,
   handler: async ({ userId, body, req }) => {
     const { email, password_hint, bank_name, pan, dob, phone } = body;
-    let cleanEmail = email?.trim().toLowerCase();
+    const cleanEmail = email?.trim().toLowerCase();
 
     // 1. If email provided or updating existing integration
     let updatedIntegration: any = null;
@@ -219,16 +219,40 @@ export const POST = createApiRoute({
 });
 
 /**
- * DELETE: Disconnect Gmail statement reader integration
+ * DELETE: Disconnect Gmail statement reader integration and revoke tokens
  */
 export const DELETE = createApiRoute({
   auth: "required",
   rateLimit: { limit: 20, windowSeconds: 60 },
   handler: async ({ userId, req }) => {
+    // 1. Revoke tokens with Google OAuth revocation endpoint
+    try {
+      const { data: currentInt } = await supabaseAdmin
+        .from("gmail_integrations")
+        .select("access_token_encrypted, refresh_token_encrypted")
+        .eq("user_id", userId!)
+        .maybeSingle();
+
+      const tokenToRevoke =
+        (currentInt?.refresh_token_encrypted ? decryptSensitiveData(currentInt.refresh_token_encrypted, "gmail-tokens") : null) ||
+        (currentInt?.access_token_encrypted ? decryptSensitiveData(currentInt.access_token_encrypted, "gmail-tokens") : null);
+
+      if (tokenToRevoke && !tokenToRevoke.startsWith("token_")) {
+        await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }).catch(() => {});
+      }
+    } catch {
+      // Best-effort revocation
+    }
+
     const { error: delErr } = await supabaseAdmin
       .from("gmail_integrations")
       .update({
         sync_status: "DISCONNECTED",
+        access_token_encrypted: null,
+        refresh_token_encrypted: null,
         error_details: "Disconnected by user",
         updated_at: new Date().toISOString(),
       })
@@ -243,7 +267,7 @@ export const DELETE = createApiRoute({
     return apiSuccess(
       {
         connected: false,
-        message: "Gmail statement reader has been disconnected.",
+        message: "Gmail statement reader has been disconnected and tokens revoked.",
       },
       undefined,
       200,

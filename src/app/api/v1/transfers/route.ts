@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
 import { apiSuccess, apiError, apiUnauthorized, apiValidationError, extractRequestId } from "@/utils/apiResponse";
 import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { claimDatabaseIdempotency, completeDatabaseIdempotency } from "@/lib/backend/databaseIdempotency";
 import { logger } from "@/utils/logger";
 import { z } from "zod";
 
@@ -120,6 +121,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Database-level idempotency lock with request fingerprinting
+    if (idempotencyKey) {
+      const dbClaim = await claimDatabaseIdempotency(userId, idempotencyKey, "TRANSFER", parseResult.data);
+      if (dbClaim.action === "CACHED_RESPONSE" && dbClaim.cachedResponse) {
+        return NextResponse.json(
+          dbClaim.cachedResponse.body,
+          { status: dbClaim.cachedResponse.status, headers: { "X-Request-Id": requestId, "X-Idempotent-Replay": "true" } }
+        );
+      }
+      if (!dbClaim.isFirstAttempt) {
+        return NextResponse.json(
+          { success: false, error: dbClaim.message || "Duplicate transfer request rejected", requestId },
+          { status: 409, headers: { "X-Request-Id": requestId } }
+        );
+      }
+    }
+
     // Execute atomic stored procedure with row-locking on both accounts
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("fn_record_transfer_atomic", {
       p_user_id: userId,
@@ -132,6 +150,15 @@ export async function POST(req: NextRequest) {
 
     if (rpcError) {
       return apiError(rpcError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+
+    // Complete database idempotency record on successful persistence
+    if (idempotencyKey) {
+      await completeDatabaseIdempotency(userId, idempotencyKey, 201, {
+        success: true,
+        data: result,
+        requestId,
+      });
     }
 
     // Invalidate affected caches

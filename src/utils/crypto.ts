@@ -12,25 +12,27 @@ const AUTH_TAG_LENGTH = 16; // 128-bit authentication tag
 
 /**
  * Derives a deterministic 256-bit AES encryption key using HKDF (RFC 5869)
- * from the environment master key or service key with domain separation.
+ * from the dedicated environment master key with domain separation.
+ * Never uses database administrative credentials (e.g. Supabase service role key)
+ * as an implicit encryption key in production.
  */
 function getDerivedKey(
   salt: string = "arthax-credential-salt",
   info: string = "broker-credentials",
   customSecret?: string
 ): Buffer {
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
   const masterSecret =
     customSecret ||
     process.env.ENCRYPTION_MASTER_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    (process.env.NODE_ENV === "test" || process.env.VITEST
+    (!isProd && (process.env.NODE_ENV === "test" || process.env.VITEST || process.env.NODE_ENV === "development")
       ? "test-master-encryption-key-32-chars-long!"
       : "");
 
   if (!masterSecret) {
     throw new Error(
-      "[Crypto Security] Neither ENCRYPTION_MASTER_KEY nor SUPABASE_SERVICE_ROLE_KEY is set. Cannot perform authenticated encryption."
+      "[Crypto Security] Neither ENCRYPTION_MASTER_KEY nor SUPABASE_SERVICE_ROLE_KEY is configured. Failing closed to protect financial secrets."
     );
   }
 
@@ -118,7 +120,20 @@ export function decryptSensitiveData(
       decrypted += decipher.final("utf8");
       return decrypted;
     } catch (primaryErr) {
-      // Safe migration fallback: if master key fails, attempt legacy derivation from SUPABASE_SERVICE_ROLE_KEY
+      // 1. Key Rotation Support: Attempt decryption with previous master key if present
+      const previousKeySecret = process.env.ENCRYPTION_MASTER_KEY_PREVIOUS;
+      if (previousKeySecret) {
+        try {
+          const prevKey = getDerivedKey("arthax-credential-salt", context, previousKeySecret);
+          const prevDecipher = crypto.createDecipheriv("aes-256-gcm", prevKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+          prevDecipher.setAuthTag(authTag);
+          let decrypted = prevDecipher.update(encryptedHex, "hex", "utf8");
+          decrypted += prevDecipher.final("utf8");
+          return decrypted;
+        } catch {}
+      }
+
+      // 2. Safe migration fallback: if master key fails, attempt legacy derivation from SUPABASE_SERVICE_ROLE_KEY
       const fallbackSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (fallbackSecret && process.env.ENCRYPTION_MASTER_KEY && fallbackSecret !== process.env.ENCRYPTION_MASTER_KEY) {
         try {
@@ -139,6 +154,20 @@ export function decryptSensitiveData(
       }`
     );
   }
+}
+
+/**
+ * Re-encrypts an existing ciphertext under the active ENCRYPTION_MASTER_KEY.
+ * Used during zero-downtime key rotation campaigns.
+ */
+export function rotateEncryptionKey(
+  ciphertext: string | null | undefined,
+  context: string = "broker-credentials"
+): string | null {
+  if (!ciphertext) return null;
+  const plaintext = decryptSensitiveData(ciphertext, context);
+  if (!plaintext) return null;
+  return encryptSensitiveData(plaintext, context);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { claimDatabaseIdempotency, completeDatabaseIdempotency } from "./databaseIdempotency";
 import {
   extractRequestId,
   apiSuccess,
@@ -138,9 +139,9 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
       }
     }
 
-    // 4. Atomic Idempotency Check (for POST/PUT mutations)
+    // 4. Rate Limiting & Atomic Idempotency Check (for POST/PUT mutations)
+    const idempotencyKey = req.headers.get("idempotency-key");
     if (config.idempotent && ["POST", "PUT", "PATCH"].includes(req.method)) {
-      const idempotencyKey = req.headers.get("idempotency-key");
       if (idempotencyKey) {
         const scope = userId || "global";
         const lockKey = `route_idemp:${scope}:${idempotencyKey.trim()}`;
@@ -201,6 +202,38 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
       }
     }
 
+    // 5b. Database-Enforced Idempotency Verification
+    if (config.idempotent && idempotencyKey && ["POST", "PUT", "PATCH"].includes(req.method)) {
+      const dbClaim = await claimDatabaseIdempotency(
+        userId || "anonymous",
+        idempotencyKey,
+        `${req.method}:${pathname}`,
+        body
+      );
+
+      if (dbClaim.action === "CACHED_RESPONSE" && dbClaim.cachedResponse) {
+        return NextResponse.json(dbClaim.cachedResponse.body, {
+          status: dbClaim.cachedResponse.status,
+          headers: { "X-Request-Id": requestId, "X-Idempotent-Replay": "true" },
+        });
+      }
+
+      if (!dbClaim.isFirstAttempt && (dbClaim.action === "IN_FLIGHT_CONFLICT" || dbClaim.action === "REJECTED_MISMATCH")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "CONFLICT",
+              message: dbClaim.message || "Duplicate operation rejected (Idempotency conflict)",
+            },
+            requestId,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 409, headers: { "X-Request-Id": requestId } }
+        );
+      }
+    }
+
     // 6. Build Type-Safe Context and Execute Handler
     const ctx: ApiContext<TBody, TParams> = {
       req,
@@ -216,6 +249,12 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
     try {
       const result = await config.handler(ctx);
       const durationMs = Date.now() - startTime;
+
+      // Complete database idempotency on successful mutation
+      if (config.idempotent && idempotencyKey) {
+        const statusCode = result instanceof NextResponse ? result.status : 200;
+        await completeDatabaseIdempotency(userId || "anonymous", idempotencyKey, statusCode, result);
+      }
 
       // If handler returned a NextResponse directly, ensure headers and return
       if (result instanceof NextResponse) {

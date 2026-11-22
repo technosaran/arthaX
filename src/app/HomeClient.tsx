@@ -93,10 +93,15 @@ const TaxSection = dynamic(() => import("@/components/TaxSection"), {
 const SettingsSection = dynamic(() => import("@/components/SettingsSection"), {
   loading: TabLoadingFallback,
 });
+const ReconciliationSection = dynamic(() => import("@/components/ReconciliationSection"), {
+  loading: TabLoadingFallback,
+});
+const CashflowForecastSection = dynamic(() => import("@/components/CashflowForecastSection"), {
+  loading: TabLoadingFallback,
+});
 
 export default function HomeClient() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -296,6 +301,16 @@ export default function HomeClient() {
           {(visitedTabs.settings || visitedTabs.profile) && (
             <div className={`h-full w-full ${activeTab === "settings" || activeTab === "profile" ? "block" : "hidden"}`}>
               <SettingsSection initialTab={activeTab === "profile" ? "profile" : "statements"} />
+            </div>
+          )}
+          {visitedTabs.reconciliation && (
+            <div className={`h-full w-full ${activeTab === "reconciliation" ? "block" : "hidden"}`}>
+              <ReconciliationSection />
+            </div>
+          )}
+          {visitedTabs.forecast && (
+            <div className={`h-full w-full ${activeTab === "forecast" ? "block" : "hidden"}`}>
+              <CashflowForecastSection />
             </div>
           )}
         </main>

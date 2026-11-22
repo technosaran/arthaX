@@ -27,6 +27,8 @@ import {
   EyeOff,
   ReceiptIndianRupee,
   Sparkles,
+  Clock,
+  Scale,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
@@ -57,6 +59,8 @@ const NAV_ITEMS: NavItemDef[] = [
   { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
   { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
   { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance" },
+  { id: "forecast", label: "Runway & Forecast", icon: Clock, group: "finance" },
+  { id: "reconciliation", label: "Reconciliation", icon: Scale, group: "finance" },
 
   // Investments
   { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
