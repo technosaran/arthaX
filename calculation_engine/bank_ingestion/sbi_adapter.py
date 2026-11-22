@@ -97,7 +97,7 @@ class SbiBankAdapter(BaseBankAdapter):
                 if doc.is_encrypted:
                     # Could be SBI statement if filename suggests or standard email statement name
                     doc.close()
-                    return "sbi" in fn or "email_statement" in fn or "statement" in fn
+                    return "sbi" in fn or "email_statement" in fn
                 text = ""
                 for i in range(min(2, doc.page_count)):
                     text += doc[i].get_text().upper()

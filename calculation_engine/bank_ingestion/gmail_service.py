@@ -27,8 +27,8 @@ logger = logging.getLogger("arthax.gmail_ingestion")
 
 # Comprehensive Gmail search query for statement discovery across major banks and brokers
 DEFAULT_GMAIL_STATEMENT_QUERY = (
-    "(subject:statement OR subject:e-statement OR subject:\"account statement\" "
-    "OR subject:\"statement of account\" OR subject:\"bank statement\" "
+    "(subject:statement OR subject:estatement OR subject:e-statement OR subject:passbook "
+    "OR subject:\"account statement\" OR subject:\"statement of account\" OR subject:\"bank statement\" "
     "OR subject:eCAS OR subject:\"consolidated account statement\" "
     "OR from:sbi.co.in OR from:sbi.bank.in OR from:alerts.sbi.bank.in "
     "OR from:hdfcbank.net OR from:hdfcbank.com OR from:icicibank.com "
@@ -37,7 +37,7 @@ DEFAULT_GMAIL_STATEMENT_QUERY = (
     "OR from:indianbank.co.in OR from:indusind.com OR from:idfcfirstbank.com "
     "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in "
     "OR from:camsonline.com OR from:kfintech.com) "
-    "AND has:attachment"
+    "has:attachment"
 )
 
 GMAIL_API_BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -368,6 +368,7 @@ class GmailStatementIngestor:
                         content=content_bytes,
                         filename=fn,
                         passwords=password_candidates,
+                        bank_hint=detected_bank,
                     )
 
                     # Enrich transactions with Transaction Intelligence

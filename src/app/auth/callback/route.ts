@@ -6,6 +6,8 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const rawNext = searchParams.get("next") ?? "/";
+  const authError = searchParams.get("error");
+  const authErrorDescription = searchParams.get("error_description");
 
   // Prevent CWE-601 Open Redirect vulnerabilities
   const safeNext = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
@@ -14,6 +16,14 @@ export async function GET(request: Request) {
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
   const baseOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : origin;
+
+  if (authError) {
+    console.error("[Auth Callback] OAuth provider error received:", authError, authErrorDescription);
+    const target = safeNext.includes("tab=settings") ? "/?tab=settings" : "/login";
+    return NextResponse.redirect(
+      `${baseOrigin}${target}?error=${encodeURIComponent(authErrorDescription || authError)}`
+    );
+  }
 
   if (code) {
     const cookieStore = await cookies();
@@ -89,5 +99,6 @@ export async function GET(request: Request) {
     console.error("[Auth Callback] Error exchanging code for session:", error?.message || "No session returned");
   }
 
-  return NextResponse.redirect(`${baseOrigin}/login?error=auth_callback_failed`);
+  const fallbackTarget = safeNext.includes("tab=settings") ? "/?tab=settings" : "/login";
+  return NextResponse.redirect(`${baseOrigin}${fallbackTarget}?error=auth_callback_failed`);
 }

@@ -628,6 +628,21 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     const zerodhaError = url.searchParams.get("zerodha_error");
     const reqToken = url.searchParams.get("request_token");
     const section = url.searchParams.get("section");
+    const gmailConnected = url.searchParams.get("connected") === "gmail" || url.searchParams.get("gmail_connected") === "true";
+    const authError = url.searchParams.get("error") || url.searchParams.get("auth_error");
+
+    if (gmailConnected) {
+      showToast("Gmail Connected!", "Google statement discovery is active. Scanning for bank statements...", "success");
+      fetchGmailStatus(true);
+      url.searchParams.delete("connected");
+      url.searchParams.delete("gmail_connected");
+      window.history.replaceState({}, "", url.toString());
+    } else if (authError) {
+      showToast("Authentication Error", decodeURIComponent(authError), "error");
+      url.searchParams.delete("error");
+      url.searchParams.delete("auth_error");
+      window.history.replaceState({}, "", url.toString());
+    }
 
     if (section && ["profile", "statements", "integrations", "security", "danger"].includes(section)) {
       if (activeTab !== section) {
@@ -1088,23 +1103,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
   const handleGoogleOAuthConnect = async () => {
     try {
-      const supabase = createClient();
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       showToast("Connecting to Google", "Redirecting to Google secure authentication...", "info");
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          scopes: "email profile openid https://www.googleapis.com/auth/gmail.readonly",
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-          redirectTo: `${origin}/auth/callback?next=/?tab=settings`,
-        },
-      });
-      if (error) {
-        throw error;
-      }
+      window.location.href = `${origin}/api/v1/integrations/gmail/oauth`;
     } catch (err: any) {
       showToast("Google Auth Error", err?.message || "Failed to initiate Google authentication.", "error");
     }

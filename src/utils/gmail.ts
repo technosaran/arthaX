@@ -310,11 +310,11 @@ export async function syncUserGmailStatements(
   const batchLimit = Math.min(Math.max(options?.maxMessages ?? 25, 5), 100);
 
   // Determine checkpoint after_date.
-  // For on-demand sync, search up to 60 days back so recent monthly statements are discovered.
+  // For on-demand sync, search up to 180 days back so all recent and quarterly statements are discovered.
   let afterDateStr: string | undefined = options?.afterDate;
   if (!afterDateStr) {
     const lookbackDate = new Date();
-    lookbackDate.setDate(lookbackDate.getDate() - 60);
+    lookbackDate.setDate(lookbackDate.getDate() - 180);
     const yyyy = lookbackDate.getFullYear();
     const mm = String(lookbackDate.getMonth() + 1).padStart(2, "0");
     const dd = String(lookbackDate.getDate()).padStart(2, "0");
@@ -344,6 +344,33 @@ export async function syncUserGmailStatements(
 
       if (pyRes.ok) {
         pyData = await pyRes.json();
+        // Fallback: If 0 statements found with after_date filter, retry once without date constraint
+        if ((!pyData?.statements || pyData.statements.length === 0) && !options?.afterDate) {
+          try {
+            const fallbackRes = await fetch(`${pythonServiceUrl}/api/py/statements/gmail/sync`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-User-Id": userId,
+                ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
+              },
+              body: JSON.stringify({
+                user_id: userId,
+                access_token: accessToken,
+                password_candidates: passwordCandidates,
+                max_messages: batchLimit,
+                custom_query: options?.customQuery,
+              }),
+            });
+            if (fallbackRes.ok) {
+              const fallbackJson = await fallbackRes.json();
+              if (fallbackJson?.statements && fallbackJson.statements.length > 0) {
+                pyData = fallbackJson;
+              }
+            }
+          } catch {}
+        }
       } else {
         const errText = await pyRes.text();
         logger.warn(`Calculation engine Gmail sync returned ${pyRes.status}: ${errText}`, "GmailService");
