@@ -22,16 +22,24 @@ export default function TermsPage() {
       <div className="max-w-4xl mx-auto w-full space-y-8">
         {/* Navigation & Header */}
         <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 group focus:outline-none">
             <Logo size={36} showText={true} />
-          </div>
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 text-xs font-semibold opacity-70 hover:opacity-100 transition-opacity"
-          >
-            <ArrowLeft size={14} />
-            <span>Back to Login</span>
           </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="text-xs font-semibold opacity-70 hover:opacity-100 hover:text-emerald-400 transition-colors"
+            >
+              Home
+            </Link>
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 text-xs font-semibold opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Login</span>
+            </Link>
+          </div>
         </div>
 
         {/* Title */}

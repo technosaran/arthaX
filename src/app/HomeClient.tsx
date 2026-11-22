@@ -8,6 +8,7 @@ import TopNav from "@/components/TopNav";
 import DashboardSection from "@/components/DashboardSection";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
+import PublicLandingView from "@/components/PublicLandingView";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { Loader2 } from "lucide-react";
 
@@ -161,12 +162,6 @@ export default function HomeClient() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [loading, user, router]);
-
   // Loading Screen while authenticating session
   if (loading) {
     return (
@@ -183,8 +178,9 @@ export default function HomeClient() {
     );
   }
 
+  // Public Landing Page for unauthenticated visitors (Google OAuth Brand Verification requirement)
   if (!user) {
-    return null;
+    return <PublicLandingView />;
   }
 
   return (

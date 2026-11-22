@@ -45,17 +45,21 @@ export const updateSession = async (request: NextRequest) => {
   );
 
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname.startsWith("/privacy") ||
+    pathname.startsWith("/terms");
 
-  // Fast-path 1: Unauthenticated request to private routes (e.g. /) without any auth cookies
+  // Fast-path 1: Unauthenticated request to private routes (e.g. /settings) without any auth cookies
   // Instantly redirect to /login without waiting for an external Supabase network round-trip (saves 300-800ms TTFB)
-  if (!hasAuthCookie && !isAuthRoute) {
+  if (!hasAuthCookie && !isAuthRoute && !isPublicRoute) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Fast-path 2: Unauthenticated request to login/auth routes without any auth cookies
+  // Fast-path 2: Unauthenticated request to login/auth or public routes (e.g. /) without any auth cookies
   // Instantly proceed without waiting for an external Supabase network round-trip
-  if (!hasAuthCookie && isAuthRoute) {
+  if (!hasAuthCookie && (isAuthRoute || isPublicRoute)) {
     return supabaseResponse;
   }
 
@@ -82,8 +86,8 @@ export const updateSession = async (request: NextRequest) => {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If user is not authenticated and trying to access private application routes (e.g. /)
-  if (!user && !isAuthRoute) {
+  // If user is not authenticated and trying to access private application routes (e.g. /settings)
+  if (!user && !isAuthRoute && !isPublicRoute) {
     url.pathname = "/login";
     const redirectResponse = NextResponse.redirect(url);
     // Forward any session cookies refreshed during getUser()

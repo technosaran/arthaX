@@ -326,9 +326,9 @@ export default function LoginClient() {
         <div className="hidden lg:flex lg:col-span-6 flex-col justify-between space-y-8 pr-4">
           <div className="space-y-6">
             {/* Header Brand */}
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3 w-fit group focus:outline-none">
               <Logo size={42} showText={true} />
-            </div>
+            </Link>
 
             {/* Headline */}
             <div className="space-y-3">
@@ -397,7 +397,9 @@ export default function LoginClient() {
           >
             {/* Mobile Header Brand */}
             <div className="flex lg:hidden flex-col items-center text-center space-y-2 pb-2">
-              <Logo size={42} showText={true} />
+              <Link href="/" className="group focus:outline-none">
+                <Logo size={42} showText={true} />
+              </Link>
               <p className="text-xs opacity-70 max-w-xs font-medium">
                 Intelligent Personal Finance & Wealth Management
               </p>

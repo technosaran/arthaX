@@ -22,16 +22,24 @@ export default function PrivacyPolicyPage() {
       <div className="max-w-4xl mx-auto w-full space-y-8">
         {/* Navigation & Header */}
         <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 group focus:outline-none">
             <Logo size={36} showText={true} />
-          </div>
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 text-xs font-semibold opacity-70 hover:opacity-100 transition-opacity"
-          >
-            <ArrowLeft size={14} />
-            <span>Back to Login</span>
           </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="text-xs font-semibold opacity-70 hover:opacity-100 hover:text-emerald-400 transition-colors"
+            >
+              Home
+            </Link>
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 text-xs font-semibold opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Login</span>
+            </Link>
+          </div>
         </div>
 
         {/* Title */}
@@ -90,19 +98,43 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-base font-bold">2. How We Use Google User Data</h2>
+          <section className="space-y-3">
+            <h2 className="text-base font-bold">2. How We Use Google User Data &amp; Limited Use Disclosure</h2>
             <p className="opacity-80">
-              Google OAuth authentication data is exclusively used to:
+              Google OAuth authentication and API data is exclusively used to:
             </p>
             <ul className="list-disc pl-5 space-y-1 opacity-80 text-xs sm:text-sm">
               <li>Authenticate your identity securely without requiring a separate password.</li>
-              <li>Personalize your profile display name in arthaX.</li>
+              <li>Personalize your profile display name and avatar in arthaX.</li>
               <li>Protect against unauthorized access through Google&apos;s multi-factor authentication infrastructure.</li>
+              <li>
+                <strong>Optional E-Statement Parsing (gmail.readonly):</strong> If you explicitly opt-in to connect Gmail synchronization in Settings, read-only access is used strictly on-demand to identify and extract financial transaction receipts (e.g. mutual fund CAS statements and broker contract notes) directly into your private ledger. arthaX does not read personal messages, compose, delete, or modify any emails.
+              </li>
             </ul>
-            <p className="opacity-80 text-xs">
-              arthaX complies with the Google API Services User Data Policy, including the Limited Use requirements.
-            </p>
+
+            <div className="p-4 rounded-xl border border-sky-500/20 bg-sky-500/5 space-y-2 mt-3">
+              <p className="text-xs sm:text-sm font-semibold text-sky-400">
+                Google API Services User Data Policy Compliance
+              </p>
+              <p className="opacity-90 text-xs sm:text-sm leading-relaxed">
+                arthaX&apos;s use and transfer to any other app of information received from Google APIs will adhere to the{" "}
+                <a
+                  href="https://developers.google.com/terms/api-services-user-data-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 underline font-medium hover:text-emerald-300"
+                >
+                  Google API Services User Data Policy
+                </a>
+                , including the Limited Use requirements.
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs opacity-75">
+                <li>Google user data is never transferred to third parties or advertising brokers.</li>
+                <li>Google user data is never used to serve targeted advertisements.</li>
+                <li>Google user data is never used to train generalized artificial intelligence or machine learning models.</li>
+                <li>Human access to user data is strictly prohibited unless explicitly authorized by the user for technical resolution.</li>
+              </ul>
+            </div>
           </section>
 
           <section className="space-y-2">
