@@ -196,3 +196,20 @@ def test_password_errors_include_bank_name_and_format_hint():
     assert exc_inc.value.format_hint is not None
     assert "Customer ID" in exc_inc.value.format_hint
     assert "Expected format:" in str(exc_inc.value)
+
+
+def test_parser_registry_preserves_bank_hint_on_decryption_failure():
+    """Validates that bank_hint (e.g. INDIAN_BANK) is preserved on failure rather than hardcoding SBI."""
+    raw_pdf = create_mock_pdf_bytes(password="Account123456789")
+
+    result = parser_registry.parse_statement(
+        content=raw_pdf,
+        filename="IndianBank_Statement.pdf",
+        passwords=["wrong1", "wrong2"],
+        bank_hint="INDIAN_BANK",
+    )
+
+    assert result.success is False
+    assert result.bank_name == "INDIAN_BANK"
+    assert result.metadata.bank_name == "INDIAN_BANK"
+    assert "PASSWORD_INCORRECT" in result.errors

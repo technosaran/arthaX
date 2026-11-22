@@ -593,7 +593,8 @@ class GmailStatementIngestor:
                 results.append(res)
             except Exception as e:
                 logger.error(f"Error parsing attachment {fname}: {e}")
-                err_res = parser_registry.adapters[0]._build_empty_failure(
+                fallback_gen = GenericPdfBankAdapter() if fname.lower().endswith(".pdf") else GenericCsvBankAdapter()
+                err_res = fallback_gen._build_empty_failure(
                     fname,
                     "unknown",
                     f"Exception during attachment ingestion: {str(e)}",

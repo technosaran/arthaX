@@ -62,8 +62,35 @@ class StatementParserRegistry:
         Prioritizes decryption passwords if password_hints are provided from the email.
         """
         file_hash = compute_file_hash(content)
-        fallback_adapter = self.adapters[0]
+        fn_lower = filename.lower()
+        is_pdf = fn_lower.endswith(".pdf") or content.startswith(b"%PDF")
         best_candidate: Optional[StatementParseResult] = None
+
+        def _get_failure_adapter(hint: Optional[str]) -> BaseBankAdapter:
+            if hint:
+                norm = hint.strip().upper()
+                for a in self.adapters:
+                    a_name = getattr(a, "BANK_NAME", "").upper()
+                    if a_name == norm or a_name in norm or norm in a_name:
+                        return a
+            if fn_lower.endswith(".csv"):
+                return GenericCsvBankAdapter()
+            return GenericPdfBankAdapter()
+
+        def _build_failure(error_msg: str, error_code: Optional[str] = None, hint_override: Optional[str] = None) -> StatementParseResult:
+            active_hint = hint_override or bank_hint
+            adapter = _get_failure_adapter(active_hint)
+            res = adapter._build_empty_failure(
+                filename,
+                file_hash,
+                error_msg,
+                error_code=error_code,
+            )
+            if active_hint and active_hint not in ("GENERIC", "BANK", "GENERIC_PDF", "GENERIC_CSV"):
+                res.bank_name = active_hint
+                if res.metadata:
+                    res.metadata.bank_name = active_hint
+            return _enrich_result(res)
 
         if password_hints and passwords:
             passwords = prioritize_passwords_by_hint(passwords, password_hints)
@@ -110,12 +137,8 @@ class StatementParserRegistry:
                         except Exception:
                             pass
             except (PasswordRequiredError, PasswordIncorrectError, CorruptedPdfError, UnsupportedEncryptionError) as pe:
-                return _enrich_result(fallback_adapter._build_empty_failure(
-                    filename,
-                    file_hash,
-                    str(pe),
-                    error_code=pe.code,
-                ))
+                pe_bank = getattr(pe, "bank_name", None) or bank_hint
+                return _build_failure(str(pe), error_code=pe.code, hint_override=pe_bank)
             except Exception:
                 pass
 
@@ -148,12 +171,8 @@ class StatementParserRegistry:
                             if err in ("PASSWORD_REQUIRED", "PASSWORD_INCORRECT", "CORRUPTED_PDF", "UNSUPPORTED_ENCRYPTION"):
                                 return _enrich_result(result)
                 except (PasswordRequiredError, PasswordIncorrectError, CorruptedPdfError, UnsupportedEncryptionError) as pe:
-                    return _enrich_result(fallback_adapter._build_empty_failure(
-                        filename,
-                        file_hash,
-                        str(pe),
-                        error_code=pe.code,
-                    ))
+                    pe_bank = getattr(pe, "bank_name", None) or bank_hint or getattr(adapter, "BANK_NAME", None)
+                    return _build_failure(str(pe), error_code=pe.code, hint_override=pe_bank)
                 except Exception as e:
                     last_error = str(e)
                     continue
@@ -168,7 +187,7 @@ class StatementParserRegistry:
                 _update_best_candidate(result)
             except Exception as e:
                 last_error = str(e)
-        elif fn_lower.endswith(".pdf") or content.startswith(b"%PDF"):
+        elif is_pdf:
             try:
                 generic_pdf = GenericPdfBankAdapter()
                 result = generic_pdf.parse(content, filename, passwords)
@@ -189,12 +208,7 @@ class StatementParserRegistry:
         if last_error:
             err_msg += f" Last error: {last_error}"
 
-        return _enrich_result(fallback_adapter._build_empty_failure(
-            filename,
-            file_hash,
-            err_msg,
-            error_code="UNSUPPORTED_FORMAT",
-        ))
+        return _build_failure(err_msg, error_code="UNSUPPORTED_FORMAT")
 
 
 # Global Singleton Registry

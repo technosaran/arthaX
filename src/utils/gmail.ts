@@ -1022,7 +1022,18 @@ export async function syncUserGmailStatements(
         }
 
         if (errsStr.includes("password") || f.error_code === "PASSWORD_REQUIRED" || f.error_code === "PASSWORD_INCORRECT") {
-          const bank = f.bank_name || f.detected_bank || "Bank";
+          const rawDetected = f.detected_bank?.toUpperCase();
+          const isGenericDetected = !rawDetected || rawDetected === "GENERIC" || rawDetected === "BANK" || rawDetected === "GENERIC_PDF";
+          const rawBankName = f.bank_name?.toUpperCase();
+          const isGenericBankName = !rawBankName || rawBankName === "GENERIC" || rawBankName === "BANK" || rawBankName === "GENERIC_PDF";
+
+          let bank = "Bank";
+          if (!isGenericDetected) {
+            bank = f.detected_bank!;
+          } else if (!isGenericBankName) {
+            bank = f.bank_name!;
+          }
+
           if (!passwordBanks.includes(bank)) passwordBanks.push(bank);
         } else if (errsStr.includes("unsupported") || f.error_code === "UNSUPPORTED_FORMAT") {
           unparseableFiles.push(fName);
@@ -1036,17 +1047,17 @@ export async function syncUserGmailStatements(
         const hints = passwordBanks
           .map((b) => {
             const desc = getBankPasswordFormatDescription(b);
-            if (!desc) return null;
             if (b.toUpperCase().includes("SBI") || b.toUpperCase().includes("STATE BANK")) {
               return "YONO uses DDMM@last 4 digits of mobile (e.g. 0101@9876); NetBanking uses DDMM + last 5 digits of mobile, or PAN";
             }
-            return desc.replace(/\.$/, "");
+            if (b.toUpperCase().includes("INDIAN") || b.toUpperCase() === "INDIAN_BANK") {
+              return "Indian Bank uses your full Account Number (e.g. 10-16 digits), or DDMMYYYY + last 4 digits of mobile";
+            }
+            return desc ? desc.replace(/\.$/, "") : null;
           })
           .filter(Boolean);
         const hintStr = hints.length > 0 ? ` Hint: ${hints.join("; ")}.` : "";
-        const cta = hints.length > 0
-          ? "Add your details in Settings > Bank Passwords."
-          : "Add your statement password in Settings > Bank Passwords.";
+        const cta = "Add your details in Settings > Identity Vault.";
         summaryParts.push(
           `Password required for ${passwordBanks.join(", ")} statement(s).${hintStr} ${cta}`
         );

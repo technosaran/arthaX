@@ -14,7 +14,8 @@
     "test:py": "pytest",
     "db:types": "supabase gen types typescript --project-id fvpfzbuoizzjwgekuhot > src/types/database.types.ts",
     "zerodha:sync": "npx tsx --env-file=.env.local scripts/zerodhaAutoSync.ts",
-    "mcp": "npx tsx src/mcp/server.ts"
+    "mcp": "npx tsx src/mcp/server.ts",
+    "mcp:http": "npx tsx src/mcp/httpServer.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

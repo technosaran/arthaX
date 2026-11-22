@@ -146,10 +146,10 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
     try {
       await navigator.clipboard.writeText(userId);
       setCopiedId(true);
-      showToast.success("User ID Copied", "Your unique arthaX User ID has been copied to clipboard.");
+      showToast("User ID Copied", "Your unique arthaX User ID has been copied to clipboard.", "success");
       setTimeout(() => setCopiedId(false), 2000);
     } catch {
-      showToast.error("Copy Failed", "Could not copy to clipboard. Please copy manually.");
+      showToast("Copy Failed", "Could not copy to clipboard. Please copy manually.", "error");
     }
   };
 
@@ -158,10 +158,10 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
     try {
       await navigator.clipboard.writeText(userToken);
       setCopiedToken(true);
-      showToast.success("Token Copied", "Personal MCP Bearer token copied to clipboard.");
+      showToast("Token Copied", "Personal MCP Bearer token copied to clipboard.", "success");
       setTimeout(() => setCopiedToken(false), 2000);
     } catch {
-      showToast.error("Copy Failed", "Could not copy token.");
+      showToast("Copy Failed", "Could not copy token.", "error");
     }
   };
 
@@ -174,13 +174,14 @@ export const McpIntegrationCard: React.FC<McpIntegrationCardProps> = ({ userId }
     try {
       await navigator.clipboard.writeText(currentConfig);
       setCopiedConfig(true);
-      showToast.success(
+      showToast(
         "MCP Config Copied",
-        `Configuration for ${selectedClient.toUpperCase()} (${connectionMode.toUpperCase()}) copied.`
+        `Configuration for ${selectedClient.toUpperCase()} (${connectionMode.toUpperCase()}) copied.`,
+        "success"
       );
       setTimeout(() => setCopiedConfig(false), 2000);
     } catch {
-      showToast.error("Copy Failed", "Could not copy configuration.");
+      showToast("Copy Failed", "Could not copy configuration.", "error");
     }
   };
 
