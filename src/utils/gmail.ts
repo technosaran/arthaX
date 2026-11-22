@@ -134,6 +134,7 @@ export interface GmailSyncOptions {
   maxMessages?: number;
   afterDate?: string;
   customQuery?: string;
+  baseUrl?: string;
 }
 
 export interface GmailSyncResult {
@@ -297,13 +298,16 @@ export async function syncUserGmailStatements(
     .single();
 
   const pythonServiceUrl =
+    options?.baseUrl ||
     process.env.PYTHON_BACKEND_URL ||
     process.env.PYTHON_SERVICE_URL ||
-    (process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://arthax.vercel.app"));
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "https://arthax.vercel.app");
 
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
     process.env.CRON_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
 
   // Determine bounded batch size (min 5, max 100, default 25)
