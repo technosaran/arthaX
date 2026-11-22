@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import DashboardSection from "@/components/DashboardSection";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
@@ -313,6 +314,9 @@ export default function HomeClient() {
             </div>
           )}
         </main>
+
+        {/* Ergonomic Mobile Bottom Navigation Dock */}
+        <MobileBottomNav activeTab={activeTab} onSelectTab={handleTabChange} />
       </div>
     </div>
   );
