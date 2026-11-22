@@ -6,7 +6,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   TrendingUp,
   TrendingDown,
   ShieldCheck,
@@ -17,17 +16,8 @@ import {
   Check,
   Edit2,
   Trash2,
-  ArrowUpRight,
-  ArrowDownRight,
   DollarSign,
   Scale,
-  Sparkles,
-  Layers,
-  ChevronRight,
-  ChevronDown,
-  Info,
-  Calendar,
-  CreditCard,
   Building,
   Activity,
   Award,
@@ -49,17 +39,13 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import {
   BullionHolding,
-  BullionTransaction,
   BullionRates,
   MetalType,
   BullionItemType,
-  StorageLocation,
   calculateHoldingMetrics,
   calculatePortfolioSummary,
   getStandardPurityPercentage,
   formatCurrencyINR,
-  gramsToTolas,
-  gramsToSovereigns,
 } from "@/utils/bullionCalculations";
 
 const DEFAULT_RATES: BullionRates = {
@@ -112,13 +98,6 @@ const ITEM_TYPE_OPTIONS = [
   { value: "OTHER", label: "Other Asset" },
 ];
 
-const STORAGE_OPTIONS = [
-  { value: "Home Safe", label: "Home Safe" },
-  { value: "Bank Locker", label: "Bank Safe Deposit Locker" },
-  { value: "Digital Vault", label: "Custodial Vault / Digital Vault" },
-  { value: "Custom", label: "Other Location" },
-];
-
 export default function GoldSilverSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -126,9 +105,7 @@ export default function GoldSilverSection() {
 
   // Core State
   const [holdings, setHoldings] = useState<BullionHolding[]>([]);
-  const [transactions, setTransactions] = useState<BullionTransaction[]>([]);
   const [rates, setRates] = useState<BullionRates>(DEFAULT_RATES);
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; balance: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [refreshingRates, setRefreshingRates] = useState(false);
 
@@ -137,7 +114,6 @@ export default function GoldSilverSection() {
   const [storageFilter, setStorageFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Modal States
@@ -203,19 +179,11 @@ export default function GoldSilverSection() {
     if (!user) return;
     try {
       setLoading(true);
-      const [holdingsRes, accountsRes] = await Promise.all([
-        fetch("/api/v1/bullion/holdings"),
-        supabase.from("accounts").select("id, name, balance").order("name", { ascending: true }),
-      ]);
-
-      if (accountsRes.data) {
-        setAccounts(accountsRes.data);
-      }
+      const holdingsRes = await fetch("/api/v1/bullion/holdings");
 
       if (holdingsRes.ok) {
         const json = await holdingsRes.json();
         setHoldings(json.holdings || []);
-        setTransactions(json.transactions || []);
       }
     } catch (err) {
       console.error("[Bullion] Error fetching portfolio:", err);

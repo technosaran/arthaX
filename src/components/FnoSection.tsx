@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Search,
   ExternalLink,
-  ArrowUpRight,
   Layers,
   History,
   Gauge,
@@ -74,21 +73,6 @@ export interface FnoTrade {
   created_at: string;
 }
 
-const DEFAULT_LOT_SIZES: Record<string, number> = {
-  NIFTY: 25,
-  BANKNIFTY: 15,
-  FINNIFTY: 25,
-  MIDCPNIFTY: 50,
-  SENSEX: 10,
-  RELIANCE: 250,
-  HDFCBANK: 550,
-  INFY: 400,
-  TCS: 175,
-  ICICIBANK: 700,
-  SBIN: 750,
-  TATAMOTORS: 575,
-};
-
 export default function FnoSection() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -96,8 +80,6 @@ export default function FnoSection() {
 
   // Primary State
   const [positions, setPositions] = useState<FnoPosition[]>([]);
-  const [trades, setTrades] = useState<FnoTrade[]>([]);
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef<boolean>(false);
   const autoSyncedRef = useRef<boolean>(false);
@@ -122,12 +104,6 @@ export default function FnoSection() {
     }).format(val);
   }, []);
 
-  const formatNumber = useCallback((val: number, maxDigits = 2) => {
-    return new Intl.NumberFormat("en-IN", {
-      maximumFractionDigits: maxDigits,
-    }).format(val);
-  }, []);
-
   // Fetch Positions & Accounts
   const fetchData = useCallback(async () => {
     if (!user || inFlightRef.current) return;
@@ -142,19 +118,11 @@ export default function FnoSection() {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      const [posRes, accRes] = await Promise.all([
-        fetch("/api/v1/fno/positions", { headers }),
-        supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
-      ]);
-
-      if (accRes.data) {
-        setAccounts(accRes.data);
-      }
+      const posRes = await fetch("/api/v1/fno/positions", { headers });
 
       if (posRes.ok) {
         const json = await posRes.json();
         setPositions(json.positions || []);
-        setTrades(json.trades || []);
       }
     } catch (err) {
       console.error("[F&O] Error loading data:", err);

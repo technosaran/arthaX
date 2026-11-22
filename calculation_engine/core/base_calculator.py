@@ -77,7 +77,6 @@ class BaseCalculator(ABC):
     @abstractmethod
     def calculate(self, inputs: Any, context: Optional[Dict[str, Any]] = None) -> Any:
         """Core mathematical calculation logic. Must be deterministic and pure."""
-        pass
 
     def summarize_result(self, result: Any) -> Dict[str, Any]:
         """Summarizes high-level totals without sensitive PII for audit logging."""

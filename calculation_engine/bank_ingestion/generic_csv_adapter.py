@@ -4,12 +4,10 @@ Parses standard CSV bank statements with dynamic column matching.
 Works with HDFC, ICICI, Axis, Kotak, and custom export formats.
 """
 
-import re
 import csv
-import io
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict
 
 from .base_adapter import BaseBankAdapter
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem

@@ -10,25 +10,17 @@ import {
   RefreshCw,
   Search,
   CheckCircle2,
-  SlidersHorizontal,
-  ArrowRight,
   Layers,
-  Percent,
   Check,
-  Copy,
   Calendar,
-  Clock,
-  ArrowUpRight,
-  HelpCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { Skeleton, StatCardSkeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useTaxAnalysisQuery } from "@/hooks/usePortfolioQueries";
 import { useToast } from "@/context/ToastContext";
 import EntityLogo from "@/components/EntityLogo";
@@ -91,13 +83,6 @@ export default function TaxSection({
 
   const formatINR = (val: number): string => {
     return `₹${Math.round(val || 0).toLocaleString("en-IN")}`;
-  };
-
-  const formatINRFraction = (val: number): string => {
-    return `₹${(val || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
   };
 
   // Filtered & sorted opportunities

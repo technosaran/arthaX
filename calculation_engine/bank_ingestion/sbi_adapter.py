@@ -6,10 +6,9 @@ Handles multi-line narration continuation, balance parsing, and opening/closing 
 
 import re
 import csv
-import io
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 import pymupdf
 
 from .base_adapter import BaseBankAdapter
@@ -21,15 +20,35 @@ from .statement_validator import validate_statement_math
 DATE_PATTERNS = [
     r"(\d{2}/\d{2}/\d{4})",
     r"(\d{2}-\d{2}-\d{4})",
+    r"(\d{2}\.\d{2}\.\d{4})",
     r"(\d{2}-[A-Za-z]{3}-\d{4})",
-    r"(\d{2}\s+[A-Za-z]{3}\s+\d{4})",
+    r"(\d{2}\.[A-Za-z]{3}\.\d{4})",
+    r"(\d{2}\s+[A-Za-z]{3,9}\s+\d{4})",
 ]
 
 
 def parse_date(date_str: str) -> Optional[date]:
-    """Parses Indian bank date string into date object."""
-    clean = date_str.strip()
+    """
+    Parses Indian bank date string into date object.
+    Supports dot separators (e.g. 14.11.2026, 14.Nov.2026),
+    dates with timestamps (e.g. 14/11/2026 12:34:56, 14-11-2026 12:34:56),
+    and full month names (e.g. 14 November 2026).
+    """
+    if not date_str:
+        return None
+    clean = " ".join(str(date_str).strip().split())
+    if not clean:
+        return None
+
+    # Strip optional timestamp part if present (e.g. 14/11/2026 12:34:56 or 2026-11-14T12:34:56)
+    clean_no_time = re.sub(
+        r"[T\s]+\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:\s*(?:AM|PM|am|pm))?$",
+        "",
+        clean,
+    ).strip()
+
     formats = [
+        # Standard slash and dash
         "%d/%m/%Y",
         "%d-%m-%Y",
         "%d-%b-%Y",
@@ -37,24 +56,51 @@ def parse_date(date_str: str) -> Optional[date]:
         "%d-%m-%y",
         "%d/%m/%y",
         "%Y-%m-%d",
+        # Dot separated dates
+        "%d.%m.%Y",
+        "%d.%b.%Y",
+        "%d.%m.%y",
+        "%d.%b.%y",
+        "%Y.%m.%d",
+        # Full month names
+        "%d %B %Y",
+        "%d-%B-%Y",
+        "%d.%B.%Y",
+        "%B %d, %Y",
+        "%d %B %y",
+        "%d-%B-%y",
+        # Explicit datetime fallback
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d-%m-%Y %H:%M:%S",
+        "%d-%m-%Y %H:%M",
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
     ]
-    for fmt in formats:
-        try:
-            return datetime.strptime(clean, fmt).date()
-        except ValueError:
-            continue
+
+    candidates = [clean_no_time, clean_no_time.title(), clean, clean.title()]
+    for cand in candidates:
+        for fmt in formats:
+            try:
+                return datetime.strptime(cand, fmt).date()
+            except ValueError:
+                continue
     return None
 
 
 class InvalidAmountError(ValueError):
     """Raised when an amount string is present but cannot be parsed as a valid finite Decimal."""
-    pass
 
 
 def parse_amount(val: Any) -> Decimal:
     """
     Parses string or numeric amount into Decimal.
     Returns Decimal('0.00') only when val is None or empty/placeholder (e.g. '', '-', 'NA').
+    Cleans currency prefixes and symbols (Rs., Rs, INR, ₹).
+    Supports accounting negative numbers with parentheses (e.g. '(1,250.00)' -> Decimal('1250.00')).
+    Supports trailing indicators like (Dr), (Cr), Dr, Cr with or without spaces and parentheses.
     Raises InvalidAmountError when val contains invalid/malformed non-empty data or NaN/Infinity.
     """
     if val is None:
@@ -64,11 +110,40 @@ def parse_amount(val: Any) -> Decimal:
         if d.is_nan() or d.is_infinite():
             raise InvalidAmountError(f"Amount cannot be NaN or Infinite: {val}")
         return d.quantize(Decimal("0.01"))
-    s = str(val).strip().replace(",", "").replace("₹", "").replace("INR", "").strip()
-    if not s or s in ("-", "--", "NA", "N/A", "Nil", "None"):
+
+    s = str(val).strip()
+    if not s or s in ("-", "--", "NA", "N/A", "Nil", "NIL", "None", "NONE", "null", "NULL"):
         return Decimal("0.00")
-    # Clean trailing Cr / Dr notations
-    s = re.sub(r"(?i)\s*(cr|dr)$", "", s).strip()
+
+    # Remove commas
+    s = s.replace(",", "")
+
+    # Remove currency symbol
+    s = s.replace("₹", "")
+
+    def _strip_currencies(txt: str) -> str:
+        txt = re.sub(r"(?i)(?<=[\s(])(?:rs\.?|inr)(?=[\s)\d]|$)", "", txt)
+        txt = re.sub(r"(?i)^(?:rs\.?|inr)(?=[\s)\d]|$)", "", txt)
+        txt = re.sub(r"(?i)(?<=[\s\d])(?:rs\.?|inr)$", "", txt)
+        return txt.strip()
+
+    def _strip_trailing_indicators(txt: str) -> str:
+        return re.sub(r"(?i)\s*(?:\((?:cr|dr)\)|cr|dr)\s*$", "", txt).strip()
+
+    s = _strip_trailing_indicators(s)
+    s = _strip_currencies(s)
+    s = _strip_trailing_indicators(s)
+
+    # Check for accounting negative format: (amount)
+    if s.startswith("(") and s.endswith(")"):
+        s = s[1:-1].strip()
+        s = _strip_trailing_indicators(s)
+        s = _strip_currencies(s)
+        s = _strip_trailing_indicators(s)
+
+    # Clean any remaining trailing Dr/Cr indicators
+    s = _strip_trailing_indicators(s)
+
     try:
         d = Decimal(s)
         if d.is_nan() or d.is_infinite():

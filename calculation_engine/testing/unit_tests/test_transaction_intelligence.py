@@ -5,7 +5,6 @@ Tests classification waterfall, UPI parsing, merchant resolution, refunds, and t
 
 from decimal import Decimal
 from datetime import date
-import pytest
 
 from calculation_engine.intelligence.models import TransactionClassificationInput
 from calculation_engine.intelligence.classifier import classifier

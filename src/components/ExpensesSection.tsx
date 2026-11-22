@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   Plus,
   Trash2,
-  Loader2,
   X,
   TrendingDown,
   Calendar,
@@ -17,9 +16,7 @@ import {
   ChevronRight,
   Flame,
   Search,
-  Filter,
   AlertCircle,
-  TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -29,7 +26,7 @@ import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
 import InteractiveLineChart, { LinePoint } from "@/components/charts/InteractiveLineChart";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
+import { saveToCache, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import {
   getCurrentMonthYear,
   formatMonthDisplay,
@@ -41,7 +38,6 @@ import { isFamilyTransfer } from "@/utils/expenseFilter";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -154,7 +150,6 @@ export default function ExpensesSection() {
 
   const redisExpensesKey = getUserCacheKey(user?.id, CACHE_KEYS.EXPENSES);
   const redisAccountsKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
-  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
 
   // Synchronous Tier 1 & 2 Local Cache load (0ms latency)
   const initialExpenses = useMemo(() => {

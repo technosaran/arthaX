@@ -4,36 +4,18 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   ShieldCheck,
   TrendingUp,
-  TrendingDown,
   RefreshCw,
   Search,
-  ExternalLink,
-  SlidersHorizontal,
-  ArrowUpRight,
-  ArrowDownRight,
-  PieChart as PieChartIcon,
-  Layers,
   History,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Clock,
-  ArrowRightLeft,
   X,
-  Target,
-  ChevronRight,
-  ChevronDown,
-  Activity,
   BarChart3,
   List,
   LayoutGrid,
   Calendar,
   Wallet,
   Receipt,
-  FileText,
   BadgePercent,
   Copy,
-  Info,
   CalendarClock,
   Check,
   RotateCw,
@@ -146,8 +128,6 @@ export default function BondsSection() {
   // State
   const [holdings, setHoldings] = useState<BondHolding[]>([]);
   const [transactions, setTransactions] = useState<BondTransaction[]>([]);
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; type: string; balance: number }>>([]);
-  const [zerodhaDematAccount, setZerodhaDematAccount] = useState<{ id: string; name: string; balance?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [copiedIsin, setCopiedIsin] = useState<string | null>(null);
@@ -207,8 +187,6 @@ export default function BondsSection() {
         const json = await res.json();
         setHoldings(json.holdings || []);
         setTransactions(json.transactions || []);
-        setAccounts(json.accounts || []);
-        setZerodhaDematAccount(json.zerodhaDematAccount || null);
       }
     } catch (err) {
       console.error("[Bonds] Error fetching data:", err);

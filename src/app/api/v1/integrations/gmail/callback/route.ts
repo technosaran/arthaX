@@ -25,8 +25,12 @@ export async function GET(req: NextRequest) {
   // 1. Surface direct Google error if present
   if (error) {
     console.error("[Gmail OAuth Callback] Google OAuth error:", error, errorDescription);
+    let friendlyMessage = errorDescription || error;
+    if (error === "access_denied") {
+      friendlyMessage = "Google authorization was cancelled. Please authorize statement read permissions to connect Gmail.";
+    }
     return buildRedirectResponse(
-      `${baseOrigin}/?tab=settings&error=${encodeURIComponent(errorDescription || error)}`
+      `${baseOrigin}/?tab=settings&error=${encodeURIComponent(friendlyMessage)}`
     );
   }
 

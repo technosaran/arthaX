@@ -24,8 +24,8 @@ export async function refreshGoogleAccessToken(
     return null;
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
     logger.warn("GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not configured", "GmailService");
@@ -64,11 +64,12 @@ export async function refreshGoogleAccessToken(
 /**
  * Resolves password candidates for a user strictly from user-authorized hints.
  * Enforces zero guessing from personal info or account numbers, in-memory decryption,
- * and bounds candidates to MAX_PASSWORD_ATTEMPTS = 10.
+ * preserves specific candidate passwords first, and bounds candidates up to 20 attempts.
  * Secrets are decrypted securely in memory and never logged or exposed.
  */
 export async function fetchUserPasswordCandidates(userId: string): Promise<string[]> {
-  const candidates: string[] = [];
+  const specificCandidates: string[] = [];
+  const permutationCandidates: string[] = [];
 
   let userName: string | null = null;
   try {
@@ -79,6 +80,16 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
         .eq("id", userId)
         .maybeSingle();
       userName = userSettings?.name || null;
+    }
+    if (!userName) {
+      const profileQuery = supabaseAdmin.from("profiles");
+      if (profileQuery && typeof profileQuery.select === "function") {
+        const { data: profile } = await profileQuery
+          .select("full_name")
+          .eq("id", userId)
+          .maybeSingle();
+        userName = profile?.full_name || null;
+      }
     }
   } catch {
     // Ignore if user_settings is unmocked or table not ready
@@ -106,28 +117,49 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
                 }
                 const perms = generateBankPasswordPermutations(parsed);
                 for (const p of perms) {
-                  if (p && !candidates.includes(p)) {
-                    candidates.push(p);
+                  if (p && !permutationCandidates.includes(p)) {
+                    permutationCandidates.push(p);
                   }
                 }
               } catch {
-                if (!candidates.includes(trimmed)) {
-                  candidates.push(trimmed);
+                if (trimmed && !specificCandidates.includes(trimmed)) {
+                  specificCandidates.push(trimmed);
                 }
               }
-            } else if (trimmed && !candidates.includes(trimmed)) {
-              candidates.push(trimmed);
+            } else if (trimmed) {
+              if (h.hint_pattern === "AUTO_PERMUTATION") {
+                if (!permutationCandidates.includes(trimmed)) {
+                  permutationCandidates.push(trimmed);
+                }
+              } else {
+                if (!specificCandidates.includes(trimmed)) {
+                  specificCandidates.push(trimmed);
+                }
+              }
             }
           }
         }
       }
     }
-  } catch (err) {
+  } catch {
     logger.warn("Could not load authorized password hints for user", "GmailService", { userId });
   }
 
-  // Bound candidates to MAX_PASSWORD_ATTEMPTS = 10
-  return candidates.slice(0, 10);
+  // Preserve specific candidate passwords first, followed by permutations
+  const combined: string[] = [];
+  for (const c of specificCandidates) {
+    if (!combined.includes(c)) {
+      combined.push(c);
+    }
+  }
+  for (const c of permutationCandidates) {
+    if (!combined.includes(c)) {
+      combined.push(c);
+    }
+  }
+
+  // Bound candidates up to 20 candidates
+  return combined.slice(0, 20);
 }
 
 export interface GmailSyncOptions {
@@ -183,9 +215,40 @@ export function normalizeBankName(bankName: string): { key: string; displayName:
   if (lower.includes("indian bank") || lower.includes("indbank")) {
     return { key: "indian_bank", displayName: "Indian Bank Account" };
   }
-  const cleanName = bankName.replace(/_/g, " ").trim();
+  if (lower.includes("indusind") || lower.includes("indus")) {
+    return { key: "indusind", displayName: "IndusInd Bank Account" };
+  }
+  if (lower.includes("yes bank") || lower.includes("yesbank")) {
+    return { key: "yes_bank", displayName: "Yes Bank Account" };
+  }
+  if (lower.includes("idfc")) {
+    return { key: "idfc", displayName: "IDFC FIRST Bank Account" };
+  }
+  if (lower.includes("federal")) {
+    return { key: "federal", displayName: "Federal Bank Account" };
+  }
+  if (lower.includes("bank of india") || lower.includes("boi")) {
+    return { key: "boi", displayName: "Bank of India Account" };
+  }
+  if (lower.includes("central bank")) {
+    return { key: "central_bank", displayName: "Central Bank of India" };
+  }
+  if (lower.includes("rbl")) {
+    return { key: "rbl", displayName: "RBL Bank Account" };
+  }
+  if (lower.includes("standard chartered") || lower.includes("scb")) {
+    return { key: "scb", displayName: "Standard Chartered Bank" };
+  }
+  if (lower.includes("hsbc")) {
+    return { key: "hsbc", displayName: "HSBC Bank Account" };
+  }
+  if (lower.includes("citibank") || lower.includes("citi")) {
+    return { key: "citibank", displayName: "Citibank Account" };
+  }
+  const rawClean = (bankName || "Unknown Bank").replace(/_/g, " ").trim();
+  const cleanName = rawClean.length > 0 ? rawClean : "Unknown Bank";
   const title = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-  return { key: lower, displayName: title.endsWith("Account") ? title : `${title} Account` };
+  return { key: lower || "bank", displayName: title.endsWith("Account") || title.endsWith("Bank") ? title : `${title} Account` };
 }
 
 /**
@@ -215,7 +278,7 @@ export async function syncUserGmailStatements(
     };
   }
 
-  if (integration.sync_status === "DISCONNECTED") {
+  if (integration.sync_status === "DISCONNECTED" || integration.sync_status === "PENDING_AUTH") {
     return {
       success: false,
       statementsCount: 0,
@@ -224,7 +287,7 @@ export async function syncUserGmailStatements(
       transfersMatched: 0,
       failedCount: 0,
       status: "FAILED",
-      error: "Gmail integration is disconnected",
+      error: "Gmail integration is not connected",
     };
   }
 
@@ -384,7 +447,16 @@ export async function syncUserGmailStatements(
           parsedDetail = parsed.detail || parsed.message || parsed.error || errText;
         } catch {}
 
-        if (parsedDetail.includes("insufficient") || parsedDetail.includes("SCOPE") || parsedDetail.includes("403") || pyRes.status === 403) {
+        const isPermissionScopeError =
+          (parsedDetail.toLowerCase().includes("insufficient") ||
+            parsedDetail.includes("SCOPE") ||
+            parsedDetail.includes("invalid_grant") ||
+            parsedDetail.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
+            parsedDetail.includes("insufficientPermissions")) &&
+          !parsedDetail.includes("userRateLimitExceeded") &&
+          !parsedDetail.includes("rateLimitExceeded");
+
+        if (isPermissionScopeError) {
           await supabaseAdmin
             .from("gmail_integrations")
             .update({

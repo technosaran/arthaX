@@ -3,10 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   BookOpen,
-  Loader2,
   Trash2,
   Wallet,
-  FileText,
   TrendingUp,
   TrendingDown,
   ArrowUpDown,
@@ -15,9 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Filter,
-  CheckCircle2,
-  ArrowUpRight,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
@@ -37,13 +32,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { StatCard } from "@/components/ui/StatCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 
 const DEFAULT_CASH_ID = "00000000-0000-0000-0000-000000000001";
 

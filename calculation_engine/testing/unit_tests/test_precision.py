@@ -3,16 +3,12 @@ Unit Tests: Precision & Monetary Arithmetic
 Tests Decimal operations, quantizing, zero-division safety, and property-based invariance with Hypothesis.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
-import math
-import pytest
+from decimal import Decimal
 from hypothesis import given, strategies as st
 
 from calculation_engine.core.precision import (
     to_decimal,
     quantize_currency,
-    quantize_units,
-    quantize_rate,
     safe_divide,
     safe_percentage,
     format_inr,

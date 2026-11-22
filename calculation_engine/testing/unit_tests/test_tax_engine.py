@@ -5,8 +5,6 @@ Section 115BBH crypto rules, and harvesting calculations.
 """
 
 from datetime import datetime, timedelta
-from decimal import Decimal
-import pytest
 from calculation_engine.modules.tax_engine import TaxEngine
 
 

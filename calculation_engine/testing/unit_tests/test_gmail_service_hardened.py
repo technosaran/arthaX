@@ -6,7 +6,6 @@ and accurate partial/failed status reporting when statements fail.
 
 from unittest.mock import MagicMock, patch
 import urllib.error
-import pytest
 
 from calculation_engine.bank_ingestion.gmail_service import GmailStatementIngestor
 

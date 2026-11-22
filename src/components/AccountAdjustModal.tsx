@@ -142,8 +142,6 @@ export default function AccountAdjustModal({
   if (!isOpen || !account) return null;
 
   const parsedAmount = parseFloat(amount) || 0;
-  const isTargetCash =
-    account.type === "Liquid Cash" || account.name.toLowerCase().includes("cash");
 
   // Helpers for calculations
   const sourceAccount = accounts.find((a) => a.id === fromAccountId);

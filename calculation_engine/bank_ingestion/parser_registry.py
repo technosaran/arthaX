@@ -18,7 +18,6 @@ from .models import StatementParseResult
 from .pdf_decryptor import (
     compute_file_hash,
     open_pdf_document,
-    DecryptionError,
     PasswordRequiredError,
     PasswordIncorrectError,
     CorruptedPdfError,
@@ -59,6 +58,13 @@ class StatementParserRegistry:
         """
         file_hash = compute_file_hash(content)
         fallback_adapter = self.adapters[0]
+        best_candidate: Optional[StatementParseResult] = None
+
+        def _update_best_candidate(cand: Optional[StatementParseResult]):
+            nonlocal best_candidate
+            if cand and cand.transactions:
+                if best_candidate is None or len(cand.transactions) > len(best_candidate.transactions):
+                    best_candidate = cand
 
         # 1. If PDF, check if we can inspect decrypted text for high-confidence bank identification
         fn_lower = filename.lower()
@@ -83,8 +89,9 @@ class StatementParserRegistry:
                     if target_adapter:
                         try:
                             result = target_adapter.parse(content, filename, passwords)
-                            if result.success or (result.transactions and not result.errors):
+                            if result.success:
                                 return result
+                            _update_best_candidate(result)
                         except Exception:
                             pass
             except (PasswordRequiredError, PasswordIncorrectError, CorruptedPdfError, UnsupportedEncryptionError) as pe:
@@ -106,8 +113,9 @@ class StatementParserRegistry:
             if hint_adapter:
                 try:
                     result = hint_adapter.parse(content, filename, passwords)
-                    if result.success or (result.transactions and not result.errors):
+                    if result.success:
                         return result
+                    _update_best_candidate(result)
                 except Exception:
                     pass
 
@@ -117,8 +125,9 @@ class StatementParserRegistry:
             if adapter.can_parse(content, filename):
                 try:
                     result = adapter.parse(content, filename, passwords)
-                    if result.success or (result.transactions and not result.errors):
+                    if result.success:
                         return result
+                    _update_best_candidate(result)
                     if result.errors:
                         for err in result.errors:
                             if err in ("PASSWORD_REQUIRED", "PASSWORD_INCORRECT", "CORRUPTED_PDF", "UNSUPPORTED_ENCRYPTION"):
@@ -138,15 +147,27 @@ class StatementParserRegistry:
         if fn_lower.endswith(".csv"):
             try:
                 generic_csv = GenericCsvBankAdapter()
-                return generic_csv.parse(content, filename, passwords)
+                result = generic_csv.parse(content, filename, passwords)
+                if result.success:
+                    return result
+                _update_best_candidate(result)
             except Exception as e:
                 last_error = str(e)
         elif fn_lower.endswith(".pdf") or content.startswith(b"%PDF"):
             try:
                 generic_pdf = GenericPdfBankAdapter()
-                return generic_pdf.parse(content, filename, passwords)
+                result = generic_pdf.parse(content, filename, passwords)
+                if result.success:
+                    return result
+                _update_best_candidate(result)
             except Exception as e:
                 last_error = str(e)
+
+        # 5. Return best candidate if any adapter successfully extracted transactions
+        if best_candidate is not None:
+            if not best_candidate.errors and best_candidate.validation and best_candidate.validation.errors:
+                best_candidate.errors = list(best_candidate.validation.errors)
+            return best_candidate
 
         # Standard failure response for unsupported or unparseable format
         err_msg = f"Unsupported or unparseable bank statement format for '{filename}'."

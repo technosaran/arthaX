@@ -84,6 +84,10 @@ export async function GET(req: NextRequest) {
   googleAuthUrl.searchParams.set("scope", scopes);
   googleAuthUrl.searchParams.set("access_type", "offline");
   googleAuthUrl.searchParams.set("prompt", "consent");
+  googleAuthUrl.searchParams.set("include_granted_scopes", "true");
+  if (auth.user.email) {
+    googleAuthUrl.searchParams.set("login_hint", auth.user.email);
+  }
   googleAuthUrl.searchParams.set("state", state);
   googleAuthUrl.searchParams.set("code_challenge", codeChallenge);
   googleAuthUrl.searchParams.set("code_challenge_method", "S256");

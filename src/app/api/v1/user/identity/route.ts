@@ -1,0 +1,138 @@
+import { supabaseAdmin } from "@/utils/supabase/admin";
+import { apiError, apiSuccess } from "@/utils/apiResponse";
+import { createApiRoute } from "@/lib/backend/routeHandler";
+import { encryptSensitiveData, decryptSensitiveData } from "@/utils/crypto";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { generateBankPasswordPermutations, BankingIdentityDetails } from "@/utils/bankPasswords";
+import { z } from "zod";
+
+const IdentitySchema = z.object({
+  name: z.string().max(100).optional().nullable(),
+  pan: z.string().max(20).optional().nullable(),
+  dob: z.string().max(30).optional().nullable(),
+  phone: z.string().max(25).optional().nullable(),
+});
+
+/**
+ * GET: Retrieve user's masked banking and personal identity
+ */
+export const GET = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 60, windowSeconds: 60 },
+  handler: async ({ userId, req }) => {
+    const { data: hints, error } = await supabaseAdmin
+      .from("statement_password_hints")
+      .select("id, bank_name, hint_pattern, encrypted_secret")
+      .eq("user_id", userId!);
+
+    if (error) {
+      return apiError(error.message, "DATABASE_ERROR", 500, undefined, req);
+    }
+
+    const identityHint = hints?.find((h) => h.hint_pattern === "BANKING_IDENTITY");
+    const bankingIdentity = {
+      hasPan: false,
+      panMasked: null as string | null,
+      hasDob: false,
+      dobMasked: null as string | null,
+      hasPhone: false,
+      phoneMasked: null as string | null,
+    };
+
+    if (identityHint?.encrypted_secret) {
+      try {
+        const decrypted = decryptSensitiveData(identityHint.encrypted_secret, "statement-passwords");
+        if (decrypted) {
+          const parsed: BankingIdentityDetails = JSON.parse(decrypted);
+          if (parsed.pan) {
+            const cleanPan = parsed.pan.trim().toUpperCase();
+            bankingIdentity.hasPan = true;
+            bankingIdentity.panMasked = `${cleanPan.slice(0, 2)}****${cleanPan.slice(-2)}`;
+          }
+          if (parsed.dob) {
+            bankingIdentity.hasDob = true;
+            bankingIdentity.dobMasked = `****-**-${parsed.dob.trim().slice(-2)}`;
+          }
+          if (parsed.phone) {
+            const cleanPhone = parsed.phone.replace(/\D/g, "");
+            bankingIdentity.hasPhone = true;
+            bankingIdentity.phoneMasked = `******${cleanPhone.slice(-4)}`;
+          }
+        }
+      } catch {
+        // Safe decryption ignore
+      }
+    }
+
+    return apiSuccess({ bankingIdentity }, undefined, 200, req);
+  },
+});
+
+/**
+ * POST: Save or update user's banking identity details (PAN, DOB, Phone, Name)
+ */
+export const POST = createApiRoute({
+  auth: "required",
+  rateLimit: { limit: 20, windowSeconds: 60 },
+  schema: IdentitySchema,
+  handler: async ({ userId, body, req }) => {
+    const { name, pan, dob, phone } = body;
+
+    // Optional name update on user_settings
+    if (name && name.trim()) {
+      await supabaseAdmin.from("user_settings").upsert({
+        id: userId!,
+        name: name.trim(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    if ((pan && pan.trim()) || (dob && dob.trim()) || (phone && phone.trim())) {
+      const identityObj: BankingIdentityDetails = {
+        pan: pan?.trim().toUpperCase() || null,
+        dob: dob?.trim() || null,
+        phone: phone?.trim() || null,
+      };
+
+      const encryptedIdentity = encryptSensitiveData(JSON.stringify(identityObj), "statement-passwords");
+      await supabaseAdmin.from("statement_password_hints").upsert(
+        {
+          user_id: userId!,
+          bank_name: "ALL",
+          hint_pattern: "BANKING_IDENTITY",
+          encrypted_secret: encryptedIdentity,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,bank_name,account_id" }
+      );
+
+      // Auto-generate permutations for SBI, HDFC, ICICI, Axis, Kotak, etc.
+      const permutations = generateBankPasswordPermutations(identityObj);
+      if (permutations.length > 0) {
+        const primaryHint = permutations[0];
+        const encryptedPrimary = encryptSensitiveData(primaryHint, "statement-passwords");
+        await supabaseAdmin.from("statement_password_hints").upsert(
+          {
+            user_id: userId!,
+            bank_name: "SBI",
+            hint_pattern: "AUTO_PERMUTATION",
+            encrypted_secret: encryptedPrimary,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,bank_name,account_id" }
+        );
+      }
+    }
+
+    await invalidateUserCaches(userId, ["ACCOUNTS", "PORTFOLIO", "LEDGER"]);
+
+    return apiSuccess(
+      {
+        message: "Personal and banking identity details encrypted and saved successfully.",
+      },
+      undefined,
+      200,
+      req
+    );
+  },
+});

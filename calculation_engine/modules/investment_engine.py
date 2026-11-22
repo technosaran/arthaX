@@ -11,7 +11,6 @@ from ..core.precision import (
     to_decimal,
     quantize_currency,
     quantize_units,
-    quantize_rate,
     safe_divide,
     safe_percentage,
     DEFAULT_CURRENCY,

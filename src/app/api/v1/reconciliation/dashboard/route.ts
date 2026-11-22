@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiSuccess, apiError } from "@/utils/apiResponse";
-import { validateMonetaryAmount, fromCents, toCentsStrict } from "@/utils/money";
+import { fromCents } from "@/utils/money";
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { z } from "zod";
@@ -217,7 +216,7 @@ export const POST = createApiRoute({
   rateLimit: { limit: 15, windowSeconds: 60 },
   schema: ResolveDiscrepancySchema,
   handler: async ({ userId, body, req }) => {
-    const { action, statement_id, account_id, notes } = body;
+    const { action, statement_id, notes } = body;
 
     if (action === "TRIGGER_TRANSFER_RECONCILIATION") {
       const result = await reconcileInternalTransfers(userId!, 90);

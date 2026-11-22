@@ -4,14 +4,13 @@ Calculates total income by source, monthly & annual aggregates, recurring income
 net cash flow, savings rate, and income vs. expenditure analysis.
 """
 
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from ..core.precision import (
     to_decimal,
     quantize_currency,
-    safe_divide,
     safe_percentage,
     DEFAULT_CURRENCY,
 )

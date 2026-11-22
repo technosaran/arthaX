@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { extractRequestId, apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
+import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
 import { rateLimit } from "@/utils/rateLimit";
 import { getZerodhaIntegration, syncAllZerodhaSections } from "@/utils/zerodha";
 import {

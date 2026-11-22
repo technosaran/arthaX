@@ -6,17 +6,14 @@ amounts into 0.00.
 """
 
 from decimal import Decimal
-from datetime import date
 import pytest
 
 from calculation_engine.bank_ingestion.sbi_adapter import (
     parse_amount,
-    parse_date,
     InvalidAmountError,
     SbiBankAdapter,
 )
 from calculation_engine.bank_ingestion.indian_bank_adapter import IndianBankAdapter
-from calculation_engine.bank_ingestion.generic_csv_adapter import GenericCsvBankAdapter
 
 
 def test_parse_amount_valid_values():

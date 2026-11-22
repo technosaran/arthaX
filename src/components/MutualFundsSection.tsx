@@ -3,50 +3,25 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Coins,
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
   Search,
-  ExternalLink,
-  SlidersHorizontal,
-  ArrowUpRight,
-  ArrowDownRight,
   PieChart as PieChartIcon,
-  Layers,
   History,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Clock,
-  Sparkles,
-  ArrowRightLeft,
   X,
-  Target,
   ShieldCheck,
-  ChevronRight,
-  ChevronDown,
-  Activity,
-  BarChart3,
   List,
   LayoutGrid,
-  FileSpreadsheet,
   Calendar,
   Wallet,
-  Receipt,
-  FileText,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import BankLogo from "@/components/BankLogo";
 
 export interface MutualFundHolding {
   id: string;
@@ -146,7 +121,6 @@ export default function MutualFundsSection() {
   const [holdings, setHoldings] = useState<MutualFundHolding[]>([]);
   const [transactions, setTransactions] = useState<MutualFundTransaction[]>([]);
   const [quotes, setQuotes] = useState<Record<string, NavQuote>>({});
-  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string }[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -157,14 +131,13 @@ export default function MutualFundsSection() {
   useEffect(() => {
     holdingsRef.current = holdings;
   }, [holdings]);
-  const [refreshingNavs, setRefreshingNavs] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");
   const [displayMode, setDisplayMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "profit" | "loss" | "sip_active" | "elss">("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedAMC, setSelectedAMC] = useState<string>("all");
+  const selectedCategory = "all";
+  const selectedAMC = "all";
   const [sortBy, setSortBy] = useState<"value_desc" | "pnl_desc" | "pnl_asc" | "returns_desc" | "name_asc">(
     "value_desc"
   );
@@ -188,7 +161,6 @@ export default function MutualFundsSection() {
   const fetchNavsForHoldings = useCallback(async (holdingsList: MutualFundHolding[], notify = true) => {
     if (holdingsList.length === 0) return;
     try {
-      setRefreshingNavs(true);
       const codes = Array.from(new Set(holdingsList.map((h) => h.scheme_code))).join(",");
       const res = await fetch(`/api/v1/mutual-funds/nav?codes=${encodeURIComponent(codes)}`);
 
@@ -206,8 +178,6 @@ export default function MutualFundsSection() {
       if (notify) {
         showToast("AMFI Notice", "Could not refresh live AMFI NAVs. Displaying last recorded valuations.", "warning");
       }
-    } finally {
-      setRefreshingNavs(false);
     }
   }, [showToast]);
 
@@ -225,14 +195,7 @@ export default function MutualFundsSection() {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      const [holdingsRes, accountsRes] = await Promise.all([
-        fetch("/api/v1/mutual-funds/holdings", { headers }),
-        supabase.from("accounts").select("id, name, type").order("name", { ascending: true }),
-      ]);
-
-      if (accountsRes.data) {
-        setAccounts(accountsRes.data);
-      }
+      const holdingsRes = await fetch("/api/v1/mutual-funds/holdings", { headers });
 
       if (holdingsRes.ok) {
         const json = await holdingsRes.json();
@@ -368,23 +331,6 @@ export default function MutualFundsSection() {
       elssInvested,
     };
   }, [holdings, quotes]);
-
-  // Distinct AMCs and Categories for filters
-  const amcOptions = useMemo(() => {
-    const set = new Set<string>();
-    holdings.forEach((h) => {
-      if (h.fund_house) set.add(h.fund_house);
-    });
-    return Array.from(set).sort();
-  }, [holdings]);
-
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>();
-    holdings.forEach((h) => {
-      if (h.category) set.add(h.category);
-    });
-    return Array.from(set).sort();
-  }, [holdings]);
 
   // Filtered and sorted holdings
   const filteredHoldings = useMemo(() => {
@@ -946,8 +892,6 @@ export default function MutualFundsSection() {
               {filteredHoldings.map((h) => {
                 const quote = quotes[h.scheme_code];
                 const liveNav = quote?.currentNav || h.current_nav || h.avg_nav;
-                const dayChange = quote?.change || 0;
-                const dayChangePercent = quote?.changePercent || 0;
 
                 const units = Number(h.units) || 0;
                 const avgNav = Number(h.avg_nav) || 0;

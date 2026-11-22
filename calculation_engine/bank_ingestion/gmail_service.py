@@ -8,13 +8,11 @@ validates balances, classifies transactions, and detects transfers.
 import base64
 import json
 import logging
-import re
 import time
 import urllib.request
 import urllib.error
 import urllib.parse
-from datetime import datetime, timezone, date
-from decimal import Decimal
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
 from .parser_registry import parser_registry
@@ -30,14 +28,16 @@ DEFAULT_GMAIL_STATEMENT_QUERY = (
     "(subject:statement OR subject:estatement OR subject:e-statement OR subject:passbook "
     "OR subject:\"account statement\" OR subject:\"statement of account\" OR subject:\"bank statement\" "
     "OR subject:eCAS OR subject:\"consolidated account statement\" "
-    "OR from:sbi.co.in OR from:sbi.bank.in OR from:alerts.sbi.bank.in "
-    "OR from:hdfcbank.net OR from:hdfcbank.com OR from:icicibank.com "
-    "OR from:axisbank.com OR from:kotak.com OR from:pnb.co.in "
-    "OR from:bankofbaroda.com OR from:canarabank.com OR from:unionbankofindia.co.in "
-    "OR from:indianbank.co.in OR from:indusind.com OR from:idfcfirstbank.com "
-    "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in "
+    "OR from:sbi.co.in OR from:sbi.bank.in OR from:alerts.sbi.bank.in OR from:onlinesbi.sbi OR from:sbicard.com "
+    "OR from:hdfcbank.net OR from:hdfcbank.com OR from:hdfcbankcard.com "
+    "OR from:icicibank.com OR from:icicibankltd.com "
+    "OR from:axisbank.com OR from:axisbank.net OR from:kotak.com OR from:pnb.co.in OR from:pnbindia.in "
+    "OR from:bankofbaroda.com OR from:bankofbaroda.co.in OR from:canarabank.com OR from:unionbankofindia.co.in "
+    "OR from:indianbank.co.in OR from:indianbank.in OR from:indbankonline.com "
+    "OR from:indusind.com OR from:idfcfirstbank.com OR from:federalbank.co.in "
+    "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in OR from:sc.com "
     "OR from:camsonline.com OR from:kfintech.com) "
-    "has:attachment"
+    "has:attachment (filename:pdf OR filename:csv)"
 )
 
 GMAIL_API_BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -94,7 +94,8 @@ class GmailStatementIngestor:
     def _make_api_request(self, endpoint_url: str, max_retries: int = 3) -> Dict[str, Any]:
         """
         Performs authenticated HTTP GET to Gmail API using standard library urllib
-        with exponential backoff retries for transient failures (HTTP 429, 500, 502, 503, 504).
+        with exponential backoff retries for transient failures (HTTP 429, 500, 502, 503, 504
+        and Google rateLimitExceeded / userRateLimitExceeded 403 errors).
         """
         if not self.access_token:
             raise ValueError("Gmail API access token is required")
@@ -104,6 +105,7 @@ class GmailStatementIngestor:
             headers={
                 "Authorization": f"Bearer {self.access_token}",
                 "Accept": "application/json",
+                "User-Agent": "ArthaX-Financial-Engine/2.0 (Google-Gmail-API)",
             },
         )
 
@@ -114,9 +116,12 @@ class GmailStatementIngestor:
                     return json.loads(data.decode("utf-8"))
             except urllib.error.HTTPError as err:
                 err_body = err.read().decode("utf-8", errors="ignore")
-                is_retryable = err.code in (429, 500, 502, 503, 504)
+                is_rate_limit_403 = err.code == 403 and any(
+                    r in err_body for r in ("rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded")
+                )
+                is_retryable = err.code in (429, 500, 502, 503, 504) or is_rate_limit_403
                 if is_retryable and attempt < max_retries:
-                    backoff = 0.25 * (2 ** attempt)
+                    backoff = (0.25 * (2 ** attempt)) + (0.05 * attempt)
                     logger.warning(
                         f"Gmail API HTTP {err.code} on {endpoint_url}. Retrying in {backoff:.2f}s (attempt {attempt+1}/{max_retries})..."
                     )
@@ -126,7 +131,7 @@ class GmailStatementIngestor:
                 raise RuntimeError(f"Gmail API error {err.code}: {err_body}")
             except Exception as e:
                 if attempt < max_retries:
-                    backoff = 0.25 * (2 ** attempt)
+                    backoff = (0.25 * (2 ** attempt)) + (0.05 * attempt)
                     time.sleep(backoff)
                     continue
                 logger.error(f"Gmail API request failure: {str(e)}")
@@ -191,8 +196,16 @@ class GmailStatementIngestor:
         return self._make_api_request(url)
 
     def extract_attachment_parts(self, message_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Recursively traverses MIME message structure to find PDF and CSV attachments."""
+        """Recursively traverses MIME message structure to find PDF and CSV attachments (including inline data)."""
         attachments: List[Dict[str, Any]] = []
+
+        def _decode_data(data_str: str) -> bytes:
+            if not data_str:
+                return b""
+            pad = len(data_str) % 4
+            if pad:
+                data_str += "=" * (4 - pad)
+            return base64.urlsafe_b64decode(data_str.encode("utf-8"))
 
         def _traverse_parts(parts: List[Dict[str, Any]]):
             for part in parts:
@@ -200,6 +213,7 @@ class GmailStatementIngestor:
                 mime_type = part.get("mimeType", "")
                 body = part.get("body", {})
                 attachment_id = body.get("attachmentId")
+                raw_data = body.get("data")
 
                 is_target_file = (
                     filename.lower().endswith(".pdf")
@@ -208,13 +222,23 @@ class GmailStatementIngestor:
                     or "csv" in mime_type.lower()
                 )
 
-                if is_target_file and attachment_id:
-                    attachments.append({
+                if is_target_file and (attachment_id or raw_data):
+                    att_dict: Dict[str, Any] = {
                         "filename": filename or "statement.pdf",
                         "mimeType": mime_type,
-                        "attachmentId": attachment_id,
                         "size": body.get("size", 0),
-                    })
+                    }
+                    if attachment_id:
+                        att_dict["attachmentId"] = attachment_id
+                    if raw_data:
+                        try:
+                            decoded = _decode_data(raw_data)
+                            att_dict["data"] = decoded
+                            if not att_dict["size"]:
+                                att_dict["size"] = len(decoded)
+                        except Exception as e:
+                            logger.warning(f"Failed to decode inline attachment data: {e}")
+                    attachments.append(att_dict)
 
                 sub_parts = part.get("parts", [])
                 if sub_parts:
@@ -227,14 +251,33 @@ class GmailStatementIngestor:
         else:
             # Single-part payload
             fn = payload.get("filename", "")
-            att_id = payload.get("body", {}).get("attachmentId")
-            if fn and att_id:
-                attachments.append({
-                    "filename": fn,
-                    "mimeType": payload.get("mimeType", ""),
-                    "attachmentId": att_id,
-                    "size": payload.get("body", {}).get("size", 0),
-                })
+            mime_type = payload.get("mimeType", "")
+            body = payload.get("body", {})
+            att_id = body.get("attachmentId")
+            raw_data = body.get("data")
+            is_target_file = (
+                fn.lower().endswith(".pdf")
+                or fn.lower().endswith(".csv")
+                or "pdf" in mime_type.lower()
+                or "csv" in mime_type.lower()
+            )
+            if is_target_file and (att_id or raw_data):
+                att_dict = {
+                    "filename": fn or "statement.pdf",
+                    "mimeType": mime_type,
+                    "size": body.get("size", 0),
+                }
+                if att_id:
+                    att_dict["attachmentId"] = att_id
+                if raw_data:
+                    try:
+                        decoded = _decode_data(raw_data)
+                        att_dict["data"] = decoded
+                        if not att_dict["size"]:
+                            att_dict["size"] = len(decoded)
+                    except Exception as e:
+                        logger.warning(f"Failed to decode inline attachment data: {e}")
+                attachments.append(att_dict)
 
         return attachments
 
@@ -353,11 +396,16 @@ class GmailStatementIngestor:
             for att_meta in attachments:
                 att_id = att_meta.get("attachmentId")
                 fn = att_meta.get("filename", "statement.pdf")
-                if not att_id:
+                inline_bytes = att_meta.get("data")
+                if not att_id and not inline_bytes:
                     continue
 
                 try:
-                    content_bytes = self.download_attachment(msg_id, att_id)
+                    if inline_bytes:
+                        content_bytes = inline_bytes
+                    else:
+                        content_bytes = self.download_attachment(msg_id, att_id)
+
                     if not content_bytes:
                         continue
 
@@ -403,7 +451,7 @@ class GmailStatementIngestor:
                     stmt_dict["detected_bank"] = detected_bank
                     stmt_dict["file_hash"] = file_hash
                     stmt_dict["message_id"] = msg_id
-                    stmt_dict["attachment_id"] = att_id
+                    stmt_dict["attachment_id"] = att_id or "inline"
                     parsed_statements.append(stmt_dict)
                     total_transactions += len(enriched_txs)
 
@@ -413,7 +461,7 @@ class GmailStatementIngestor:
                             "file_name": fn,
                             "file_hash": file_hash,
                             "message_id": msg_id,
-                            "attachment_id": att_id,
+                            "attachment_id": att_id or "inline",
                             "errors": parse_res.errors,
                             "email_metadata": email_meta,
                         })

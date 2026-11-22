@@ -26,11 +26,9 @@ import {
   RefreshCw,
   Zap,
   Mail,
-  Calendar,
   KeyRound,
   Bitcoin,
-  Clock,
-  XCircle,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -140,7 +138,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   });
   const [greetingName, setGreetingName] = useState(profile?.name || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [cacheSyncing, setCacheSyncing] = useState(false);
   const [copiedAccountId, setCopiedAccountId] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
@@ -258,11 +255,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     latestJob: null,
   });
   const [loadingGmail, setLoadingGmail] = useState(false);
-  const [connectingGmail, setConnectingGmail] = useState(false);
   const [syncingGmail, setSyncingGmail] = useState(false);
   const [gmailEmail, setGmailEmail] = useState("");
-  const [gmailPasswordHint, setGmailPasswordHint] = useState("");
-  const [gmailBankFilter, setGmailBankFilter] = useState("ALL");
   const [panInput, setPanInput] = useState("");
   const [dobInput, setDobInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
@@ -833,7 +827,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         setZerodhaStatus(resetStatus);
         saveToLocalCache(zerodhaCacheKey, resetStatus, 86400);
       }
-    } catch (err: any) {
+    } catch {
       showToast("Disconnect Failed", "Failed to disconnect Zerodha credentials.", "error");
     }
   };
@@ -914,49 +908,8 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
           window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
         }
       }
-    } catch (err: any) {
+    } catch {
       showToast("Disconnect Error", "Failed to disconnect Binance.", "error");
-    }
-  };
-
-  const handleConnectGmail = async () => {
-    const targetEmail = gmailEmail.trim().toLowerCase() || user?.email?.toLowerCase();
-    if (!targetEmail) {
-      showToast("Missing Email", "Please enter a valid Gmail address.", "error");
-      return;
-    }
-    setConnectingGmail(true);
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
-      }
-
-      const res = await fetch("/api/v1/integrations/gmail", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          email: targetEmail,
-          password_hint: gmailPasswordHint.trim() || undefined,
-          bank_name: gmailBankFilter,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        showToast("Connection Error", json.error?.message || (typeof json.error === "string" ? json.error : "Failed to connect Gmail integration."), "error");
-        return;
-      }
-
-      showToast("Gmail Connected!", json.data?.message || "Gmail statement reader connected successfully.", "success");
-      setGmailPasswordHint("");
-      await fetchGmailStatus(true);
-    } catch (err: any) {
-      showToast("Connection Error", err?.message || "Error connecting to Gmail", "error");
-    } finally {
-      setConnectingGmail(false);
     }
   };
 
@@ -1053,14 +1006,14 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
           window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
         }
       }
-    } catch (err: any) {
+    } catch {
       showToast("Disconnect Error", "Failed to disconnect Gmail.", "error");
     }
   };
 
   const handleSaveBankingIdentity = async () => {
     if (!panInput.trim() && !dobInput.trim() && !phoneInput.trim()) {
-      showToast("Missing Details", "Please enter your PAN, DOB, or Mobile Number to generate bank statement passwords.", "error");
+      showToast("Missing Details", "Please enter your PAN, DOB, or Mobile Number to save your basic details.", "error");
       return;
     }
     setSavingIdentity(true);
@@ -1072,33 +1025,33 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      const res = await fetch("/api/v1/integrations/gmail", {
+      const res = await fetch("/api/v1/user/identity", {
         method: "POST",
         headers,
         body: JSON.stringify({
+          name: greetingName.trim() || undefined,
           pan: panInput.trim().toUpperCase() || undefined,
           dob: dobInput.trim() || undefined,
           phone: phoneInput.trim() || undefined,
-          bank_name: "ALL",
         }),
       });
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        showToast("Error Saving Details", json.error?.message || "Failed to save banking identity.", "error");
+        showToast("Error Saving Details", json.error?.message || "Failed to save identity details.", "error");
         return;
       }
 
       showToast(
-        "Banking Identity Saved!",
-        "Statement passwords automatically configured for SBI, HDFC, ICICI, Axis, Kotak, PNB & more. Statements will now decrypt automatically without asking for passwords.",
+        "Basic Profile Details Saved!",
+        "Identity details encrypted & saved. Bank statement decryption passwords automatically configured for SBI, HDFC, ICICI, Axis, Kotak, PNB & Canara Bank.",
         "success"
       );
       setPanInput("");
       setPhoneInput("");
       await fetchGmailStatus(true);
-    } catch (err: any) {
-      showToast("Error", err?.message || "Failed to save identity.", "error");
+    } catch (err: unknown) {
+      showToast("Error", err instanceof Error ? err.message : "Failed to save identity.", "error");
     } finally {
       setSavingIdentity(false);
     }
@@ -1258,32 +1211,6 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       setCopiedAccountId(true);
       showToast("Copied to Clipboard", "Account ID copied to clipboard.", "success");
       setTimeout(() => setCopiedAccountId(false), 2000);
-    }
-  };
-
-  const handlePurgeCacheAndSync = async () => {
-    setCacheSyncing(true);
-    try {
-      const keysToPurge = [
-        getUserCacheKey(userId, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(userId, CACHE_KEYS.INCOME),
-        getUserCacheKey(userId, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(userId, CACHE_KEYS.BUDGETS),
-        getUserCacheKey(userId, CACHE_KEYS.LEDGER),
-        getUserCacheKey(userId, CACHE_KEYS.PORTFOLIO),
-        getUserCacheKey(userId, CACHE_KEYS.SETTINGS),
-      ];
-
-      await invalidateCacheKeys(keysToPurge);
-      await refreshCounts();
-      if (refreshProfile) await refreshProfile();
-
-      showToast("Data Synchronized", "All account balances and financial datasets synchronized.", "success");
-    } catch (err) {
-      console.error("Refresh failed:", err);
-      showToast("Sync Failed", "Could not synchronize data. Please try again.", "error");
-    } finally {
-      setCacheSyncing(false);
     }
   };
 
@@ -2166,6 +2093,111 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               </div>
             </Card>
 
+            {/* Basic Personal & Banking Details Card */}
+            <Card className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border-subtle)] flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                    <Landmark size={16} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight">Basic Personal &amp; Banking Details</h2>
+                    <p className="text-xs opacity-60">Identity details used for tax verification and automatic bank statement decryption</p>
+                  </div>
+                </div>
+
+                {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) ? (
+                  <Badge variant="emerald" dot>
+                    Active Keys Ready
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral">
+                    Not Configured
+                  </Badge>
+                )}
+              </div>
+
+              {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2 flex-wrap">
+                  <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
+                  <span className="font-semibold">Current Saved Details:</span>
+                  {gmailStatus.bankingIdentity.panMasked && (
+                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
+                      PAN: {gmailStatus.bankingIdentity.panMasked}
+                    </span>
+                  )}
+                  {gmailStatus.bankingIdentity.dobMasked && (
+                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
+                      DOB: {gmailStatus.bankingIdentity.dobMasked}
+                    </span>
+                  )}
+                  {gmailStatus.bankingIdentity.phoneMasked && (
+                    <span className="font-mono bg-[var(--app-bg)] px-2 py-0.5 rounded border border-emerald-500/30 text-[11px]">
+                      Mobile: {gmailStatus.bankingIdentity.phoneMasked}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <p className="text-xs opacity-70 leading-relaxed">
+                Save your basic details here alongside your profile name. ArthaX securely encrypts them and automatically computes standard decryption passwords for <strong>SBI (PAN+DOB or Phone+DOB), ICICI (Name+DOB), HDFC, Axis, Kotak, PNB &amp; Canara Bank</strong>, so your statements decrypt automatically without having to configure details in integrations.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                    PAN Number
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder={gmailStatus.bankingIdentity?.panMasked || "e.g. ABCDE1234F"}
+                    value={panInput}
+                    maxLength={10}
+                    onChange={(e) => setPanInput(e.target.value.toUpperCase())}
+                    className="font-mono text-xs uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                    Date of Birth (DOB)
+                  </label>
+                  <Input
+                    type="date"
+                    value={dobInput}
+                    onChange={(e) => setDobInput(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
+                    Registered Mobile
+                  </label>
+                  <Input
+                    type="tel"
+                    placeholder={gmailStatus.bankingIdentity?.phoneMasked || "10-digit number"}
+                    value={phoneInput}
+                    maxLength={10}
+                    onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end pt-1">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim())}
+                  onClick={handleSaveBankingIdentity}
+                  className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
+                >
+                  {savingIdentity ? "Encrypting & Storing..." : "Save Basic Details"}
+                </Button>
+              </div>
+            </Card>
+
             {/* Comprehensive Account Profile Details & Status Card */}
             <Card className="p-6 sm:p-7 space-y-5">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border-subtle)] flex-wrap gap-2">
@@ -2716,21 +2748,32 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     );
                   })()}
 
-                  {/* Automated Indian Bank Password Generator */}
-                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-3">
-                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
-                      <KeyRound size={14} className="text-rose-400" />
-                      <span>Automated Banking Identity &amp; PDF Decryption</span>
+                  {/* Automated Statement PDF Decryption Status (Managed in Profile & Identity) */}
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2.5">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
+                        <KeyRound size={14} className="text-emerald-400" />
+                        <span>Automated Statement PDF Decryption</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setActiveTab("profile")}
+                        className="text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1 font-medium"
+                      >
+                        <span>Manage Basic Details</span>
+                        <ChevronRight size={12} />
+                      </Button>
                     </div>
 
                     <p className="text-[11px] opacity-70 leading-relaxed">
-                      Enter your details once. ArthaX automatically computes and tries standard decryption passwords for <strong>SBI (PAN+DOB or Phone+DOB), ICICI (Name+DOB), HDFC, Axis, Kotak, PNB &amp; Canara Bank</strong> so you never have to manually enter passwords again.
+                      Bank statement PDFs (SBI, HDFC, ICICI, Axis, Kotak, PNB &amp; Canara Bank) are decrypted automatically in the background using your basic details (Name, PAN, Date of Birth, Mobile) configured under <strong>Profile &amp; Identity</strong>.
                     </p>
 
-                    {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) && (
+                    {gmailStatus.bankingIdentity && (gmailStatus.bankingIdentity.hasPan || gmailStatus.bankingIdentity.hasDob || gmailStatus.bankingIdentity.hasPhone) ? (
                       <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] flex items-center gap-2 flex-wrap">
                         <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
-                        <span>Active Decryption Keys: </span>
+                        <span>Active Keys Configured:</span>
                         {gmailStatus.bankingIdentity.panMasked && (
                           <span className="font-mono bg-[var(--app-bg)] px-1.5 py-0.5 rounded border border-emerald-500/30">
                             PAN: {gmailStatus.bankingIdentity.panMasked}
@@ -2747,134 +2790,38 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           </span>
                         )}
                       </div>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="text-amber-400 flex-shrink-0" />
+                          <span>No basic details saved yet. Configure your PAN or DOB under Profile &amp; Identity for auto-decryption.</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => setActiveTab("profile")}
+                          className="text-[11px] border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                        >
+                          Add Details in Profile
+                        </Button>
+                      </div>
                     )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--app-foreground)] mb-1">
-                          PAN Number
-                        </label>
-                        <Input
-                          type="text"
-                          placeholder="e.g. ABCDE1234F"
-                          value={panInput}
-                          maxLength={10}
-                          onChange={(e) => setPanInput(e.target.value.toUpperCase())}
-                          className="font-mono text-xs uppercase"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--app-foreground)] mb-1">
-                          Date of Birth (DOB)
-                        </label>
-                        <Input
-                          type="date"
-                          value={dobInput}
-                          onChange={(e) => setDobInput(e.target.value)}
-                          className="font-mono text-xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[var(--app-foreground)] mb-1">
-                          Registered Mobile
-                        </label>
-                        <Input
-                          type="tel"
-                          placeholder="10-digit number"
-                          value={phoneInput}
-                          maxLength={10}
-                          onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-                          className="font-mono text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end pt-1">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={savingIdentity || (!panInput.trim() && !dobInput.trim() && !phoneInput.trim())}
-                        onClick={handleSaveBankingIdentity}
-                        className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
-                      >
-                        {savingIdentity ? "Encrypting & Storing..." : "Save Banking Identity & Auto-Generate Passwords"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Optional Password Hint Update */}
-                  <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-3">
-                    <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
-                      <KeyRound size={13} className="text-rose-400" />
-                      <span>Custom Password Hint (Optional Override):</span>
-                    </div>
-                    <p className="text-[11px] opacity-70">
-                      If your bank uses a unique custom password (such as a netbanking portal password), save it here.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="password"
-                        placeholder="e.g. 01011995 or custom password"
-                        value={gmailPasswordHint}
-                        onChange={(e) => setGmailPasswordHint(e.target.value)}
-                        className="font-mono text-xs max-w-sm"
-                      />
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={connectingGmail || !gmailPasswordHint.trim()}
-                        onClick={handleConnectGmail}
-                      >
-                        {connectingGmail ? "Saving..." : "Save Hint"}
-                      </Button>
-                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Instructions */}
-                  <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2">
+                  <div className="p-4 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)] text-xs space-y-2">
                     <div className="font-semibold flex items-center gap-1.5 text-[var(--app-foreground)]">
                       <Zap size={13} className="text-amber-400" />
-                      <span>How Gmail Statement Discovery Works:</span>
+                      <span>How Gmail Automated Statement Discovery Works:</span>
                     </div>
-                    <ol className="list-decimal list-inside space-y-1 opacity-80 text-[11px] leading-relaxed">
-                      <li>Connect your primary banking email address below.</li>
-                      <li>ArthaX discovers incoming bank e-statements (SBI, HDFC, ICICI, Axis, Kotak, etc.).</li>
-                      <li>When a statement is found, <strong>ArthaX automatically creates the account card</strong> in your Accounts tab with live balance and asset classification.</li>
-                      <li>Your Net Worth immediately updates without any manual calculations.</li>
+                    <ol className="list-decimal list-inside space-y-1.5 opacity-80 text-[11px] leading-relaxed">
+                      <li>Click <strong>Connect with Google</strong> below to authorize statement read access with Google OAuth.</li>
+                      <li>ArthaX automatically discovers incoming bank e-statements (SBI, HDFC, ICICI, Axis, Kotak, PNB &amp; more).</li>
+                      <li>Statements are automatically unlocked in the background using your basic details saved in <strong>Profile &amp; Identity</strong> (zero password prompts).</li>
+                      <li>Account cards, transactions, and live balances are created and reconciled automatically.</li>
                     </ol>
-                  </div>
-
-                  {/* Form */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
-                        Gmail Address
-                      </label>
-                      <Input
-                        type="email"
-                        placeholder="e.g. yourname@gmail.com"
-                        value={gmailEmail || (user?.email || "")}
-                        onChange={(e) => setGmailEmail(e.target.value)}
-                        className="font-mono text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--app-foreground)] mb-1">
-                        PDF Decryption Hint (Optional)
-                      </label>
-                      <Input
-                        type="password"
-                        placeholder="DOB (DDMMYYYY) or PAN"
-                        value={gmailPasswordHint}
-                        onChange={(e) => setGmailPasswordHint(e.target.value)}
-                        className="font-mono text-xs"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-[var(--app-border-subtle)]">
@@ -2885,12 +2832,12 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
                     <div className="flex items-center gap-2">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="primary"
+                        size="md"
                         onClick={handleGoogleOAuthConnect}
-                        className="gap-2 border-[var(--app-border-subtle)] hover:bg-[var(--app-bg-subtle)] text-xs"
+                        className="gap-2.5 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm px-4"
                       >
-                        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
                           <path
                             fill="#4285F4"
                             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -2908,27 +2855,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                             d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                           />
                         </svg>
-                        <span>One-Click Google OAuth</span>
-                      </Button>
-
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={connectingGmail || (!gmailEmail.trim() && !user?.email)}
-                        onClick={handleConnectGmail}
-                        className="gap-2 bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
-                      >
-                        {connectingGmail ? (
-                          <>
-                            <Loader2 size={13} className="animate-spin text-white" />
-                            <span>Connecting...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Mail size={14} />
-                            <span>Connect Gmail</span>
-                          </>
-                        )}
+                        <span>Connect with Google</span>
                       </Button>
                     </div>
                   </div>

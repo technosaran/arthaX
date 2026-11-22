@@ -5,20 +5,16 @@ import {
   Bitcoin,
   RefreshCw,
   Search,
-  ExternalLink,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
   Key,
-  Lock,
   Wallet,
   TrendingUp,
   TrendingDown,
   Layers,
-  Sparkles,
   ArrowUpRight,
   ArrowDownRight,
-  SlidersHorizontal,
   ArrowRightLeft,
   BarChart2,
   Activity,
@@ -26,7 +22,6 @@ import {
   Cpu,
   History,
   DollarSign,
-  Check,
   ChevronRight,
   Zap,
 } from "lucide-react";
@@ -104,7 +99,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   // Terminal states
   const [selectedSymbol, setSelectedSymbol] = useState("BTCUSDT");
   const [klineInterval, setKlineInterval] = useState("1h");
-  const [terminalLoading, setTerminalLoading] = useState(false);
 
   // Swap converter states
   const [swapFrom, setSwapFrom] = useState("BTC");
@@ -262,7 +256,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   // Fetch Market data
   const fetchMarket = useCallback(async (symbol = selectedSymbol, interval = klineInterval) => {
     try {
-      setTerminalLoading(true);
       const url = `/api/v1/crypto/market?symbol=${symbol}&interval=${interval}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Market HTTP error ${res.status}`);
@@ -272,8 +265,6 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
       }
     } catch (err) {
       console.warn("Failed to fetch market data:", err);
-    } finally {
-      setTerminalLoading(false);
     }
   }, [selectedSymbol, klineInterval]);
 

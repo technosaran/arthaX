@@ -1,6 +1,5 @@
-import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError, apiSuccess } from "@/utils/apiResponse";
+import { apiError } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import {
@@ -282,7 +281,7 @@ export const POST = createApiRoute({
       finalInvested = addMoney(mulMoney(prevQty, prevBuyPrice), mulMoney(quantity, avg_buy_price));
       finalBuyPrice = finalQty > 0 ? divMoney(finalInvested, finalQty) : avg_buy_price;
 
-      const { data: updated, error: updateErr } = await supabaseAdmin
+      const { error: updateErr } = await supabaseAdmin
         .from("bond_holdings")
         .update({
           name,

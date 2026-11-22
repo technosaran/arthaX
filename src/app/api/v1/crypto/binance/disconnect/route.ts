@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiUnauthorized, apiError, apiSuccess, extractRequestId } from "@/utils/apiResponse";
+import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
 
 export async function POST(req: NextRequest) {
   return handleDisconnect(req);
@@ -12,7 +12,6 @@ export async function DELETE(req: NextRequest) {
 }
 
 async function handleDisconnect(req: NextRequest) {
-  const requestId = extractRequestId(req);
   const { user, userId, error: authError } = await getAuthenticatedUser(req);
 
   if (!user || !userId) {

@@ -10,7 +10,7 @@ Handles multi-line narration continuation and balance reconciliation.
 import re
 import csv
 import io
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 import pymupdf
@@ -225,6 +225,7 @@ class AxisBankAdapter(BaseBankAdapter):
             parser_version=self.PARSER_VERSION,
             file_hash=file_hash,
             file_name=filename,
+            errors=validation.errors,
         )
 
     def _parse_pdf(
@@ -234,7 +235,7 @@ class AxisBankAdapter(BaseBankAdapter):
         file_hash: str,
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
-        doc = open_pdf_document(content, filename, passwords)
+        doc, _ = open_pdf_document(content, passwords)
         try:
             full_text = ""
             for i in range(doc.page_count):
@@ -346,6 +347,7 @@ class AxisBankAdapter(BaseBankAdapter):
             parser_version=self.PARSER_VERSION,
             file_hash=file_hash,
             file_name=filename,
+            errors=validation.errors,
         )
 
     def _finalize_pdf_tx(self, tx_dict: Dict[str, Any]) -> Optional[ParsedTransactionItem]:

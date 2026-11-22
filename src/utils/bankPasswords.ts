@@ -9,6 +9,7 @@ export interface BankingIdentityDetails {
   pan?: string | null;       // e.g. "ABCDE1234F"
   phone?: string | null;     // e.g. "9876543210", "+919876543210"
   name?: string | null;      // e.g. "Saran Kumar"
+  accountNumber?: string | null; // e.g. "123456789012"
 }
 
 interface ParsedDOB {
@@ -68,7 +69,7 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
   const rawName = (identity.name || "").trim().replace(/[^a-zA-Z]/g, "");
   const name4 = rawName.slice(0, 4);
 
-  // 1. Phone + DOB combinations (SBI YONO Primary standard & Bank of Baroda)
+  // 1. Phone + DOB combinations (SBI standard, Indian Bank, Bank of Baroda)
   if (dob) {
     const ddmm = `${dob.dd}${dob.mm}`;
     const mmdd = `${dob.mm}${dob.dd}`;
@@ -76,16 +77,21 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
     const ddmmyy = `${dob.dd}${dob.mm}${dob.yy}`;
     const yyyymmdd = `${dob.yyyy}${dob.mm}${dob.dd}`;
 
-    // SBI YONO Primary standard: Last 5 digits of mobile + DDMMYY
+    // SBI standard: DDMM + last 5 of mobile, and reverse (e.g. 150843210, 432101508)
     if (phoneLast5) {
+      candidates.add(`${ddmm}${phoneLast5}`);
+      candidates.add(`${phoneLast5}${ddmm}`);
       candidates.add(`${phoneLast5}${ddmmyy}`);
       candidates.add(`${phoneLast5}${ddmmyyyy}`);
     }
     if (phoneLast4) {
-      candidates.add(`${phoneLast4}${ddmmyy}`);
-      candidates.add(`${phoneLast4}${ddmmyyyy}`);
-      candidates.add(`${phoneLast4}${ddmm}`);
+      // SBI & Indian Bank: DDMM + phoneLast4, phoneLast4 + DDMM
       candidates.add(`${ddmm}${phoneLast4}`);
+      candidates.add(`${phoneLast4}${ddmm}`);
+      // Indian Bank standard: DDMMYYYY + phoneLast4, and reverse (e.g. 150819953210, 321015081995)
+      candidates.add(`${ddmmyyyy}${phoneLast4}`);
+      candidates.add(`${phoneLast4}${ddmmyyyy}`);
+      candidates.add(`${phoneLast4}${ddmmyy}`);
     }
 
     // 2. PAN + DOB combinations (Standard SBI Netbanking, Axis, HDFC)
@@ -139,6 +145,14 @@ export function generateBankPasswordPermutations(identity: BankingIdentityDetail
   }
   if (phoneLast5) {
     candidates.add(phoneLast5);
+  }
+
+  // 7. Standalone Account Number (Indian Bank Rule 1)
+  if (identity.accountNumber) {
+    const cleanAcc = identity.accountNumber.trim();
+    if (cleanAcc) {
+      candidates.add(cleanAcc);
+    }
   }
 
   return Array.from(candidates);

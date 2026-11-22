@@ -457,8 +457,6 @@ export async function exportBudgetsPDF(budgets: any[], expenses: any[]) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const dateFileStr = new Date().toISOString().split("T")[0];
 
-  const totalBudgeted = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
-
   addHeader(
     doc,
     "Category Budgets & Monthly Limits",
@@ -584,7 +582,7 @@ export async function exportMasterPortfolioPDF(
   accounts: any[],
   income: any[],
   expenses: any[],
-  budgets: any[]
+  _budgets?: any[]
 ) {
   const { jsPDF, autoTable } = await initPdf();
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });

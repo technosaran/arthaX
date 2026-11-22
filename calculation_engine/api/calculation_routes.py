@@ -5,7 +5,7 @@ health status, validation metrics dashboard, and audit history.
 """
 
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 
 from ..modules.expense_engine import ExpenseEngine
@@ -22,7 +22,7 @@ from ..modules.debt_engine import DebtPayoffEngine
 from ..modules.stress_test_engine import FinancialStressTestEngine
 from ..modules.goal_engine import GoalWealthEngine
 from ..modules.portfolio_analytics_engine import PortfolioAnalyticsEngine
-from ..bank_ingestion import parser_registry, validate_statement_continuity
+from ..bank_ingestion import parser_registry
 from ..bank_ingestion.gmail_service import GmailStatementIngestor
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
 from ..audit.calculation_logger import (
@@ -395,7 +395,6 @@ def parse_bank_statement(payload: StatementParseRequest):
     and runs hybrid classification on all extracted transactions.
     """
     import base64
-    from decimal import Decimal
     try:
         content_bytes = base64.b64decode(payload.content_base64)
     except Exception as e:

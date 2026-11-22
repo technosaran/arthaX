@@ -6,13 +6,9 @@ Enhanced with NumPy & SciPy for Vectorized Financial Intelligence, Monte Carlo S
 """
 
 import os
-import time
 import hmac
-import hashlib
-import json
-import base64
 import math
-from datetime import datetime, date
+from datetime import datetime
 from typing import List, Optional, Any, Union
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware

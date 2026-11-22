@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       success: true,
       automation: {
         gmail: {
-          connected: Boolean(gmailRes.data),
+          connected: Boolean(gmailRes.data && gmailRes.data.sync_status === "ACTIVE"),
           email: gmailRes.data?.email_address || null,
           syncStatus: gmailRes.data?.sync_status || "DISCONNECTED",
           lastSyncAt: gmailRes.data?.last_sync_at || null,
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         recentJobs: jobsRes.data || [],
       },
     }, { headers: { "X-Request-Id": requestId } });
-  } catch (err: unknown) {
+  } catch {
     return apiError("Failed to fetch automation status", "INTERNAL_ERROR", 500, undefined, req);
   }
 }

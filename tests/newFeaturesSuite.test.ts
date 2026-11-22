@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { GET as exportGet } from "@/app/api/v1/workspace/export/route";
 import { GET as reconciliationGet, POST as reconciliationPost } from "@/app/api/v1/reconciliation/dashboard/route";
 import { GET as forecastGet } from "@/app/api/v1/forecast/cashflow/route";
-import { GET as rulesGet, POST as rulesPost, DELETE as rulesDelete } from "@/app/api/v1/transactions/rules/route";
+import { POST as rulesPost, DELETE as rulesDelete } from "@/app/api/v1/transactions/rules/route";
 
 vi.mock("@/utils/auth", () => ({
   getAuthenticatedUser: vi.fn(),
@@ -341,7 +341,7 @@ describe("ArthaX Production Re-Engineering: New Financial Features Suite", () =>
   // =========================================================================
   describe("Transaction Intelligence Rules (/api/v1/transactions/rules)", () => {
     it("creates a new user classification rule and applies it retrospectively", async () => {
-      mockedSupabase.from.mockImplementation((table: string) => {
+      mockedSupabase.from.mockImplementation(() => {
         const queryBuilder: any = {
           upsert: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
@@ -384,7 +384,7 @@ describe("ArthaX Production Re-Engineering: New Financial Features Suite", () =>
     });
 
     it("deletes a user classification rule cleanly with user_id scoping", async () => {
-      mockedSupabase.from.mockImplementation((table: string) => {
+      mockedSupabase.from.mockImplementation(() => {
         const queryBuilder: any = {
           delete: vi.fn().mockReturnThis(),
           eq: vi.fn().mockImplementation((col: string, val: string) => {

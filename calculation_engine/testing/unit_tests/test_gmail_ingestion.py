@@ -4,17 +4,11 @@ Tests Gmail search query building, bank detection, MIME attachment extraction,
 URL-safe base64 decoding, password decryptor, and error handling.
 """
 
-import base64
-from decimal import Decimal
-from datetime import date
-import pytest
 
 from calculation_engine.bank_ingestion.gmail_service import (
     GmailStatementIngestor,
     detect_bank_from_metadata,
-    DEFAULT_GMAIL_STATEMENT_QUERY,
 )
-from calculation_engine.bank_ingestion.models import StatementParseResult
 
 
 def test_build_query_default_and_after_date():

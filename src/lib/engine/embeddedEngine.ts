@@ -9,7 +9,6 @@ import {
   addMoney,
   subMoney,
   mulMoney,
-  divMoney,
   sumMoney,
   roundMoney,
   percentMoney,
@@ -1261,7 +1260,7 @@ export function executeTaxRegimesTS(inputs: TaxRegimesInputs) {
     }
   }
 
-  let oldTaxAfterRebate = oldTaxable <= 500000 ? 0 : oldBaseTax;
+  const oldTaxAfterRebate = oldTaxable <= 500000 ? 0 : oldBaseTax;
   let oldSurcharge = 0;
   if (oldTaxable > 5000000) {
     const rate = oldTaxable > 50000000 ? 0.37 : oldTaxable > 20000000 ? 0.25 : oldTaxable > 10000000 ? 0.15 : 0.10;

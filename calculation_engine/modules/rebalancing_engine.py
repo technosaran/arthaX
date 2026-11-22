@@ -5,7 +5,6 @@ and calculates a multi-dimensional 0-100 Portfolio Health Index with prioritized
 """
 
 from decimal import Decimal
-import math
 from typing import List, Dict, Any, Optional
 from ..core.precision import (
     to_decimal,

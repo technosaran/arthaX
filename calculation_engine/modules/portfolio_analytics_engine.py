@@ -5,15 +5,9 @@ Underwater periods, Value at Risk (VaR 95% & 99%), Conditional Value at Risk (CV
 Calmar Ratio, Beta, Jensen's Alpha, and Herfindahl Concentration Index (HHI).
 """
 
-from decimal import Decimal
 import math
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from ..core.precision import (
-    to_decimal,
-    quantize_currency,
-    quantize_rate,
-    safe_divide,
-    safe_percentage,
     DEFAULT_CURRENCY,
 )
 from ..core.base_calculator import BaseCalculator

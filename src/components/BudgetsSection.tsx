@@ -13,17 +13,11 @@ import {
   ChevronRight,
   TrendingDown,
   ShieldCheck,
-  Zap,
-  CircleDollarSign,
   Copy,
   PieChart,
   Eye,
   Download,
-  Calendar,
-  CheckCircle2,
   ArrowUpDown,
-  Filter,
-  BarChart3,
 } from "lucide-react";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { createClient } from "@/utils/supabase/client";
@@ -322,7 +316,7 @@ export default function BudgetsSection() {
   }, [precedingMonthBudgets, currentMonthBudgets, selectedMonthYear, user]);
 
   // Unbudgeted spending analysis
-  const { unbudgetedExpenses, totalUnbudgeted, unbudgetedCategories } = useMemo(() => {
+  const { totalUnbudgeted, unbudgetedCategories } = useMemo(() => {
     return analyzeUnbudgetedSpending(currentMonthExpenses, currentMonthBudgets);
   }, [currentMonthExpenses, currentMonthBudgets]);
 

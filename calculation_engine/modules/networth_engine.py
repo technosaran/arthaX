@@ -8,7 +8,6 @@ loans, credit cards, and avoids double-counting transfers.
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
-from collections import defaultdict
 from ..core.precision import (
     to_decimal,
     quantize_currency,

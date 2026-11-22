@@ -67,7 +67,7 @@ export default function CashflowForecastSection() {
       if (!res.ok) throw new Error("Failed to load cashflow forecast");
       const json = await res.json();
       setData(json.data || json);
-    } catch (err: unknown) {
+    } catch {
       showToast("Could not load cashflow forecast", "error");
     } finally {
       setLoading(false);
@@ -77,12 +77,6 @@ export default function CashflowForecastSection() {
   useEffect(() => {
     fetchForecast();
   }, [fetchForecast]);
-
-  const getRunwayBadgeVariant = (status?: string) => {
-    if (status === "EXCELLENT" || status === "HEALTHY") return "success";
-    if (status === "CAUTION") return "warning";
-    return "danger";
-  };
 
   return (
     <main

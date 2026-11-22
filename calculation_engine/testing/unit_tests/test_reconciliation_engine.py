@@ -4,7 +4,6 @@ Tests forensic audit of financial data, detecting duplicate transactions,
 category mismatches, negative asset balances, and net worth discrepancies.
 """
 
-from decimal import Decimal
 import pytest
 from calculation_engine.modules.reconciliation_engine import ReconciliationEngine
 

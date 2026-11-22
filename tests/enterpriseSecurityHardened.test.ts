@@ -4,7 +4,6 @@ import { getOAuthStateSigningSecret, getTrustedOrigin, GET as oauthStart } from 
 import { GET as oauthCallback } from "@/app/api/v1/integrations/gmail/callback/route";
 import {
   createSignedOAuthState,
-  verifySignedOAuthState,
 } from "@/utils/oauthSecurity";
 import {
   encryptSensitiveData,
@@ -14,7 +13,6 @@ import {
 } from "@/utils/crypto";
 import {
   claimDatabaseIdempotency,
-  completeDatabaseIdempotency,
   computeRequestFingerprint,
 } from "@/lib/backend/databaseIdempotency";
 import { getAuthenticatedUser } from "@/utils/auth";

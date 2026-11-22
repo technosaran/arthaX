@@ -4,7 +4,6 @@ Provides deterministic test cases across standard and edge-case financial scenar
 """
 
 from decimal import Decimal
-from datetime import date
 
 # Known benchmark from prompt:
 # Assets = ₹100,000, Liabilities = ₹15,000 -> Expected Net Worth = ₹85,000

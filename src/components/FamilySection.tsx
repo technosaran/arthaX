@@ -6,7 +6,6 @@ import {
   UserPlus,
   Trash2,
   Pencil,
-  Loader2,
   Phone,
   Mail,
   Send,
@@ -22,7 +21,6 @@ import {
   LayoutGrid,
   List,
   Search,
-  ShieldCheck,
   Calendar,
   Clock,
 } from "lucide-react";
@@ -43,7 +41,7 @@ import {
   computePrevMonth,
 } from "@/utils/monthUtils";
 import { Button } from "@/components/ui/Button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";

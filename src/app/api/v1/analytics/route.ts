@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getCachedData, setCachedData, getUserCacheKey } from "@/utils/redis";
 import { getCurrentMonthYear, formatMonthDisplay } from "@/utils/monthUtils";

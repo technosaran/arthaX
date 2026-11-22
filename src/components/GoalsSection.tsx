@@ -6,7 +6,6 @@ import {
   Plus,
   Trash2,
   Pencil,
-  Loader2,
   Search,
   CheckCircle2,
   ShieldCheck,
@@ -19,16 +18,12 @@ import {
   Flame,
   Coins,
   Calendar,
-  Sparkles,
   TrendingUp,
   AlertTriangle,
   Play,
   Pause,
-  ArrowUpRight,
-  ArrowDownRight,
   X,
   Target,
-  SlidersHorizontal,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -44,7 +39,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 
 // ==========================================
 // Types & Metadata
@@ -116,7 +111,6 @@ export default function GoalsSection() {
   const [loading, setLoading] = useState<boolean>(initialGoals.length === 0);
   const inFlightRef = useRef<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,7 +149,6 @@ export default function GoalsSection() {
     async (skipCache: boolean = false) => {
       if (!user || inFlightRef.current) return;
       inFlightRef.current = true;
-      setErrorMsg(null);
       try {
         if (!skipCache) {
           const cached = getFromLocalCache<GoalItem[]>(redisGoalsKey);
@@ -188,13 +181,13 @@ export default function GoalsSection() {
         saveToCache(redisGoalsKey, normalized);
       } catch (err: any) {
         console.error("[Goals] Fetch Error:", err);
-        setErrorMsg(err.message || "Failed to load financial goals.");
+        showToast(err?.message || "Failed to load financial goals.", "error");
       } finally {
         setLoading(false);
         inFlightRef.current = false;
       }
     },
-    [user, redisGoalsKey]
+    [user, redisGoalsKey, showToast]
   );
 
   // 2. Initial Fetch & Realtime Subscription
@@ -718,24 +711,19 @@ export default function GoalsSection() {
             // Harmonious Theme Colors matching progress bar and badge
             let progressBg = "bg-sky-500";
             let badgeVariant: "success" | "info" | "warning" | "neutral" = "info";
-            let accentTextColor = "text-sky-400";
 
             if (isCompleted) {
               progressBg = "bg-emerald-500";
               badgeVariant = "success";
-              accentTextColor = "text-emerald-400";
             } else if (isPaused) {
               progressBg = "bg-slate-500";
               badgeVariant = "neutral";
-              accentTextColor = "text-[var(--app-muted)]";
             } else if (progress >= 70) {
               progressBg = "bg-emerald-400";
               badgeVariant = "success";
-              accentTextColor = "text-emerald-400";
             } else if (progress < 30) {
               progressBg = "bg-amber-400";
               badgeVariant = "warning";
-              accentTextColor = "text-amber-400";
             }
 
             return (

@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiError, apiSuccess } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
@@ -47,7 +46,9 @@ export const GET = createApiRoute({
 
     return apiSuccess(
       {
-        connected: integration.sync_status !== "DISCONNECTED",
+        connected:
+          integration.sync_status !== "DISCONNECTED" &&
+          integration.sync_status !== "PENDING_AUTH",
         email: integration.email_address,
         syncStatus: integration.sync_status,
         lastSyncAt: integration.last_sync_at,
@@ -76,9 +77,9 @@ export const POST = createApiRoute({
       .eq("user_id", userId!)
       .maybeSingle();
 
-    if (!integration || integration.sync_status === "DISCONNECTED") {
+    if (!integration || integration.sync_status === "DISCONNECTED" || integration.sync_status === "PENDING_AUTH") {
       return apiError(
-        "Gmail integration is not connected. Please connect your Gmail account to enable automatic bank statement ingestion.",
+        "Gmail integration is not connected. Please connect your Gmail account via Google OAuth to enable automatic bank statement ingestion.",
         "BAD_REQUEST",
         400,
         undefined,

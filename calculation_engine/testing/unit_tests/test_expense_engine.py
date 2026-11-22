@@ -3,7 +3,6 @@ Unit Tests: Expense Engine
 Tests category aggregation, refunds, deduplication, transfer exclusions, and averages.
 """
 
-from decimal import Decimal
 import pytest
 from calculation_engine.modules.expense_engine import ExpenseEngine
 from calculation_engine.testing.test_fixtures.fixtures import (

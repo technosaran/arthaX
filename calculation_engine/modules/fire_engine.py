@@ -4,15 +4,11 @@ Calculates LeanFIRE, Standard FIRE, FatFIRE, CoastFIRE targets, years to financi
 and Monte Carlo retirement sequence-of-returns survival probabilities.
 """
 
-from datetime import date
 from decimal import Decimal
 import math
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from ..core.precision import (
     to_decimal,
-    quantize_currency,
-    quantize_rate,
-    safe_divide,
     safe_percentage,
     DEFAULT_CURRENCY,
 )

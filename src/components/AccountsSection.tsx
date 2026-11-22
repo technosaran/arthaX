@@ -6,17 +6,11 @@ import {
   Loader2,
   X,
   PieChart as PieChartIcon,
-  Banknote,
   ArrowRightLeft,
-  ShieldCheck,
-  History,
   Search,
-  ArrowDownRight,
   Trash2,
   Wallet,
-  Calendar,
   ChevronLeft,
-  CheckCircle2,
   AlertCircle,
   Landmark,
   RefreshCw,
@@ -25,11 +19,10 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
-import BankLogo from "@/components/BankLogo";
 import AppleWalletCard from "@/components/AppleWalletCard";
 import AccountAdjustModal from "@/components/AccountAdjustModal";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import { saveToCache, invalidateCacheKeys, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
+import { saveToCache, getFromLocalCache, invalidateAllFinancialCache } from "@/utils/cacheClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Button } from "@/components/ui/Button";
@@ -73,7 +66,6 @@ export default function AccountsSection() {
   const { showToast } = useToast();
 
   const redisKey = getUserCacheKey(user?.id, CACHE_KEYS.ACCOUNTS);
-  const redisLedgerKey = getUserCacheKey(user?.id, CACHE_KEYS.LEDGER);
   const redisTransfersKey = getUserCacheKey(user?.id, CACHE_KEYS.TRANSFERS);
 
   // Synchronous Tier 1 & 2 Local Cache load (0ms latency)

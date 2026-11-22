@@ -5,7 +5,7 @@ Stagflation, Medical Emergency, Black Swan) and computes a 0-100 Resilience Scor
 """
 
 from decimal import Decimal
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 import math
 
 from ..core.precision import (

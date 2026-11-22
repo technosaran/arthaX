@@ -145,7 +145,6 @@ export default function Sidebar({
     }
   };
 
-  const financeItems = NAV_ITEMS.filter((item) => item.group === "finance");
   const overviewItems = NAV_ITEMS.filter((item) => ["dashboard", "accounts"].includes(item.id));
   const cashFlowItems = NAV_ITEMS.filter((item) =>
     ["income", "expenses", "budgets", "ledger"].includes(item.id)

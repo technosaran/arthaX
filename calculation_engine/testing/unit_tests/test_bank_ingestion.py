@@ -5,7 +5,6 @@ Tests SBI, Indian Bank, Generic CSV parsers, password generators, and validation
 
 from decimal import Decimal
 from datetime import date
-import pytest
 
 from calculation_engine.bank_ingestion.models import (
     StatementMetadata,
@@ -17,11 +16,9 @@ from calculation_engine.bank_ingestion.statement_validator import (
 )
 from calculation_engine.bank_ingestion.pdf_decryptor import (
     generate_candidate_passwords,
-    compute_file_hash,
 )
 from calculation_engine.bank_ingestion.sbi_adapter import SbiBankAdapter
 from calculation_engine.bank_ingestion.indian_bank_adapter import IndianBankAdapter
-from calculation_engine.bank_ingestion.generic_csv_adapter import GenericCsvBankAdapter
 from calculation_engine.bank_ingestion.parser_registry import parser_registry
 
 

@@ -8,7 +8,6 @@ import pytest
 import pymupdf
 from calculation_engine.bank_ingestion.pdf_decryptor import (
     open_pdf_document,
-    generate_candidate_passwords,
     PasswordRequiredError,
     PasswordIncorrectError,
     CorruptedPdfError,

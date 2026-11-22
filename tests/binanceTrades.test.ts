@@ -3,7 +3,6 @@ import {
   parseBinanceRawTrades,
   calculateTradeStats,
   getExitedAssets,
-  CalculatedCryptoTrade,
 } from "../src/utils/binance";
 
 describe("Binance Trades & Realized Sell Analytics", () => {

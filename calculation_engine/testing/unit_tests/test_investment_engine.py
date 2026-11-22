@@ -3,7 +3,6 @@ Unit Tests: Investment Engine
 Tests invested capital, valuation, realized & unrealized P&L, dividends, and allocation.
 """
 
-from decimal import Decimal
 import pytest
 from calculation_engine.modules.investment_engine import InvestmentEngine
 

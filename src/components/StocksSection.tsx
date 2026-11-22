@@ -6,24 +6,12 @@ import {
   TrendingDown,
   Search,
   ExternalLink,
-  SlidersHorizontal,
   ArrowUpRight,
   ArrowDownRight,
   PieChart as PieChartIcon,
   Layers,
   History,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Clock,
-  Sparkles,
-  ArrowRightLeft,
   X,
-  Target,
-  ShieldAlert,
-  ChevronRight,
-  ChevronDown,
-  Activity,
   BarChart3,
   List,
   LayoutGrid,
@@ -40,7 +28,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
-import BankLogo from "@/components/BankLogo";
 import EntityLogo from "@/components/EntityLogo";
 
 export interface StockHolding {
@@ -140,7 +127,6 @@ export default function StocksSection() {
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [quotes, setQuotes] = useState<Record<string, StockQuote>>({});
-  const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
   const [accounts, setAccounts] = useState<{ id: string; name: string; type: string; balance?: number }[]>([]);
 
   // UI state
@@ -152,7 +138,6 @@ export default function StocksSection() {
   useEffect(() => {
     holdingsRef.current = holdings;
   }, [holdings]);
-  const [refreshingQuotes, setRefreshingQuotes] = useState(false);
   const [syncingZerodha, setSyncingZerodha] = useState(false);
   const [viewTab, setViewTab] = useState<string>("holdings");
   const [displayMode, setDisplayMode] = useState<"table" | "grid">("table");
@@ -182,7 +167,6 @@ export default function StocksSection() {
   const fetchQuotesForHoldings = useCallback(async (list: StockHolding[], force = false) => {
     if (list.length === 0) return;
     try {
-      setRefreshingQuotes(true);
       const symbolParams = list.map((h) => `${h.symbol}:${h.exchange}`).join(",");
       const url = `/api/v1/stocks/quote?symbols=${encodeURIComponent(symbolParams)}${
         force ? "&refresh=true" : ""
@@ -194,9 +178,6 @@ export default function StocksSection() {
         if (data.quotes) {
           setQuotes((prev) => ({ ...prev, ...data.quotes }));
         }
-        if (data.marketStatus) {
-          setMarketStatus(data.marketStatus);
-        }
         if (force) {
           showToast("Quotes Updated", "Latest Indian stock market prices refreshed successfully.", "success");
         }
@@ -206,8 +187,6 @@ export default function StocksSection() {
       if (force) {
         showToast("Quote Refresh Failed", "Could not fetch latest market prices from NSE/BSE.", "error");
       }
-    } finally {
-      setRefreshingQuotes(false);
     }
   }, [showToast]);
 
@@ -484,10 +463,6 @@ export default function StocksSection() {
   // Deep Links for Zerodha Kite
   const getKiteChartUrl = (symbol: string, exchange = "NSE") => {
     return `https://kite.zerodha.com/chart/ext/ciq/${exchange}/${encodeURIComponent(symbol)}`;
-  };
-
-  const getTradingViewUrl = (symbol: string, exchange = "NSE") => {
-    return `https://in.tradingview.com/chart/?symbol=${exchange}:${encodeURIComponent(symbol)}`;
   };
 
   const zerodhaAccount = useMemo(() => {

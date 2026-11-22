@@ -3,7 +3,6 @@ Unit Tests: Budget Engine
 Tests category tracking, overspending detection, thresholds, and rollover calculations.
 """
 
-from decimal import Decimal
 import pytest
 from calculation_engine.modules.budget_engine import BudgetEngine
 

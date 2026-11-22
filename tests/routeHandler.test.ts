@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { z } from "zod";
 

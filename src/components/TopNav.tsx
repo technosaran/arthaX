@@ -24,7 +24,6 @@ interface TopNavProps {
 }
 
 export default function TopNav({
-  activeTab = "dashboard",
   setActiveTab,
   setCollapsed,
 }: TopNavProps) {

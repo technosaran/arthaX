@@ -43,7 +43,7 @@ async function fetchTicker(symbol: string): Promise<YahooChartMeta | null> {
     if (!res.ok) return null;
     const json = await res.json();
     return json?.chart?.result?.[0]?.meta || null;
-  } catch (err) {
+  } catch {
     clearTimeout(timeout);
     return null;
   }

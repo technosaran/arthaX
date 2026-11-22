@@ -1,5 +1,4 @@
 from decimal import Decimal
-import pytest
 from calculation_engine.modules.fire_engine import FireEngine
 from calculation_engine.modules.rebalancing_engine import RebalancingEngine
 from calculation_engine.modules.tax_engine import TaxEngine

@@ -7,7 +7,6 @@ so ambiguous or coincidental transactions are left unmatched.
 """
 
 from decimal import Decimal
-from datetime import date
 import re
 from typing import List, Dict, Any, Optional, Set, Tuple
 from .models import TransferMatchResult

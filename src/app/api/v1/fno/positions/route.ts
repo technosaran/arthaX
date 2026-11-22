@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiError, apiSuccess } from "@/utils/apiResponse";
 import { calculateZerodhaCharges } from "@/utils/fnoCalculations";

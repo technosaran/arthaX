@@ -3,7 +3,6 @@ Unit Tests: Income Engine
 Tests income source aggregation, transfer_in exclusion, and net cash flow analysis.
 """
 
-from decimal import Decimal
 import pytest
 from calculation_engine.modules.income_engine import IncomeEngine
 

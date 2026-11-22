@@ -5,7 +5,6 @@ import {
   tolasToGrams,
   gramsToSovereigns,
   sovereignsToGrams,
-  getRateForHolding,
   calculateHoldingMetrics,
   calculatePortfolioSummary,
   BullionHolding,

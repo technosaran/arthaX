@@ -4,7 +4,7 @@ Calculates CAGR, XIRR with dated cash flows, weighted average purchase prices,
 holdings valuations, asset-wise returns, and corporate cash flows.
 """
 
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 import math
 from typing import List, Dict, Any, Optional, Tuple
@@ -13,7 +13,6 @@ from ..core.precision import (
     quantize_currency,
     quantize_units,
     quantize_rate,
-    safe_divide,
     safe_percentage,
     DEFAULT_CURRENCY,
 )

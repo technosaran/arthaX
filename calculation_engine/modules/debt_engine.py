@@ -4,17 +4,12 @@ Calculates Debt Avalanche vs Debt Snowball strategies, rollover acceleration,
 total interest savings, payoff timelines, and month-by-month repayment schedules.
 """
 
-from datetime import date
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
-from collections import deque
-import math
 
 from ..core.precision import (
     to_decimal,
     quantize_currency,
-    safe_divide,
-    safe_percentage,
     DEFAULT_CURRENCY,
 )
 from ..core.base_calculator import BaseCalculator

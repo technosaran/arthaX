@@ -6,7 +6,6 @@ Unit tests for Institutional Financial Engines v3:
 """
 
 from decimal import Decimal
-import pytest
 from calculation_engine.modules.goal_engine import GoalWealthEngine
 from calculation_engine.modules.portfolio_analytics_engine import PortfolioAnalyticsEngine
 from calculation_engine.modules.tax_engine import TaxEngine

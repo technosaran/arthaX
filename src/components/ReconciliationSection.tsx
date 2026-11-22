@@ -11,8 +11,6 @@ import {
   Building2,
   Copy,
   RotateCcw,
-  Sparkles,
-  ExternalLink,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
@@ -92,7 +90,7 @@ export default function ReconciliationSection() {
       if (!res.ok) throw new Error("Failed to load reconciliation data");
       const json = await res.json();
       setData(json.data || json);
-    } catch (err: unknown) {
+    } catch {
       showToast("Could not load reconciliation dashboard", "error");
     } finally {
       setLoading(false);
@@ -136,7 +134,7 @@ export default function ReconciliationSection() {
       if (!res.ok) throw new Error("Failed to acknowledge");
       showToast("Statement marked as acknowledged", "success");
       fetchReconciliation();
-    } catch (err: unknown) {
+    } catch {
       showToast("Error acknowledging statement", "error");
     }
   };

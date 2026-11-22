@@ -28,12 +28,12 @@ const isToastType = (val: unknown): val is ToastType =>
   val === "success" || val === "error" || val === "info" || val === "warning";
 
 const defaultToastFn: ToastFn = Object.assign(
-  (_title: string, _messageOrType?: string | ToastType, _typeArg?: ToastType) => {},
+  (() => {}) as unknown as ToastFn,
   {
-    success: (_title: string, _message?: string) => {},
-    error: (_title: string, _message?: string) => {},
-    warning: (_title: string, _message?: string) => {},
-    info: (_title: string, _message?: string) => {},
+    success: () => {},
+    error: () => {},
+    warning: () => {},
+    info: () => {},
   }
 );
 

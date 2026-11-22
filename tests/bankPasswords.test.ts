@@ -14,8 +14,18 @@ describe("Automated Bank Password Permutations Generator", () => {
     expect(permutations).toContain("ABCDE1508");
     // SBI primary: First 5 of PAN lowercase + DDMM
     expect(permutations).toContain("abcde1508");
-    // SBI alternative: DDMM + last 4 of phone
+    // SBI standard: DDMM + last 5 of phone
+    expect(permutations).toContain("150843210");
+    // SBI standard: last 5 of phone + DDMM
+    expect(permutations).toContain("432101508");
+    // SBI standard: DDMM + last 4 of phone
     expect(permutations).toContain("15083210");
+    // SBI standard: last 4 of phone + DDMM
+    expect(permutations).toContain("32101508");
+    // Indian Bank standard: DDMMYYYY + last 4 of phone
+    expect(permutations).toContain("150819953210");
+    // Indian Bank standard: last 4 of phone + DDMMYYYY
+    expect(permutations).toContain("321015081995");
     // DOB formats
     expect(permutations).toContain("15081995");
     expect(permutations).toContain("150895");
@@ -24,6 +34,24 @@ describe("Automated Bank Password Permutations Generator", () => {
     expect(permutations).toContain("sara1508");
     // Standalone PAN
     expect(permutations).toContain("ABCDE1234F");
+  });
+
+  it("generates authentic Indian Bank passwords including account number", () => {
+    const permutations = generateBankPasswordPermutations({
+      dob: "15/08/1995",
+      phone: "9876543210",
+      accountNumber: "50100412345678",
+    });
+
+    // Rule 1: Account number
+    expect(permutations).toContain("50100412345678");
+    // Rule 2: DDMMYYYY + last 4 of phone
+    expect(permutations).toContain("150819953210");
+    // Reverse: last 4 of phone + DDMMYYYY
+    expect(permutations).toContain("321015081995");
+    // SBI standard permutations
+    expect(permutations).toContain("150843210");
+    expect(permutations).toContain("432101508");
   });
 
   it("handles DD/MM/YYYY and DD-MM-YYYY formats properly", () => {

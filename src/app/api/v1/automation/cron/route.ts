@@ -74,8 +74,8 @@ async function handleAutomationCron(req: NextRequest) {
       logger.warn("Failed to check or recover abandoned jobs", "AutomationCron", { error: String(recErr) });
     }
 
-    // 3. Query all users with active Gmail integrations
-    const { data: integrations, error: fetchErr } = await supabaseAdmin
+    // 3. Query all users with active Gmail integrations (strictly ACTIVE status)
+    const { data: rawIntegrations, error: fetchErr } = await supabaseAdmin
       .from("gmail_integrations")
       .select("user_id, email_address, sync_status")
       .neq("sync_status", "DISCONNECTED");
@@ -84,6 +84,8 @@ async function handleAutomationCron(req: NextRequest) {
       logger.error("Failed to query active Gmail integrations", "AutomationCron", fetchErr);
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     }
+
+    const integrations = (rawIntegrations || []).filter((item) => item.sync_status === "ACTIVE");
 
     const results: Array<{
       userId: string;

@@ -6,7 +6,6 @@ and calibrated confidence scoring.
 
 import re
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
 
 from .models import TransactionClassificationInput, ClassificationResult
 from .entity_database import lookup_merchant_by_name, lookup_merchant_by_vpa

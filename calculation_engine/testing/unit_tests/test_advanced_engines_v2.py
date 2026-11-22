@@ -4,7 +4,6 @@ DebtPayoffEngine and FinancialStressTestEngine.
 """
 
 from decimal import Decimal
-import pytest
 from calculation_engine.modules.debt_engine import DebtPayoffEngine
 from calculation_engine.modules.stress_test_engine import FinancialStressTestEngine
 

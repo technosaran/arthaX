@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import DashboardSection from "@/components/DashboardSection";

@@ -15,7 +15,6 @@ class BaseBankAdapter(ABC):
     @abstractmethod
     def can_parse(self, content: bytes, filename: str) -> bool:
         """Determines if this adapter can parse the given file."""
-        pass
 
     @abstractmethod
     def parse(
@@ -25,4 +24,3 @@ class BaseBankAdapter(ABC):
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
         """Parses the statement content and returns normalized result."""
-        pass

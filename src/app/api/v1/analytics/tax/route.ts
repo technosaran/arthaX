@@ -1,13 +1,10 @@
-import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import {
   roundMoney,
   addMoney,
   subMoney,
   mulMoney,
-  divMoney,
   sumMoney,
 } from "@/utils/money";
 
@@ -72,7 +69,7 @@ interface StockLot {
 
 export const GET = createApiRoute({
   rateLimit: { limit: 60, windowSeconds: 60 },
-  handler: async ({ userId, query, req }) => {
+  handler: async ({ userId, query }) => {
     const assessmentYear = query.get("ay") || "2025-26";
     const slabRate = Math.min(Math.max(parseFloat(query.get("slab") || "0.30"), 0.0), 0.45);
 

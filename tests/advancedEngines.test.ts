@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   executeDebtPayoffTS,
   executeStressTestTS,
-  executeNetWorthTS,
-  executeFireTS,
-  executeRebalancingTS,
 } from "@/lib/engine/embeddedEngine";
 
 describe("ArthaX Advanced Embedded Financial Engines Suite (DebtPayoff & StressTesting)", () => {

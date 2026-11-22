@@ -5,10 +5,9 @@ tests boundary conditions, and prevents financial regression.
 """
 
 from decimal import Decimal
-import pytest
 from calculation_engine.modules.expense_engine import ExpenseEngine
 from calculation_engine.modules.networth_engine import NetWorthEngine
-from calculation_engine.modules.portfolio_engine import calculate_cagr, calculate_xirr
+from calculation_engine.modules.portfolio_engine import calculate_xirr
 from datetime import date
 
 

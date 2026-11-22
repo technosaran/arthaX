@@ -24,11 +24,10 @@ import BankLogo from "@/components/BankLogo";
 import { getTimeGreeting } from "@/utils/greeting";
 import { isFamilyTransfer } from "@/utils/expenseFilter";
 import { StatCard } from "@/components/ui/StatCard";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { Skeleton, StatCardSkeleton } from "@/components/ui/Skeleton";
 
 interface AccountItem {
   id: string;

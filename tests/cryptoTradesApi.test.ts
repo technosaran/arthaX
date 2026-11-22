@@ -3,8 +3,6 @@ import { z } from "zod";
 import {
   fetchBinanceMyTrades,
   parseBinanceRawTrades,
-  calculateTradeStats,
-  getExitedAssets,
 } from "../src/utils/binance";
 
 const TradeRecordSchema = z.object({

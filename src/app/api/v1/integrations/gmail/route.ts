@@ -87,14 +87,18 @@ export const GET = createApiRoute({
             bankingIdentity.phoneMasked = `******${cleanPhone.slice(-4)}`;
           }
         }
-      } catch (err) {
+      } catch {
         // Safe decryption ignore
       }
     }
 
     return apiSuccess(
       {
-        connected: Boolean(integration && integration.sync_status !== "DISCONNECTED"),
+        connected: Boolean(
+          integration &&
+            integration.sync_status !== "DISCONNECTED" &&
+            integration.sync_status !== "PENDING_AUTH"
+        ),
         email: integration?.email_address || null,
         syncStatus: integration?.sync_status || "DISCONNECTED",
         lastSyncAt: integration?.last_sync_at || null,
@@ -121,31 +125,86 @@ export const POST = createApiRoute({
     const { email, password_hint, bank_name, pan, dob, phone } = body;
     const cleanEmail = email?.trim().toLowerCase();
 
-    // 1. If email provided or updating existing integration
+    // 1. Fetch existing integration to check for real OAuth tokens
+    const { data: existingInt, error: fetchIntErr } = await supabaseAdmin
+      .from("gmail_integrations")
+      .select("id, email_address, access_token_encrypted, refresh_token_encrypted, sync_status")
+      .eq("user_id", userId!)
+      .maybeSingle();
+
+    if (fetchIntErr) {
+      return apiError(fetchIntErr.message, "DATABASE_ERROR", 500, undefined, req);
+    }
+
+    let hasRealTokens = false;
+    if (existingInt?.access_token_encrypted || existingInt?.refresh_token_encrypted) {
+      const accToken = existingInt.access_token_encrypted
+        ? decryptSensitiveData(existingInt.access_token_encrypted, "gmail-tokens")
+        : null;
+      const refToken = existingInt.refresh_token_encrypted
+        ? decryptSensitiveData(existingInt.refresh_token_encrypted, "gmail-tokens")
+        : null;
+
+      const isRealAcc = Boolean(accToken && !accToken.startsWith("token_"));
+      const isRealRef = Boolean(refToken && !refToken.startsWith("token_"));
+      hasRealTokens = isRealAcc || isRealRef;
+    }
+
     let updatedIntegration: any = null;
+    let syncStatus: string = existingInt?.sync_status || "PENDING_AUTH";
+    let isConnected = Boolean(hasRealTokens && syncStatus === "ACTIVE");
+
     if (cleanEmail) {
-      const encryptedToken = encryptSensitiveData(`token_${Date.now()}`, "gmail-tokens");
+      if (existingInt && hasRealTokens) {
+        // Real tokens exist; preserve tokens and update email address
+        syncStatus = existingInt.sync_status || "ACTIVE";
+        isConnected = syncStatus === "ACTIVE";
 
-      const { data, error: upsertErr } = await supabaseAdmin
-        .from("gmail_integrations")
-        .upsert(
-          {
-            user_id: userId!,
+        const { data, error: updateErr } = await supabaseAdmin
+          .from("gmail_integrations")
+          .update({
             email_address: cleanEmail,
-            access_token_encrypted: encryptedToken,
-            sync_status: "ACTIVE",
-            error_details: null,
             updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        )
-        .select()
-        .single();
+          })
+          .eq("id", existingInt.id)
+          .select()
+          .single();
 
-      if (upsertErr) {
-        return apiError(upsertErr.message, "DATABASE_ERROR", 500, undefined, req);
+        if (updateErr) {
+          return apiError(updateErr.message, "DATABASE_ERROR", 500, undefined, req);
+        }
+        updatedIntegration = data;
+      } else {
+        // No integration exists or no real tokens in DB; save email with PENDING_AUTH (no dummy tokens)
+        syncStatus = "PENDING_AUTH";
+        isConnected = false;
+
+        const { data, error: upsertErr } = await supabaseAdmin
+          .from("gmail_integrations")
+          .upsert(
+            {
+              user_id: userId!,
+              email_address: cleanEmail,
+              access_token_encrypted: null,
+              refresh_token_encrypted: null,
+              sync_status: "PENDING_AUTH",
+              error_details: "OAuth authentication required to grant statement read access",
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" }
+          )
+          .select()
+          .single();
+
+        if (upsertErr) {
+          return apiError(upsertErr.message, "DATABASE_ERROR", 500, undefined, req);
+        }
+        updatedIntegration = data;
       }
-      updatedIntegration = data;
+    } else if (existingInt) {
+      updatedIntegration = existingInt;
+      syncStatus = existingInt.sync_status;
+      isConnected = Boolean(hasRealTokens && syncStatus === "ACTIVE");
     }
 
     // 2. If banking identity provided (PAN, DOB, Phone), store encrypted identity and auto-generate permutations
@@ -203,12 +262,17 @@ export const POST = createApiRoute({
 
     await invalidateUserCaches(userId, ["ACCOUNTS", "PORTFOLIO", "LEDGER"]);
 
+    const message = isConnected
+      ? "Banking identity and password configuration saved. Bank statements will now decrypt and auto-create accounts automatically."
+      : "Email and banking configuration saved. Please complete Google OAuth authentication to grant statement read access.";
+
     return apiSuccess(
       {
-        connected: true,
-        email: cleanEmail,
-        syncStatus: "ACTIVE",
-        message: "Banking identity and password configuration saved. Bank statements will now decrypt and auto-create accounts automatically.",
+        connected: isConnected,
+        email: cleanEmail || updatedIntegration?.email_address || existingInt?.email_address || null,
+        syncStatus,
+        requiresAuth: !isConnected,
+        message,
         integration: updatedIntegration,
       },
       undefined,

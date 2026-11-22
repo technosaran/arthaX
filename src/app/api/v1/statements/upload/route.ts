@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiError, apiSuccess } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
@@ -8,10 +8,13 @@ import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
 import crypto from "crypto";
 
-const PYTHON_SERVICE_URL =
-  process.env.PYTHON_BACKEND_URL ||
-  process.env.PYTHON_SERVICE_URL ||
-  "http://127.0.0.1:8000";
+function getPythonServiceUrl(): string {
+  if (process.env.PYTHON_BACKEND_URL) return process.env.PYTHON_BACKEND_URL;
+  if (process.env.PYTHON_SERVICE_URL) return process.env.PYTHON_SERVICE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  return process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "https://arthax.vercel.app";
+}
 
 export const POST = createApiRoute({
   auth: "required",
@@ -72,7 +75,8 @@ export const POST = createApiRoute({
         account_id: accountId || undefined,
       };
 
-      const pyRes = await fetch(`${PYTHON_SERVICE_URL}/api/py/statements/parse`, {
+      const pyServiceUrl = getPythonServiceUrl();
+      const pyRes = await fetch(`${pyServiceUrl}/api/py/statements/parse`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -86,8 +90,33 @@ export const POST = createApiRoute({
       if (!pyRes.ok) {
         const errJson = await pyRes.json().catch(() => ({}));
         const detail = errJson.detail || errJson.message || "Failed to parse statement.";
+        let errorMessage = "Failed to parse statement.";
+        let errorCode = "PARSE_FAILED";
+
+        if (typeof detail === "string") {
+          errorMessage = detail;
+        } else if (typeof detail === "object" && detail !== null) {
+          const detailObj = detail as Record<string, unknown>;
+          const errList = Array.isArray(detailObj.errors) ? (detailObj.errors as string[]) : [];
+          if (errList.includes("PASSWORD_REQUIRED")) {
+            errorMessage = "Statement is password-protected. Please provide the decryption password.";
+            errorCode = "PASSWORD_REQUIRED";
+          } else if (errList.includes("PASSWORD_INCORRECT")) {
+            errorMessage = "Decryption failed: supplied password is incorrect.";
+            errorCode = "PASSWORD_INCORRECT";
+          } else if (errList.includes("CORRUPTED_PDF")) {
+            errorMessage = "Corrupted or malformed PDF statement.";
+            errorCode = "CORRUPTED_PDF";
+          } else if (typeof detailObj.message === "string") {
+            errorMessage = detailObj.message;
+            if (errList.length > 0) {
+              errorMessage += `: ${errList.join("; ")}`;
+            }
+          }
+        }
+
         return NextResponse.json(
-          { success: false, error: typeof detail === "string" ? detail : JSON.stringify(detail) },
+          { success: false, error: errorMessage, code: errorCode, detail },
           { status: pyRes.status }
         );
       }

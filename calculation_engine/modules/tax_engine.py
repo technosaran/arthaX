@@ -6,16 +6,13 @@ Supports FIFO lot matching, multi-asset classes, loss set-off rules, and tax har
 
 from datetime import datetime, date
 from decimal import Decimal
-import math
 from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict, deque
 
 from ..core.precision import (
     to_decimal,
     quantize_currency,
-    safe_divide,
     safe_percentage,
-    DEFAULT_CURRENCY,
 )
 from ..core.validators import parse_iso_date
 from ..core.base_calculator import BaseCalculator

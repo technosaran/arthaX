@@ -192,7 +192,7 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
           } else {
             body = rawJson as TBody;
           }
-        } catch (err: unknown) {
+        } catch {
           // If schema was required, empty/malformed json is an error
           if (config.schema) {
             return apiError("Malformed or missing JSON request body", "VALIDATION_ERROR", 400, undefined, req);

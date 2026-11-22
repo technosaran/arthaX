@@ -77,9 +77,9 @@ describe("PDF Password Security & Authorized Hint Audit Suite", () => {
     expect(supabaseAdmin.from).not.toHaveBeenCalledWith("accounts");
   });
 
-  it("strictly enforces candidate bound of MAX_PASSWORD_ATTEMPTS = 10", async () => {
-    // Generate 15 hints
-    const hints = Array.from({ length: 15 }, (_, i) => ({
+  it("strictly enforces candidate bound of MAX_PASSWORD_ATTEMPTS = 20", async () => {
+    // Generate 25 hints
+    const hints = Array.from({ length: 25 }, (_, i) => ({
       encrypted_secret: encryptSensitiveData(`candidate_${i}`, "statement-passwords"),
       hint_pattern: `hint_${i}`,
     }));
@@ -100,10 +100,10 @@ describe("PDF Password Security & Authorized Hint Audit Suite", () => {
 
     const candidates = await fetchUserPasswordCandidates(userId);
 
-    // Verified: Capped at 10 to prevent DoS or brute force
-    expect(candidates).toHaveLength(10);
+    // Verified: Capped at 20 to prevent DoS or brute force while accommodating permutations
+    expect(candidates).toHaveLength(20);
     expect(candidates[0]).toBe("candidate_0");
-    expect(candidates[9]).toBe("candidate_9");
+    expect(candidates[19]).toBe("candidate_19");
   });
 
   it("gracefully handles unencrypted or corrupt secrets without crashing or logging secrets", async () => {

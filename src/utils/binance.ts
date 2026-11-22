@@ -1098,11 +1098,11 @@ export function getDemoDepth(symbol: string = "BTCUSDT", currentPrice: number = 
   };
 }
 
-export function getDemoKlines(symbol: string = "BTCUSDT", interval: string = "1h", limit: number = 36): BinanceKline[] {
+export function getDemoKlines(_symbol: string = "BTCUSDT", _interval: string = "1h", _limit: number = 36): BinanceKline[] {
   return [];
 }
 
-export function getDemoRecentTrades(symbol: string = "BTCUSDT", currentPrice: number = 0): BinancePublicTrade[] {
+export function getDemoRecentTrades(_symbol: string = "BTCUSDT", _currentPrice: number = 0): BinancePublicTrade[] {
   return [];
 }
 

@@ -7,8 +7,7 @@ Date | Particulars | Cheque No | Withdrawals(Dr) | Deposits(Cr) | Balance
 
 import re
 import csv
-import io
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 import pymupdf

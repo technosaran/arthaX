@@ -8,10 +8,9 @@ and strict mathematical balance validation.
 """
 
 import re
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
-from typing import Optional, List, Dict, Any, Tuple
-import pymupdf
+from typing import Optional, List, Dict, Any
 
 from .base_adapter import BaseBankAdapter
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem

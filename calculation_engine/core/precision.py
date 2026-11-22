@@ -3,7 +3,7 @@ Financial Calculation Engine - Precision & Monetary Arithmetic
 Strict Decimal arithmetic for financial correctness (Zero binary floating-point error).
 """
 
-from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_EVEN, InvalidOperation
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from typing import Any, Optional, Union, Dict
 import math
 

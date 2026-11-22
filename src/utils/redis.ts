@@ -1,5 +1,4 @@
 import { Redis } from "@upstash/redis";
-import { CACHE_KEYS, getUserCacheKey } from "./cacheKeys";
 
 export * from "./cacheKeys";
 

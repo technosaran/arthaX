@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiError } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
