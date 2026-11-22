@@ -34,6 +34,15 @@ const nextConfig: NextConfig = {
 
     return rules;
   },
+  redirects: async () => {
+    return [
+      {
+        source: "/settings",
+        destination: "/?tab=settings",
+        permanent: false,
+      },
+    ];
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },

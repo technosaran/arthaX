@@ -1099,7 +1099,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
             access_type: "offline",
             prompt: "consent",
           },
-          redirectTo: `${origin}/auth/callback?next=/settings?section=integrations`,
+          redirectTo: `${origin}/auth/callback?next=/?tab=settings`,
         },
       });
       if (error) {
