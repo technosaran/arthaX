@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../../src/types/database.types";
 import { handleQueryTransactions } from "../../src/mcp/tools/transactions";
 import {
   handleRecordExpense,
@@ -8,7 +10,7 @@ import {
 
 describe("MCP Transaction Tools", () => {
   it("rejects non-positive transaction amounts", async () => {
-    const mockDb = {} as any;
+    const mockDb = {} as unknown as SupabaseClient<Database>;
     await expect(
       handleRecordExpense(mockDb, "user-test", {
         accountId: "acc-1",
@@ -44,7 +46,7 @@ describe("MCP Transaction Tools", () => {
       data: "exp-123",
       error: null,
     });
-    const mockDb = { rpc: rpcMock } as any;
+    const mockDb = { rpc: rpcMock } as unknown as SupabaseClient<Database>;
 
     const res = await handleRecordExpense(mockDb, "user-test", {
       accountId: "acc-1",
@@ -73,7 +75,7 @@ describe("MCP Transaction Tools", () => {
       data: "inc-123",
       error: null,
     });
-    const mockDb = { rpc: rpcMock } as any;
+    const mockDb = { rpc: rpcMock } as unknown as SupabaseClient<Database>;
 
     const res = await handleRecordIncome(mockDb, "user-test", {
       accountId: "acc-1",
@@ -103,7 +105,7 @@ describe("MCP Transaction Tools", () => {
       data: "xfer-123",
       error: null,
     });
-    const mockDb = { rpc: rpcMock } as any;
+    const mockDb = { rpc: rpcMock } as unknown as SupabaseClient<Database>;
 
     const res = await handleRecordTransfer(mockDb, "user-test", {
       fromAccountId: "acc-1",
@@ -139,9 +141,9 @@ describe("MCP Transaction Tools", () => {
           error: null,
         }),
       })),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
-    const res: any = await handleQueryTransactions(mockDb, "user-test", {
+    const res = await handleQueryTransactions(mockDb, "user-test", {
       type: "expense",
       limit: 10,
     });

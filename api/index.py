@@ -26,7 +26,6 @@ except ImportError:
 # High-Performance Mathematical & Statistical Libraries
 try:
     import numpy as np
-    from scipy import stats
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
@@ -230,8 +229,8 @@ def calculate_runway_logic(liquid_cash: float, monthly_expenses: List[float]) ->
         if len(arr) >= 3:
             x_axis = np.arange(len(arr))
             try:
-                slope, _, r_val, p_val, _ = stats.linregress(x_axis, arr)
-                trend_slope = round(float(slope), 2)
+                slope = float(np.polyfit(x_axis, arr, 1)[0])
+                trend_slope = round(slope, 2)
                 if slope > 0.05 * burn_rate:
                     trend = "increasing_burn"
                 elif slope < -0.05 * burn_rate:
@@ -385,11 +384,7 @@ def detect_anomalies_logic(transactions: List[Any]):
         if raw_mad > 0:
             modified_z = 0.6745 * np.abs(amounts - median) / raw_mad
         else:
-            try:
-                normal_mad = float(stats.median_abs_deviation(amounts, scale="normal"))
-                modified_z = (np.abs(amounts - median) / normal_mad) if normal_mad > 0 else np.zeros_like(amounts)
-            except Exception:
-                modified_z = np.zeros_like(amounts)
+            modified_z = np.zeros_like(amounts)
 
         for i, tx in enumerate(valid_items):
             amt = amounts_list[i]

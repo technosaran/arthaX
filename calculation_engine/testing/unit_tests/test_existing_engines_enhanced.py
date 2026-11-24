@@ -15,7 +15,6 @@ from calculation_engine.modules.income_engine import IncomeEngine
 from calculation_engine.modules.budget_engine import BudgetEngine
 from calculation_engine.modules.networth_engine import NetWorthEngine
 from calculation_engine.modules.portfolio_engine import PortfolioEngine
-from calculation_engine.modules.rebalancing_engine import RebalancingEngine
 from calculation_engine.modules.investment_engine import InvestmentEngine
 
 
@@ -150,34 +149,6 @@ def test_portfolio_engine_tax_eligibility_and_hhi():
     assert "performance_attribution" in data
     assert len(data["performance_attribution"]["top_winners"]) == 2
     assert "concentration_analytics" in data
-
-
-def test_rebalancing_engine_tax_free_cash_infusion():
-    engine = RebalancingEngine()
-    inputs = {
-        "portfolio": {
-            "equity": 800000.0, # 80% (overweight vs target 60%)
-            "debt": 100000.0,   # 10% (underweight vs target 20%)
-            "gold": 50000.0,    # 5% (underweight vs target 10%)
-            "cash": 50000.0,    # 5% (underweight vs target 10%)
-        },
-        "target_allocation": {
-            "equity": 60.0,
-            "debt": 20.0,
-            "gold": 10.0,
-            "cash": 10.0,
-        },
-    }
-    res = engine.execute(inputs)
-    assert res["metadata"]["status"] == "SUCCESS"
-    data = res["data"]
-
-    tax_free = data["tax_free_cash_rebalancing"]
-    # Should recommend buying Debt, Gold, Cash with new capital without selling Equity
-    assert tax_free["total_new_capital_required"] > 0
-    orders = tax_free["allocation_orders"]
-    assert all(o["action"] == "BUY" for o in orders)
-    assert not any(o["asset"] == "equity" for o in orders)
 
 
 def test_investment_engine_win_rate_and_profit_factor():

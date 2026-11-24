@@ -58,8 +58,12 @@ export async function GET(request: Request) {
     const { data: authData, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && authData?.session) {
       const session = authData.session;
-      const providerToken = (session as any).provider_token;
-      const providerRefreshToken = (session as any).provider_refresh_token;
+      const sessionWithProviders = session as typeof session & {
+        provider_token?: string | null;
+        provider_refresh_token?: string | null;
+      };
+      const providerToken = sessionWithProviders.provider_token;
+      const providerRefreshToken = sessionWithProviders.provider_refresh_token;
       const user = session.user;
 
       if (providerToken && user?.id) {
@@ -69,7 +73,7 @@ export async function GET(request: Request) {
           const encAccess = encryptSensitiveData(providerToken, "gmail-tokens");
           const encRefresh = providerRefreshToken ? encryptSensitiveData(providerRefreshToken, "gmail-tokens") : null;
 
-          const payload: Record<string, any> = {
+          const payload: Record<string, unknown> = {
             user_id: user.id,
             email_address: user.email?.toLowerCase() || "",
             access_token_encrypted: encAccess,

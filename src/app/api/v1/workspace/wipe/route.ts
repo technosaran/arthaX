@@ -65,8 +65,10 @@ async function handleWipe(req: NextRequest) {
 
     // 2. Cascade-safe fallback if RPC is unavailable
     if (!rpcSuccess) {
-      // 2a. Transfers (Restricted foreign keys on accounts)
+      // 2a. Transfers & Canonical Bank Transactions (Restricted foreign keys on accounts)
       await supabaseAdmin.from("transfers").delete().eq("user_id", userId);
+      await supabaseAdmin.from("canonical_transactions").delete().eq("user_id", userId);
+      await supabaseAdmin.from("bank_statements").delete().eq("user_id", userId);
 
       // 2b. Recurring rules
       await supabaseAdmin.from("recurring_rules").delete().eq("user_id", userId);

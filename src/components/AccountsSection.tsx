@@ -981,7 +981,7 @@ export default function AccountsSection() {
                 ].map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setHistoryTypeFilter(tab.id as any)}
+                    onClick={() => setHistoryTypeFilter(tab.id as "all" | "inflow" | "outflow")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
                       historyTypeFilter === tab.id
                         ? "border-sky-500/50 bg-sky-500/10 text-sky-400 font-bold shadow-xs"

@@ -16,12 +16,6 @@ from ..modules.investment_engine import InvestmentEngine
 from ..modules.portfolio_engine import PortfolioEngine
 from ..modules.reconciliation_engine import ReconciliationEngine
 from ..modules.tax_engine import TaxEngine
-from ..modules.fire_engine import FireEngine
-from ..modules.rebalancing_engine import RebalancingEngine
-from ..modules.debt_engine import DebtPayoffEngine
-from ..modules.stress_test_engine import FinancialStressTestEngine
-from ..modules.goal_engine import GoalWealthEngine
-from ..modules.portfolio_analytics_engine import PortfolioAnalyticsEngine
 from ..bank_ingestion import parser_registry
 from ..bank_ingestion.gmail_service import GmailStatementIngestor
 from ..intelligence import classifier, match_internal_transfers, TransactionClassificationInput
@@ -32,7 +26,7 @@ from ..audit.calculation_logger import (
 
 router = APIRouter(prefix="", tags=["Financial Calculations"])
 
-# Initialized Singletons
+# Initialized Singletons (Core ArthaX Financial Engine)
 expense_engine = ExpenseEngine()
 income_engine = IncomeEngine()
 budget_engine = BudgetEngine()
@@ -41,12 +35,6 @@ investment_engine = InvestmentEngine()
 portfolio_engine = PortfolioEngine()
 reconciliation_engine = ReconciliationEngine()
 tax_engine = TaxEngine()
-fire_engine = FireEngine()
-rebalancing_engine = RebalancingEngine()
-debt_engine = DebtPayoffEngine()
-stress_test_engine = FinancialStressTestEngine()
-goal_engine = GoalWealthEngine()
-portfolio_analytics_engine = PortfolioAnalyticsEngine()
 
 
 # ---------------------------------------------------------------------------
@@ -131,61 +119,6 @@ class TaxRegimeComparisonRequest(CalculationBaseRequest):
     home_loan_interest_24b: Optional[float] = 0.0
     hra_exemption: Optional[float] = 0.0
     other_deductions: Optional[float] = 0.0
-
-
-class FireCalculationRequest(CalculationBaseRequest):
-    current_net_worth: float = 0.0
-    annual_expenses: float = 0.0
-    annual_savings: float = 0.0
-    current_age: Optional[int] = 30
-    target_retirement_age: Optional[int] = 50
-    expected_annual_return_pct: Optional[float] = 11.0
-    expected_inflation_pct: Optional[float] = 6.0
-    safe_withdrawal_rate_pct: Optional[float] = 3.5
-
-
-class RebalancingCalculationRequest(CalculationBaseRequest):
-    portfolio: Dict[str, float] = Field(default_factory=dict)
-    target_allocation: Optional[Dict[str, float]] = None
-    liabilities: Optional[float] = 0.0
-    monthly_expenses: Optional[float] = 0.0
-    monthly_income: Optional[float] = 0.0
-
-
-class DebtPayoffCalculationRequest(CalculationBaseRequest):
-    debts: List[Dict[str, Any]] = Field(default_factory=list)
-    monthly_extra_payment: Optional[float] = 0.0
-
-
-class StressTestCalculationRequest(CalculationBaseRequest):
-    liquid_cash: float = 0.0
-    semi_liquid_assets: float = 0.0
-    monthly_income: float = 0.0
-    monthly_mandatory_expenses: float = 0.0
-    monthly_discretionary_expenses: float = 0.0
-    total_debt: float = 0.0
-    emergency_shock_amount: Optional[float] = 500000.0
-
-
-class GoalPlannerCalculationRequest(CalculationBaseRequest):
-    goal_name: Optional[str] = "Financial Goal"
-    target_amount_today: float
-    horizon_years: int
-    current_savings: Optional[float] = 0.0
-    category: Optional[str] = "general"
-    custom_inflation_pct: Optional[float] = None
-    custom_expected_return_pct: Optional[float] = None
-    annual_step_up_pct: Optional[float] = 10.0
-
-
-class PortfolioAnalyticsCalculationRequest(CalculationBaseRequest):
-    portfolio_returns: Optional[List[float]] = None
-    portfolio_snapshots: Optional[List[Dict[str, Any]]] = None
-    benchmark_returns: Optional[List[float]] = None
-    current_portfolio_value: Optional[float] = 0.0
-    risk_free_rate_pct: Optional[float] = 6.75
-    period_frequency: Optional[str] = "monthly"
-    holdings: Optional[List[Dict[str, Any]]] = None
 
 
 class StatementParseRequest(CalculationBaseRequest):
@@ -288,48 +221,6 @@ def calculate_tax_regimes(payload: TaxRegimeComparisonRequest, x_user_id: Option
     return {"success": True, "result": res}
 
 
-@router.post("/calculations/fire")
-def calculate_fire(payload: FireCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return fire_engine.execute(inputs, user_id=user_id)
-
-
-@router.post("/calculations/rebalancing")
-def calculate_rebalancing(payload: RebalancingCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return rebalancing_engine.execute(inputs, user_id=user_id)
-
-
-@router.post("/calculations/debt-payoff")
-def calculate_debt_payoff(payload: DebtPayoffCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return debt_engine.execute(inputs, user_id=user_id)
-
-
-@router.post("/calculations/stress-test")
-def calculate_stress_test(payload: StressTestCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return stress_test_engine.execute(inputs, user_id=user_id)
-
-
-@router.post("/calculations/goal-planner")
-def calculate_goal_planner(payload: GoalPlannerCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return goal_engine.execute(inputs, user_id=user_id)
-
-
-@router.post("/calculations/portfolio-analytics")
-def calculate_portfolio_analytics(payload: PortfolioAnalyticsCalculationRequest, x_user_id: Optional[str] = Header(None)):
-    user_id = resolve_user_id(payload.user_id, x_user_id)
-    inputs = payload.model_dump()
-    return portfolio_analytics_engine.execute(inputs, user_id=user_id)
-
-
 @router.get("/calculations/health")
 def calculation_engine_health():
     return {
@@ -346,12 +237,6 @@ def calculation_engine_health():
             "PortfolioEngine",
             "ReconciliationEngine",
             "TaxEngine",
-            "FireEngine",
-            "RebalancingEngine",
-            "DebtPayoffEngine",
-            "FinancialStressTestEngine",
-            "GoalWealthEngine",
-            "PortfolioAnalyticsEngine",
         ],
     }
 

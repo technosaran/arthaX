@@ -150,7 +150,7 @@ export const POST = createApiRoute({
       hasRealTokens = isRealAcc || isRealRef;
     }
 
-    let updatedIntegration: any = null;
+    let updatedIntegration: Record<string, unknown> | null = null;
     let syncStatus: string = existingInt?.sync_status || "PENDING_AUTH";
     let isConnected = Boolean(hasRealTokens && syncStatus === "ACTIVE");
 

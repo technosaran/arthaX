@@ -178,7 +178,7 @@ export async function GET(req: NextRequest) {
     const encRefresh = refreshToken ? encryptSensitiveData(refreshToken, "gmail-tokens") : null;
     const tokenExpiry = new Date(Date.now() + (expiresIn - 60) * 1000).toISOString();
 
-    const dbPayload: Record<string, any> = {
+    const dbPayload: Record<string, unknown> = {
       user_id: userId,
       access_token_encrypted: encAccess,
       token_expiry: tokenExpiry,

@@ -11,7 +11,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:py": "pytest",
+    "test:py": "python -m pytest",
     "db:types": "supabase gen types typescript --project-id fvpfzbuoizzjwgekuhot > src/types/database.types.ts",
     "zerodha:sync": "npx tsx --env-file=.env.local scripts/zerodhaAutoSync.ts",
     "mcp": "npx tsx src/mcp/server.ts",

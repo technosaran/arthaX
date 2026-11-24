@@ -51,7 +51,7 @@ export interface TaxAnalysisPayload {
   harvestingOpportunities: TaxHarvestingOpportunity[];
   totalHarvestableLoss: number;
   totalPotentialTaxSavings: number;
-  regimeComparison?: any;
+  regimeComparison?: Record<string, unknown>;
   advice: string[];
 }
 

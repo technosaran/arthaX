@@ -261,7 +261,7 @@ export const GET = createApiRoute({
       }
 
       // 2. Cash flow calculations (excluding internal transfers / family transfers from spending)
-      const isTransferOrFamily = (e: any): boolean => {
+      const isTransferOrFamily = (e: { category?: string | null; title?: string | null; notes?: string | null }): boolean => {
         const cat = (e.category || "").toLowerCase();
         const title = (e.title || "").toLowerCase();
         const notes = (e.notes || "").toLowerCase();

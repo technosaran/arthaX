@@ -139,6 +139,7 @@ export default function BondsSection() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedRating, setSelectedRating] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"value_desc" | "coupon_desc" | "next_payout_asc" | "maturity_asc" | "name_asc">("value_desc");
+  const [currentTimestamp] = useState(() => Date.now());
 
   // Optional Record Coupon Modal
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
@@ -786,7 +787,7 @@ export default function BondsSection() {
               {/* Sort By */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as "value_desc" | "coupon_desc" | "next_payout_asc" | "maturity_asc" | "name_asc")}
                 className="text-xs px-2.5 py-2 rounded-xl bg-[var(--app-card)] border border-[var(--app-border)] text-[var(--app-fg)] focus:outline-none cursor-pointer"
               >
                 <option value="value_desc">Valuation: High to Low</option>
@@ -941,7 +942,7 @@ export default function BondsSection() {
                                 {formatDate(b.maturity_date)}
                               </div>
                               <div className="text-[10px] text-[var(--app-muted)]">
-                                {Math.max(0, Math.ceil((new Date(b.maturity_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365)))} yrs left
+                                {Math.max(0, Math.ceil((new Date(b.maturity_date).getTime() - currentTimestamp) / (1000 * 60 * 60 * 24 * 365)))} yrs left
                               </div>
                             </div>
                           </td>
@@ -1131,7 +1132,7 @@ export default function BondsSection() {
               <div className="divide-y divide-[var(--app-border-subtle)]">
                 {stats.upcomingCoupons.map((c, idx) => {
                   const d = new Date(c.nextDate);
-                  const daysLeft = Math.max(0, Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  const daysLeft = Math.max(0, Math.ceil((d.getTime() - currentTimestamp) / (1000 * 60 * 60 * 24)));
                   const isSoon = daysLeft <= 30;
 
                   return (

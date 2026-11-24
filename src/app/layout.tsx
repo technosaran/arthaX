@@ -101,12 +101,12 @@ export default function RootLayout({
       <head>
         <link
           rel="preconnect"
-          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ytqqzeemkzhifbtthanh.supabase.co"}
+          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co"}
           crossOrigin="anonymous"
         />
         <link
           rel="dns-prefetch"
-          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ytqqzeemkzhifbtthanh.supabase.co"}
+          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co"}
         />
         <script
           type="application/ld+json"

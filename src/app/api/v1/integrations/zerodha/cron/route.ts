@@ -152,13 +152,14 @@ async function handleZerodhaCron(req: NextRequest) {
         walletBalance: syncResult.walletBalance,
         error: syncResult.error,
       });
-    } catch (err: any) {
-      logger.error(`[Zerodha Cron] Unexpected error processing user ${targetUserId}`, "ZerodhaCron", err);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      logger.error(`[Zerodha Cron] Unexpected error processing user ${targetUserId}`, "ZerodhaCron", { error: errorMsg });
       results.push({
         userId: targetUserId,
         autoLoginSuccess: false,
         syncSuccess: false,
-        error: err?.message || "Unknown error",
+        error: errorMsg,
       });
     }
   }

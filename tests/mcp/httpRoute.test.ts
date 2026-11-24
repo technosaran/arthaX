@@ -29,7 +29,7 @@ describe("Remote MCP HTTP API Route (/api/v1/mcp)", () => {
   });
 
   it("rejects unauthorized POST requests with 401 and JSON-RPC error", async () => {
-    (getAuthenticatedUser as any).mockResolvedValueOnce({
+    vi.mocked(getAuthenticatedUser).mockResolvedValueOnce({
       user: null,
       userId: null,
       error: "No authorization header",
@@ -54,8 +54,8 @@ describe("Remote MCP HTTP API Route (/api/v1/mcp)", () => {
   });
 
   it("processes tools/list successfully when authenticated via standard Bearer token", async () => {
-    (getAuthenticatedUser as any).mockResolvedValueOnce({
-      user: { id: "user-test-uuid" },
+    vi.mocked(getAuthenticatedUser).mockResolvedValueOnce({
+      user: { id: "user-test-uuid" } as unknown as import("@supabase/supabase-js").User,
       userId: "user-test-uuid",
       error: null,
     });
@@ -79,7 +79,7 @@ describe("Remote MCP HTTP API Route (/api/v1/mcp)", () => {
     const json = await res.json();
     expect(json).toHaveProperty("result");
     expect(json.result).toHaveProperty("tools");
-    const names = json.result.tools.map((t: any) => t.name);
+    const names = json.result.tools.map((t: { name: string }) => t.name);
     expect(names).toContain("get_net_worth");
     expect(names).toContain("list_accounts");
     expect(names).toContain("record_expense");

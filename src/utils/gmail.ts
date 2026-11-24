@@ -5,6 +5,7 @@ import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
 import { generateBankPasswordPermutations, BankingIdentityDetails, getBankPasswordFormatDescription } from "@/utils/bankPasswords";
+import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage } from "@/utils/pythonService";
 import crypto from "crypto";
 
 export interface GoogleTokenRefreshResult {
@@ -165,8 +166,12 @@ export async function fetchUserPasswordCandidates(userId: string): Promise<strin
 export interface GmailSyncOptions {
   maxMessages?: number;
   afterDate?: string;
+  lookbackDays?: number;
   customQuery?: string;
   baseUrl?: string;
+  passwords?: string[];
+  bankPasswords?: Record<string, string>;
+  storePasswords?: boolean;
 }
 
 export interface GmailSyncResult {
@@ -180,6 +185,15 @@ export interface GmailSyncResult {
   accountsCreated?: string[];
   status?: "COMPLETED" | "PARTIAL" | "FAILED";
   error?: string;
+  passwordRequired?: boolean;
+  passwordBanks?: string[];
+  passwordHints?: Record<string, string>;
+  passwordRequiredStatements?: Array<{
+    fileName: string;
+    bankName: string;
+    formatHint?: string;
+    errorCode?: string;
+  }>;
   details?: Record<string, unknown>;
 }
 
@@ -345,8 +359,75 @@ export async function syncUserGmailStatements(
     };
   }
 
-  // 3. Password candidates
-  const passwordCandidates = await fetchUserPasswordCandidates(userId);
+  // 3. Store user-provided bank passwords if requested for future automated statements
+  if (options?.bankPasswords && Object.keys(options.bankPasswords).length > 0) {
+    for (const [bank, pwd] of Object.entries(options.bankPasswords)) {
+      if (!pwd || typeof pwd !== "string" || !pwd.trim()) continue;
+      const cleanPwd = pwd.trim();
+      const normBank = bank.trim().toUpperCase();
+
+      if (options.storePasswords !== false) {
+        try {
+          const encSecret = encryptSensitiveData(cleanPwd, "statement-passwords");
+          const { data: existing } = await supabaseAdmin
+            .from("statement_password_hints")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("bank_name", normBank)
+            .maybeSingle();
+
+          if (existing?.id) {
+            await supabaseAdmin
+              .from("statement_password_hints")
+              .update({
+                hint_pattern: "BANK_PASSWORD",
+                encrypted_secret: encSecret,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existing.id);
+          } else {
+            await supabaseAdmin
+              .from("statement_password_hints")
+              .insert({
+                user_id: userId,
+                bank_name: normBank,
+                hint_pattern: "BANK_PASSWORD",
+                encrypted_secret: encSecret,
+                updated_at: new Date().toISOString(),
+              });
+          }
+        } catch (saveErr) {
+          logger.warn(`Failed to store password hint for bank ${normBank}`, "GmailService", { error: String(saveErr) });
+        }
+      }
+    }
+  }
+
+  // 4. Resolve Password candidates strictly from authorized hints & current provided inputs
+  const rawCandidates = await fetchUserPasswordCandidates(userId);
+  const providedPasswords: string[] = [];
+  if (options?.passwords) {
+    for (const p of options.passwords) {
+      if (p && typeof p === "string" && p.trim() && !providedPasswords.includes(p.trim())) {
+        providedPasswords.push(p.trim());
+      }
+    }
+  }
+  if (options?.bankPasswords) {
+    for (const p of Object.values(options.bankPasswords)) {
+      if (p && typeof p === "string" && p.trim() && !providedPasswords.includes(p.trim())) {
+        providedPasswords.push(p.trim());
+      }
+    }
+  }
+
+  const mergedCandidates: string[] = [...providedPasswords];
+  for (const c of rawCandidates) {
+    if (!mergedCandidates.includes(c)) {
+      mergedCandidates.push(c);
+    }
+  }
+  const passwordCandidates = mergedCandidates.slice(0, 20);
 
   // 4. Create running automation_jobs record
   const { data: jobRecord } = await supabaseAdmin
@@ -377,11 +458,12 @@ export async function syncUserGmailStatements(
   const batchLimit = Math.min(Math.max(options?.maxMessages ?? 25, 5), 100);
 
   // Determine checkpoint after_date.
-  // For on-demand sync, search up to 180 days back so all recent and quarterly statements are discovered.
+  // Default to 30 days (1 month) so only recent monthly statements are discovered.
   let afterDateStr: string | undefined = options?.afterDate;
   if (!afterDateStr) {
+    const lookbackDays = options?.lookbackDays ?? 30;
     const lookbackDate = new Date();
-    lookbackDate.setDate(lookbackDate.getDate() - 180);
+    lookbackDate.setDate(lookbackDate.getDate() - lookbackDays);
     const yyyy = lookbackDate.getFullYear();
     const mm = String(lookbackDate.getMonth() + 1).padStart(2, "0");
     const dd = String(lookbackDate.getDate()).padStart(2, "0");
@@ -411,33 +493,6 @@ export async function syncUserGmailStatements(
 
       if (pyRes.ok) {
         pyData = await pyRes.json();
-        // Fallback: If 0 statements found with after_date filter, retry once without date constraint
-        if ((!pyData?.statements || pyData.statements.length === 0) && !options?.afterDate) {
-          try {
-            const fallbackRes = await fetch(`${pythonServiceUrl}/api/py/statements/gmail/sync`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                "X-User-Id": userId,
-                ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
-              },
-              body: JSON.stringify({
-                user_id: userId,
-                access_token: accessToken,
-                password_candidates: passwordCandidates,
-                max_messages: batchLimit,
-                custom_query: options?.customQuery,
-              }),
-            });
-            if (fallbackRes.ok) {
-              const fallbackJson = await fallbackRes.json();
-              if (fallbackJson?.statements && fallbackJson.statements.length > 0) {
-                pyData = fallbackJson;
-              }
-            }
-          } catch {}
-        }
       } else {
         const errText = await pyRes.text();
         logger.warn(`Calculation engine Gmail sync returned ${pyRes.status}: ${errText}`, "GmailService");
@@ -489,8 +544,38 @@ export async function syncUserGmailStatements(
         };
       }
     } catch (fetchErr) {
-      logger.warn("Calculation engine service unreachable during Gmail sync", "GmailService", { error: String(fetchErr) });
-      if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+      logger.warn("Calculation engine service unreachable during Gmail sync, checking auto-start...", "GmailService", { error: String(fetchErr) });
+
+      // In local development, attempt to auto-start Python service and retry once
+      const recovered = await ensurePythonServiceOnline(pythonServiceUrl);
+      if (recovered) {
+        try {
+          const retryRes = await fetch(`${pythonServiceUrl}/api/py/statements/gmail/sync`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "X-User-Id": userId,
+              ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              access_token: accessToken,
+              password_candidates: passwordCandidates,
+              after_date: afterDateStr,
+              max_messages: batchLimit,
+              custom_query: options?.customQuery,
+            }),
+          });
+          if (retryRes.ok) {
+            pyData = await retryRes.json();
+          }
+        } catch (retryErr) {
+          logger.warn("Retry after auto-start failed", "GmailService", { error: String(retryErr) });
+        }
+      }
+
+      if (!pyData && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
         return {
           success: false,
           statementsCount: 0,
@@ -499,7 +584,7 @@ export async function syncUserGmailStatements(
           transfersMatched: 0,
           failedCount: 1,
           status: "FAILED",
-          error: "Calculation engine service unreachable. Please ensure service is online and try again.",
+          error: getCalculationEngineUnreachableMessage(pythonServiceUrl),
         };
       }
     }
@@ -1002,8 +1087,16 @@ export async function syncUserGmailStatements(
       : "COMPLETED";
 
     let failureSummary: string | null = null;
+    const passwordBanks: string[] = [];
+    const passwordRequiredStatements: Array<{
+      fileName: string;
+      bankName: string;
+      formatHint?: string;
+      errorCode?: string;
+    }> = [];
+    const passwordHintsMap: Record<string, string> = {};
+
     if (hasFailures || failedStatements.length > 0) {
-      const passwordBanks: string[] = [];
       const unparseableFiles: string[] = [];
       const otherErrors: string[] = [];
 
@@ -1035,6 +1128,22 @@ export async function syncUserGmailStatements(
           }
 
           if (!passwordBanks.includes(bank)) passwordBanks.push(bank);
+
+          let hint = getBankPasswordFormatDescription(bank);
+          if (bank.toUpperCase().includes("SBI") || bank.toUpperCase().includes("STATE BANK")) {
+            hint = "YONO uses DDMM@last 4 digits of mobile (e.g. 0101@9876); NetBanking uses DDMM + last 5 digits of mobile, or PAN";
+          } else if (bank.toUpperCase().includes("INDIAN") || bank.toUpperCase() === "INDIAN_BANK") {
+            hint = "Indian Bank uses your full Account Number (e.g. 10-16 digits), or DDMMYYYY + last 4 digits of mobile";
+          }
+
+          passwordHintsMap[bank] = hint ? hint.replace(/\.$/, "") : "";
+
+          passwordRequiredStatements.push({
+            fileName: fName,
+            bankName: bank,
+            formatHint: hint,
+            errorCode: f.error_code || "PASSWORD_REQUIRED",
+          });
         } else if (errsStr.includes("unsupported") || f.error_code === "UNSUPPORTED_FORMAT") {
           unparseableFiles.push(fName);
         } else {
@@ -1156,6 +1265,10 @@ export async function syncUserGmailStatements(
       failedCount: actionableFailedStatements.length,
       status: finalJobStatus,
       error: failureSummary || undefined,
+      passwordRequired: passwordBanks.length > 0,
+      passwordBanks,
+      passwordHints: passwordHintsMap,
+      passwordRequiredStatements,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);

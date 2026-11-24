@@ -5,6 +5,7 @@ Section 115BBH crypto rules, and harvesting calculations.
 """
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from calculation_engine.modules.tax_engine import TaxEngine
 
 
@@ -171,3 +172,78 @@ def test_tax_loss_harvesting_opportunities():
     # Ensure statutory disclaimer is present
     assert "disclaimer" in data
     assert "Chartered Accountant" in data["disclaimer"]
+
+
+def test_old_vs_new_tax_regime_comparator():
+    engine = TaxEngine()
+    # Income: 12 Lakhs, 80C: 1.5L, 80D: 25k, NPS: 50k
+    res = engine.compare_regimes(
+        gross_income=Decimal("1200000.00"),
+        deductions_80c=Decimal("150000.00"),
+        deductions_80d=Decimal("25000.00"),
+        nps_80ccd_1b=Decimal("50000.00"),
+        home_loan_interest_24b=Decimal("0.00"),
+        hra_exemption=Decimal("0.00"),
+    )
+
+    assert "recommendedRegime" in res
+    assert res["recommendedRegime"] in ["NEW_REGIME", "OLD_REGIME", "EQUAL"]
+    assert res["newRegime"]["grossIncome"] == 1200000.0
+    assert res["newRegime"]["standardDeduction"] == 75000.0  # Union Budget 2024
+    assert res["oldRegime"]["standardDeduction"] == 50000.0
+    assert res["savingsAmount"] >= 0.0
+
+
+def test_tax_regime_marginal_relief_87a():
+    """
+    Test Section 87A Marginal Relief under Section 115BAC New Regime:
+    For gross income = ₹7,85,000 (after ₹75k standard deduction, taxable income = ₹7,10,000):
+    Without marginal relief:
+      3L-7L = 4L * 5% = 20,000
+      7L-7.1L = 10,000 * 10% = 1,000
+      Total base tax = ₹21,000.
+    With marginal relief:
+      Excess income over ₹7,00,000 = ₹10,000.
+      Tax payable CANNOT exceed excess income (₹10,000).
+      Relief = 21,000 - 10,000 = ₹11,000!
+      Tax after rebate = ₹10,000 (+ 4% cess = ₹10,400).
+    """
+    engine = TaxEngine()
+    gross_income = Decimal("785000.00")  # Taxable = 7,10,000 after 75,000 std deduction
+
+    res = engine.compare_regimes(gross_income=gross_income)
+    new_regime = res["newRegime"]
+
+    assert new_regime["taxableIncome"] == 710000.00
+    assert new_regime["baseIncomeTax"] == 21000.00
+    assert new_regime["section87aMarginalRelief"] == 11000.00
+    assert new_regime["taxAfterRebate"] == 10000.00
+    assert new_regime["totalTax"] == 10400.00
+
+
+def test_tax_regime_corporate_nps_and_surcharge():
+    """
+    Test Corporate NPS Section 80CCD(2) and High Net Worth Surcharge:
+    Gross income = ₹60,00,000.
+    Corporate NPS = ₹2,00,000 (deducted in BOTH New and Old regimes).
+    Taxable income = 60,00,000 - 75,000 - 2,00,000 = ₹57,25,000.
+    Surcharge of 10% applies on income > ₹50,00,000 with marginal relief check.
+    """
+    engine = TaxEngine()
+    gross_income = Decimal("6000000.00")
+    corp_nps = Decimal("200000.00")
+
+    res = engine.compare_regimes(
+        gross_income=gross_income,
+        nps_80ccd_2=corp_nps,
+    )
+    new_regime = res["newRegime"]
+    old_regime = res["oldRegime"]
+
+    assert new_regime["corporateNpsDeduction"] == 200000.00
+    assert old_regime["corporateNpsDeduction"] == 200000.00
+    assert new_regime["taxableIncome"] == 5725000.00
+
+    # High net worth surcharge (> 50L) must be triggered
+    assert new_regime["surcharge"] > 0
+    assert old_regime["surcharge"] > 0

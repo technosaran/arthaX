@@ -33,6 +33,10 @@ import {
   Smartphone,
   Lock,
   Sparkles,
+  Plus,
+  Eye,
+  EyeOff,
+  HelpCircle,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -57,6 +61,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
 import { McpIntegrationCard } from "@/components/McpIntegrationCard";
+import { StatementPasswordModal } from "@/components/StatementPasswordModal";
+import { getBankPasswordFormatDescription } from "@/utils/bankPasswords";
 
 // Utility function to escape CSV values according to RFC 4180 and mitigate Formula Injection (CWE-1236)
 function escapeCSV(val: unknown): string {
@@ -263,6 +269,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   });
   const [loadingGmail, setLoadingGmail] = useState(false);
   const [syncingGmail, setSyncingGmail] = useState(false);
+  const [gmailLookbackDays, setGmailLookbackDays] = useState<number>(30);
   const [gmailEmail, setGmailEmail] = useState("");
   const [panInput, setPanInput] = useState("");
   const [dobInput, setDobInput] = useState("");
@@ -279,6 +286,32 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   } | null>(null);
   const inFlightGmailRef = useRef(false);
 
+  // Statement Password Decryption Modal State
+  const [passwordModalState, setPasswordModalState] = useState<{
+    isOpen: boolean;
+    banks: string[];
+    hints: Record<string, string>;
+    noticeMessage?: string;
+  }>({
+    isOpen: false,
+    banks: [],
+    hints: {},
+  });
+  const [decryptingModal, setDecryptingModal] = useState(false);
+
+  // Stored Bank Passwords State (for Profile & Identity Vault)
+  const [storedBankPasswords, setStoredBankPasswords] = useState<Array<{
+    id?: string;
+    bank: string;
+    hintPattern?: string;
+    configured: boolean;
+    formatHint?: string;
+    updatedAt?: string;
+  }>>([]);
+  const [newBankName, setNewBankName] = useState("INDIAN_BANK");
+  const [newBankPassword, setNewBankPassword] = useState("");
+  const [savingBankPassword, setSavingBankPassword] = useState(false);
+  const [showNewBankPassword, setShowNewBankPassword] = useState(false);
 
   // Master Data Wipe State
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
@@ -530,6 +563,26 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
   }, [gmailEmail]);
 
+  const fetchStoredBankPasswords = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch("/api/v1/user/bank-passwords", { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data?.bankPasswords)) {
+          setStoredBankPasswords(json.data.bankPasswords);
+        }
+      }
+    } catch {
+      // Safe fallback
+    }
+  }, []);
+
   useEffect(() => {
     refreshCounts();
 
@@ -568,8 +621,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       fetchZerodhaStatus(false);
       fetchBinanceStatus(false);
       fetchGmailStatus(false);
+      fetchStoredBankPasswords();
     }
-  }, [fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, activeTab]);
+  }, [fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, fetchStoredBankPasswords, activeTab]);
 
   // Sync profile telegram changes if profile arrives after mount
   useEffect(() => {
@@ -596,12 +650,14 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       fetchZerodhaStatus(false);
       fetchBinanceStatus(false);
       fetchGmailStatus(false);
+      fetchStoredBankPasswords();
 
       const onFocus = () => {
         fetchTelegramStatus(false);
         fetchZerodhaStatus(false);
         fetchBinanceStatus(false);
         fetchGmailStatus(false);
+        fetchStoredBankPasswords();
       };
       window.addEventListener("focus", onFocus);
 
@@ -616,7 +672,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         clearInterval(interval);
       };
     }
-  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus]);
+  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, fetchStoredBankPasswords]);
 
   // Handle Zerodha URL Redirects / Callbacks and section deep links
   useEffect(() => {
@@ -914,7 +970,10 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
   };
 
-  const handleSyncGmail = async () => {
+  const handleSyncGmail = async (overrideOptions?: {
+    bankPasswords?: Record<string, string>;
+    storePasswords?: boolean;
+  }) => {
     setSyncingGmail(true);
     setLastSyncResult(null);
     try {
@@ -925,21 +984,73 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
+      const bodyPayload: Record<string, any> = { lookbackDays: gmailLookbackDays };
+      if (overrideOptions?.bankPasswords) {
+        bodyPayload.bankPasswords = overrideOptions.bankPasswords;
+      }
+      if (overrideOptions?.storePasswords !== undefined) {
+        bodyPayload.storePasswords = overrideOptions.storePasswords;
+      }
+
       const res = await fetch("/api/v1/integrations/gmail/sync", {
         method: "POST",
         headers,
-        body: JSON.stringify({}),
+        body: JSON.stringify(bodyPayload),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
+
+      // Check if statement decryption requires a password
+      const rawErrMsg = json.error?.message || (typeof json.error === "string" ? json.error : "");
+      const isPasswordRequired = Boolean(
+        json.passwordRequired ||
+        json.data?.passwordRequired ||
+        json.error?.details?.passwordRequired ||
+        json.error?.code === "PASSWORD_REQUIRED" ||
+        rawErrMsg.toLowerCase().includes("password required")
+      );
+
+      if (isPasswordRequired) {
+        let detectedBanks: string[] =
+          json.data?.passwordBanks ||
+          json.error?.details?.passwordBanks ||
+          json.passwordBanks ||
+          [];
+
+        if (!detectedBanks.length && rawErrMsg) {
+          const match = rawErrMsg.match(/Password required for (.*?) statement\(s\)/i);
+          if (match && match[1]) {
+            detectedBanks = match[1].split(/,\s*/).map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
+
+        if (!detectedBanks.length) {
+          detectedBanks = ["BANK"];
+        }
+
+        const hintsMap =
+          json.data?.passwordHints ||
+          json.error?.details?.passwordHints ||
+          json.passwordHints ||
+          {};
+
+        // Open Statement Password Decryption Modal
+        setPasswordModalState({
+          isOpen: true,
+          banks: detectedBanks,
+          hints: hintsMap,
+          noticeMessage: rawErrMsg || undefined,
+        });
+        return;
+      }
+
       if (!res.ok || !json.success) {
-        const rawErr = json.error?.message || (typeof json.error === "string" ? json.error : "Failed to sync Gmail bank statements.");
-        const cleanErr = rawErr.length > 250 ? `${rawErr.slice(0, 247)}...` : rawErr;
+        const cleanErr = rawErrMsg.length > 250 ? `${rawErrMsg.slice(0, 247)}...` : rawErrMsg || "Failed to sync Gmail bank statements.";
         showToast("Gmail Sync Notice", cleanErr, "error");
         return;
       }
 
-      const syncData = json.data;
+      const syncData = json.data || json;
       const extractedCount =
         typeof syncData.transactionsExtracted === "number" && syncData.transactionsExtracted > 0
           ? syncData.transactionsExtracted
@@ -960,7 +1071,13 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       if (syncData.accountsCreated && syncData.accountsCreated.length > 0) {
         successDetail += ` Auto-created accounts: ${syncData.accountsCreated.join(", ")}.`;
       }
+      if (overrideOptions?.bankPasswords && Object.keys(overrideOptions.bankPasswords).length > 0) {
+        successDetail += ` Password(s) saved for future statements.`;
+      }
       showToast("Statements Synced!", successDetail, "success");
+
+      // Dismiss password modal if it was open
+      setPasswordModalState((prev) => ({ ...prev, isOpen: false }));
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
@@ -968,10 +1085,26 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
       refreshCounts();
       await fetchGmailStatus(false);
+      await fetchStoredBankPasswords();
     } catch (err: any) {
       showToast("Sync Error", err?.message || "Error syncing Gmail statements", "error");
     } finally {
       setSyncingGmail(false);
+    }
+  };
+
+  const handleDecryptModalSubmit = async (
+    passwords: Record<string, string>,
+    storeForFuture: boolean
+  ) => {
+    setDecryptingModal(true);
+    try {
+      await handleSyncGmail({
+        bankPasswords: passwords,
+        storePasswords: storeForFuture,
+      });
+    } finally {
+      setDecryptingModal(false);
     }
   };
 
@@ -1056,10 +1189,77 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       setPhoneInput("");
       setAccountNumberInput("");
       await fetchGmailStatus(true);
+      await fetchStoredBankPasswords();
     } catch (err: unknown) {
       showToast("Error", err instanceof Error ? err.message : "Failed to save identity.", "error");
     } finally {
       setSavingIdentity(false);
+    }
+  };
+
+  const handleSaveCustomBankPassword = async () => {
+    if (!newBankPassword.trim()) {
+      showToast("Validation Error", "Please enter a statement password for the selected bank.", "error");
+      return;
+    }
+    setSavingBankPassword(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch("/api/v1/user/bank-passwords", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          bank: newBankName,
+          password: newBankPassword.trim(),
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || "Failed to save bank password.");
+      }
+
+      showToast("Password Saved", `Statement decryption password for ${newBankName} encrypted & saved for future statements.`, "success");
+      setNewBankPassword("");
+      await fetchStoredBankPasswords();
+      await fetchGmailStatus(false);
+    } catch (err: any) {
+      showToast("Error", err?.message || "Failed to save bank password.", "error");
+    } finally {
+      setSavingBankPassword(false);
+    }
+  };
+
+  const handleDeleteCustomBankPassword = async (bank: string) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`/api/v1/user/bank-passwords?bank=${encodeURIComponent(bank)}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || "Failed to delete bank password.");
+      }
+
+      showToast("Password Removed", `Removed stored password for ${bank}.`, "success");
+      await fetchStoredBankPasswords();
+      await fetchGmailStatus(false);
+    } catch (err: any) {
+      showToast("Error", err?.message || "Failed to remove bank password.", "error");
     }
   };
 
@@ -2269,6 +2469,103 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         </div>
                       ))}
                     </div>
+
+                    {/* Stored Bank Decryption Passwords */}
+                    <div className="pt-3 border-t border-[var(--app-border-subtle)] space-y-2.5">
+                      <div className="flex items-center justify-between text-xs font-semibold text-[var(--app-fg)]">
+                        <div className="flex items-center gap-2">
+                          <KeyRound size={13} className="text-emerald-400" />
+                          <span>Saved Bank Statement Passwords</span>
+                        </div>
+                        <span className="text-[10px] font-mono opacity-60">
+                          {storedBankPasswords.length} custom key(s)
+                        </span>
+                      </div>
+
+                      {storedBankPasswords.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {storedBankPasswords.map((sp) => (
+                            <div
+                              key={sp.bank}
+                              className="p-2 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card)] flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex items-center justify-center p-0.5 flex-shrink-0">
+                                  <BankLogo name={sp.bank} size={15} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-medium text-[var(--app-fg)] truncate">
+                                    {sp.bank.replace(/_/g, " ")}
+                                  </div>
+                                  <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                                    <Check size={9} /> Saved &amp; Encrypted
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCustomBankPassword(sp.bank)}
+                                className="text-[var(--app-muted)] hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                                title={`Delete saved password for ${sp.bank}`}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add Custom Bank Password Form */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                        <select
+                          value={newBankName}
+                          onChange={(e) => setNewBankName(e.target.value)}
+                          className="text-xs bg-[var(--app-card)] border border-[var(--app-border)] text-[var(--app-fg)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer min-w-[140px]"
+                        >
+                          <option value="INDIAN_BANK">Indian Bank</option>
+                          <option value="SBI">State Bank of India (SBI)</option>
+                          <option value="HDFC">HDFC Bank</option>
+                          <option value="ICICI">ICICI Bank</option>
+                          <option value="AXIS">Axis Bank</option>
+                          <option value="KOTAK">Kotak Mahindra Bank</option>
+                          <option value="PNB">Punjab National Bank</option>
+                          <option value="CANARA">Canara Bank</option>
+                          <option value="BOB">Bank of Baroda</option>
+                          <option value="UNION">Union Bank of India</option>
+                          <option value="OTHER">Other Bank</option>
+                        </select>
+
+                        <div className="relative flex-1">
+                          <input
+                            type={showNewBankPassword ? "text" : "password"}
+                            value={newBankPassword}
+                            onChange={(e) => setNewBankPassword(e.target.value)}
+                            placeholder={`Enter ${newBankName.replace(/_/g, " ")} password`}
+                            className="w-full text-xs font-mono px-3 pr-8 py-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-fg)] placeholder:text-[var(--app-muted)] placeholder:font-sans focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewBankPassword(!showNewBankPassword)}
+                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
+                            title={showNewBankPassword ? "Hide password" : "Show password"}
+                          >
+                            {showNewBankPassword ? <EyeOff size={12} /> : <Eye size={12} />}
+                          </button>
+                        </div>
+
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={savingBankPassword}
+                          disabled={savingBankPassword || !newBankPassword.trim()}
+                          onClick={handleSaveCustomBankPassword}
+                          icon={savingBankPassword ? undefined : <Plus size={12} />}
+                          className="whitespace-nowrap text-xs shadow-xs"
+                        >
+                          Save Password
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Form Section */}
@@ -2918,7 +3215,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           variant="primary"
                           size="sm"
                           disabled={syncingGmail}
-                          onClick={handleSyncGmail}
+                          onClick={() => handleSyncGmail()}
                           className="gap-1.5 shadow-sm font-semibold"
                         >
                           <RefreshCw size={12} className={syncingGmail ? "animate-spin" : ""} />
@@ -3565,6 +3862,17 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
           </div>
         </div>
       </Modal>
+
+      {/* POPUP STATEMENT PASSWORD DECRYPTION MODAL */}
+      <StatementPasswordModal
+        isOpen={passwordModalState.isOpen}
+        onClose={() => !decryptingModal && setPasswordModalState((prev) => ({ ...prev, isOpen: false }))}
+        banks={passwordModalState.banks}
+        hints={passwordModalState.hints}
+        noticeMessage={passwordModalState.noticeMessage}
+        isSubmitting={decryptingModal}
+        onDecrypt={handleDecryptModalSubmit}
+      />
 
     </main>
   );

@@ -12,6 +12,7 @@ const IdentitySchema = z.object({
   dob: z.string().max(30).optional().nullable(),
   phone: z.string().max(25).optional().nullable(),
   accountNumber: z.string().max(50).optional().nullable(),
+  bankPasswords: z.record(z.string(), z.string()).optional().nullable(),
 });
 
 /**
@@ -23,7 +24,7 @@ export const GET = createApiRoute({
   handler: async ({ userId, req }) => {
     const { data: hints, error } = await supabaseAdmin
       .from("statement_password_hints")
-      .select("id, bank_name, hint_pattern, encrypted_secret")
+      .select("id, bank_name, hint_pattern, encrypted_secret, updated_at")
       .eq("user_id", userId!);
 
     if (error) {
@@ -72,7 +73,20 @@ export const GET = createApiRoute({
       }
     }
 
-    return apiSuccess({ bankingIdentity }, undefined, 200, req);
+    const bankPasswordsList: Array<{ bank: string; configured: boolean; updatedAt?: string }> = [];
+    if (hints && hints.length > 0) {
+      for (const h of hints) {
+        if (h.bank_name && h.bank_name !== "ALL" && h.encrypted_secret) {
+          bankPasswordsList.push({
+            bank: h.bank_name,
+            configured: true,
+            updatedAt: h.updated_at || undefined,
+          });
+        }
+      }
+    }
+
+    return apiSuccess({ bankingIdentity, bankPasswords: bankPasswordsList }, undefined, 200, req);
   },
 });
 
@@ -171,6 +185,42 @@ export const POST = createApiRoute({
           },
           { onConflict: "user_id,bank_name,account_id" }
         );
+      }
+    }
+
+    // Save individual bank-specific passwords if provided
+    if (body.bankPasswords && typeof body.bankPasswords === "object") {
+      for (const [bank, pwd] of Object.entries(body.bankPasswords)) {
+        if (!pwd || typeof pwd !== "string" || !pwd.trim()) continue;
+        const normBank = bank.trim().toUpperCase();
+        const encrypted = encryptSensitiveData(pwd.trim(), "statement-passwords");
+        const { data: existing } = await supabaseAdmin
+          .from("statement_password_hints")
+          .select("id")
+          .eq("user_id", userId!)
+          .eq("bank_name", normBank)
+          .maybeSingle();
+
+        if (existing?.id) {
+          await supabaseAdmin
+            .from("statement_password_hints")
+            .update({
+              hint_pattern: "BANK_PASSWORD",
+              encrypted_secret: encrypted,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+        } else {
+          await supabaseAdmin
+            .from("statement_password_hints")
+            .insert({
+              user_id: userId!,
+              bank_name: normBank,
+              hint_pattern: "BANK_PASSWORD",
+              encrypted_secret: encrypted,
+              updated_at: new Date().toISOString(),
+            });
+        }
       }
     }
 

@@ -7,6 +7,7 @@ import {
   getZerodhaIntegration,
   exchangeRequestToken,
   syncAllZerodhaSections,
+  type ZerodhaProfile,
 } from "@/utils/zerodha";
 import {
   getAutoLoginCredentials,
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
             status.integration.access_token = loginRes.accessToken;
             status.integration.token_generated_at = new Date().toISOString();
             if (loginRes.profile) {
-              status.integration.user_profile = loginRes.profile as any;
+              status.integration.user_profile = loginRes.profile as unknown as ZerodhaProfile;
             }
           }
 
@@ -78,8 +79,9 @@ export async function GET(req: NextRequest) {
         } else {
           logger.warn(`[Zerodha] Seamless auto-login failed: ${loginRes.error}`);
         }
-      } catch (autoLoginErr: any) {
-        logger.warn(`[Zerodha] Seamless auto-login exception: ${autoLoginErr?.message || autoLoginErr}`);
+      } catch (autoLoginErr: unknown) {
+        const autoLoginErrMsg = autoLoginErr instanceof Error ? autoLoginErr.message : String(autoLoginErr);
+        logger.warn(`[Zerodha] Seamless auto-login exception: ${autoLoginErrMsg}`);
       }
     }
 

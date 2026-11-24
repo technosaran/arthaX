@@ -23,12 +23,13 @@ export const GET = createApiRoute({
 
     try {
       // 1. Fetch user data scoped strictly to authenticated userId
-      const [accountsRes, expensesRes, incomeRes, transfersRes, statementsRes, auditRes] = await Promise.all([
+      const [accountsRes, expensesRes, incomeRes, transfersRes, statementsRes, canonicalRes, auditRes] = await Promise.all([
         supabaseAdmin.from("accounts").select("*").eq("user_id", userId!),
         supabaseAdmin.from("expenses").select("*").eq("user_id", userId!).order("expense_date", { ascending: false }),
         supabaseAdmin.from("income").select("*").eq("user_id", userId!).order("received_date", { ascending: false }),
         supabaseAdmin.from("transfers").select("*").eq("user_id", userId!).order("transfer_date", { ascending: false }),
         supabaseAdmin.from("bank_statements").select("*").eq("user_id", userId!).order("period_end", { ascending: false }),
+        supabaseAdmin.from("canonical_transactions").select("*").eq("user_id", userId!).order("transaction_date", { ascending: false }),
         supabaseAdmin.from("financial_audit_logs").select("*").eq("user_id", userId!).order("timestamp", { ascending: false }).limit(200),
       ]);
 
@@ -44,6 +45,7 @@ export const GET = createApiRoute({
         income: incomeRes.data || [],
         transfers: transfersRes.data || [],
         bank_statements: statementsRes.data || [],
+        canonical_transactions: canonicalRes.data || [],
         audit_trail: auditRes.data || [],
       };
 
@@ -72,6 +74,14 @@ export const GET = createApiRoute({
           csvContent += "ID,Name,Type,Classification,Balance,Last_Four,Active\n";
           for (const a of exportBundle.accounts) {
             csvContent += `${sanitizeCsvField(a.id)},${sanitizeCsvField(a.name)},${sanitizeCsvField(a.type)},${sanitizeCsvField(a.classification)},${sanitizeCsvField(a.balance)},${sanitizeCsvField(a.last_four)},${sanitizeCsvField(a.is_active)}\n`;
+          }
+        }
+
+        if (entity === "canonical_transactions" || entity === "transactions" || entity === "all") {
+          csvContent += "\n=== CANONICAL TRANSACTIONS ===\n";
+          csvContent += "ID,Date,Direction,Amount,Currency,Category,Channel,Narration,Merchant,Reference\n";
+          for (const t of exportBundle.canonical_transactions) {
+            csvContent += `${sanitizeCsvField(t.id)},${sanitizeCsvField(t.transaction_date)},${sanitizeCsvField(t.direction)},${sanitizeCsvField(t.amount)},${sanitizeCsvField(t.currency)},${sanitizeCsvField(t.category)},${sanitizeCsvField(t.channel)},${sanitizeCsvField(t.original_narration)},${sanitizeCsvField(t.merchant_name)},${sanitizeCsvField(t.transaction_reference)}\n`;
           }
         }
 

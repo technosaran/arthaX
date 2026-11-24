@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../../src/types/database.types";
 import { handleGetNetWorth } from "../../src/mcp/tools/netWorth";
 import { handleListAccounts } from "../../src/mcp/tools/accounts";
 import { handleGetHoldings } from "../../src/mcp/tools/holdings";
@@ -38,7 +40,7 @@ describe("MCP Read Tools", () => {
         };
         return queryBuilder;
       }),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
     const result = await handleGetNetWorth(mockDb, "user-test", "INR");
     expect(result).toHaveProperty("totalNetWorth");
@@ -61,9 +63,9 @@ describe("MCP Read Tools", () => {
           error: null,
         }),
       })),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
-    const res: any = await handleListAccounts(mockDb, "user-test", false);
+    const res = await handleListAccounts(mockDb, "user-test", false);
     expect(res).toBeDefined();
     expect(res.accounts).toHaveLength(1);
     expect(res.accounts[0].name).toBe("Axis Bank");
@@ -80,9 +82,9 @@ describe("MCP Read Tools", () => {
           error: null,
         }),
       })),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
-    const res: any = await handleGetHoldings(mockDb, "user-test", "stocks");
+    const res = await handleGetHoldings(mockDb, "user-test", "stocks");
     expect(res).toBeDefined();
     expect(res.stocks).toHaveLength(1);
     expect(res.stocks[0].symbol).toBe("TCS");
@@ -111,11 +113,11 @@ describe("MCP Read Tools", () => {
             }),
           };
         }
-        return {} as any;
+        return {} as unknown as ReturnType<SupabaseClient<Database>["from"]>;
       }),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
-    const res: any = await handleGetBudgets(mockDb, "user-test", "2026-11");
+    const res = await handleGetBudgets(mockDb, "user-test", "2026-11");
     expect(res).toBeDefined();
     expect(res.budgets).toHaveLength(1);
     expect(res.budgets[0].spent).toBe(6500);
@@ -154,11 +156,11 @@ describe("MCP Read Tools", () => {
             }),
           };
         }
-        return {} as any;
+        return {} as unknown as ReturnType<SupabaseClient<Database>["from"]>;
       }),
-    } as any;
+    } as unknown as SupabaseClient<Database>;
 
-    const res: any = await handleGetForecast(mockDb, "user-test", 3);
+    const res = await handleGetForecast(mockDb, "user-test", 3);
     expect(res).toHaveProperty("currentLiquidCash", 200000);
     expect(res).toHaveProperty("estimatedMonthlyBurn");
     expect(res).toHaveProperty("runwayMonths");

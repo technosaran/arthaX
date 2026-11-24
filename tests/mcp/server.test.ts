@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createMcpServer } from "../../src/mcp/server";
 
 describe("ArthaX MCP Server Assembly", () => {

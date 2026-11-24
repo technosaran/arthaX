@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Parse JSON-RPC payload
-  let body: any;
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
@@ -230,11 +230,12 @@ export async function POST(req: NextRequest) {
   await server.connect(serverTransport);
 
   // Helper to execute a single JSON-RPC call
-  const executeCall = (rpcMsg: any): Promise<any> => {
+  const executeCall = (rpcMsg: Record<string, unknown>): Promise<unknown> => {
     return new Promise((resolve) => {
       // If it's a notification (no id), resolve immediately after sending
       if (rpcMsg.id === undefined || rpcMsg.id === null) {
-        clientTransport.send(rpcMsg).then(() => resolve(null));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        clientTransport.send(rpcMsg as any).then(() => resolve(null));
         return;
       }
 
@@ -249,19 +250,21 @@ export async function POST(req: NextRequest) {
         });
       }, 15000);
 
-      clientTransport.onmessage = (responseMsg: any) => {
+      clientTransport.onmessage = (responseMsg: unknown) => {
         clearTimeout(timeout);
         resolve(responseMsg);
       };
 
-      clientTransport.send(rpcMsg).catch((err: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      clientTransport.send(rpcMsg as any).catch((err: unknown) => {
         clearTimeout(timeout);
+        const errMsg = err instanceof Error ? err.message : "Failed to process MCP request";
         resolve({
           jsonrpc: "2.0",
           id: rpcMsg.id,
           error: {
             code: -32603,
-            message: err.message || "Failed to process MCP request",
+            message: errMsg,
           },
         });
       });
@@ -270,11 +273,11 @@ export async function POST(req: NextRequest) {
 
   try {
     if (Array.isArray(body)) {
-      const responses = await Promise.all(body.map(executeCall));
+      const responses = await Promise.all((body as Record<string, unknown>[]).map(executeCall));
       return NextResponse.json(responses.filter(Boolean), { headers: CORS_HEADERS });
     }
 
-    const response = await executeCall(body);
+    const response = await executeCall(body as Record<string, unknown>);
     if (!response) {
       return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
     }

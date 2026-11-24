@@ -139,6 +139,51 @@ describe("Gmail Statement Auto-Sync API Suite", () => {
     expect(json.transactionsImported).toBe(45);
   });
 
+  it("passes lookbackDays and afterDate to syncUserGmailStatements when supplied", async () => {
+    mockedAuth.mockResolvedValueOnce({
+      user: { id: "user_test_1" } as any,
+      userId: "user_test_1",
+      error: null,
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { sync_status: "ACTIVE", email_address: "finance@test.com" },
+            error: null,
+          }),
+        }),
+      }),
+    });
+    mockedSupabase.from = mockFrom as any;
+
+    mockedSync.mockResolvedValueOnce({
+      success: true,
+      statementsCount: 1,
+      transactionsImported: 10,
+      duplicatesSkipped: 0,
+      transfersMatched: 0,
+      status: "COMPLETED",
+    });
+
+    const req = new NextRequest("http://localhost:3000/api/v1/integrations/gmail/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lookbackDays: 90, afterDate: "2026/08/01" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    expect(mockedSync).toHaveBeenCalledWith("user_test_1", {
+      maxMessages: 30,
+      customQuery: undefined,
+      lookbackDays: 90,
+      afterDate: "2026/08/01",
+    });
+  });
+
   it("POST returns partial status with enhanced password guidance hint", async () => {
     mockedAuth.mockResolvedValueOnce({
       user: { id: "user_test_1" } as any,

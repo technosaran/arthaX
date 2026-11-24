@@ -6,6 +6,8 @@ import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
 import { logger } from "@/utils/logger";
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
+import { fetchUserPasswordCandidates } from "@/utils/gmail";
+import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage } from "@/utils/pythonService";
 import crypto from "crypto";
 
 function getPythonServiceUrl(): string {
@@ -67,25 +69,52 @@ export const POST = createApiRoute({
         "";
 
       const base64Content = buffer.toString("base64");
+      const defaultCandidates = await fetchUserPasswordCandidates(userId!).catch(() => []);
+      const candidatePasswords = password ? [password.trim(), ...defaultCandidates] : defaultCandidates;
+
       const pyPayload = {
         user_id: userId,
         filename: file.name,
         content_base64: base64Content,
-        passwords: password ? [password.trim()] : [],
+        passwords: candidatePasswords,
         account_id: accountId || undefined,
       };
 
       const pyServiceUrl = getPythonServiceUrl();
-      const pyRes = await fetch(`${pyServiceUrl}/api/py/statements/parse`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-User-Id": userId!,
-          ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
-        },
-        body: JSON.stringify(pyPayload),
-      });
+      let pyRes: Response;
+      try {
+        pyRes = await fetch(`${pyServiceUrl}/api/py/statements/parse`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-User-Id": userId!,
+            ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
+          },
+          body: JSON.stringify(pyPayload),
+        });
+      } catch (fetchErr) {
+        logger.warn("Calculation engine unreachable during upload, checking auto-start...", "StatementUpload", { error: String(fetchErr) });
+        const recovered = await ensurePythonServiceOnline(pyServiceUrl);
+        if (recovered) {
+          try {
+            pyRes = await fetch(`${pyServiceUrl}/api/py/statements/parse`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-User-Id": userId!,
+                ...(internalKey ? { "X-Internal-Service-Key": internalKey } : {}),
+              },
+              body: JSON.stringify(pyPayload),
+            });
+          } catch {
+            return apiError(getCalculationEngineUnreachableMessage(pyServiceUrl), "SERVICE_UNAVAILABLE", 503, undefined, req);
+          }
+        } else {
+          return apiError(getCalculationEngineUnreachableMessage(pyServiceUrl), "SERVICE_UNAVAILABLE", 503, undefined, req);
+        }
+      }
 
       if (!pyRes.ok) {
         const errJson = await pyRes.json().catch(() => ({}));
@@ -191,7 +220,28 @@ export const POST = createApiRoute({
       let importedCount = 0;
       let duplicateCount = 0;
 
-      const rowsToInsert = transactions.map((t: any) => {
+      interface StatementTxInput {
+        amount: unknown;
+        transaction_date: string;
+        value_date?: string;
+        direction: string;
+        original_narration: string;
+        normalized_narration: string;
+        transaction_reference?: string;
+        counterparty_name?: string;
+        counterparty_identifier?: string;
+        merchant_name?: string;
+        merchant_category?: string;
+        channel?: string;
+        category?: string;
+        transaction_type?: string;
+        classification_confidence?: number;
+        classification_reason?: string;
+        is_transfer?: boolean;
+        raw_metadata?: Record<string, unknown>;
+      }
+
+      const rowsToInsert = (transactions as StatementTxInput[]).map((t) => {
         const parsedAmount = validateMonetaryAmount(t.amount, {
           fieldName: "Statement transaction amount",
           allowNegative: false,

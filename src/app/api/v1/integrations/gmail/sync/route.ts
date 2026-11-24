@@ -87,29 +87,51 @@ export const POST = createApiRoute({
       );
     }
 
-    // 2. Parse optional query parameters or request body (e.g. maxMessages, customQuery)
+    // 2. Parse optional query parameters or request body (e.g. maxMessages, customQuery, lookbackDays, afterDate)
     let maxMessages = 30;
     let customQuery: string | undefined = undefined;
+    let lookbackDays: number | undefined = undefined;
+    let afterDate: string | undefined = undefined;
 
     const requestBody = (body || {}) as Record<string, unknown>;
     if (typeof requestBody?.maxMessages === "number") {
       maxMessages = Math.min(Math.max(requestBody.maxMessages, 5), 100);
     }
+    if (typeof requestBody?.lookbackDays === "number") {
+      lookbackDays = Math.max(requestBody.lookbackDays, 1);
+    }
+    if (typeof requestBody?.afterDate === "string" && requestBody.afterDate.trim()) {
+      afterDate = requestBody.afterDate.trim();
+    }
     if (typeof requestBody?.customQuery === "string" && requestBody.customQuery.trim()) {
       customQuery = requestBody.customQuery.trim();
     }
 
+    const passwords = Array.isArray(requestBody?.passwords) ? (requestBody.passwords as string[]) : undefined;
+    const bankPasswords = (typeof requestBody?.bankPasswords === "object" && requestBody.bankPasswords !== null)
+      ? (requestBody.bankPasswords as Record<string, string>)
+      : undefined;
+    const storePasswords = requestBody?.storePasswords !== false;
+
     // 3. Execute statement sync pipeline
-    const syncResult = await syncUserGmailStatements(userId!, {
+    const syncOptions: Parameters<typeof syncUserGmailStatements>[1] = {
       maxMessages,
       customQuery,
-    });
+      ...(lookbackDays !== undefined ? { lookbackDays } : {}),
+      ...(afterDate !== undefined ? { afterDate } : {}),
+      ...(passwords !== undefined ? { passwords } : {}),
+      ...(bankPasswords !== undefined ? { bankPasswords } : {}),
+      ...(passwords !== undefined || bankPasswords !== undefined ? { storePasswords } : {}),
+    };
+
+    const syncResult = await syncUserGmailStatements(userId!, syncOptions);
 
     if (!syncResult.success && syncResult.status === "FAILED") {
+      const isPassword = Boolean(syncResult.passwordRequired || (syncResult.passwordBanks && syncResult.passwordBanks.length > 0));
       return apiError(
         syncResult.error || "Gmail statement synchronization failed",
-        "SYNC_FAILED",
-        500,
+        isPassword ? "PASSWORD_REQUIRED" : "SYNC_FAILED",
+        isPassword ? 422 : 500,
         syncResult,
         req
       );

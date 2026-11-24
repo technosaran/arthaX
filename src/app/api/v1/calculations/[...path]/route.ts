@@ -5,12 +5,6 @@ import { logger } from "@/utils/logger";
 import { constantTimeCompare } from "@/utils/crypto";
 import {
   executeNetWorthTS,
-  executeFireTS,
-  executeRebalancingTS,
-  executeDebtPayoffTS,
-  executeStressTestTS,
-  executeGoalPlannerTS,
-  executePortfolioAnalyticsTS,
   executeTaxRegimesTS,
 } from "@/lib/engine/embeddedEngine";
 
@@ -41,16 +35,17 @@ function getPythonServiceUrl(req: NextRequest): string {
   return "http://127.0.0.1:8000";
 }
 
-function formatEngineResponse(data: any) {
+function formatEngineResponse(data: Record<string, unknown> | null | undefined) {
   const isWrapped = data && typeof data === "object" && data.data && typeof data.data === "object";
+  const meta = data?.metadata as Record<string, unknown> | undefined;
   return {
     success: true,
-    ...data,
-    ...(isWrapped ? data.data : {}),
-    ...(data?.metadata && typeof data.metadata === "object"
+    ...(data || {}),
+    ...(isWrapped ? (data!.data as Record<string, unknown>) : {}),
+    ...(meta && typeof meta === "object"
       ? {
-          execution_time_ms: data.metadata.execution_time_ms,
-          calculation_version: data.metadata.version,
+          execution_time_ms: meta.execution_time_ms,
+          calculation_version: meta.version,
         }
       : {}),
   };
@@ -147,10 +142,6 @@ export async function GET(
           "PortfolioEngine",
           "ReconciliationEngine",
           "TaxEngine",
-          "FireEngine",
-          "RebalancingEngine",
-          "DebtPayoffEngine",
-          "FinancialStressTestEngine",
         ],
         _engine: "ts_embedded_fallback",
       }, { headers: { "X-Request-Id": requestId } });
@@ -182,7 +173,7 @@ export async function POST(
   const baseUrl = getPythonServiceUrl(req);
   const targetUrl = `${baseUrl}/api/py/calculations/${subPath}`;
 
-  let body: any = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json().catch(() => ({}));
   } catch {}
@@ -242,56 +233,16 @@ export async function POST(
 
     // High-resilience embedded TypeScript calculation fallback
     if (subPath === "networth") {
-      const result = executeNetWorthTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "fire") {
-      const result = executeFireTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "rebalancing") {
-      const result = executeRebalancingTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "debt-payoff") {
-      const result = executeDebtPayoffTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "stress-test") {
-      const result = executeStressTestTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "goal-planner") {
-      const result = executeGoalPlannerTS(body);
-      return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
-        headers: { "X-Request-Id": requestId },
-      });
-    }
-
-    if (subPath === "portfolio-analytics") {
-      const result = executePortfolioAnalyticsTS(body);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = executeNetWorthTS(body as any);
       return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
         headers: { "X-Request-Id": requestId },
       });
     }
 
     if (subPath === "tax/regimes") {
-      const result = executeTaxRegimesTS(body);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = executeTaxRegimesTS(body as any);
       return NextResponse.json(formatEngineResponse({ success: true, result, ...result, _engine: "ts_embedded_fallback" }), {
         headers: { "X-Request-Id": requestId },
       });

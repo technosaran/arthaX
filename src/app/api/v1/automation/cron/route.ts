@@ -74,6 +74,26 @@ async function handleAutomationCron(req: NextRequest) {
       logger.warn("Failed to check or recover abandoned jobs", "AutomationCron", { error: String(recErr) });
     }
 
+    // 2c. Non-blocking trigger of recurring transactions & broker daily sync for unified Vercel cron
+    if (!isTest) {
+      try {
+        const origin = req.nextUrl?.origin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
+        const cronAuth = `Bearer ${cronSecret}`;
+        // Trigger recurring transactions processing asynchronously
+        fetch(`${origin}/api/v1/jobs/recurring`, {
+          method: "POST",
+          headers: { authorization: cronAuth },
+        }).catch((err) => logger.warn("Recurring job trigger error in unified cron", "AutomationCron", { error: String(err) }));
+        // Trigger Zerodha auto-sync asynchronously
+        fetch(`${origin}/api/v1/integrations/zerodha/cron`, {
+          method: "POST",
+          headers: { authorization: cronAuth },
+        }).catch((err) => logger.warn("Zerodha cron trigger error in unified cron", "AutomationCron", { error: String(err) }));
+      } catch (triggerErr) {
+        logger.warn("Failed to dispatch sub-crons in unified automation", "AutomationCron", { error: String(triggerErr) });
+      }
+    }
+
     // 3. Query all users with active Gmail integrations (strictly ACTIVE status)
     const { data: rawIntegrations, error: fetchErr } = await supabaseAdmin
       .from("gmail_integrations")
