@@ -146,10 +146,10 @@ describe("Telegram Integration Suite", () => {
     it("formats welcome message for linked user", () => {
       const welcome = formatWelcomeMessage({
         isLinked: true,
-        userName: "Saran",
+        userName: "Alex",
       });
 
-      expect(welcome).toContain("Welcome back, Saran!");
+      expect(welcome).toContain("Welcome back, Alex!");
       expect(welcome).toContain("/balance");
       expect(welcome).toContain("/recent");
       expect(welcome).toContain("/summary");
@@ -266,7 +266,7 @@ describe("Telegram Integration Suite", () => {
 
     it("formats rich status overview message", () => {
       const statusMsg = formatStatusMessage({
-        userName: "Saran",
+        userName: "Alex",
         accountCount: 3,
         totalPortfolio: 75000,
         botUsername: "Artha_X_bot",
@@ -275,7 +275,7 @@ describe("Telegram Integration Suite", () => {
 
       expect(statusMsg).toContain("arthaX Connection Status");
       expect(statusMsg).toContain("Connected &amp; Synchronized");
-      expect(statusMsg).toContain("Saran");
+      expect(statusMsg).toContain("Alex");
       expect(statusMsg).toContain("3");
       expect(statusMsg).toContain("75,000");
       expect(statusMsg).toContain("@Artha_X_bot");
@@ -436,10 +436,10 @@ describe("Telegram Integration Suite", () => {
         mfTotal: 210000,
         bullionTotal: 185000,
         netWorth: 860000,
-        userName: "Saran",
+        userName: "Alex",
       });
 
-      expect(overview).toContain("Total Net Worth &amp; Portfolio (Saran)");
+      expect(overview).toContain("Total Net Worth &amp; Portfolio (Alex)");
       expect(overview).toContain("Bank &amp; Cash Accounts:</b> ₹1,25,000.00");
       expect(overview).toContain("Indian Equities (Stocks):</b> ₹3,40,000.00");
       expect(overview).toContain("Mutual Funds &amp; SIPs:</b> ₹2,10,000.00");

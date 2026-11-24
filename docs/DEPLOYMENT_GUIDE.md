@@ -3,7 +3,7 @@
 ## 1. Hosting Architecture
 - **Web & API Tier**: Hosted on [Vercel](https://arthax.vercel.app) with edge-optimized regions (`bom1` / Mumbai for low latency across Indian users).
 - **Python Calculation Engine**: Deployed natively as Vercel Python Serverless Functions under `api/index.py` (`/api/py/*` and `/api/calculations/*`).
-- **Database**: Managed PostgreSQL on Supabase (`ytqqzeemkzhifbtthanh`).
+- **Database**: Managed PostgreSQL on Supabase.
 - **Distributed Cache & Rate Limiter**: Serverless Redis on Upstash.
 - **Monitoring & Telemetry**: Sentry exception tracking and performance tracing.
 
@@ -37,7 +37,7 @@ npm run build
 Ensure the following production secrets are configured in Vercel and GitHub Actions secrets:
 
 ### Supabase & Auth:
-- `NEXT_PUBLIC_SUPABASE_URL`: Production Supabase Project URL (`https://ytqqzeemkzhifbtthanh.supabase.co`).
+- `NEXT_PUBLIC_SUPABASE_URL`: Production Supabase Project URL (`https://<project-ref>.supabase.co`).
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Client-safe anonymous key.
 - `SUPABASE_SERVICE_ROLE_KEY`: Privileged server-side key.
 - `SUPABASE_JWT_SECRET`: Secret used to cryptographically verify user JWT signatures.
@@ -58,7 +58,7 @@ Ensure the following production secrets are configured in Vercel and GitHub Acti
 
 ### 4.1 Immediate Instant Rollback on Vercel
 If an issue is detected post-deployment:
-1. Open the [Vercel Dashboard](https://vercel.com/technosaran/arthax/deployments).
+1. Open the Vercel Dashboard for your project.
 2. Select the previous stable deployment.
 3. Click **Instant Rollback**. Traffic is redirected instantly (< 2 seconds) with zero build delay.
 

@@ -365,7 +365,7 @@ export default function PublicLandingView() {
               <ExternalLink size={11} />
             </a>
             <a
-              href="mailto:iamsaran.ai@gmail.com"
+              href="mailto:support@arthax.app"
               className="hover:opacity-100 hover:text-emerald-400 transition-colors"
             >
               Contact Support

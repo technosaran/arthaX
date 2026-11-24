@@ -470,7 +470,7 @@ export default function LoginClient() {
                   autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Saran Kumar"
+                  placeholder="e.g. Alex Morgan"
                   leftIcon={<User size={13} className="text-emerald-400" />}
                   required
                 />

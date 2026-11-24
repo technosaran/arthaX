@@ -10,7 +10,7 @@ describe("Automated Bank Password Permutations Generator", () => {
       pan: "ABCDE1234F",
       dob: "1995-08-15",
       phone: "9876543210",
-      name: "Saran Kumar",
+      name: "John Doe",
     });
 
     // SBI YONO format: DDMM@phoneLast4, DDMM@phoneLast5, reverse, and DDMMYYYY@phoneLast4
@@ -42,14 +42,14 @@ describe("Automated Bank Password Permutations Generator", () => {
     expect(permutations).toContain("150895");
     expect(permutations).toContain("1508");
     // ICICI format: First 4 of name lowercase + DDMM
-    expect(permutations).toContain("sara1508");
+    expect(permutations).toContain("john1508");
     // Standalone PAN
     expect(permutations).toContain("ABCDE1234F");
   });
 
   it("generates authentic Indian Bank and Axis passwords including account number combinations", () => {
     const permutations = generateBankPasswordPermutations({
-      name: "Saran Kumar",
+      name: "John Doe",
       pan: "ABCDE1234F",
       dob: "15/08/1995",
       phone: "9876543210",
@@ -62,8 +62,8 @@ describe("Automated Bank Password Permutations Generator", () => {
     expect(permutations).toContain("45678");
 
     // Axis Bank format: First 4 letters of name uppercase + last 4 of account number
-    expect(permutations).toContain("SARA5678");
-    expect(permutations).toContain("sara5678");
+    expect(permutations).toContain("JOHN5678");
+    expect(permutations).toContain("john5678");
 
     // Account Number + DOB combinations
     expect(permutations).toContain("15085678");

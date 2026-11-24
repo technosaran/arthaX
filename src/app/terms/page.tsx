@@ -87,7 +87,7 @@ export default function TermsPage() {
               For any questions regarding these Terms, please contact us at:
             </p>
             <p className="font-mono text-xs text-emerald-400">
-              iamsaran.ai@gmail.com
+              support@arthax.app
             </p>
           </section>
         </Card>

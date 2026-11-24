@@ -26,6 +26,8 @@ import {
   Settings,
   X,
   ChevronRight,
+  Download,
+  Smartphone,
 } from "lucide-react";
 
 export type MobileNavGroup = "dashboard" | "portfolio" | "cashflow" | "more";
@@ -315,6 +317,34 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
                     onClick={() => handleSelectModule("settings")}
                   />
                 </div>
+              </div>
+
+              {/* Install PWA Quick Tile */}
+              <div className="pt-2 border-t border-[var(--app-border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSheetOpen(false);
+                    const promptEvent = (window as any).deferredPrompt;
+                    if (promptEvent) {
+                      promptEvent.prompt();
+                    } else {
+                      window.dispatchEvent(new CustomEvent("arthax:pwa-installable"));
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-400 transition-all cursor-pointer active:scale-98"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <Download size={16} className="text-emerald-400" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold text-[var(--app-fg)]">Install ArthaX Mobile App</div>
+                      <div className="text-[10px] text-emerald-400/80">Add to Home Screen for native fullscreen</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="opacity-60" />
+                </button>
               </div>
             </div>
           </div>

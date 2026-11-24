@@ -40,29 +40,8 @@ def clean_upi_counterparty(raw_name: str) -> str:
         if prefix in upper:
             return brand
 
-    clean = re.sub(r"(?i)\bHemakum\s*ar\b", "Hemakumar", clean)
-    clean = re.sub(r"(?i)\bVODAFON\s*E\b", "Vodafone", clean)
-    clean = re.sub(r"(?i)\bSWIGGY\s*I\b", "Swiggy", clean)
-    clean = re.sub(r"(?i)\bAmazon\s*B\b", "Amazon", clean)
-    clean = re.sub(r"(?i)\bSA\s*Engin\b", "SA Engineering", clean)
-    clean = re.sub(r"(?i)\bBunk\s*Shop\b", "Bunk Shop", clean)
-    clean = re.sub(r"(?i)\bJam\s*Jam\b", "Jam Jam Store", clean)
-    clean = re.sub(r"(?i)\bNaidu\s*ho\b", "Naidu Hotel", clean)
-    clean = re.sub(r"(?i)\bSelva\s*ho\b", "Selva Hotel", clean)
-    clean = re.sub(r"(?i)\bOne\s*Mobi\b", "Mobikwik", clean)
-    clean = re.sub(r"(?i)\bPoongodi\s*S\b", "Poongodi S", clean)
-    clean = re.sub(r"(?i)\bM\s*Muruga\b", "M Murugan", clean)
-    clean = re.sub(r"(?i)\bAlbert\s*J\b", "Albert J", clean)
-    clean = re.sub(r"(?i)\bMr\s*R\s*Saran\b", "Self Transfer (R Saran)", clean)
-    clean = re.sub(r"(?i)\bR\s*VALLI\b", "R Valli", clean)
-    clean = re.sub(r"(?i)\bRATHANP\s*R\b", "Rathan P R", clean)
-    clean = re.sub(r"(?i)\bBISMILLA\b", "Bismilla", clean)
-    clean = re.sub(r"(?i)\bMADURAI\b", "Madurai Store", clean)
-    clean = re.sub(r"(?i)\bKALAI\s*SE\b", "Kalai Selvi", clean)
-    clean = re.sub(r"(?i)\bMr\s*Ramas\b", "Mr Ramasamy", clean)
-    clean = re.sub(r"(?i)\bMr\s*Valla\b", "Mr Vallavan", clean)
-    clean = re.sub(r"(?i)\bSAHIL\s*SHA\b", "Sahil Shah", clean)
-    clean = re.sub(r"(?i)\bShanthi\s*K\b", "Shanthi K", clean)
+    # Normalize excessive spaces
+    clean = re.sub(r"\s+", " ", clean)
 
     words = clean.split()
     formatted = []

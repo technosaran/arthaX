@@ -11,7 +11,9 @@ import {
   EyeOff,
   Sun,
   Moon,
+  Download,
 } from "lucide-react";
+import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
@@ -34,7 +36,31 @@ export default function TopNav({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPrivacyMasked, setIsPrivacyMasked] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const [canInstallPwa, setCanInstallPwa] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Check PWA installability
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+    if (isStandalone) return;
+
+    const checkInstall = () => setCanInstallPwa(Boolean((window as any).deferredPrompt));
+    checkInstall();
+    window.addEventListener("arthax:pwa-installable", checkInstall);
+    return () => window.removeEventListener("arthax:pwa-installable", checkInstall);
+  }, []);
+
+  const triggerPwaInstall = useCallback(() => {
+    const promptEvent = (window as any).deferredPrompt;
+    if (promptEvent) {
+      promptEvent.prompt();
+    } else {
+      showToast("Install ArthaX App", "Tap the browser menu or share icon and select 'Add to Home Screen'.", "info");
+    }
+  }, [showToast]);
 
   // Synchronize privacy mode from localStorage on mount
   useEffect(() => {
@@ -167,8 +193,30 @@ export default function TopNav({
         </button>
       </div>
 
+      {/* Center: Sovereign ArthaX Brand Emblem */}
+      <div
+        className="flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
+        onClick={() => setActiveTab("dashboard")}
+        title="Go to Dashboard"
+      >
+        <Logo size={24} showText={true} />
+      </div>
+
       {/* Right: Quick Controls on Mobile */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* PWA Quick Install Pill when available */}
+        {canInstallPwa && (
+          <button
+            type="button"
+            onClick={triggerPwaInstall}
+            className="h-8 px-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 flex items-center gap-1 text-[11px] font-bold transition-all cursor-pointer active:scale-95 shadow-xs"
+            title="Install ArthaX App"
+          >
+            <Download size={13} />
+            <span className="hidden xs:inline">Install</span>
+          </button>
+        )}
+
         {/* Quick Theme Toggle Button */}
         <button
           type="button"

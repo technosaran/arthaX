@@ -55,9 +55,9 @@ All tests (503 Vitest tests across 69 files, and 116 pytest tests) pass with 100
 - **Issue**: `package.json` had `"test:py": "pytest"`. On Windows development environments, `pytest` is often not in the system execution PATH directly even when Python is installed, resulting in `CommandNotFoundException`.
 - **Fix**: Updated `package.json` to `"test:py": "python -m pytest"`, which works reliably across Windows, macOS, Linux, and virtual environments.
 
-### H. Legacy Supabase Project Preconnect in `layout.tsx`
-- **Issue**: In `src/app/layout.tsx`, the fallback preconnect URL referenced an old test project ID (`ytqqzeemkzhifbtthanh.supabase.co`) instead of the ArthaX project ID (`fvpfzbuoizzjwgekuhot.supabase.co`).
-- **Fix**: Updated the preconnect and DNS-prefetch links in `layout.tsx` to use the correct fallback project ID.
+### H. Hardcoded Supabase Project Preconnect in `layout.tsx`
+- **Issue**: In `src/app/layout.tsx`, the fallback preconnect URL referenced a hardcoded project ID.
+- **Fix**: Removed hardcoded project URL fallbacks and dynamically preconnect only when `NEXT_PUBLIC_SUPABASE_URL` is set in the environment.
 
 ### I. Impure Function in React 19 Render (`BondsSection.tsx`)
 - **Issue**: Calling `Date.now()` directly inside JSX mapping functions triggered React 19 compiler warnings (`react-hooks/purity`).

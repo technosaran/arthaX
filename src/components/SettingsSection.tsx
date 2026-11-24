@@ -2256,7 +2256,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       onChange={handleNameInputChange}
                       onKeyDown={handleNameKeyDown}
                       onBlur={handleNameBlur}
-                      placeholder="Enter display name (e.g. Saran)"
+                      placeholder="Enter display name (e.g. Alex)"
                     />
                   </div>
 

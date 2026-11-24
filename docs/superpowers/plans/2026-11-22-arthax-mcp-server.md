@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, `@modelcontextprotocol/sdk`, `@supabase/supabase-js`, `zod`, Vitest, Node.js (`tsx`).
 
-**Spec:** [docs/superpowers/specs/2026-11-22-arthax-mcp-server-design.md](file:///c:/Users/saran/Desktop/arthaX/docs/superpowers/specs/2026-11-22-arthax-mcp-server-design.md)
+**Spec:** [docs/superpowers/specs/2026-11-22-arthax-mcp-server-design.md](../specs/2026-11-22-arthax-mcp-server-design.md)
 
 ## Global Constraints
 - Node.js >= 20.x, TypeScript strict mode compliance with no type errors (`npm run typecheck`).

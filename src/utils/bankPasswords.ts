@@ -8,7 +8,7 @@ export interface BankingIdentityDetails {
   dob?: string | null;       // Formats: "YYYY-MM-DD", "DD/MM/YYYY", "DD-MM-YYYY", "DDMMYYYY"
   pan?: string | null;       // e.g. "ABCDE1234F"
   phone?: string | null;     // e.g. "9876543210", "+919876543210"
-  name?: string | null;      // e.g. "Saran Kumar"
+  name?: string | null;      // e.g. "Jane Doe"
   accountNumber?: string | null; // e.g. "123456789012"
 }
 

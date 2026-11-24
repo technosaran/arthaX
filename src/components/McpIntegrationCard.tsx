@@ -38,7 +38,7 @@ export function getMcpRemoteConfig(
 export function getMcpClientConfig(
   client: ClientPreset,
   userId: string,
-  supabaseUrl: string = "https://fvpfzbuoizzjwgekuhot.supabase.co"
+  supabaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://your-project.supabase.co"
 ): string {
   if (client === "muse" || client === "claude") {
     return JSON.stringify(
@@ -47,7 +47,7 @@ export function getMcpClientConfig(
           arthax: {
             command: "npx",
             args: ["-y", "tsx", "src/mcp/server.ts"],
-            cwd: "C:/Users/saran/Desktop/arthaX",
+            cwd: "${workspaceFolder}",
             env: {
               NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
               SUPABASE_SERVICE_ROLE_KEY: "YOUR_SUPABASE_SERVICE_ROLE_KEY",
@@ -68,7 +68,7 @@ export function getMcpClientConfig(
         arthax: {
           command: "npx",
           args: ["-y", "tsx", "src/mcp/server.ts"],
-          cwd: "C:/Users/saran/Desktop/arthaX",
+          cwd: "${workspaceFolder}",
         },
       },
     },

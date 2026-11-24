@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { QueryProvider } from "@/context/QueryProvider";
 import { siteConfig, generateStructuredData } from "@/config/seo";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 
 // FinTech Typography Stack (Zerodha Kite & Institutional FinTech Standard)
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -27,6 +29,9 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
   colorScheme: "dark light",
 };
 
@@ -49,6 +54,17 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ArthaX",
+    startupImage: [
+      {
+        url: "/icon-512x512.png",
+      },
+    ],
   },
   openGraph: {
     type: "website",
@@ -99,15 +115,19 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full" data-theme="dark" suppressHydrationWarning>
       <head>
-        <link
-          rel="preconnect"
-          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co"}
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="dns-prefetch"
-          href={process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co"}
-        />
+        {process.env.NEXT_PUBLIC_SUPABASE_URL && (
+          <>
+            <link
+              rel="preconnect"
+              href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+              crossOrigin="anonymous"
+            />
+            <link
+              rel="dns-prefetch"
+              href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+            />
+          </>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -148,6 +168,8 @@ export default function RootLayout({
             <ThemeProvider>
               <ToastProvider>
                 {children}
+                <ServiceWorkerRegister />
+                <PwaInstallPrompt />
               </ToastProvider>
             </ThemeProvider>
           </AuthProvider>

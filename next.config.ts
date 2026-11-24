@@ -66,8 +66,8 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: "techno-saran-jz",
-  project: "arthax",
+  org: process.env.SENTRY_ORG || "arthax",
+  project: process.env.SENTRY_PROJECT || "arthax",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,

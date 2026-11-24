@@ -151,7 +151,7 @@ export async function saveToCache<T>(
   }
 }
 
-let broadcastTimeout: NodeJS.Timeout | null = null;
+let broadcastTimeout: ReturnType<typeof setTimeout> | null = null;
 const pendingBroadcastKeys = new Set<string>();
 
 function debouncedBroadcastDataUpdated(keys: string[]) {

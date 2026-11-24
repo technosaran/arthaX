@@ -14,7 +14,7 @@
 
 **Tech Stack:** Next.js 16 (App Router), React 19, Tailwind CSS 4, Lucide React, TypeScript, Vitest.
 
-**Spec:** [docs/superpowers/specs/2026-11-22-smooth-responsive-spec.md](file:///c:/Users/saran/Desktop/arthaX/docs/superpowers/specs/2026-11-22-smooth-responsive-spec.md)
+**Spec:** [docs/superpowers/specs/2026-11-22-smooth-responsive-spec.md](../specs/2026-11-22-smooth-responsive-spec.md)
 
 ## Global Constraints
 

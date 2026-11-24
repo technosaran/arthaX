@@ -160,7 +160,7 @@ export default function PrivacyPolicyPage() {
               If you have any questions about this Privacy Policy or how your data is handled, please reach out to:
             </p>
             <p className="font-mono text-xs text-emerald-400">
-              iamsaran.ai@gmail.com
+              support@arthax.app
             </p>
           </section>
         </Card>

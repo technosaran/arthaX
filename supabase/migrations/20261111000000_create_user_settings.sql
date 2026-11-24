@@ -33,5 +33,5 @@ end $$;
 
 -- Insert initial record
 insert into public.user_settings (id, name)
-values ('default_user', 'Saran')
+values ('default_user', 'User')
 on conflict (id) do nothing;

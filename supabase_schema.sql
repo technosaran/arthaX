@@ -1,5 +1,5 @@
 -- Consolidated Supabase Schema for arthaX Multi-Tenant Architecture
--- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/fvpfzbuoizzjwgekuhot/sql
+-- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/<your-project-id>/sql
 
 -- 1. User Settings Table
 create table if not exists public.user_settings (

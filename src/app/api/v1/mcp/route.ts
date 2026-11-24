@@ -221,7 +221,9 @@ export async function POST(req: NextRequest) {
 
   // 3. Initialize scoped McpServer for this user
   const server = createMcpServer({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fvpfzbuoizzjwgekuhot.supabase.co",
+    supabaseUrl:
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      (process.env.NODE_ENV === "test" || process.env.VITEST ? "https://example.supabase.co" : ""),
     supabaseKey,
     userId: auth.userId,
   });

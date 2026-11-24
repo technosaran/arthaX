@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "ArthaX",
+    "slug": "arthax-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090d16"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.arthax.mobile"
+    },
+    "android": {
+      "package": "com.arthax.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#090d16",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "supabaseUrl": "https://fvpfzbuoizzjwgekuhot.supabase.co",
+      "supabaseAnonKey": "sb_publishable_eb8KMAHsO_TnQgkhswFBXg_7tcL1qq4"
+    }
+  }
+}

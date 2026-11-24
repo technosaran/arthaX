@@ -24,7 +24,7 @@ export const POST = createApiRoute({
   maxBodySize: 15 * 1024 * 1024, // 15 MB
   handler: async ({ userId, req }) => {
     try {
-      const formData = await req.formData();
+      const formData = (await req.formData()) as any;
       const file = formData.get("file") as File | null;
       const accountId = formData.get("account_id") as string | null;
       const password = formData.get("password") as string | null;

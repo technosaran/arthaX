@@ -40,9 +40,9 @@ npm run mcp
     "arthax": {
       "command": "npx",
       "args": ["-y", "tsx", "src/mcp/server.ts"],
-      "cwd": "C:/Users/saran/Desktop/arthaX",
+      "cwd": "${workspaceFolder}",
       "env": {
-        "NEXT_PUBLIC_SUPABASE_URL": "https://fvpfzbuoizzjwgekuhot.supabase.co",
+        "NEXT_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "YOUR_SUPABASE_SERVICE_ROLE_KEY",
         "ARTHAX_USER_ID": "YOUR_USER_UUID"
       }

@@ -426,9 +426,54 @@ a,
   padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 }
 
+.safe-top-nav {
+  padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+}
+
 .touch-smooth-scroll {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
 }
+
+/* ==========================================================================
+   Mobile & PWA Standalone Experience Enhancements
+   ========================================================================== */
+
+/* Prevent iOS Safari auto-zoom on input focus by enforcing 16px font-size */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Remove default mobile grey tap highlight box */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* PWA Standalone Titlebar / Window-Control-Overlay safe areas */
+@media all and (display-mode: standalone) {
+  body {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Ensure horizontal tables scroll with momentum without breaking parent */
+.table-mobile-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
 

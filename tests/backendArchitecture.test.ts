@@ -28,7 +28,7 @@ describe("Advanced Backend Architecture Suite", () => {
     });
 
     it("creates a standardized successful API response", async () => {
-      const data = { user: "Saran", netWorth: 150000 };
+      const data = { user: "Alex", netWorth: 150000 };
       const meta = { page: 1, limit: 10, total: 1 };
       const res = apiSuccess(data, meta, 200);
 

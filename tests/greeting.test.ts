@@ -105,7 +105,7 @@ describe("getTimeGreeting", () => {
 
 describe("formatGreeting", () => {
   it("formats greeting with user name", () => {
-    expect(formatGreeting("Good morning", "Saran")).toBe("Good morning, Saran");
+    expect(formatGreeting("Good morning", "Alex")).toBe("Good morning, Alex");
     expect(formatGreeting("Good evening", "  Alex  ")).toBe("Good evening, Alex");
   });
 

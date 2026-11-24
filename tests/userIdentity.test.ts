@@ -116,7 +116,7 @@ describe("User Identity & Basic Details API Suite", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Saran Tech",
+        name: "Alex Morgan",
         pan: "ABCDE1234F",
         dob: "1995-01-15",
         phone: "9876543210",

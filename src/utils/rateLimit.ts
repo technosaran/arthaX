@@ -12,14 +12,14 @@ const inMemoryStore = new Map<string, { count: number; resetAt: number }>();
 
 // Periodic in-memory store cleanup to avoid memory leaks
 if (typeof setInterval !== "undefined") {
-  setInterval(() => {
+  (setInterval(() => {
     const now = Date.now();
     for (const [k, v] of inMemoryStore.entries()) {
       if (v.resetAt <= now) {
         inMemoryStore.delete(k);
       }
     }
-  }, 60000).unref?.();
+  }, 60000) as any).unref?.();
 }
 
 /**
