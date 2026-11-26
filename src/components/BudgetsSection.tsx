@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRWhole as formatINR } from "@/utils/money";
 import {
   Target,
   Plus,
@@ -109,13 +110,6 @@ export default function BudgetsSection() {
   const [formThreshold, setFormThreshold] = useState("80");
   const [formNotes, setFormNotes] = useState("");
 
-  const formatINR = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
 
   // Earliest data month
   const earliestMonthYear = useMemo(() => {

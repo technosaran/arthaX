@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRFlex as formatINR } from "@/utils/money";
 import {
   Plus,
   Trash2,
@@ -177,13 +178,6 @@ export default function IncomeSection() {
     setSelectedMonthYear(currentMonthYear);
   };
 
-  const formatINR = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  };
 
   const formatDisplayDate = (dStr: string) => {
     if (!dStr) return "";

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRFlex as formatINR } from "@/utils/money";
 import {
   TrendingUp,
   TrendingDown,
@@ -149,13 +150,6 @@ export default function StocksSection() {
   );
 
   // Formatters
-  const formatINR = useCallback((val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  }, []);
 
   const formatNumber = useCallback((val: number, maxDigits = 2) => {
     return new Intl.NumberFormat("en-IN", {
@@ -429,7 +423,7 @@ export default function StocksSection() {
         subtitle: formatINR(val),
       }))
       .sort((a, b) => b.value - a.value);
-  }, [portfolioStats.enrichedHoldings, portfolioStats.totalCurrentValue, formatINR]);
+  }, [portfolioStats.enrichedHoldings, portfolioStats.totalCurrentValue]);
 
   // Stock weight allocation segments
   const stockWeightSegments: DonutSegment[] = useMemo(() => {
@@ -458,7 +452,7 @@ export default function StocksSection() {
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [portfolioStats.enrichedHoldings, portfolioStats.totalCurrentValue, formatINR]);
+  }, [portfolioStats.enrichedHoldings, portfolioStats.totalCurrentValue]);
 
   // Deep Links for Zerodha Kite
   const getKiteChartUrl = (symbol: string, exchange = "NSE") => {

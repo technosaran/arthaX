@@ -16,7 +16,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRightLeft,
-  BarChart2,
   History,
   DollarSign,
   Zap,

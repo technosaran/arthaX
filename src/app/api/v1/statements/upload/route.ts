@@ -7,16 +7,8 @@ import { logger } from "@/utils/logger";
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
 import { fetchUserPasswordCandidates } from "@/utils/gmail";
-import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage } from "@/utils/pythonService";
+import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage, getPythonServiceUrl } from "@/utils/pythonService";
 import crypto from "crypto";
-
-function getPythonServiceUrl(): string {
-  if (process.env.PYTHON_BACKEND_URL) return process.env.PYTHON_BACKEND_URL;
-  if (process.env.PYTHON_SERVICE_URL) return process.env.PYTHON_SERVICE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  return process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "https://arthax.vercel.app";
-}
 
 export const POST = createApiRoute({
   auth: "required",
@@ -291,46 +283,54 @@ export const POST = createApiRoute({
         importedCount = insertedList.length;
         duplicateCount = rowsToInsert.length - importedCount;
 
-        // Synchronize ONLY newly inserted, non-transfer canonical records into expenses and income
+        // Synchronize ONLY newly inserted, non-transfer canonical records via bulk upserts
+        const expenseRowsToUpsert: Array<Record<string, unknown>> = [];
+        const incomeRowsToUpsert: Array<Record<string, unknown>> = [];
+
         for (const row of rowsToInsert) {
           if (row.is_transfer) continue;
           const canonicalId = newCanonicalMap.get(row.dedup_hash);
-          if (!canonicalId) {
-            continue;
-          }
+          if (!canonicalId) continue;
 
           if (row.direction === "DEBIT") {
-            await supabaseAdmin.from("expenses").upsert(
-              {
-                user_id: userId!,
-                account_id: targetAccountId,
-                amount: row.amount,
-                category: row.category || "Food & Dining",
-                expense_date: row.transaction_date,
-                title: row.merchant_name || row.normalized_narration,
-                notes: `Statement import: ${row.original_narration}`,
-                tags: ["statement_import", "verified"],
-                canonical_transaction_id: canonicalId,
-              },
-              { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true }
-            );
+            expenseRowsToUpsert.push({
+              user_id: userId!,
+              account_id: targetAccountId,
+              amount: row.amount,
+              category: row.category || "Food & Dining",
+              expense_date: row.transaction_date,
+              title: row.merchant_name || row.normalized_narration,
+              notes: `Statement import: ${row.original_narration}`,
+              tags: ["statement_import", "verified"],
+              canonical_transaction_id: canonicalId,
+            });
           } else if (row.direction === "CREDIT") {
-            await supabaseAdmin.from("income").upsert(
-              {
-                user_id: userId!,
-                account_id: targetAccountId,
-                amount: row.amount,
-                category: row.category === "Salary" ? "Salary" : "Other Income",
-                received_date: row.transaction_date,
-                title: row.counterparty_name || row.normalized_narration,
-                notes: `Statement import: ${row.original_narration}`,
-                tags: ["statement_import", "verified"],
-                canonical_transaction_id: canonicalId,
-              },
-              { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true }
-            );
+            incomeRowsToUpsert.push({
+              user_id: userId!,
+              account_id: targetAccountId,
+              amount: row.amount,
+              category: row.category === "Salary" ? "Salary" : "Other Income",
+              received_date: row.transaction_date,
+              title: row.counterparty_name || row.normalized_narration,
+              notes: `Statement import: ${row.original_narration}`,
+              tags: ["statement_import", "verified"],
+              canonical_transaction_id: canonicalId,
+            });
           }
         }
+
+        await Promise.all([
+          expenseRowsToUpsert.length > 0
+            ? supabaseAdmin
+                .from("expenses")
+                .upsert(expenseRowsToUpsert, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true })
+            : null,
+          incomeRowsToUpsert.length > 0
+            ? supabaseAdmin
+                .from("income")
+                .upsert(incomeRowsToUpsert, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true })
+            : null,
+        ]);
       }
 
       // 6. Update target account balance ONLY if this statement is the latest verified statement

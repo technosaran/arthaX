@@ -27,16 +27,13 @@ import {
   Mail,
   KeyRound,
   Bitcoin,
-  ChevronRight,
   CreditCard,
   Calendar,
   Smartphone,
   Lock,
-  Sparkles,
   Plus,
   Eye,
   EyeOff,
-  HelpCircle,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -62,7 +59,6 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import BankLogo from "@/components/BankLogo";
 import { McpIntegrationCard } from "@/components/McpIntegrationCard";
 import { StatementPasswordModal } from "@/components/StatementPasswordModal";
-import { getBankPasswordFormatDescription } from "@/utils/bankPasswords";
 
 // Utility function to escape CSV values according to RFC 4180 and mitigate Formula Injection (CWE-1236)
 function escapeCSV(val: unknown): string {
@@ -269,7 +265,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   });
   const [loadingGmail, setLoadingGmail] = useState(false);
   const [syncingGmail, setSyncingGmail] = useState(false);
-  const [gmailLookbackDays, setGmailLookbackDays] = useState<number>(30);
+  const gmailLookbackDays = 30;
   const [gmailEmail, setGmailEmail] = useState("");
   const [panInput, setPanInput] = useState("");
   const [dobInput, setDobInput] = useState("");

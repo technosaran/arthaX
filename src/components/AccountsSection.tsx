@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { formatINRFlex as formatINR } from "@/utils/money";
 import {
   Plus,
   Loader2,
@@ -12,6 +13,7 @@ import {
   Wallet,
   ChevronLeft,
   AlertCircle,
+  AlertTriangle,
   Landmark,
   RefreshCw,
 } from "lucide-react";
@@ -19,6 +21,13 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
+import {
+  DEFAULT_CASH_ID,
+  isCashAccount,
+  isDematAccount,
+  isZerodhaAccount,
+  getProtectedAccountReason,
+} from "@/utils/accountGuards";
 import AppleWalletCard from "@/components/AppleWalletCard";
 import AccountAdjustModal from "@/components/AccountAdjustModal";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
@@ -32,8 +41,6 @@ import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
-
-const DEFAULT_CASH_ID = "00000000-0000-0000-0000-000000000001";
 
 interface Account {
   id: string;
@@ -94,6 +101,14 @@ export default function AccountsSection() {
   const [historySearch, setHistorySearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(25);
   const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    account: Account;
+    linkedTransfersCount: number;
+    linkedStatementsCount: number;
+    checkingLinks: boolean;
+    linksVerified: boolean;
+  } | null>(null);
+  const [confirmDeleting, setConfirmDeleting] = useState(false);
 
   // Cash in hand editing state
   const [isEditingCash, setIsEditingCash] = useState(false);
@@ -122,37 +137,7 @@ export default function AccountsSection() {
   const [transferNotes, setTransferNotes] = useState("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
 
-  const formatINR = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  };
-
-  const isCashAccount = (acc: Account) => {
-    return (
-      acc.id === DEFAULT_CASH_ID ||
-      acc.type === "Liquid Cash" ||
-      acc.name.toLowerCase() === "cash in hand"
-    );
-  };
-
-  const isDematAccount = (acc: Account) => {
-    return (
-      acc.type.toUpperCase() === "INVESTMENT" ||
-      acc.name.toLowerCase().includes("zerodha") ||
-      acc.name.toLowerCase().includes("demat") ||
-      acc.name.toLowerCase().includes("trading")
-    );
-  };
-
-  const isZerodhaAccount = (acc: Account) => {
-    return (
-      acc.name.toLowerCase().includes("zerodha") ||
-      acc.name.toLowerCase().includes("kite")
-    );
-  };
+  // Removed redundant per-render Intl.NumberFormat closure (shared via @/utils/money)
 
   const fetchAccounts = useCallback(async (skipCache: boolean = false) => {
     if (!user) return;
@@ -542,36 +527,155 @@ export default function AccountsSection() {
     }
   };
 
-  const handleDeleteAccount = async (id: string) => {
-    if (!user) return;
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {};
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return headers;
+  };
+
+  const handleRequestDeleteAccount = async (id: string) => {
+    if (!user || confirmDeleting) return;
+
     const target = accounts.find((a) => a.id === id);
-    if (target && (isCashAccount(target) || isZerodhaAccount(target))) {
-      showToast(
-        "Protected Account",
-        isCashAccount(target)
-          ? "Cash in Hand is a permanent built-in card and cannot be deleted."
-          : "Zerodha Trading & Demat is an integrated account and cannot be deleted here.",
-        "warning"
-      );
-      return;
+    if (target) {
+      const protectedReason = getProtectedAccountReason(target);
+      if (protectedReason) {
+        showToast("Protected Account", protectedReason, "warning");
+        return;
+      }
     }
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("accounts")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+    const cachedTransfersCount = activityHistory.filter(
+      (t) => t.fromAccountId === id || t.toAccountId === id
+    ).length;
 
-    if (error) {
-      setErrorMsg("Failed to delete account.");
-      showToast("Delete Failed", "Could not remove the card.", "error");
-    } else {
-      showToast("Card Removed", `${target?.name || "Account"} has been unlinked.`, "info");
+    setErrorMsg(null);
+    setDeleteConfirmState({
+      account: target || {
+        id,
+        name: "this card",
+        type: "Account",
+        balance: 0,
+      },
+      linkedTransfersCount: cachedTransfersCount,
+      linkedStatementsCount: 0,
+      checkingLinks: true,
+      linksVerified: false,
+    });
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/v1/accounts/${encodeURIComponent(id)}`, {
+        method: "GET",
+        headers,
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok || !json?.success) {
+        setDeleteConfirmState((prev) =>
+          prev && prev.account.id === id
+            ? { ...prev, checkingLinks: false, linksVerified: false }
+            : prev
+        );
+        return;
+      }
+
+      const d = json.data || json;
+      setDeleteConfirmState((prev) =>
+        prev && prev.account.id === id
+          ? {
+              ...prev,
+              linkedTransfersCount: Number(d.linkedTransfersCount ?? cachedTransfersCount),
+              linkedStatementsCount: Number(d.linkedStatementsCount ?? 0),
+              checkingLinks: false,
+              linksVerified: true,
+            }
+          : prev
+      );
+    } catch {
+      setDeleteConfirmState((prev) =>
+        prev && prev.account.id === id
+          ? { ...prev, checkingLinks: false, linksVerified: false }
+          : prev
+      );
+    }
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (!user || !deleteConfirmState || confirmDeleting) return;
+
+    const { account: target, linksVerified } = deleteConfirmState;
+    const id = target.id;
+
+    setConfirmDeleting(true);
+    setErrorMsg(null);
+
+    try {
+      const headers = await getAuthHeaders();
+      const url = linksVerified
+        ? `/api/v1/accounts/${encodeURIComponent(id)}?force=true`
+        : `/api/v1/accounts/${encodeURIComponent(id)}`;
+
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers,
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (res.status === 409 && json?.error?.code === "LINKED_RECORDS_EXIST") {
+        const details = json.error.details || {};
+        setDeleteConfirmState((prev) =>
+          prev && prev.account.id === id
+            ? {
+                ...prev,
+                linkedTransfersCount: Number(details.linkedTransfersCount || 0),
+                linkedStatementsCount: Number(details.linkedStatementsCount || 0),
+                checkingLinks: false,
+                linksVerified: true,
+              }
+            : prev
+        );
+        return;
+      }
+
+      if (!res.ok || !json?.success) {
+        const msg =
+          json?.error?.message ||
+          (typeof json?.error === "string" ? json.error : null) ||
+          "Could not remove the card.";
+        setErrorMsg(msg);
+        showToast("Delete Failed", msg, "error");
+        return;
+      }
+
+      const clearedTransfers = Number(json?.data?.clearedTransfers ?? json?.clearedTransfers ?? 0);
+      const removedName = target.name || json?.data?.accountName || "Account";
+      const infoMessage =
+        clearedTransfers > 0
+          ? `${removedName} has been unlinked (${clearedTransfers} linked transfer ${
+              clearedTransfers === 1 ? "record" : "records"
+            } cleared).`
+          : `${removedName} has been unlinked.`;
+
+      setDeleteConfirmState(null);
+      showToast("Card Removed", infoMessage, "info");
       if (user?.id) {
         await invalidateAllFinancialCache(user.id);
       }
       await fetchAccounts(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not remove the card.";
+      setErrorMsg(msg);
+      showToast("Delete Failed", msg, "error");
+    } finally {
+      setConfirmDeleting(false);
     }
   };
 
@@ -941,7 +1045,8 @@ export default function AccountsSection() {
                   onAdjust={handleOpenAdjust}
                   onSyncZerodha={handleSyncZerodha}
                   isSyncing={syncingZerodha}
-                  onDelete={handleDeleteAccount}
+                  onDelete={handleRequestDeleteAccount}
+                  isDeleting={confirmDeleting && deleteConfirmState?.account.id === acc.id}
                   formatCurrency={formatINR}
                 />
               ))}
@@ -1490,6 +1595,98 @@ export default function AccountsSection() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* POPUP MODAL: Confirm Card Deletion */}
+      <Modal
+        isOpen={Boolean(deleteConfirmState)}
+        onClose={() => {
+          if (!confirmDeleting) setDeleteConfirmState(null);
+        }}
+        title={deleteConfirmState ? `Delete ${deleteConfirmState.account.name}?` : "Delete Card"}
+        size="sm"
+      >
+        {deleteConfirmState && (
+          <div className="space-y-3">
+            {deleteConfirmState.checkingLinks ? (
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-xs text-[var(--app-muted)]">
+                <Loader2 size={14} className="animate-spin text-[var(--app-accent)] flex-shrink-0" />
+                <span>Checking linked transfers and statements...</span>
+              </div>
+            ) : deleteConfirmState.linkedTransfersCount > 0 ||
+              deleteConfirmState.linkedStatementsCount > 0 ? (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-[var(--app-fg)] text-xs leading-relaxed">
+                <AlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1.5">
+                  {deleteConfirmState.linkedTransfersCount > 0 && (
+                    <p>
+                      This card is referenced by{" "}
+                      <span className="font-bold">
+                        {deleteConfirmState.linkedTransfersCount} internal transfer{" "}
+                        {deleteConfirmState.linkedTransfersCount === 1 ? "record" : "records"}
+                      </span>
+                      . Deleting it will clear those transfer entries while keeping balances on your
+                      remaining cards intact.
+                    </p>
+                  )}
+                  {deleteConfirmState.linkedStatementsCount > 0 && (
+                    <p>
+                      It also has{" "}
+                      <span className="font-bold">
+                        {deleteConfirmState.linkedStatementsCount} imported bank{" "}
+                        {deleteConfirmState.linkedStatementsCount === 1 ? "statement" : "statements"}
+                      </span>{" "}
+                      whose parsed statement records will be removed.
+                    </p>
+                  )}
+                  <p className="text-[11px] opacity-80">
+                    Existing manual expenses and income entries will stay in your ledger as unlinked
+                    transactions.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] text-xs text-[var(--app-fg)] leading-relaxed space-y-1.5">
+                <p>
+                  Are you sure you want to delete{" "}
+                  <span className="font-bold">{deleteConfirmState.account.name}</span>
+                  {deleteConfirmState.account.last_four
+                    ? ` (•••• ${deleteConfirmState.account.last_four})`
+                    : ""}
+                  ?
+                </p>
+                <p className="text-[11px] text-[var(--app-muted)]">
+                  Existing manual expenses and income entries will remain in your ledger as unlinked
+                  transactions.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--app-border-subtle)]">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={confirmDeleting}
+                onClick={() => setDeleteConfirmState(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={confirmDeleting}
+                disabled={confirmDeleting || deleteConfirmState.checkingLinks}
+                onClick={handleConfirmDeleteAccount}
+              >
+                {deleteConfirmState.linkedTransfersCount > 0
+                  ? "Delete & Clear Transfers"
+                  : "Delete"}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </main>
   );

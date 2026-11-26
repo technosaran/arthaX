@@ -1,9 +1,14 @@
 """
 Financial Calculation Engine - Indian Capital Gains Tax & Tax-Loss Harvesting Engine
-Compliant with Income Tax Act, 1961 and Union Budget 2024 / Finance (No. 2) Act, 2024 reforms.
-Supports FIFO lot matching, multi-asset classes, loss set-off rules, and tax harvesting opportunities.
+Supports versioned statutory tax rules across Financial Years / Assessment Years:
+- FY 2023-24 (AY 2024-25): Finance Act, 2023 (Pre-Budget 2024)
+- FY 2024-25 (AY 2025-26): Union Budget 2024 (Finance (No. 2) Act, 2024)
+- FY 2025-26 (AY 2026-27): Union Budget 2025 (Finance Act, 2025)
+- FY 2026-27+ (AY 2027-28+): Income-tax Act, 2025 & Union Budget 2026
+Also supports user-defined rule overrides for future budgets without code updates.
 """
 
+import re
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Dict, Any, Optional, Tuple
@@ -18,49 +23,318 @@ from ..core.validators import parse_iso_date
 from ..core.base_calculator import BaseCalculator
 
 
-# Union Budget 2024 / FY 2024-25 (AY 2025-26) Statutory Rules
-BUDGET_2024_TAX_RULES = {
-    "version": "Union Budget 2024 (Finance No. 2 Act, 2024)",
-    "effective_date": "2024-07-23",
+OLD_REGIME_STANDARD = {
+    "standard_deduction": Decimal("50000.00"),
+    "rebate_87a_max_income": Decimal("500000.00"),
+    "rebate_87a_max_amount": Decimal("12500.00"),
+    "marginal_relief_87a": False,
+    "slabs": [
+        (Decimal("250000.00"), Decimal("0.00")),
+        (Decimal("500000.00"), Decimal("0.05")),
+        (Decimal("1000000.00"), Decimal("0.20")),
+        (None, Decimal("0.30")),
+    ],
+}
+
+BUDGET_2025_NEW_REGIME = {
+    "standard_deduction": Decimal("75000.00"),
+    "rebate_87a_max_income": Decimal("1200000.00"),
+    "rebate_87a_max_amount": Decimal("60000.00"),
+    "marginal_relief_87a": True,
+    "slabs": [
+        (Decimal("400000.00"), Decimal("0.00")),
+        (Decimal("800000.00"), Decimal("0.05")),
+        (Decimal("1200000.00"), Decimal("0.10")),
+        (Decimal("1600000.00"), Decimal("0.15")),
+        (Decimal("2000000.00"), Decimal("0.20")),
+        (Decimal("2400000.00"), Decimal("0.25")),
+        (None, Decimal("0.30")),
+    ],
+}
+
+_CRYPTO_VDA_DEFAULT = {
+    "flat_rate": Decimal("0.30"),
+    "cess_rate": Decimal("0.04"),
+    "effective_rate": Decimal("0.312"),
+    "allow_loss_setoff": False,
+}
+
+_POST_2024_CAP_GAINS = {
     "equity": {
         "holding_threshold_days": 365,
-        "stcg_rate": Decimal("0.20"),       # Sec 111A (revised from 15% to 20%)
-        "ltcg_rate": Decimal("0.125"),      # Sec 112A (revised from 10% to 12.5%)
-        "ltcg_exemption_limit": Decimal("125000.00"), # Sec 112A (increased from 1L to 1.25L)
+        "stcg_rate": Decimal("0.20"),
+        "ltcg_rate": Decimal("0.125"),
+        "ltcg_exemption_limit": Decimal("125000.00"),
     },
-    "debt_mutual_funds": {
-        # Specified mutual funds post April 1, 2023 (Sec 50AA)
-        "tax_treatment": "SLAB_RATE",
-    },
+    "debt_mutual_funds": {"tax_treatment": "SLAB_RATE"},
     "bullion": {
-        "holding_threshold_days": 730,      # 24 months
+        "holding_threshold_days": 730,
         "stcg_rate": "SLAB_RATE",
-        "ltcg_rate": Decimal("0.125"),      # 12.5% without indexation
+        "ltcg_rate": Decimal("0.125"),
     },
     "bonds_listed": {
-        "holding_threshold_days": 365,      # 12 months
+        "holding_threshold_days": 365,
         "stcg_rate": "SLAB_RATE",
-        "ltcg_rate": Decimal("0.125"),      # 12.5% without indexation
+        "ltcg_rate": Decimal("0.125"),
     },
-    "crypto_vda": {
-        # Section 115BBH: Flat 30% tax, no expense deductions except acquisition cost, zero loss set-off
-        "flat_rate": Decimal("0.30"),
-        "cess_rate": Decimal("0.04"),       # 4% health & education cess
-        "effective_rate": Decimal("0.312"), # 31.2%
-        "allow_loss_setoff": False,
+    "crypto_vda": _CRYPTO_VDA_DEFAULT,
+    "fno_derivatives": {"tax_treatment": "SLAB_RATE"},
+}
+
+def _clone_rules(rules: Dict[str, Any]) -> Dict[str, Any]:
+    """Fast structural clone avoiding expensive copy.deepcopy over immutable Decimals/tuples."""
+    return {
+        **rules,
+        "equity": dict(rules["equity"]),
+        "debt_mutual_funds": dict(rules["debt_mutual_funds"]),
+        "bullion": dict(rules["bullion"]),
+        "bonds_listed": dict(rules["bonds_listed"]),
+        "crypto_vda": dict(rules["crypto_vda"]),
+        "fno_derivatives": dict(rules["fno_derivatives"]),
+        "new_regime": {**rules["new_regime"], "slabs": list(rules["new_regime"]["slabs"])},
+        "old_regime": {**rules["old_regime"], "slabs": list(rules["old_regime"]["slabs"])},
+    }
+
+# Retained for backward compatibility with existing callers/tests
+BUDGET_2024_TAX_RULES = _clone_rules({
+    **_POST_2024_CAP_GAINS,
+    "version": "Union Budget 2024 (Finance (No. 2) Act, 2024)",
+    "statute_reference": "Income-tax Act, 1961 (post 23 Jul 2024 reform)",
+    "effective_date": "2024-07-23",
+    "new_regime": {
+        "standard_deduction": Decimal("75000.00"),
+        "rebate_87a_max_income": Decimal("700000.00"),
+        "rebate_87a_max_amount": Decimal("25000.00"),
+        "marginal_relief_87a": True,
+        "slabs": [
+            (Decimal("300000.00"), Decimal("0.00")),
+            (Decimal("700000.00"), Decimal("0.05")),
+            (Decimal("1000000.00"), Decimal("0.10")),
+            (Decimal("1200000.00"), Decimal("0.15")),
+            (Decimal("1500000.00"), Decimal("0.20")),
+            (None, Decimal("0.30")),
+        ],
     },
-    "fno_derivatives": {
-        # Section 43(5): Non-speculative business income
-        "tax_treatment": "SLAB_RATE",
+    "old_regime": OLD_REGIME_STANDARD,
+})
+
+TAX_RULES_BY_AY: Dict[str, Dict[str, Any]] = {
+    "2024-2025": {
+        "assessment_year": "2024-2025",
+        "financial_year": "2023-2024",
+        "version": "Finance Act, 2023 (Pre-Budget 2024)",
+        "statute_reference": "Income-tax Act, 1961 (FY 2023-24)",
+        "effective_date": "2023-04-01",
+        "equity": {
+            "holding_threshold_days": 365,
+            "stcg_rate": Decimal("0.15"),
+            "ltcg_rate": Decimal("0.10"),
+            "ltcg_exemption_limit": Decimal("100000.00"),
+        },
+        "debt_mutual_funds": {"tax_treatment": "SLAB_RATE"},
+        "bullion": {"holding_threshold_days": 1095, "stcg_rate": "SLAB_RATE", "ltcg_rate": Decimal("0.20")},
+        "bonds_listed": {"holding_threshold_days": 365, "stcg_rate": "SLAB_RATE", "ltcg_rate": Decimal("0.10")},
+        "crypto_vda": _CRYPTO_VDA_DEFAULT,
+        "fno_derivatives": {"tax_treatment": "SLAB_RATE"},
+        "new_regime": {
+            "standard_deduction": Decimal("50000.00"),
+            "rebate_87a_max_income": Decimal("700000.00"),
+            "rebate_87a_max_amount": Decimal("25000.00"),
+            "marginal_relief_87a": True,
+            "slabs": [
+                (Decimal("300000.00"), Decimal("0.00")),
+                (Decimal("600000.00"), Decimal("0.05")),
+                (Decimal("900000.00"), Decimal("0.10")),
+                (Decimal("1200000.00"), Decimal("0.15")),
+                (Decimal("1500000.00"), Decimal("0.20")),
+                (None, Decimal("0.30")),
+            ],
+        },
+        "old_regime": OLD_REGIME_STANDARD,
+    },
+    "2025-2026": {
+        **BUDGET_2024_TAX_RULES,
+        "assessment_year": "2025-2026",
+        "financial_year": "2024-2025",
+    },
+    "2026-2027": {
+        **BUDGET_2024_TAX_RULES,
+        "assessment_year": "2026-2027",
+        "financial_year": "2025-2026",
+        "version": "Union Budget 2025 (Finance Act, 2025)",
+        "statute_reference": "Income-tax Act, 1961 (Sec 115BAC & Sec 87A ₹12L Rebate)",
+        "effective_date": "2025-04-01",
+        "new_regime": BUDGET_2025_NEW_REGIME,
+    },
+    "2027-2028": {
+        **BUDGET_2024_TAX_RULES,
+        "assessment_year": "2027-2028",
+        "financial_year": "2026-2027",
+        "version": "Income-tax Act, 2025 & Union Budget 2026",
+        "statute_reference": "Income-tax Act, 2025 (effective 1 Apr 2026)",
+        "effective_date": "2026-04-01",
+        "new_regime": BUDGET_2025_NEW_REGIME,
     },
 }
 
-DISCLAIMER_TEXT = (
-    "Estimated Indian capital gains tax analysis based on Union Budget 2024 provisions. "
-    "Calculations are simulated for personal portfolio planning and tax-loss harvesting only. "
-    "They do not constitute certified tax filings under the Income Tax Department. "
-    "Please consult a certified Chartered Accountant or tax advisor before filing ITR."
-)
+LATEST_STATUTORY_AY = "2027-2028"
+_AY_RE_SHORT = re.compile(r"^(\d{4})-(\d{2})$")
+_AY_RE_FULL = re.compile(r"^(\d{4})-(\d{4})$")
+_AY_PREFIX = re.compile(r"^(AY|FY)\s*", flags=re.IGNORECASE)
+
+
+def get_current_indian_ay(now: Optional[datetime] = None) -> str:
+    """Returns current Indian Assessment Year under April-March fiscal cycle."""
+    ref = now or datetime.now()
+    fy_start = ref.year if ref.month >= 4 else ref.year - 1
+    ay_start = fy_start + 1
+    return f"{ay_start}-{ay_start + 1}"
+
+
+def normalize_assessment_year(raw: Optional[str] = None) -> str:
+    """Normalizes AY strings like '2026-27' or 'AY 2026-2027' to 'YYYY-YYYY'."""
+    if not raw:
+        return get_current_indian_ay()
+    cleaned = _AY_PREFIX.sub("", str(raw).strip())
+    if m := _AY_RE_SHORT.match(cleaned):
+        start = int(m.group(1))
+        return f"{start}-{start + 1}"
+    if m := _AY_RE_FULL.match(cleaned):
+        return f"{m.group(1)}-{m.group(2)}"
+    return get_current_indian_ay()
+
+
+def get_fiscal_year_date_range(assessment_year: str) -> Tuple[str, str, str]:
+    """Returns (financial_year, start_date, end_date) for an Assessment Year."""
+    ay_start = int(normalize_assessment_year(assessment_year)[:4])
+    fy_start = ay_start - 1
+    return f"{fy_start}-{ay_start}", f"{fy_start}-04-01", f"{ay_start}-03-31"
+
+
+def _normalize_slabs(raw_slabs: Any) -> Optional[List[Tuple[Optional[Decimal], Decimal]]]:
+    if not isinstance(raw_slabs, list) or not raw_slabs:
+        return None
+    parsed: List[Tuple[Optional[Decimal], Decimal]] = []
+    for item in raw_slabs:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            up_to, rate = item[0], item[1]
+            parsed.append((None if up_to is None else to_decimal(up_to), to_decimal(rate)))
+        elif isinstance(item, dict):
+            up_to = item.get("upTo", item.get("up_to"))
+            parsed.append((None if up_to is None else to_decimal(up_to), to_decimal(item.get("rate", 0))))
+    return parsed or None
+
+
+def _apply_mapped_overrides(
+    target: Dict[str, Any],
+    override: Any,
+    spec: List[Tuple[str, str, str, Any]],
+) -> None:
+    if not isinstance(override, dict):
+        return
+    for dest_key, camel_key, snake_key, caster in spec:
+        if camel_key in override:
+            target[dest_key] = caster(override[camel_key])
+        elif snake_key in override:
+            target[dest_key] = caster(override[snake_key])
+
+
+_REGIME_FIELD_SPEC = [
+    ("standard_deduction", "standardDeduction", "standard_deduction", to_decimal),
+    ("rebate_87a_max_income", "rebate87aMaxIncome", "rebate_87a_max_income", to_decimal),
+    ("rebate_87a_max_amount", "rebate87aMaxAmount", "rebate_87a_max_amount", to_decimal),
+    ("marginal_relief_87a", "marginalRelief87a", "marginal_relief_87a", bool),
+]
+_EQUITY_FIELD_SPEC = [
+    ("holding_threshold_days", "ltcgThresholdDays", "holding_threshold_days", int),
+    ("stcg_rate", "stcgRate", "stcg_rate", to_decimal),
+    ("ltcg_rate", "ltcgRate", "ltcg_rate", to_decimal),
+    ("ltcg_exemption_limit", "ltcgExemptionLimit", "ltcg_exemption_limit", to_decimal),
+]
+_LTCG_ASSET_FIELD_SPEC = [
+    ("holding_threshold_days", "ltcgThresholdDays", "holding_threshold_days", int),
+    ("ltcg_rate", "ltcgRate", "ltcg_rate", to_decimal),
+]
+_CRYPTO_FIELD_SPEC = [
+    ("flat_rate", "flatRate", "flat_rate", to_decimal),
+    ("cess_rate", "cessRate", "cess_rate", to_decimal),
+    ("allow_loss_setoff", "allowLossSetoff", "allow_loss_setoff", bool),
+]
+
+
+def _apply_regime_override(base: Dict[str, Any], override: Any) -> None:
+    if not isinstance(override, dict):
+        return
+    _apply_mapped_overrides(base, override, _REGIME_FIELD_SPEC)
+    if parsed := _normalize_slabs(override.get("slabs")):
+        base["slabs"] = parsed
+
+
+def resolve_tax_rules(
+    assessment_year: Optional[str] = None,
+    custom_rules: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Resolves statutory tax preset for the given Assessment Year and merges optional overrides."""
+    norm_ay = normalize_assessment_year(assessment_year)
+    fy_str, fy_start, fy_end = get_fiscal_year_date_range(norm_ay)
+
+    if norm_ay in TAX_RULES_BY_AY:
+        resolved = _clone_rules(TAX_RULES_BY_AY[norm_ay])
+        is_projected = False
+    else:
+        template_key = "2024-2025" if int(norm_ay[:4]) < 2024 else LATEST_STATUTORY_AY
+        resolved = _clone_rules(TAX_RULES_BY_AY[template_key])
+        resolved["assessment_year"] = norm_ay
+        resolved["financial_year"] = fy_str
+        resolved["effective_date"] = fy_start
+        resolved["version"] = f"{resolved['version']} (Auto-carried forward — editable)"
+        is_projected = True
+
+    resolved.update({"fy_start": fy_start, "fy_end": fy_end, "is_projected": is_projected})
+
+    has_override = isinstance(custom_rules, dict) and len(custom_rules) > 0
+    if has_override:
+        assert custom_rules is not None
+        _apply_mapped_overrides(resolved["equity"], custom_rules.get("equity"), _EQUITY_FIELD_SPEC)
+        _apply_mapped_overrides(resolved["bullion"], custom_rules.get("bullion"), _LTCG_ASSET_FIELD_SPEC)
+        _apply_mapped_overrides(
+            resolved["bonds_listed"],
+            custom_rules.get("bondsListed") or custom_rules.get("bonds_listed"),
+            _LTCG_ASSET_FIELD_SPEC,
+        )
+        crypto_ov = custom_rules.get("cryptoVda") or custom_rules.get("crypto_vda")
+        if isinstance(crypto_ov, dict):
+            _apply_mapped_overrides(resolved["crypto_vda"], crypto_ov, _CRYPTO_FIELD_SPEC)
+            if "effectiveRate" in crypto_ov or "effective_rate" in crypto_ov:
+                resolved["crypto_vda"]["effective_rate"] = to_decimal(
+                    crypto_ov.get("effectiveRate", crypto_ov.get("effective_rate"))
+                )
+            elif any(k in crypto_ov for k in ("flatRate", "flat_rate", "cessRate", "cess_rate")):
+                resolved["crypto_vda"]["effective_rate"] = (
+                    resolved["crypto_vda"]["flat_rate"] * (Decimal("1.00") + resolved["crypto_vda"]["cess_rate"])
+                )
+
+        _apply_regime_override(resolved["new_regime"], custom_rules.get("newRegime") or custom_rules.get("new_regime"))
+        _apply_regime_override(resolved["old_regime"], custom_rules.get("oldRegime") or custom_rules.get("old_regime"))
+
+        custom_ver = custom_rules.get("rulesVersion") or custom_rules.get("version")
+        resolved["version"] = str(custom_ver).strip() if custom_ver else f"{resolved['version']} + Custom Rules"
+
+    resolved["is_customized"] = has_override
+    return resolved
+
+
+def build_disclaimer(rules: Dict[str, Any]) -> str:
+    return (
+        f"Estimated Indian capital gains tax analysis for FY {rules['financial_year']} "
+        f"(AY {rules['assessment_year']}) using {rules['version']}. "
+        "Calculations are simulated for personal portfolio planning and tax-loss harvesting only. "
+        "They do not constitute certified tax filings under the Income Tax Department. "
+        "Please consult a certified Chartered Accountant or tax advisor before filing ITR."
+    )
+
+
+DISCLAIMER_TEXT = build_disclaimer(TAX_RULES_BY_AY[LATEST_STATUTORY_AY])
 
 
 class TaxEngine(BaseCalculator):
@@ -180,8 +454,17 @@ class TaxEngine(BaseCalculator):
             sell_orders: Optional List[Dict] for FIFO matching
             unrealized_holdings: List[Dict] [{ id, symbol, asset_class, buy_date, invested_amount, current_value }]
         """
-        ay: str = inputs.get("assessment_year", "2025-26")
+        ay = normalize_assessment_year(inputs.get("assessment_year"))
         slab_rate_dec: Decimal = to_decimal(inputs.get("tax_slab_rate", "0.30"))
+        custom_rules = inputs.get("custom_rules") or inputs.get("tax_rules_override")
+        rules = resolve_tax_rules(ay, custom_rules)
+        eq_rules = rules["equity"]
+        bul_rules = rules["bullion"]
+        bond_rules = rules["bonds_listed"]
+        crypto_rules = rules["crypto_vda"]
+        filter_by_fy = bool(inputs.get("filter_by_fy", False))
+        fy_start = rules["fy_start"]
+        fy_end = rules["fy_end"]
         now = datetime.now()
 
         # 1. Determine realized trades (either directly supplied or matched via FIFO)
@@ -197,6 +480,14 @@ class TaxEngine(BaseCalculator):
         if not realized_trades and (buy_lots and sell_orders):
             realized_trades = self.match_lots_fifo(buy_lots, sell_orders)
 
+        if filter_by_fy and realized_trades:
+            filtered = []
+            for trade in realized_trades:
+                sell_dt = str(trade.get("sell_date") or "")[:10]
+                if not sell_dt or (fy_start <= sell_dt <= fy_end):
+                    filtered.append(trade)
+            realized_trades = filtered
+
         # 2. Categorize Realized Gains & Losses
         equity_ltcg_gain = Decimal("0.00")
         equity_stcg_gain = Decimal("0.00")
@@ -208,6 +499,10 @@ class TaxEngine(BaseCalculator):
         crypto_gain = Decimal("0.00")
         crypto_losses = Decimal("0.00")
         fno_income = Decimal("0.00")
+
+        eq_threshold = int(eq_rules["holding_threshold_days"])
+        bul_threshold = int(bul_rules["holding_threshold_days"])
+        bond_threshold = int(bond_rules["holding_threshold_days"])
 
         for trade in realized_trades:
             net_gain = to_decimal(trade.get("gain", 0))
@@ -223,19 +518,19 @@ class TaxEngine(BaseCalculator):
             asset = str(trade.get("asset_class") or "equity").lower()
 
             if asset in ("equity", "stock", "mutual_fund", "equity_mf"):
-                if holding_days >= 365:
+                if holding_days >= eq_threshold:
                     equity_ltcg_gain += net_gain
                 else:
                     equity_stcg_gain += net_gain
-            elif asset in ("debt_fund", "debt_mf", "specified_mutual_fund"):
+            elif asset in ("debt_fund", "debt_mf", "specified_mutual_fund", "debt"):
                 debt_gain += net_gain
             elif asset in ("bullion", "gold", "silver"):
-                if holding_days >= 730:
+                if holding_days >= bul_threshold:
                     bullion_ltcg_gain += net_gain
                 else:
                     bullion_stcg_gain += net_gain
             elif asset in ("bond", "bonds", "bonds_listed"):
-                if holding_days >= 365:
+                if holding_days >= bond_threshold:
                     bonds_ltcg_gain += net_gain
                 else:
                     bonds_stcg_gain += net_gain
@@ -250,7 +545,7 @@ class TaxEngine(BaseCalculator):
         # 3. Inter-Asset Loss Set-Off Rules (Sections 70 & 71)
         # STCL can offset both STCG and LTCG.
         # LTCL can ONLY offset LTCG.
-        # Crypto losses cannot offset any gains (Sec 115BBH).
+        # Crypto losses cannot offset any gains (Sec 115BBH) unless customized.
         adjusted_equity_ltcg = equity_ltcg_gain
         adjusted_equity_stcg = equity_stcg_gain
 
@@ -260,21 +555,26 @@ class TaxEngine(BaseCalculator):
             adjusted_equity_ltcg -= offset_amt
             adjusted_equity_stcg += offset_amt
 
-        # 4. Tax Liability Computation (Union Budget 2024)
-        ltcg_exemption = BUDGET_2024_TAX_RULES["equity"]["ltcg_exemption_limit"]
+        # 4. Tax Liability Computation
+        ltcg_exemption = eq_rules["ltcg_exemption_limit"]
         taxable_equity_ltcg = max(Decimal("0.00"), adjusted_equity_ltcg - ltcg_exemption)
-        equity_ltcg_tax = taxable_equity_ltcg * BUDGET_2024_TAX_RULES["equity"]["ltcg_rate"]
-        equity_stcg_tax = max(Decimal("0.00"), adjusted_equity_stcg) * BUDGET_2024_TAX_RULES["equity"]["stcg_rate"]
+        equity_ltcg_tax = taxable_equity_ltcg * eq_rules["ltcg_rate"]
+        equity_stcg_tax = max(Decimal("0.00"), adjusted_equity_stcg) * eq_rules["stcg_rate"]
 
         debt_tax = max(Decimal("0.00"), debt_gain) * slab_rate_dec
-        bullion_ltcg_tax = max(Decimal("0.00"), bullion_ltcg_gain) * Decimal("0.125")
+        bullion_ltcg_tax = max(Decimal("0.00"), bullion_ltcg_gain) * bul_rules["ltcg_rate"]
         bullion_stcg_tax = max(Decimal("0.00"), bullion_stcg_gain) * slab_rate_dec
-        bonds_ltcg_tax = max(Decimal("0.00"), bonds_ltcg_gain) * Decimal("0.125")
+        bonds_ltcg_tax = max(Decimal("0.00"), bonds_ltcg_gain) * bond_rules["ltcg_rate"]
         bonds_stcg_tax = max(Decimal("0.00"), bonds_stcg_gain) * slab_rate_dec
         fno_tax = max(Decimal("0.00"), fno_income) * slab_rate_dec
 
-        # Crypto flat 30% (+4% cess = 31.2%) on gross gains
-        crypto_tax = crypto_gain * BUDGET_2024_TAX_RULES["crypto_vda"]["effective_rate"]
+        # Crypto flat 30% (+4% cess = 31.2%) on gross gains (or net if custom allows loss setoff)
+        crypto_taxable = (
+            max(Decimal("0.00"), crypto_gain - crypto_losses)
+            if crypto_rules.get("allow_loss_setoff")
+            else crypto_gain
+        )
+        crypto_tax = crypto_taxable * crypto_rules["effective_rate"]
 
         total_realized_gains = (
             equity_ltcg_gain
@@ -318,24 +618,39 @@ class TaxEngine(BaseCalculator):
 
                 asset = str(holding.get("asset_class") or "equity").lower()
                 is_equity = asset in ("equity", "stock", "mutual_fund", "equity_mf")
+                is_bond = asset in ("bond", "bonds", "bonds_listed")
                 is_crypto = asset in ("crypto", "cryptocurrency", "vda")
                 is_debt = asset in ("debt", "debt_fund", "debt_mf")
 
-                if is_crypto:
+                if is_crypto and not crypto_rules.get("allow_loss_setoff", False):
                     # Under Sec 115BBH, crypto losses cannot be harvested to offset any gains
                     tax_rate = Decimal("0.00")
                     gain_type = "VDA_LOSS_UNOFFSETTABLE"
                     potential_savings = Decimal("0.00")
                     rec = "Under Section 115BBH, Virtual Digital Asset (Crypto) losses cannot be set off against any gains or carried forward."
+                elif is_crypto:
+                    tax_rate = crypto_rules["effective_rate"]
+                    gain_type = "VDA"
+                    potential_savings = loss * tax_rate
+                    rec = f"Harvest ₹{loss:,.2f} VDA loss under custom rule override to save ~₹{potential_savings:,.2f}."
                 elif is_debt:
                     tax_rate = slab_rate_dec
                     gain_type = "SLAB"
                     potential_savings = loss * tax_rate
                     rec = f"Harvest ₹{loss:,.2f} debt fund loss to offset other capital gains and save up to ₹{potential_savings:,.2f}."
-                else:
-                    is_long_term = (holding_days >= 365) if is_equity else (holding_days >= 730)
+                elif is_bond:
+                    is_long_term = holding_days >= bond_threshold
                     gain_type = "LTCG" if is_long_term else "STCG"
-                    tax_rate = Decimal("0.125") if is_long_term else (Decimal("0.20") if is_equity else slab_rate_dec)
+                    tax_rate = bond_rules["ltcg_rate"] if is_long_term else slab_rate_dec
+                    potential_savings = loss * tax_rate
+                    rec = f"Harvest ₹{loss:,.2f} bond loss to offset taxable {gain_type} gains and save ~₹{potential_savings:,.2f} in taxes."
+                else:
+                    is_long_term = (holding_days >= eq_threshold) if is_equity else (holding_days >= bul_threshold)
+                    gain_type = "LTCG" if is_long_term else "STCG"
+                    if is_long_term:
+                        tax_rate = eq_rules["ltcg_rate"] if is_equity else bul_rules["ltcg_rate"]
+                    else:
+                        tax_rate = eq_rules["stcg_rate"] if is_equity else slab_rate_dec
                     potential_savings = loss * tax_rate
                     rec = f"Harvest ₹{loss:,.2f} loss to offset taxable {gain_type} gains and save ~₹{potential_savings:,.2f} in taxes."
 
@@ -354,7 +669,7 @@ class TaxEngine(BaseCalculator):
                     "recommendation": rec,
                 })
 
-                if not is_crypto:
+                if not is_crypto or crypto_rules.get("allow_loss_setoff", False):
                     total_harvestable_loss += loss
                     total_potential_tax_savings += potential_savings
 
@@ -364,20 +679,21 @@ class TaxEngine(BaseCalculator):
         advice = []
         if taxable_equity_ltcg > Decimal("0.00"):
             advice.append(
-                f"Your equity LTCG of ₹{equity_ltcg_gain:,.2f} exceeds the Section 112A ₹1.25 Lakh exemption limit by ₹{taxable_equity_ltcg:,.2f}. Consider harvesting available long-term losses before March 31st to reduce tax liability."
+                f"Your equity LTCG of ₹{equity_ltcg_gain:,.2f} exceeds the Section 112A ₹{ltcg_exemption:,.0f} exemption limit by ₹{taxable_equity_ltcg:,.2f}. Consider harvesting available long-term losses before March 31st to reduce tax liability."
             )
         elif equity_ltcg_gain > Decimal("0.00"):
             rem = ltcg_exemption - equity_ltcg_gain
             advice.append(
-                f"You have ₹{rem:,.2f} in remaining tax-free LTCG exemption under Section 112A for AY {ay}."
+                f"You have ₹{rem:,.2f} in remaining tax-free LTCG exemption under Section 112A for AY {rules['assessment_year']}."
             )
 
         if equity_stcg_gain > Decimal("0.00") and total_harvestable_loss > Decimal("0.00"):
+            stcg_pct = float(quantize_currency(eq_rules["stcg_rate"] * Decimal("100")))
             advice.append(
-                f"You have ₹{equity_stcg_gain:,.2f} in taxable STCG (taxed at 20%). You can harvest available short-term losses to directly neutralize this liability."
+                f"You have ₹{equity_stcg_gain:,.2f} in taxable STCG (taxed at {stcg_pct:g}%). You can harvest available short-term losses to directly neutralize this liability."
             )
 
-        if crypto_losses > Decimal("0.00"):
+        if crypto_losses > Decimal("0.00") and not crypto_rules.get("allow_loss_setoff", False):
             advice.append(
                 f"Note: You have ₹{crypto_losses:,.2f} in cryptocurrency losses. Section 115BBH strictly prohibits setting off crypto losses against capital gains from stocks, mutual funds, or other crypto."
             )
@@ -394,18 +710,27 @@ class TaxEngine(BaseCalculator):
                 home_loan_interest_24b=to_decimal(inputs.get("home_loan_interest_24b", 0)),
                 hra_exemption=to_decimal(inputs.get("hra_exemption", 0)),
                 other_deductions=to_decimal(inputs.get("other_deductions", 0)),
+                assessment_year=rules["assessment_year"],
+                custom_rules=custom_rules,
             )
 
+        adjusted_taxable_ltcg = taxable_equity_ltcg
+        adjusted_stcg = adjusted_equity_stcg
         return {
-            "disclaimer": DISCLAIMER_TEXT,
-            "assessmentYear": ay,
+            "disclaimer": build_disclaimer(rules),
+            "assessmentYear": rules["assessment_year"],
+            "financialYear": rules["financial_year"],
+            "fiscalYearStart": rules["fy_start"],
+            "fiscalYearEnd": rules["fy_end"],
             "taxSlabRate": float(slab_rate_dec),
-            "taxRulesVersion": BUDGET_2024_TAX_RULES["version"],
+            "taxRulesVersion": rules["version"],
+            "statuteReference": rules["statute_reference"],
+            "isCustomized": rules["is_customized"],
             "realized": {
                 "equityLtcgGain": float(quantize_currency(equity_ltcg_gain)),
-                "equityLtcgTaxable": float(quantize_currency(taxable_equity_ltcg)),
+                "equityLtcgTaxable": float(quantize_currency(adjusted_taxable_ltcg)),
                 "equityLtcgTax": float(quantize_currency(equity_ltcg_tax)),
-                "equityStcgGain": float(quantize_currency(equity_stcg_gain)),
+                "equityStcgGain": float(quantize_currency(adjusted_stcg)),
                 "equityStcgTax": float(quantize_currency(equity_stcg_tax)),
                 "debtGain": float(quantize_currency(debt_gain)),
                 "debtTax": float(quantize_currency(debt_tax)),
@@ -432,59 +757,51 @@ class TaxEngine(BaseCalculator):
             "advice": advice,
         }
 
-    def _calculate_new_regime_base_tax(self, taxable_income: Decimal) -> Decimal:
-        """Calculates New Regime (Section 115BAC) slab tax before rebate, surcharge and cess."""
-        if taxable_income <= Decimal("300000.00"):
+    def _calculate_progressive_slab_tax(
+        self,
+        taxable_income: Decimal,
+        slabs: List[Tuple[Optional[Decimal], Decimal]],
+    ) -> Decimal:
+        """Calculates slab tax dynamically across ordered progressive brackets."""
+        if taxable_income <= Decimal("0.00") or not slabs:
             return Decimal("0.00")
         tax = Decimal("0.00")
-        rem = taxable_income
-        # 3L - 7L (4 Lakhs @ 5% = 20,000)
-        s1 = min(rem - Decimal("300000.00"), Decimal("400000.00"))
-        if s1 > Decimal("0.00"):
-            tax += s1 * Decimal("0.05")
-        # 7L - 10L (3 Lakhs @ 10% = 30,000)
-        if rem > Decimal("700000.00"):
-            s2 = min(rem - Decimal("700000.00"), Decimal("300000.00"))
-            tax += s2 * Decimal("0.10")
-        # 10L - 12L (2 Lakhs @ 15% = 30,000)
-        if rem > Decimal("1000000.00"):
-            s3 = min(rem - Decimal("1000000.00"), Decimal("200000.00"))
-            tax += s3 * Decimal("0.15")
-        # 12L - 15L (3 Lakhs @ 20% = 60,000)
-        if rem > Decimal("1200000.00"):
-            s4 = min(rem - Decimal("1200000.00"), Decimal("300000.00"))
-            tax += s4 * Decimal("0.20")
-        # > 15L @ 30%
-        if rem > Decimal("1500000.00"):
-            s5 = rem - Decimal("1500000.00")
-            tax += s5 * Decimal("0.30")
+        prev_cap = Decimal("0.00")
+        for up_to, rate in slabs:
+            if taxable_income <= prev_cap:
+                break
+            upper = taxable_income if up_to is None else min(taxable_income, up_to)
+            band_width = max(Decimal("0.00"), upper - prev_cap)
+            tax += band_width * rate
+            if up_to is None:
+                break
+            prev_cap = up_to
         return tax
 
-    def _calculate_old_regime_base_tax(self, taxable_income: Decimal) -> Decimal:
+    def _calculate_new_regime_base_tax(
+        self,
+        taxable_income: Decimal,
+        slabs: Optional[List[Tuple[Optional[Decimal], Decimal]]] = None,
+    ) -> Decimal:
+        """Calculates New Regime (Section 115BAC) slab tax before rebate, surcharge and cess."""
+        active_slabs = slabs if slabs is not None else TAX_RULES_BY_AY[LATEST_STATUTORY_AY]["new_regime"]["slabs"]
+        return self._calculate_progressive_slab_tax(taxable_income, active_slabs)
+
+    def _calculate_old_regime_base_tax(
+        self,
+        taxable_income: Decimal,
+        slabs: Optional[List[Tuple[Optional[Decimal], Decimal]]] = None,
+    ) -> Decimal:
         """Calculates Old Regime slab tax before rebate, surcharge and cess."""
-        if taxable_income <= Decimal("250000.00"):
-            return Decimal("0.00")
-        tax = Decimal("0.00")
-        rem = taxable_income
-        # 2.5L - 5L (2.5 Lakhs @ 5% = 12,500)
-        s1 = min(rem - Decimal("250000.00"), Decimal("250000.00"))
-        if s1 > Decimal("0.00"):
-            tax += s1 * Decimal("0.05")
-        # 5L - 10L (5 Lakhs @ 20% = 100,000)
-        if rem > Decimal("500000.00"):
-            s2 = min(rem - Decimal("500000.00"), Decimal("500000.00"))
-            tax += s2 * Decimal("0.20")
-        # > 10L @ 30%
-        if rem > Decimal("1000000.00"):
-            s3 = rem - Decimal("1000000.00")
-            tax += s3 * Decimal("0.30")
-        return tax
+        active_slabs = slabs if slabs is not None else OLD_REGIME_STANDARD["slabs"]
+        return self._calculate_progressive_slab_tax(taxable_income, active_slabs)
 
     def _calculate_surcharge_with_marginal_relief(
         self,
         taxable_income: Decimal,
         base_tax: Decimal,
         is_new_regime: bool,
+        slabs: Optional[List[Tuple[Optional[Decimal], Decimal]]] = None,
     ) -> Tuple[Decimal, Decimal]:
         """
         Calculates Surcharge on high net worth incomes and applies statutory Marginal Relief.
@@ -493,7 +810,11 @@ class TaxEngine(BaseCalculator):
         if taxable_income <= Decimal("5000000.00"):
             return Decimal("0.00"), Decimal("0.00")
 
-        base_calc = self._calculate_new_regime_base_tax if is_new_regime else self._calculate_old_regime_base_tax
+        base_calc = (
+            (lambda inc: self._calculate_new_regime_base_tax(inc, slabs=slabs))
+            if is_new_regime
+            else (lambda inc: self._calculate_old_regime_base_tax(inc, slabs=slabs))
+        )
 
         # 1. Determine nominal surcharge rate
         if taxable_income <= Decimal("10000000.00"):
@@ -542,42 +863,51 @@ class TaxEngine(BaseCalculator):
         home_loan_interest_24b: Decimal = Decimal("0.00"),
         hra_exemption: Decimal = Decimal("0.00"),
         other_deductions: Decimal = Decimal("0.00"),
+        assessment_year: Optional[str] = None,
+        custom_rules: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Comprehensive Union Budget 2024 Old vs New Tax Regime Comparator.
+        Versioned Old vs New Tax Regime Comparator across Financial/Assessment Years.
         Calculates tax liability under both regimes with Section 87A rebate,
         Section 87A marginal relief, Section 80CCD(2) Corporate NPS deductions,
         and High-Net-Worth Surcharge with Marginal Relief.
         """
+        rules = resolve_tax_rules(assessment_year, custom_rules)
+        new_cfg = rules["new_regime"]
+        old_cfg = rules["old_regime"]
         cess_rate = Decimal("0.04")
 
         # ---------------------------------------------------------
-        # 1. New Tax Regime (Section 115BAC - Union Budget 2024)
+        # 1. New Tax Regime (Section 115BAC / Income-tax Act 2025)
         # ---------------------------------------------------------
-        # Standard deduction ₹75,000 + Section 80CCD(2) employer NPS
-        new_std_deduction = Decimal("75000.00")
+        new_std_deduction = new_cfg["standard_deduction"]
         new_taxable_income = max(Decimal("0.00"), gross_income - new_std_deduction - nps_80ccd_2)
 
-        new_base_tax = self._calculate_new_regime_base_tax(new_taxable_income)
+        new_base_tax = self._calculate_new_regime_base_tax(new_taxable_income, slabs=new_cfg["slabs"])
         new_marginal_relief_87a = Decimal("0.00")
         new_rebate_87a = Decimal("0.00")
 
+        new_rebate_limit = new_cfg["rebate_87a_max_income"]
+        new_rebate_cap = new_cfg["rebate_87a_max_amount"]
+
         # Section 87A Rebate & Marginal Relief
-        if new_taxable_income <= Decimal("700000.00"):
-            new_rebate_87a = new_base_tax
-            new_tax_after_87a = Decimal("0.00")
-        else:
-            # Proviso to Section 87A: tax payable shall not exceed (taxable_income - 7,00,000)
-            excess_income_over_7l = new_taxable_income - Decimal("700000.00")
-            if new_base_tax > excess_income_over_7l:
-                new_marginal_relief_87a = new_base_tax - excess_income_over_7l
-                new_tax_after_87a = excess_income_over_7l
+        if new_taxable_income <= new_rebate_limit:
+            new_rebate_87a = min(new_base_tax, new_rebate_cap)
+            new_tax_after_87a = max(Decimal("0.00"), new_base_tax - new_rebate_87a)
+        elif new_cfg.get("marginal_relief_87a", True):
+            # Proviso to Section 87A: tax payable shall not exceed (taxable_income - rebate_limit)
+            excess_income_over_limit = new_taxable_income - new_rebate_limit
+            if new_base_tax > excess_income_over_limit:
+                new_marginal_relief_87a = new_base_tax - excess_income_over_limit
+                new_tax_after_87a = excess_income_over_limit
             else:
                 new_tax_after_87a = new_base_tax
+        else:
+            new_tax_after_87a = new_base_tax
 
         # Surcharge on High Net Worth Incomes
         new_surcharge, new_surcharge_relief = self._calculate_surcharge_with_marginal_relief(
-            new_taxable_income, new_tax_after_87a, is_new_regime=True
+            new_taxable_income, new_tax_after_87a, is_new_regime=True, slabs=new_cfg["slabs"]
         )
 
         new_tax_with_surcharge = new_tax_after_87a + new_surcharge
@@ -587,7 +917,7 @@ class TaxEngine(BaseCalculator):
         # ---------------------------------------------------------
         # 2. Old Tax Regime
         # ---------------------------------------------------------
-        old_std_deduction = Decimal("50000.00")
+        old_std_deduction = old_cfg["standard_deduction"]
         capped_80c = min(deductions_80c, Decimal("150000.00"))
         capped_80d = min(deductions_80d, Decimal("100000.00"))
         capped_nps = min(nps_80ccd_1b, Decimal("50000.00"))
@@ -605,19 +935,22 @@ class TaxEngine(BaseCalculator):
         )
 
         old_taxable_income = max(Decimal("0.00"), gross_income - total_old_deductions)
-        old_base_tax = self._calculate_old_regime_base_tax(old_taxable_income)
+        old_base_tax = self._calculate_old_regime_base_tax(old_taxable_income, slabs=old_cfg["slabs"])
         old_rebate_87a = Decimal("0.00")
 
+        old_rebate_limit = old_cfg["rebate_87a_max_income"]
+        old_rebate_cap = old_cfg["rebate_87a_max_amount"]
+
         # Section 87A Rebate for Old Regime (up to 5L)
-        if old_taxable_income <= Decimal("500000.00"):
-            old_rebate_87a = min(old_base_tax, Decimal("12500.00"))
-            old_tax_after_87a = Decimal("0.00")
+        if old_taxable_income <= old_rebate_limit:
+            old_rebate_87a = min(old_base_tax, old_rebate_cap)
+            old_tax_after_87a = max(Decimal("0.00"), old_base_tax - old_rebate_87a)
         else:
             old_tax_after_87a = old_base_tax
 
         # Surcharge on High Net Worth Incomes (Old Regime)
         old_surcharge, old_surcharge_relief = self._calculate_surcharge_with_marginal_relief(
-            old_taxable_income, old_tax_after_87a, is_new_regime=False
+            old_taxable_income, old_tax_after_87a, is_new_regime=False, slabs=old_cfg["slabs"]
         )
 
         old_tax_with_surcharge = old_tax_after_87a + old_surcharge
@@ -627,13 +960,12 @@ class TaxEngine(BaseCalculator):
         # ---------------------------------------------------------
         # 3. Recommendation & Savings
         # ---------------------------------------------------------
-        tax_difference = abs(old_total_tax - new_total_tax)
         if new_total_tax < old_total_tax:
             recommended_regime = "NEW_REGIME"
             savings_amount = old_total_tax - new_total_tax
             advice_summary = (
-                f"New Tax Regime saves ₹{savings_amount:,.2f} in taxes under Union Budget 2024 provisions "
-                f"(₹75,000 standard deduction, revised Section 115BAC slabs, and 87A relief)."
+                f"New Tax Regime saves ₹{savings_amount:,.2f} under {rules['version']} "
+                f"(₹{new_std_deduction:,.0f} standard deduction, Section 87A relief up to ₹{new_rebate_limit:,.0f})."
             )
         elif old_total_tax < new_total_tax:
             recommended_regime = "OLD_REGIME"
@@ -648,6 +980,10 @@ class TaxEngine(BaseCalculator):
             advice_summary = "Both tax regimes yield the exact same tax liability."
 
         return {
+            "assessmentYear": rules["assessment_year"],
+            "financialYear": rules["financial_year"],
+            "taxRulesVersion": rules["version"],
+            "statuteReference": rules["statute_reference"],
             "recommendedRegime": recommended_regime,
             "savingsAmount": float(quantize_currency(savings_amount)),
             "advice": advice_summary,

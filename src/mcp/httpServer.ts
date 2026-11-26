@@ -6,7 +6,6 @@
 
 import http, { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
-import crypto from "node:crypto";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./server";
 import { getMcpConfig, McpConfig } from "./config";

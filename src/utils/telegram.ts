@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { formatINRFlex } from "@/utils/money";
 
 export interface SendTelegramMessageOptions {
   chatId: string | number;
@@ -36,13 +37,7 @@ export function escapeTelegramHtml(text: string): string {
 /**
  * Formats monetary amounts in Indian Rupee format
  */
-export function formatCurrencyINR(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+export const formatCurrencyINR = (amount: number): string => formatINRFlex(amount);
 
 /**
  * Sends a message via Telegram Bot API using fetch and AbortController timeout.

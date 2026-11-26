@@ -97,9 +97,12 @@ class ReconciliationCalculationRequest(CalculationBaseRequest):
 
 class TaxCalculationRequest(CalculationBaseRequest):
     transactions: List[Dict[str, Any]] = Field(default_factory=list)
+    realized_trades: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     unrealized_holdings: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
-    assessment_year: Optional[str] = "2025-2026"
+    assessment_year: Optional[str] = None
     tax_slab_rate: Optional[float] = 0.30
+    filter_by_fy: Optional[bool] = False
+    custom_rules: Optional[Dict[str, Any]] = None
     gross_salary: Optional[float] = None
     annual_income: Optional[float] = None
     deductions_80c: Optional[float] = 0.0
@@ -112,6 +115,8 @@ class TaxCalculationRequest(CalculationBaseRequest):
 
 class TaxRegimeComparisonRequest(CalculationBaseRequest):
     gross_income: float
+    assessment_year: Optional[str] = None
+    custom_rules: Optional[Dict[str, Any]] = None
     deductions_80c: Optional[float] = 0.0
     deductions_80d: Optional[float] = 0.0
     nps_80ccd_1b: Optional[float] = 0.0
@@ -217,6 +222,8 @@ def calculate_tax_regimes(payload: TaxRegimeComparisonRequest, x_user_id: Option
         home_loan_interest_24b=Decimal(str(payload.home_loan_interest_24b or 0)),
         hra_exemption=Decimal(str(payload.hra_exemption or 0)),
         other_deductions=Decimal(str(payload.other_deductions or 0)),
+        assessment_year=payload.assessment_year,
+        custom_rules=payload.custom_rules,
     )
     return {"success": True, "result": res}
 

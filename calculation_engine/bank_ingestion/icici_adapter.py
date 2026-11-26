@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Optional, List, Dict, Any
 import pymupdf
 
-from .base_adapter import BaseBankAdapter, detect_account_type_from_text, is_non_financial_document
+from .base_adapter import BaseBankAdapter
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem
 from .pdf_decryptor import open_pdf_document, compute_file_hash
 from .statement_validator import validate_statement_math

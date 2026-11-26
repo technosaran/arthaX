@@ -165,11 +165,18 @@ export async function reconcileInternalTransfers(
     lookbackDate.setDate(lookbackDate.getDate() - lookbackDays);
     const lookbackDateStr = lookbackDate.toISOString().split("T")[0];
 
-    // Fetch user accounts for account hint cross-referencing
-    const { data: userAccounts } = await supabaseAdmin
-      .from("accounts")
-      .select("id, name, last_four")
-      .eq("user_id", userId);
+    // Fetch user accounts and unmatched canonical transactions concurrently
+    const [{ data: userAccounts }, { data: unmatchedTxs, error: fetchErr }] = await Promise.all([
+      supabaseAdmin.from("accounts").select("id, name, last_four").eq("user_id", userId),
+      supabaseAdmin
+        .from("canonical_transactions")
+        .select(
+          "id, account_id, direction, amount, transaction_date, original_narration, normalized_narration, transaction_reference, is_transfer, transfer_counterpart_id"
+        )
+        .eq("user_id", userId)
+        .is("transfer_counterpart_id", null)
+        .gte("transaction_date", lookbackDateStr),
+    ]);
 
     const accountsMap = new Map<string, { name?: string; last_four?: string }>();
     if (userAccounts) {
@@ -178,20 +185,24 @@ export async function reconcileInternalTransfers(
       }
     }
 
-    // Fetch unmatched canonical transactions for this user within lookback window
-    const { data: unmatchedTxs, error: fetchErr } = await supabaseAdmin
-      .from("canonical_transactions")
-      .select("id, account_id, direction, amount, transaction_date, original_narration, normalized_narration, transaction_reference, is_transfer, transfer_counterpart_id")
-      .eq("user_id", userId)
-      .is("transfer_counterpart_id", null)
-      .gte("transaction_date", lookbackDateStr);
-
     if (fetchErr || !unmatchedTxs || unmatchedTxs.length === 0) {
       return { success: true, transfersReconciled: 0, expensesCleaned: 0, incomeCleaned: 0 };
     }
 
-    const debits = unmatchedTxs.filter((t) => t.direction === "DEBIT");
-    const credits = unmatchedTxs.filter((t) => t.direction === "CREDIT");
+    type TxRow = (typeof unmatchedTxs)[number];
+    const debits: TxRow[] = [];
+    const creditsByAmount = new Map<number, Array<TxRow & { ts: number }>>();
+
+    for (const tx of unmatchedTxs) {
+      if (tx.direction === "DEBIT") {
+        debits.push(tx);
+      } else if (tx.direction === "CREDIT") {
+        const amt = Number(tx.amount);
+        const list = creditsByAmount.get(amt) || [];
+        list.push({ ...tx, ts: Date.parse(tx.transaction_date) });
+        creditsByAmount.set(amt, list);
+      }
+    }
 
     let matchedCount = 0;
     let cleanedExpenses = 0;
@@ -204,29 +215,24 @@ export async function reconcileInternalTransfers(
     for (const debit of debits) {
       if (matchedDebitIds.has(debit.id)) continue;
 
-      const debitDate = new Date(debit.transaction_date).getTime();
+      const debitDate = Date.parse(debit.transaction_date);
       const debitAmount = Number(debit.amount);
+      const candidates = creditsByAmount.get(debitAmount);
+      if (!candidates) continue;
 
-      let bestCredit: (typeof credits)[0] | null = null;
+      let bestCredit: TxRow | null = null;
       let highestConfidence = 0;
       let minDiff = Infinity;
 
-      for (const credit of credits) {
+      for (const credit of candidates) {
         if (matchedCreditIds.has(credit.id)) continue;
         if (credit.account_id === debit.account_id) continue; // Same account is not a transfer
-        if (Number(credit.amount) !== debitAmount) continue;
 
-        const creditDate = new Date(credit.transaction_date).getTime();
-        const diffDays = Math.abs(debitDate - creditDate) / (1000 * 60 * 60 * 24);
-
+        const diffDays = Math.abs(debitDate - credit.ts) / (1000 * 60 * 60 * 24);
         if (diffDays > 3) continue; // Must be within 3-day (72-hour) settlement window
 
-        // Evaluate evidence (identifiers, UPI references, narration evidence)
         const evidence = evaluateTransferEvidence(debit, credit, accountsMap);
-        if (!evidence.isMatch || evidence.confidence < 0.80) {
-          // Reject coincidental / ambiguous match without transfer evidence
-          continue;
-        }
+        if (!evidence.isMatch || evidence.confidence < 0.80) continue;
 
         if (evidence.confidence > highestConfidence || (evidence.confidence === highestConfidence && diffDays < minDiff)) {
           highestConfidence = evidence.confidence;

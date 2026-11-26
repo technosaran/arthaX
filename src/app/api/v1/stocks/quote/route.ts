@@ -203,35 +203,40 @@ export async function GET(req: NextRequest) {
   const symbolsToFetch: { symbol: string; exchange: "NSE" | "BSE"; key: string }[] = [];
   const now = Date.now();
 
-  // Check cache for each requested symbol
-  for (const item of parsedItems) {
-    const cacheKey = `arthax:stock_quote:${item.key}`;
-
-    if (!forceRefresh) {
-      // 1. Check memory cache first (fastest, 0ms)
-      const memCached = memoryCache.get(cacheKey);
+  if (forceRefresh) {
+    symbolsToFetch.push(...parsedItems);
+  } else {
+    // 1. Check in-memory cache synchronously first
+    const memMisses: { symbol: string; exchange: "NSE" | "BSE"; key: string }[] = [];
+    for (const item of parsedItems) {
+      const memCached = memoryCache.get(`arthax:stock_quote:${item.key}`);
       if (memCached && memCached.expiry > now) {
         quotesMap[item.key] = memCached.data;
-        continue;
-      }
-
-      // 2. Check Redis cache if configured
-      if (isRedisConfigured && redis) {
-        try {
-          const redisCached = await redis.get<StockQuote>(cacheKey);
-          if (redisCached) {
-            quotesMap[item.key] = redisCached;
-            // Update memory cache
-            memoryCache.set(cacheKey, { data: redisCached, expiry: now + 60000 });
-            continue;
-          }
-        } catch {
-          // Graceful fallback on Redis timeout/error
-        }
+      } else {
+        memMisses.push(item);
       }
     }
 
-    symbolsToFetch.push(item);
+    // 2. Batch-fetch remaining misses from Redis in a single MGET round-trip
+    if (memMisses.length > 0 && isRedisConfigured && redis) {
+      try {
+        const cacheKeys = memMisses.map((m) => `arthax:stock_quote:${m.key}`);
+        const redisResults = await redis.mget<(StockQuote | null)[]>(...cacheKeys);
+        memMisses.forEach((item, idx) => {
+          const cached = redisResults?.[idx];
+          if (cached) {
+            quotesMap[item.key] = cached;
+            memoryCache.set(cacheKeys[idx], { data: cached, expiry: now + 60000 });
+          } else {
+            symbolsToFetch.push(item);
+          }
+        });
+      } catch {
+        symbolsToFetch.push(...memMisses);
+      }
+    } else {
+      symbolsToFetch.push(...memMisses);
+    }
   }
 
   // Fetch uncached symbols in parallel

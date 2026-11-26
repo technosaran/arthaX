@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRWhole as formatINR } from "@/utils/money";
 import {
   Users,
   UserPlus,
@@ -175,13 +176,6 @@ export default function FamilySection() {
   const [resetMember, setResetMember] = useState<FamilyMember | null>(null);
 
   // Currency Formatter
-  const formatINR = useCallback((val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(val || 0);
-  }, []);
 
   // ==========================================
   // Fetch Family Members & Accounts
@@ -505,7 +499,7 @@ export default function FamilySection() {
       })
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [members, chartMode, getMemberSpendingForMonth, formatINR]);
+  }, [members, chartMode, getMemberSpendingForMonth]);
 
   const donutTotal = useMemo(() => {
     return chartMode === "spending" ? totalCurrentSpending : totalMonthlyAllowance;

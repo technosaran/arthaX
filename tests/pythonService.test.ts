@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  getPythonServiceUrl,
   isPythonServiceHealthy,
   ensurePythonServiceOnline,
   getCalculationEngineUnreachableMessage,
@@ -105,6 +106,39 @@ describe("Python Service Manager Suite", () => {
     it("provides cloud guidance for remote URLs", () => {
       const msgRemote = getCalculationEngineUnreachableMessage("https://arthax.vercel.app");
       expect(msgRemote).toContain("backend analytics service is online");
+    });
+  });
+
+  describe("getPythonServiceUrl", () => {
+    it("resolves explicit env, dev loopback, and production origins cleanly", () => {
+      const env = process.env as Record<string, string | undefined>;
+      const saved = {
+        PYTHON_BACKEND_URL: env.PYTHON_BACKEND_URL,
+        PYTHON_SERVICE_URL: env.PYTHON_SERVICE_URL,
+        NODE_ENV: env.NODE_ENV,
+        VERCEL: env.VERCEL,
+        VERCEL_URL: env.VERCEL_URL,
+        NEXT_PUBLIC_APP_URL: env.NEXT_PUBLIC_APP_URL,
+      };
+      try {
+        delete env.PYTHON_BACKEND_URL;
+        delete env.PYTHON_SERVICE_URL;
+        delete env.VERCEL;
+        env.NODE_ENV = "development";
+        env.NEXT_PUBLIC_APP_URL = "https://arthax.vercel.app";
+        expect(getPythonServiceUrl()).toBe("http://127.0.0.1:8000");
+
+        env.NODE_ENV = "production";
+        expect(getPythonServiceUrl("https://preview.arthax.app/")).toBe("https://preview.arthax.app");
+
+        env.PYTHON_SERVICE_URL = "https://py.internal.local/";
+        expect(getPythonServiceUrl("https://preview.arthax.app")).toBe("https://py.internal.local");
+      } finally {
+        for (const [k, v] of Object.entries(saved)) {
+          if (v !== undefined) env[k] = v;
+          else delete env[k];
+        }
+      }
     });
   });
 });

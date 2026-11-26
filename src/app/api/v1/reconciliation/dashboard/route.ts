@@ -18,41 +18,44 @@ export const GET = createApiRoute({
   rateLimit: { limit: 60, windowSeconds: 60 },
   handler: async ({ userId, req }) => {
     try {
-      // 1. Fetch user accounts
-      const { data: accounts, error: accErr } = await supabaseAdmin
-        .from("accounts")
-        .select("id, name, type, classification, balance, last_four, is_active, updated_at")
-        .eq("user_id", userId!);
+      // 1-3. Fetch accounts, recent bank statements, and canonical transactions in parallel
+      const [
+        { data: accounts, error: accErr },
+        { data: statements, error: stmtErr },
+        { data: canonicalTxs, error: txErr },
+      ] = await Promise.all([
+        supabaseAdmin
+          .from("accounts")
+          .select("id, name, type, classification, balance, last_four, is_active, updated_at")
+          .eq("user_id", userId!),
+        supabaseAdmin
+          .from("bank_statements")
+          .select(
+            "id, account_id, bank_name, file_name, period_start, period_end, opening_balance, closing_balance, total_credits, total_debits, transaction_count, reconciliation_status, reconciliation_error, parser_version, created_at"
+          )
+          .eq("user_id", userId!)
+          .order("period_end", { ascending: false })
+          .limit(25),
+        supabaseAdmin
+          .from("canonical_transactions")
+          .select("id, account_id, transaction_date, amount, direction, original_narration, normalized_narration, transaction_reference, category, is_transfer")
+          .eq("user_id", userId!)
+          .order("transaction_date", { ascending: false })
+          .limit(500),
+      ]);
 
       if (accErr) {
         return apiError(`Failed to load accounts: ${accErr.message}`, "DATABASE_ERROR", 500, undefined, req);
       }
-
-      // 2. Fetch recent bank statements
-      const { data: statements, error: stmtErr } = await supabaseAdmin
-        .from("bank_statements")
-        .select("*")
-        .eq("user_id", userId!)
-        .order("period_end", { ascending: false })
-        .limit(25);
-
       if (stmtErr) {
         return apiError(`Failed to load statements: ${stmtErr.message}`, "DATABASE_ERROR", 500, undefined, req);
       }
-
-      // 3. Fetch recent canonical transactions for duplicate and reversal analysis
-      const { data: canonicalTxs, error: txErr } = await supabaseAdmin
-        .from("canonical_transactions")
-        .select("id, account_id, transaction_date, amount, direction, original_narration, normalized_narration, transaction_reference, category, is_transfer")
-        .eq("user_id", userId!)
-        .order("transaction_date", { ascending: false })
-        .limit(500);
-
       if (txErr) {
         return apiError(`Failed to load transactions: ${txErr.message}`, "DATABASE_ERROR", 500, undefined, req);
       }
 
-      // 4. Statement Invariant Analysis (Opening + Credits - Debits == Closing)
+      // 4. Statement Invariant Analysis & O(1) lookup map by account
+      const latestStmtByAccount = new Map<string, { period_end: string; closing_balance: number }>();
       const statementAudits = (statements || []).map((stmt) => {
         const opCents = Math.round(Number(stmt.opening_balance || 0) * 100);
         const crCents = Math.round(Number(stmt.total_credits || 0) * 100);
@@ -61,7 +64,12 @@ export const GET = createApiRoute({
 
         const expectedClosingCents = opCents + crCents - drCents;
         const discrepancyCents = clCents - expectedClosingCents;
-        const hasDiscrepancy = Math.abs(discrepancyCents) > 1; // 1 paisa tolerance
+        const hasDiscrepancy = Math.abs(discrepancyCents) > 1;
+        const closingBalance = Number(stmt.closing_balance);
+
+        if (stmt.account_id && !latestStmtByAccount.has(stmt.account_id)) {
+          latestStmtByAccount.set(stmt.account_id, { period_end: stmt.period_end, closing_balance: closingBalance });
+        }
 
         return {
           id: stmt.id,
@@ -71,7 +79,7 @@ export const GET = createApiRoute({
           period_start: stmt.period_start,
           period_end: stmt.period_end,
           opening_balance: Number(stmt.opening_balance),
-          closing_balance: Number(stmt.closing_balance),
+          closing_balance: closingBalance,
           total_credits: Number(stmt.total_credits),
           total_debits: Number(stmt.total_debits),
           transaction_count: stmt.transaction_count,
@@ -86,7 +94,7 @@ export const GET = createApiRoute({
 
       // 5. Account Balance Reconciliation against Statements
       const accountAudits = (accounts || []).map((acc) => {
-        const latestStmt = statementAudits.find((s) => s.account_id === acc.id);
+        const latestStmt = latestStmtByAccount.get(acc.id);
         const accBal = Number(acc.balance || 0);
 
         let discrepancy = 0;
@@ -141,7 +149,7 @@ export const GET = createApiRoute({
         }
       }
 
-      // 7. Reversed Transaction Detection (e.g. UPI failure refunded or POS reversal)
+      // 7. Reversed Transaction Detection in O(N) via indexed reversal credits
       const reversals: Array<{
         original_id: string;
         reversal_id: string;
@@ -150,26 +158,29 @@ export const GET = createApiRoute({
         narration: string;
       }> = [];
 
-      for (let i = 0; i < txList.length; i++) {
-        const debit = txList[i];
-        if (debit.direction !== "DEBIT") continue;
+      const reversalCreditsByKey = new Map<string, typeof txList>();
+      for (const tx of txList) {
+        if (tx.direction !== "CREDIT") continue;
+        const cNarr = (tx.original_narration || "").toUpperCase();
+        if (cNarr.includes("REFUND") || cNarr.includes("REV") || cNarr.includes("REVERSAL") || cNarr.includes("FAIL")) {
+          const key = `${tx.account_id}:${Number(tx.amount)}`;
+          const bucket = reversalCreditsByKey.get(key) || [];
+          bucket.push(tx);
+          reversalCreditsByKey.set(key, bucket);
+        }
+      }
 
-        for (let j = 0; j < txList.length; j++) {
-          const credit = txList[j];
-          if (credit.direction !== "CREDIT" || credit.account_id !== debit.account_id) continue;
-          if (Number(credit.amount) === Number(debit.amount)) {
-            const cNarr = (credit.original_narration || "").toUpperCase();
-            if (cNarr.includes("REFUND") || cNarr.includes("REV") || cNarr.includes("REVERSAL") || cNarr.includes("FAIL")) {
-              reversals.push({
-                original_id: debit.id,
-                reversal_id: credit.id,
-                amount: Number(debit.amount),
-                date: credit.transaction_date,
-                narration: credit.original_narration,
-              });
-              break;
-            }
-          }
+      for (const debit of txList) {
+        if (debit.direction !== "DEBIT") continue;
+        const creditMatch = reversalCreditsByKey.get(`${debit.account_id}:${Number(debit.amount)}`)?.[0];
+        if (creditMatch) {
+          reversals.push({
+            original_id: debit.id,
+            reversal_id: creditMatch.id,
+            amount: Number(debit.amount),
+            date: creditMatch.transaction_date,
+            narration: creditMatch.original_narration,
+          });
         }
       }
 

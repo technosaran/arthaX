@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRFlex as formatINR } from "@/utils/money";
 import {
   Zap,
   TrendingUp,
@@ -96,13 +97,6 @@ export default function FnoSection() {
   const [syncingZerodha, setSyncingZerodha] = useState(false);
 
   // Currency & formatting helpers
-  const formatINR = useCallback((val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  }, []);
 
   // Fetch Positions & Accounts
   const fetchData = useCallback(async () => {

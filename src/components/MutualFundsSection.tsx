@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRFlex as formatINR } from "@/utils/money";
 import {
   Coins,
   RefreshCw,
@@ -143,13 +144,6 @@ export default function MutualFundsSection() {
   );
 
   // Formatters
-  const formatINR = useCallback((val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  }, []);
 
   const formatNumber = useCallback((val: number, maxDigits = 3) => {
     return new Intl.NumberFormat("en-IN", {

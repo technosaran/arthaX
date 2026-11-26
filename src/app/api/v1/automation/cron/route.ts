@@ -6,6 +6,7 @@ import { checkAndSetIdempotency } from "@/utils/rateLimit";
 import { syncUserGmailStatements } from "@/utils/gmail";
 import { runRecurringJobs } from "@/utils/recurringJobs";
 import { runZerodhaCronSync } from "@/utils/zerodhaCron";
+import { checkAndAutoUpdateTaxRules } from "@/utils/taxAutoUpdater";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -83,10 +84,12 @@ async function handleAutomationCron(req: NextRequest) {
     // so Vercel never drops unawaited background fetch promises upon returning.
     let recurringJobs: unknown = null;
     let zerodhaSync: unknown = null;
+    let taxAutoUpdate: unknown = null;
     if (!isTest || process.env.RUN_SUB_CRONS_IN_TEST === "1") {
-      const [recOutcome, zerodhaOutcome] = await Promise.allSettled([
+      const [recOutcome, zerodhaOutcome, taxOutcome] = await Promise.allSettled([
         runRecurringJobs(),
         runZerodhaCronSync(),
+        checkAndAutoUpdateTaxRules(),
       ]);
 
       if (recOutcome.status === "fulfilled") {
@@ -110,6 +113,16 @@ async function handleAutomationCron(req: NextRequest) {
         logger.error("Zerodha sync execution threw inside unified cron", "AutomationCron", zerodhaOutcome.reason);
         zerodhaSync = { status: "failed", success: false, error: msg };
       }
+
+      taxAutoUpdate =
+        taxOutcome.status === "fulfilled"
+          ? {
+              assessmentYear: taxOutcome.value.assessmentYear,
+              source: taxOutcome.value.source,
+              updated: taxOutcome.value.updated,
+              rulesVersion: taxOutcome.value.rulesVersion,
+            }
+          : { updated: false, error: String(taxOutcome.reason) };
     }
 
     // 3. Query all users with active Gmail integrations (strictly ACTIVE status)
@@ -162,6 +175,7 @@ async function handleAutomationCron(req: NextRequest) {
       results,
       ...(recurringJobs !== null ? { recurringJobs } : {}),
       ...(zerodhaSync !== null ? { zerodhaSync } : {}),
+      ...(taxAutoUpdate !== null ? { taxAutoUpdate } : {}),
     }, { status: 200 });
 
   } catch (err: unknown) {

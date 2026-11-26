@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Banknote, RefreshCw, Trash2, TrendingUp, Plus, Minus } from "lucide-react";
+import { formatINRFlex } from "@/utils/money";
+import { Banknote, Loader2, RefreshCw, Trash2, TrendingUp, Plus, Minus } from "lucide-react";
 import BankLogo from "@/components/BankLogo";
 
 export interface AccountData {
@@ -428,6 +429,7 @@ export interface AppleWalletCardProps {
   onSyncZerodha?: (acc: AccountData) => void;
   isSyncing?: boolean;
   onDelete?: (id: string) => void;
+  isDeleting?: boolean;
   formatCurrency?: (val: number) => string;
   className?: string;
   isStacked?: boolean;
@@ -448,6 +450,7 @@ export default function AppleWalletCard({
   onSyncZerodha,
   isSyncing = false,
   onDelete,
+  isDeleting = false,
   formatCurrency,
   className = "",
   isStacked = false,
@@ -474,14 +477,7 @@ export default function AppleWalletCard({
     account.name.toLowerCase().includes("zerodha") ||
     account.name.toLowerCase().includes("kite");
 
-  const formatINR = (val: number) => {
-    if (formatCurrency) return formatCurrency(val);
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(val);
-  };
+  const formatINR = (val: number) => (formatCurrency ? formatCurrency(val) : formatINRFlex(val));
 
   // Capitalize bank name nicely for Apple Wallet feel with proper acronym preservation
   const acronyms = new Set([
@@ -670,15 +666,17 @@ export default function AppleWalletCard({
 
           {!isCash && !computedIsZerodha && onDelete && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(account.id);
               }}
+              disabled={isDeleting}
               title={`Remove ${account.name}`}
               aria-label={`Remove ${account.name}`}
-              className="w-7 h-7 rounded-full bg-white/10 hover:bg-red-500/25 active:scale-90 text-white/50 hover:text-red-300 border border-white/10 hover:border-red-500/30 backdrop-blur-md flex items-center justify-center transition-all opacity-70 group-hover:opacity-100 shadow-sm cursor-pointer"
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-red-500/25 active:scale-90 text-white/50 hover:text-red-300 border border-white/10 hover:border-red-500/30 backdrop-blur-md flex items-center justify-center transition-all opacity-70 group-hover:opacity-100 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 size={13} />
+              {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
           )}
         </div>

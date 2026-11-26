@@ -63,57 +63,55 @@ async function handleWipe(req: NextRequest) {
       console.warn("[Master Wipe] RPC execution exception:", rpcErr);
     }
 
-    // 2. Cascade-safe fallback if RPC is unavailable
+    // 2. Cascade-safe parallel fallback if RPC is unavailable
     if (!rpcSuccess) {
-      // 2a. Transfers & Canonical Bank Transactions (Restricted foreign keys on accounts)
-      await supabaseAdmin.from("transfers").delete().eq("user_id", userId);
-      await supabaseAdmin.from("canonical_transactions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("bank_statements").delete().eq("user_id", userId);
+      // 2a. Transfers & Canonical Bank Transactions first (FK order before accounts)
+      await Promise.all([
+        supabaseAdmin.from("transfers").delete().eq("user_id", userId),
+        supabaseAdmin.from("canonical_transactions").delete().eq("user_id", userId),
+        supabaseAdmin.from("bank_statements").delete().eq("user_id", userId),
+      ]);
 
-      // 2b. Recurring rules
-      await supabaseAdmin.from("recurring_rules").delete().eq("user_id", userId);
+      // 2b. Independent financial, family, investment, integration & settings leaf tables in parallel
+      const leafTables = [
+        "recurring_rules",
+        "expenses",
+        "income",
+        "budgets",
+        "family_responsibilities",
+        "family_goals",
+        "family_emergency_vault",
+        "family_members",
+        "bond_transactions",
+        "bond_holdings",
+        "bullion_transactions",
+        "bullion_holdings",
+        "crypto_trades",
+        "crypto_holdings",
+        "zerodha_integrations",
+        "binance_integrations",
+        "mutual_fund_transactions",
+        "mutual_fund_holdings",
+        "fno_trades",
+        "fno_positions",
+        "stock_transactions",
+        "stock_holdings",
+        "financial_audit_logs",
+      ] as const;
 
-      // 2c. Expenses & Income
-      await supabaseAdmin.from("expenses").delete().eq("user_id", userId);
-      await supabaseAdmin.from("income").delete().eq("user_id", userId);
-
-      // 2d. Budgets
-      await supabaseAdmin.from("budgets").delete().eq("user_id", userId);
-
-      // 2e. Family finance tables
-      await supabaseAdmin.from("family_responsibilities").delete().eq("user_id", userId);
-      await supabaseAdmin.from("family_goals").delete().eq("user_id", userId);
-      await supabaseAdmin.from("family_emergency_vault").delete().eq("user_id", userId);
-      await supabaseAdmin.from("family_members").delete().eq("user_id", userId);
-
-      // 2f. Financial audit logs, F&O derivatives, stocks, mutual funds, bonds, bullion, crypto & integrations
-      await supabaseAdmin.from("bond_transactions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("bond_holdings").delete().eq("user_id", userId);
-      await supabaseAdmin.from("bullion_transactions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("bullion_holdings").delete().eq("user_id", userId);
-      await supabaseAdmin.from("crypto_trades").delete().eq("user_id", userId);
-      await supabaseAdmin.from("crypto_holdings").delete().eq("user_id", userId);
-      await supabaseAdmin.from("zerodha_integrations").delete().eq("user_id", userId);
-      await supabaseAdmin.from("binance_integrations").delete().eq("user_id", userId);
-      await supabaseAdmin.from("mutual_fund_transactions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("mutual_fund_holdings").delete().eq("user_id", userId);
-      await supabaseAdmin.from("fno_trades").delete().eq("user_id", userId);
-      await supabaseAdmin.from("fno_positions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("stock_transactions").delete().eq("user_id", userId);
-      await supabaseAdmin.from("stock_holdings").delete().eq("user_id", userId);
-      await supabaseAdmin.from("financial_audit_logs").delete().eq("user_id", userId);
-
-      // 2g. Reset external telegram integration on user_settings
-      await supabaseAdmin
-        .from("user_settings")
-        .update({
-          telegram_chat_id: null,
-          telegram_username: null,
-          telegram_link_token: null,
-          telegram_linked_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
+      await Promise.all([
+        ...leafTables.map((table) => supabaseAdmin.from(table).delete().eq("user_id", userId)),
+        supabaseAdmin
+          .from("user_settings")
+          .update({
+            telegram_chat_id: null,
+            telegram_username: null,
+            telegram_link_token: null,
+            telegram_linked_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId),
+      ]);
 
       // 2g. Accounts: preserve/seed Cash in Hand with 0.00 balance
       const { data: accounts } = await supabaseAdmin

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Download, X, Share, PlusSquare, Smartphone, Sparkles, CheckCircle2 } from "lucide-react";
+import { Download, X, Share, PlusSquare } from "lucide-react";
 import Logo from "@/components/Logo";
 
 export default function PwaInstallPrompt() {

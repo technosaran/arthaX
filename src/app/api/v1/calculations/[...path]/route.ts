@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/utils/auth";
 import { apiError, apiUnauthorized, apiForbidden, extractRequestId } from "@/utils/apiResponse";
 import { logger } from "@/utils/logger";
 import { constantTimeCompare } from "@/utils/crypto";
+import { getPythonServiceUrl } from "@/utils/pythonService";
 import {
   executeNetWorthTS,
   executeTaxRegimesTS,
@@ -24,15 +25,6 @@ function isDeveloperOrAdmin(req: NextRequest, userId: string): boolean {
   }
 
   return false;
-}
-
-function getPythonServiceUrl(req: NextRequest): string {
-  if (process.env.PYTHON_BACKEND_URL) return process.env.PYTHON_BACKEND_URL;
-  if (process.env.PYTHON_SERVICE_URL) return process.env.PYTHON_SERVICE_URL;
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    return req.nextUrl.origin;
-  }
-  return "http://127.0.0.1:8000";
 }
 
 function formatEngineResponse(data: Record<string, unknown> | null | undefined) {
@@ -88,7 +80,7 @@ export async function GET(
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
 
-  const baseUrl = getPythonServiceUrl(req);
+  const baseUrl = getPythonServiceUrl(req.nextUrl.origin);
   const targetUrl = `${baseUrl}/api/py/calculations/${subPath}${effectiveSearch}`;
 
   try {
@@ -170,7 +162,7 @@ export async function POST(
   const { path } = await context.params;
   const subPath = path ? path.join("/") : "";
 
-  const baseUrl = getPythonServiceUrl(req);
+  const baseUrl = getPythonServiceUrl(req.nextUrl.origin);
   const targetUrl = `${baseUrl}/api/py/calculations/${subPath}`;
 
   let body: Record<string, unknown> = {};

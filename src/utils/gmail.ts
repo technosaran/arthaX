@@ -5,7 +5,7 @@ import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis
 import { reconcileInternalTransfers } from "@/utils/transfers";
 import { validateMonetaryAmount } from "@/utils/money";
 import { generateBankPasswordPermutations, BankingIdentityDetails, getBankPasswordFormatDescription } from "@/utils/bankPasswords";
-import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage } from "@/utils/pythonService";
+import { ensurePythonServiceOnline, getCalculationEngineUnreachableMessage, getPythonServiceUrl } from "@/utils/pythonService";
 import crypto from "crypto";
 
 export interface GoogleTokenRefreshResult {
@@ -441,12 +441,7 @@ export async function syncUserGmailStatements(
     .select("id")
     .single();
 
-  const pythonServiceUrl =
-    options?.baseUrl ||
-    process.env.PYTHON_BACKEND_URL ||
-    process.env.PYTHON_SERVICE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "https://arthax.vercel.app");
+  const pythonServiceUrl = options?.baseUrl || getPythonServiceUrl();
 
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
@@ -968,56 +963,64 @@ export async function syncUserGmailStatements(
         totalImported += insertedCount;
         totalDuplicates += canonicalRows.length - insertedCount;
 
-        // Synchronize ONLY newly inserted non-transfer canonical records into expenses and income
+        // Synchronize ONLY newly inserted non-transfer canonical records via bulk upserts
+        const expenseRows: Array<Record<string, unknown>> = [];
+        const incomeRows: Array<Record<string, unknown>> = [];
+
         for (const row of canonicalRows) {
-          if (row.is_transfer) continue; // Transfers are reconciled separately
+          if (row.is_transfer) continue;
           const canonicalId = newCanonicalMap.get(row.dedup_hash);
-          if (!canonicalId) {
-            // Already imported in a previous statement run; skip to prevent duplication
-            continue;
-          }
+          if (!canonicalId) continue;
 
           if (row.direction === "DEBIT") {
-            const { error: expErr } = await supabaseAdmin
-              .from("expenses")
-              .upsert({
-                user_id: userId,
-                account_id: targetAccountId,
-                amount: row.amount,
-                category: row.category,
-                expense_date: row.transaction_date,
-                title: row.merchant_name || row.normalized_narration,
-                notes: `Bank statement import: ${row.original_narration}`,
-                tags: ["statement_import", "verified"],
-                canonical_transaction_id: canonicalId,
-              }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
-
-            if (expErr) {
-              logger.error("Failed to sync expense from canonical transaction", "GmailService", expErr, {
-                canonicalId,
-              });
-            }
+            expenseRows.push({
+              user_id: userId,
+              account_id: targetAccountId,
+              amount: row.amount,
+              category: row.category,
+              expense_date: row.transaction_date,
+              title: row.merchant_name || row.normalized_narration,
+              notes: `Bank statement import: ${row.original_narration}`,
+              tags: ["statement_import", "verified"],
+              canonical_transaction_id: canonicalId,
+            });
           } else if (row.direction === "CREDIT") {
-            const { error: incErr } = await supabaseAdmin
-              .from("income")
-              .upsert({
-                user_id: userId,
-                account_id: targetAccountId,
-                amount: row.amount,
-                category: row.category === "Salary" ? "Salary" : "Other Income",
-                received_date: row.transaction_date,
-                title: row.counterparty_name || row.normalized_narration,
-                notes: `Bank statement import: ${row.original_narration}`,
-                tags: ["statement_import", "verified"],
-                canonical_transaction_id: canonicalId,
-              }, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true });
-
-            if (incErr) {
-              logger.error("Failed to sync income from canonical transaction", "GmailService", incErr, {
-                canonicalId,
-              });
-            }
+            incomeRows.push({
+              user_id: userId,
+              account_id: targetAccountId,
+              amount: row.amount,
+              category: row.category === "Salary" ? "Salary" : "Other Income",
+              received_date: row.transaction_date,
+              title: row.counterparty_name || row.normalized_narration,
+              notes: `Bank statement import: ${row.original_narration}`,
+              tags: ["statement_import", "verified"],
+              canonical_transaction_id: canonicalId,
+            });
           }
+        }
+
+        const [expSyncRes, incSyncRes] = await Promise.all([
+          expenseRows.length > 0
+            ? supabaseAdmin
+                .from("expenses")
+                .upsert(expenseRows, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true })
+            : { error: null },
+          incomeRows.length > 0
+            ? supabaseAdmin
+                .from("income")
+                .upsert(incomeRows, { onConflict: "user_id,canonical_transaction_id", ignoreDuplicates: true })
+            : { error: null },
+        ]);
+
+        if (expSyncRes.error) {
+          logger.error("Failed to sync expenses from canonical transactions", "GmailService", expSyncRes.error, {
+            count: expenseRows.length,
+          });
+        }
+        if (incSyncRes.error) {
+          logger.error("Failed to sync income from canonical transactions", "GmailService", incSyncRes.error, {
+            count: incomeRows.length,
+          });
         }
       }
 

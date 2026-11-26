@@ -13,6 +13,12 @@ import {
   roundMoney,
   percentMoney,
 } from "@/utils/money";
+import {
+  TaxRuleOverride,
+  TaxSlab,
+  calculateProgressiveSlabTax,
+  resolveTaxYearPreset,
+} from "@/utils/taxRules";
 
 export interface EmbeddedEngineResult<T = unknown> {
   success: boolean;
@@ -171,10 +177,12 @@ export function executeNetWorthTS(inputs: NetWorthInputs) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Tax Regime Comparison Engine (TS Embedded)
+// 2. Tax Regime Comparison Engine (TS Embedded — Dynamic FY & Budget Rules)
 // ---------------------------------------------------------------------------
 export interface TaxRegimesInputs {
   gross_income: number;
+  assessment_year?: string;
+  custom_rules?: TaxRuleOverride | null;
   deductions_80c?: number;
   deductions_80d?: number;
   nps_80ccd_1b?: number;
@@ -184,62 +192,87 @@ export interface TaxRegimesInputs {
   other_deductions?: number;
 }
 
+function computeSurchargeWithMarginalRelief(
+  taxableIncome: number,
+  baseTax: number,
+  slabs: TaxSlab[],
+  isNewRegime: boolean
+): number {
+  if (taxableIncome <= 5000000 || baseTax <= 0) return 0;
+
+  let nominalRate = 0.1;
+  let threshold = 5000000;
+  let priorSurchargeRateAtThreshold = 0;
+
+  if (taxableIncome <= 10000000) {
+    nominalRate = 0.1;
+    threshold = 5000000;
+    priorSurchargeRateAtThreshold = 0;
+  } else if (taxableIncome <= 20000000) {
+    nominalRate = 0.15;
+    threshold = 10000000;
+    priorSurchargeRateAtThreshold = 0.1;
+  } else if (taxableIncome <= 50000000) {
+    nominalRate = 0.25;
+    threshold = 20000000;
+    priorSurchargeRateAtThreshold = 0.15;
+  } else {
+    nominalRate = isNewRegime ? 0.25 : 0.37;
+    threshold = 50000000;
+    priorSurchargeRateAtThreshold = 0.25;
+  }
+
+  const taxAtThreshold = calculateProgressiveSlabTax(threshold, slabs);
+  const priorSurcharge = taxAtThreshold * priorSurchargeRateAtThreshold;
+  const maxPayable = taxAtThreshold + priorSurcharge + (taxableIncome - threshold);
+  const nominalSurcharge = baseTax * nominalRate;
+  const totalUnderNominal = baseTax + nominalSurcharge;
+
+  if (totalUnderNominal > maxPayable) {
+    const relief = totalUnderNominal - maxPayable;
+    return roundMoney(Math.max(0, nominalSurcharge - relief));
+  }
+  return roundMoney(nominalSurcharge);
+}
+
 export function executeTaxRegimesTS(inputs: TaxRegimesInputs) {
+  const preset = resolveTaxYearPreset(inputs.assessment_year, inputs.custom_rules);
+  const { newRegime: newRules, oldRegime: oldRules } = preset.rules;
+
   const gross = Math.max(0, inputs.gross_income || 0);
   const nps2 = Math.max(0, inputs.nps_80ccd_2 || 0);
 
-  // --- New Regime (Section 115BAC) ---
-  const newStdDed = 75000;
+  // --- New Regime (Section 115BAC / Income-tax Act, 2025) ---
+  const newStdDed = newRules.standardDeduction;
   const newTaxable = Math.max(0, gross - newStdDed - nps2);
+  const newBaseTax = calculateProgressiveSlabTax(newTaxable, newRules.slabs);
 
-  let newBaseTax = 0;
-  if (newTaxable > 300000) {
-    const s1 = Math.min(newTaxable - 300000, 400000);
-    if (s1 > 0) newBaseTax += s1 * 0.05;
-    if (newTaxable > 700000) {
-      const s2 = Math.min(newTaxable - 700000, 300000);
-      newBaseTax += s2 * 0.10;
-    }
-    if (newTaxable > 1000000) {
-      const s3 = Math.min(newTaxable - 1000000, 200000);
-      newBaseTax += s3 * 0.15;
-    }
-    if (newTaxable > 1200000) {
-      const s4 = Math.min(newTaxable - 1200000, 300000);
-      newBaseTax += s4 * 0.20;
-    }
-    if (newTaxable > 1500000) {
-      const s5 = newTaxable - 1500000;
-      newBaseTax += s5 * 0.30;
-    }
-  }
-
+  let newRebate87a = 0;
   let newMarginalRelief87a = 0;
-  let newTaxAfterRebate = 0;
-  if (newTaxable <= 700000) {
-    newTaxAfterRebate = 0;
-  } else {
-    const excess7L = newTaxable - 700000;
-    if (newBaseTax > excess7L) {
-      newMarginalRelief87a = newBaseTax - excess7L;
-      newTaxAfterRebate = excess7L;
-    } else {
-      newTaxAfterRebate = newBaseTax;
+  let newTaxAfterRebate = newBaseTax;
+
+  if (newTaxable <= newRules.rebate87aMaxIncome) {
+    newRebate87a = Math.min(newBaseTax, newRules.rebate87aMaxAmount);
+    newTaxAfterRebate = Math.max(0, roundMoney(newBaseTax - newRebate87a));
+  } else if (newRules.marginalRelief87a) {
+    const excessOverThreshold = newTaxable - newRules.rebate87aMaxIncome;
+    if (newBaseTax > excessOverThreshold) {
+      newMarginalRelief87a = roundMoney(newBaseTax - excessOverThreshold);
+      newTaxAfterRebate = roundMoney(excessOverThreshold);
     }
   }
 
-  // Surcharge (New Regime)
-  let newSurcharge = 0;
-  if (newTaxable > 5000000) {
-    const rate = newTaxable > 20000000 ? 0.25 : newTaxable > 10000000 ? 0.15 : 0.10;
-    newSurcharge = roundMoney(newTaxAfterRebate * rate);
-  }
-
+  const newSurcharge = computeSurchargeWithMarginalRelief(
+    newTaxable,
+    newTaxAfterRebate,
+    newRules.slabs,
+    true
+  );
   const newCess = roundMoney((newTaxAfterRebate + newSurcharge) * 0.04);
   const newTotalTax = roundMoney(newTaxAfterRebate + newSurcharge + newCess);
 
   // --- Old Regime ---
-  const oldStdDed = 50000;
+  const oldStdDed = oldRules.standardDeduction;
   const capped80c = Math.min(inputs.deductions_80c || 0, 150000);
   const capped80d = Math.min(inputs.deductions_80d || 0, 100000);
   const cappedNps1b = Math.min(inputs.nps_80ccd_1b || 0, 50000);
@@ -255,34 +288,33 @@ export function executeTaxRegimesTS(inputs: TaxRegimesInputs) {
     (inputs.other_deductions || 0);
 
   const oldTaxable = Math.max(0, gross - totalOldDeductions);
-  let oldBaseTax = 0;
-  if (oldTaxable > 250000) {
-    const s1 = Math.min(oldTaxable - 250000, 250000);
-    if (s1 > 0) oldBaseTax += s1 * 0.05;
-    if (oldTaxable > 500000) {
-      const s2 = Math.min(oldTaxable - 500000, 500000);
-      oldBaseTax += s2 * 0.20;
-    }
-    if (oldTaxable > 1000000) {
-      const s3 = oldTaxable - 1000000;
-      oldBaseTax += s3 * 0.30;
-    }
+  const oldBaseTax = calculateProgressiveSlabTax(oldTaxable, oldRules.slabs);
+
+  let oldRebate87a = 0;
+  let oldTaxAfterRebate = oldBaseTax;
+  if (oldTaxable <= oldRules.rebate87aMaxIncome) {
+    oldRebate87a = Math.min(oldBaseTax, oldRules.rebate87aMaxAmount);
+    oldTaxAfterRebate = Math.max(0, roundMoney(oldBaseTax - oldRebate87a));
   }
 
-  const oldTaxAfterRebate = oldTaxable <= 500000 ? 0 : oldBaseTax;
-  let oldSurcharge = 0;
-  if (oldTaxable > 5000000) {
-    const rate = oldTaxable > 50000000 ? 0.37 : oldTaxable > 20000000 ? 0.25 : oldTaxable > 10000000 ? 0.15 : 0.10;
-    oldSurcharge = roundMoney(oldTaxAfterRebate * rate);
-  }
-
+  const oldSurcharge = computeSurchargeWithMarginalRelief(
+    oldTaxable,
+    oldTaxAfterRebate,
+    oldRules.slabs,
+    false
+  );
   const oldCess = roundMoney((oldTaxAfterRebate + oldSurcharge) * 0.04);
   const oldTotalTax = roundMoney(oldTaxAfterRebate + oldSurcharge + oldCess);
 
   const savingsAmount = Math.abs(oldTotalTax - newTotalTax);
-  const recommendedRegime = newTotalTax < oldTotalTax ? "NEW_REGIME" : oldTotalTax < newTotalTax ? "OLD_REGIME" : "EQUAL";
+  const recommendedRegime: "NEW_REGIME" | "OLD_REGIME" | "EQUAL" =
+    newTotalTax < oldTotalTax ? "NEW_REGIME" : oldTotalTax < newTotalTax ? "OLD_REGIME" : "EQUAL";
 
   return {
+    assessmentYear: preset.assessmentYear,
+    financialYear: preset.financialYear,
+    rulesVersion: preset.rulesVersion,
+    statuteReference: preset.statuteReference,
     recommendedRegime,
     savingsAmount: roundMoney(savingsAmount),
     newRegime: {
@@ -291,6 +323,7 @@ export function executeTaxRegimesTS(inputs: TaxRegimesInputs) {
       corporateNpsDeduction: roundMoney(nps2),
       taxableIncome: roundMoney(newTaxable),
       baseIncomeTax: roundMoney(newBaseTax),
+      section87aRebate: roundMoney(newRebate87a),
       section87aMarginalRelief: roundMoney(newMarginalRelief87a),
       taxAfterRebate: roundMoney(newTaxAfterRebate),
       surcharge: newSurcharge,
@@ -304,6 +337,7 @@ export function executeTaxRegimesTS(inputs: TaxRegimesInputs) {
       totalDeductions: roundMoney(totalOldDeductions),
       taxableIncome: roundMoney(oldTaxable),
       baseIncomeTax: roundMoney(oldBaseTax),
+      section87aRebate: roundMoney(oldRebate87a),
       taxAfterRebate: roundMoney(oldTaxAfterRebate),
       surcharge: oldSurcharge,
       cess: oldCess,

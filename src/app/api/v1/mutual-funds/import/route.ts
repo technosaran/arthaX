@@ -190,72 +190,74 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upsert into mutual_fund_holdings
-    let importedCount = 0;
-    let updatedCount = 0;
-    const finalHoldings: Record<string, unknown>[] = [];
+    // Batch mutual_fund_holdings sync (1 lookup + up to 2 parallel writes instead of 2N sequential queries)
+    const { data: existingRows } = await supabaseAdmin
+      .from("mutual_fund_holdings")
+      .select("scheme_code, folio_number")
+      .eq("user_id", userId);
+
+    const existingKeys = new Set(
+      (existingRows || []).map((r) => `${r.scheme_code}:${r.folio_number}`)
+    );
+
+    const nowIso = new Date().toISOString();
+    const navDateIso = nowIso.split("T")[0];
+    const updatesMap = new Map<string, Record<string, unknown>>();
+    const insertsMap = new Map<string, Record<string, unknown>>();
 
     for (const item of parsedItems) {
-      const { data: existing } = await supabaseAdmin
-        .from("mutual_fund_holdings")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("scheme_code", item.schemeCode)
-        .eq("folio_number", item.folioNumber)
-        .maybeSingle();
-
-      if (existing) {
-        const { data: updated } = await supabaseAdmin
-          .from("mutual_fund_holdings")
-          .update({
-            scheme_name: item.schemeName,
-            fund_house: item.fundHouse,
-            category: item.category,
-            plan_type: item.planType,
-            units: item.units,
-            avg_nav: item.avgNav,
-            invested_amount: item.investedAmount,
-            current_nav: item.currentNav,
-            isin: item.isin,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id)
-          .select()
-          .single();
-
-        if (updated) {
-          updatedCount++;
-          finalHoldings.push(updated);
-        }
+      const k = `${item.schemeCode}:${item.folioNumber}`;
+      const common = {
+        user_id: userId,
+        scheme_code: item.schemeCode,
+        scheme_name: item.schemeName,
+        fund_house: item.fundHouse,
+        category: item.category,
+        plan_type: item.planType,
+        folio_number: item.folioNumber,
+        units: item.units,
+        avg_nav: item.avgNav,
+        invested_amount: item.investedAmount,
+        current_nav: item.currentNav,
+        isin: item.isin,
+      };
+      if (existingKeys.has(k)) {
+        updatesMap.set(k, { ...common, updated_at: nowIso });
       } else {
-        const { data: inserted } = await supabaseAdmin
-          .from("mutual_fund_holdings")
-          .insert({
-            user_id: userId,
-            scheme_code: item.schemeCode,
-            scheme_name: item.schemeName,
-            fund_house: item.fundHouse,
-            category: item.category,
-            plan_type: item.planType,
-            dividend_option: "Growth",
-            folio_number: item.folioNumber,
-            units: item.units,
-            avg_nav: item.avgNav,
-            invested_amount: item.investedAmount,
-            current_nav: item.currentNav,
-            previous_nav: item.currentNav,
-            isin: item.isin,
-            nav_date: new Date().toISOString().split("T")[0],
-          })
-          .select()
-          .single();
-
-        if (inserted) {
-          importedCount++;
-          finalHoldings.push(inserted);
-        }
+        insertsMap.set(k, {
+          ...common,
+          dividend_option: "Growth",
+          previous_nav: item.currentNav,
+          nav_date: navDateIso,
+        });
       }
     }
+
+    const updateRows = Array.from(updatesMap.values());
+    const insertRows = Array.from(insertsMap.values());
+
+    const [updateRes, insertRes] = await Promise.all([
+      updateRows.length > 0
+        ? supabaseAdmin
+            .from("mutual_fund_holdings")
+            .upsert(updateRows, { onConflict: "user_id,folio_number,scheme_code" })
+            .select()
+        : { data: [], error: null },
+      insertRows.length > 0
+        ? supabaseAdmin.from("mutual_fund_holdings").insert(insertRows).select()
+        : { data: [], error: null },
+    ]);
+
+    const writeErr = updateRes.error || insertRes.error;
+    if (writeErr) {
+      return apiError(writeErr.message || "Failed to import mutual fund holdings", "DATABASE_ERROR", 500, undefined, req);
+    }
+
+    const updatedRows = (updateRes.data || []) as Record<string, unknown>[];
+    const insertedRows = (insertRes.data || []) as Record<string, unknown>[];
+    const updatedCount = updatedRows.length;
+    const importedCount = insertedRows.length;
+    const finalHoldings: Record<string, unknown>[] = [...updatedRows, ...insertedRows];
 
     if (importedCount > 0 || updatedCount > 0) {
       await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);

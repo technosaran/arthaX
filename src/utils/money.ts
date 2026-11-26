@@ -357,28 +357,56 @@ export function percentMoney(part: MoneyInput, total: MoneyInput, options?: { cl
   return clamped;
 }
 
+const INR_FORMATTER_2DP = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const INR_FORMATTER_FLEX = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
+
+const INR_FORMATTER_0DP = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+const USD_FORMATTER_2DP = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 /**
- * Formats a monetary number in Indian standard currency format (Lakhs / Crores).
+ * Formats a monetary number in Indian standard currency format (Lakhs / Crores, 2 decimals).
  */
 export function formatINR(val: MoneyInput): string {
-  const num = roundMoney(val);
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
+  return INR_FORMATTER_2DP.format(roundMoney(val));
+}
+
+/**
+ * Formats a monetary number in INR up to 2 decimal places without forcing trailing .00.
+ */
+export function formatINRFlex(val: MoneyInput): string {
+  return INR_FORMATTER_FLEX.format(roundMoney(val));
+}
+
+/**
+ * Formats a monetary number rounded to whole INR rupees (₹1,50,000).
+ */
+export function formatINRWhole(val: MoneyInput): string {
+  return INR_FORMATTER_0DP.format(Math.round(parseCleanNumber(val)));
 }
 
 /**
  * Formats a monetary number in USD currency format.
  */
 export function formatUSD(val: MoneyInput): string {
-  const num = roundMoney(val);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
+  return USD_FORMATTER_2DP.format(roundMoney(val));
 }

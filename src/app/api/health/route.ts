@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { isRedisConfigured, redis } from "@/utils/redis";
 import { extractRequestId } from "@/utils/apiResponse";
+import { getPythonServiceUrl } from "@/utils/pythonService";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +61,13 @@ export async function GET(req: Request) {
   };
 
   // 5. ArthaX Financial Calculation Engine (AFCE) Health Check
-  const pyUrl =
-    process.env.PYTHON_BACKEND_URL ||
-    process.env.PYTHON_SERVICE_URL ||
-    "http://127.0.0.1:8000";
+  let originFallback: string | undefined;
+  try {
+    originFallback = new URL(req.url).origin;
+  } catch {
+    originFallback = undefined;
+  }
+  const pyUrl = getPythonServiceUrl(originFallback);
 
   try {
     const calcStart = Date.now();

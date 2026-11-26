@@ -196,7 +196,7 @@ def test_old_vs_new_tax_regime_comparator():
 
 def test_tax_regime_marginal_relief_87a():
     """
-    Test Section 87A Marginal Relief under Section 115BAC New Regime:
+    Test Section 87A Marginal Relief under AY 2025-26 (Budget 2024) New Regime:
     For gross income = ₹7,85,000 (after ₹75k standard deduction, taxable income = ₹7,10,000):
     Without marginal relief:
       3L-7L = 4L * 5% = 20,000
@@ -211,7 +211,7 @@ def test_tax_regime_marginal_relief_87a():
     engine = TaxEngine()
     gross_income = Decimal("785000.00")  # Taxable = 7,10,000 after 75,000 std deduction
 
-    res = engine.compare_regimes(gross_income=gross_income)
+    res = engine.compare_regimes(gross_income=gross_income, assessment_year="2025-2026")
     new_regime = res["newRegime"]
 
     assert new_regime["taxableIncome"] == 710000.00
@@ -219,6 +219,63 @@ def test_tax_regime_marginal_relief_87a():
     assert new_regime["section87aMarginalRelief"] == 11000.00
     assert new_regime["taxAfterRebate"] == 10000.00
     assert new_regime["totalTax"] == 10400.00
+
+
+def test_tax_regime_budget_2025_and_income_tax_act_2025():
+    """
+    Test FY 2025-26 (AY 2026-27) & FY 2026-27 (AY 2027-28) slabs and ₹12L 87A rebate:
+    - ₹12,75,000 gross -> ₹12,00,000 taxable -> ₹60,000 base tax fully rebated -> ₹0 tax.
+    - ₹12,85,000 gross -> ₹12,10,000 taxable -> marginal relief caps base tax at ₹10,000 (+4% cess = ₹10,400).
+    - ₹25,75,000 gross -> ₹25,00,000 taxable -> ₹3,30,000 + ₹13,200 cess = ₹3,43,200.
+    """
+    engine = TaxEngine()
+
+    res_zero = engine.compare_regimes(gross_income=Decimal("1275000.00"), assessment_year="2027-2028")
+    assert res_zero["newRegime"]["taxableIncome"] == 1200000.00
+    assert res_zero["newRegime"]["baseIncomeTax"] == 60000.00
+    assert res_zero["newRegime"]["section87aRebate"] == 60000.00
+    assert res_zero["newRegime"]["totalTax"] == 0.00
+
+    res_marginal = engine.compare_regimes(gross_income=Decimal("1285000.00"), assessment_year="2027-2028")
+    assert res_marginal["newRegime"]["baseIncomeTax"] == 61500.00
+    assert res_marginal["newRegime"]["section87aMarginalRelief"] == 51500.00
+    assert res_marginal["newRegime"]["totalTax"] == 10400.00
+
+    res_high = engine.compare_regimes(gross_income=Decimal("2575000.00"), assessment_year="2026-2027")
+    assert res_high["newRegime"]["baseIncomeTax"] == 330000.00
+    assert res_high["newRegime"]["totalTax"] == 343200.00
+
+
+def test_future_ay_and_custom_rule_overrides():
+    """
+    Future AY (e.g. 2029-2030) automatically carries forward latest statutory preset,
+    and custom_rules overrides allow updating exemption limits without code edits.
+    """
+    engine = TaxEngine()
+    result = engine.execute({
+        "assessment_year": "2029-2030",
+        "custom_rules": {
+            "rulesVersion": "Union Budget 2028",
+            "equity": {"ltcgExemptionLimit": 200000, "ltcgRate": 0.10},
+        },
+        "realized_trades": [
+            {
+                "symbol": "TCS",
+                "asset_class": "equity",
+                "buy_date": "2024-01-01",
+                "sell_date": "2028-06-01",
+                "buy_amount": 100000,
+                "sell_amount": 350000,
+            }
+        ],
+    })
+    assert result["metadata"]["status"] == "SUCCESS"
+    data = result["data"]
+    assert data["assessmentYear"] == "2029-2030"
+    assert data["isCustomized"] is True
+    assert data["realized"]["equityLtcgGain"] == 250000.00
+    assert data["realized"]["equityLtcgTaxable"] == 50000.00
+    assert data["realized"]["equityLtcgTax"] == 5000.00
 
 
 def test_tax_regime_corporate_nps_and_surcharge():

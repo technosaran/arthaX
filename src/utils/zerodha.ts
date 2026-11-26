@@ -669,6 +669,9 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     // --- Section 1: Stocks & Bonds Demat Holdings Sync ---
     if (holdingsRes.status === "fulfilled" && Array.isArray(holdingsRes.value)) {
       const activeSymbols = new Set<string>();
+      const nowIso = new Date().toISOString();
+      const bondsToUpsert: Array<Record<string, unknown>> = [];
+      const stocksToUpsert: Array<Record<string, unknown>> = [];
 
       for (const h of holdingsRes.value) {
         const totalQty = (h.quantity || 0) + (h.t1_quantity || 0);
@@ -679,9 +682,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         const isin = (h.isin || "").toUpperCase();
 
         if (isBondInstrument(symbol, isin)) {
-          // Detected Bond / G-Sec / SGB instrument in Zerodha Demat
           const existingBond = existingBondMap.get(isin);
-
           let bondType: "CORPORATE" | "GOVERNMENT" | "STATE_DEVELOPMENT" | "SGB" | "TAX_FREE" | "OTHER" = "CORPORATE";
           let issuerName = symbol.split("-")[0] || symbol;
           let creditRating = "CRISIL AAA";
@@ -703,56 +704,56 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           const faceValue = existingBond?.face_value ? Number(existingBond.face_value) : (isin.startsWith("IN00") ? 100 : 1000);
           const avgBuyPrice = h.average_price || faceValue;
           const currentPrice = h.last_price || h.close_price || avgBuyPrice;
-          const investedAmount = Math.round(totalQty * avgBuyPrice * 100) / 100;
 
-          await supabaseAdmin.from("bond_holdings").upsert(
-            {
-              user_id: userId,
-              isin: isin || `BOND_${symbol}`,
-              name: existingBond?.name || h.tradingsymbol || symbol,
-              issuer_name: existingBond?.issuer_name || issuerName,
-              bond_type: existingBond?.bond_type || bondType,
-              platform: existingBond?.platform || "ZERODHA",
-              demat_account_id: zerodhaAccountId,
-              demat_broker: "ZERODHA",
-              face_value: faceValue,
-              quantity: totalQty,
-              avg_buy_price: Math.round(avgBuyPrice * 100) / 100,
-              invested_amount: investedAmount,
-              current_price: Math.round(currentPrice * 100) / 100,
-              coupon_rate: existingBond?.coupon_rate ?? 7.5,
-              coupon_frequency: existingBond?.coupon_frequency || "ANNUAL",
-              maturity_date: existingBond?.maturity_date || "2033-01-01",
-              credit_rating: existingBond?.credit_rating || creditRating,
-              notes: `Confirmed in Zerodha Demat (CDSL). ISIN: ${isin || "N/A"}`,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,isin" }
-          );
+          bondsToUpsert.push({
+            user_id: userId,
+            isin: isin || `BOND_${symbol}`,
+            name: existingBond?.name || h.tradingsymbol || symbol,
+            issuer_name: existingBond?.issuer_name || issuerName,
+            bond_type: existingBond?.bond_type || bondType,
+            platform: existingBond?.platform || "ZERODHA",
+            demat_account_id: zerodhaAccountId,
+            demat_broker: "ZERODHA",
+            face_value: faceValue,
+            quantity: totalQty,
+            avg_buy_price: Math.round(avgBuyPrice * 100) / 100,
+            invested_amount: Math.round(totalQty * avgBuyPrice * 100) / 100,
+            current_price: Math.round(currentPrice * 100) / 100,
+            coupon_rate: existingBond?.coupon_rate ?? 7.5,
+            coupon_frequency: existingBond?.coupon_frequency || "ANNUAL",
+            maturity_date: existingBond?.maturity_date || "2033-01-01",
+            credit_rating: existingBond?.credit_rating || creditRating,
+            notes: `Confirmed in Zerodha Demat (CDSL). ISIN: ${isin || "N/A"}`,
+            updated_at: nowIso,
+          });
           bondsSynced++;
         } else {
-          // Regular Equity Stock
           activeSymbols.add(`${symbol}:${exchange}`);
-
-          await supabaseAdmin.from("stock_holdings").upsert(
-            {
-              user_id: userId,
-              symbol,
-              exchange,
-              company_name: h.tradingsymbol || symbol,
-              sector: "Other",
-              quantity: totalQty,
-              avg_buy_price: h.average_price || 0,
-              account_id: zerodhaAccountId,
-              currency: "INR",
-              notes: `Synced from Zerodha Kite. ISIN: ${h.isin || "N/A"}`,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,symbol,exchange" }
-          );
+          stocksToUpsert.push({
+            user_id: userId,
+            symbol,
+            exchange,
+            company_name: h.tradingsymbol || symbol,
+            sector: "Other",
+            quantity: totalQty,
+            avg_buy_price: h.average_price || 0,
+            account_id: zerodhaAccountId,
+            currency: "INR",
+            notes: `Synced from Zerodha Kite. ISIN: ${h.isin || "N/A"}`,
+            updated_at: nowIso,
+          });
           stocksSynced++;
         }
       }
+
+      await Promise.all([
+        bondsToUpsert.length > 0
+          ? supabaseAdmin.from("bond_holdings").upsert(bondsToUpsert, { onConflict: "user_id,isin" })
+          : null,
+        stocksToUpsert.length > 0
+          ? supabaseAdmin.from("stock_holdings").upsert(stocksToUpsert, { onConflict: "user_id,symbol,exchange" })
+          : null,
+      ]);
 
       // Cleanup previously synced Zerodha stocks that are no longer held
       try {
@@ -762,13 +763,11 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           .eq("user_id", userId)
           .ilike("notes", "%Synced from Zerodha Kite%");
 
-        if (oldHoldings && oldHoldings.length > 0) {
-          const toDelete = oldHoldings.filter(
-            (o) => !activeSymbols.has(`${o.symbol.toUpperCase()}:${o.exchange.toUpperCase()}`)
-          );
-          for (const d of toDelete) {
-            await supabaseAdmin.from("stock_holdings").delete().eq("id", d.id);
-          }
+        const deleteIds = (oldHoldings || [])
+          .filter((o) => !activeSymbols.has(`${o.symbol.toUpperCase()}:${o.exchange.toUpperCase()}`))
+          .map((d) => d.id);
+        if (deleteIds.length > 0) {
+          await supabaseAdmin.from("stock_holdings").delete().in("id", deleteIds);
         }
       } catch (cleanupErr) {
         logger.warn("[Zerodha Sync] Old stock holdings cleanup notice:", String(cleanupErr));
@@ -778,50 +777,55 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     // --- Section 2: F&O Positions Sync ---
     if (positionsRes.status === "fulfilled") {
       const netPositions = positionsRes.value?.net || [];
+      const nowIso = new Date().toISOString();
 
-      // Clean up previous Zerodha synced positions for this user to avoid duplicate rows
       await supabaseAdmin
         .from("fno_positions")
         .delete()
         .eq("user_id", userId)
         .eq("strategy_name", "Zerodha Live Sync");
 
+      const fnoRowsToInsert: Array<Record<string, unknown>> = [];
       for (const p of netPositions) {
         const qty = p.quantity || 0;
-        if (qty === 0 && !p.m2m) continue; // Skip completely empty flat positions
+        if (qty === 0 && !p.m2m) continue;
 
         const parsed = parseFnoSymbol(p.tradingsymbol || "");
-        const side = qty >= 0 ? "BUY" : "SELL";
-        const lotSize = 25; // default lot size
-        const lots = Math.max(1, Math.round(Math.abs(qty) / lotSize));
-        const avgPrice = qty >= 0 ? p.buy_price || 0 : p.sell_price || 0;
-
-        await supabaseAdmin.from("fno_positions").insert({
+        const lotSize = 25;
+        fnoRowsToInsert.push({
           user_id: userId,
           symbol: parsed.symbol,
           instrument_type: parsed.instrument_type,
           strike_price: parsed.strike_price,
           expiry_date: parsed.expiry_date,
-          side,
+          side: qty >= 0 ? "BUY" : "SELL",
           product: ["NRML", "MIS", "CNC"].includes(p.product) ? p.product : "NRML",
           lot_size: lotSize,
-          lots,
+          lots: Math.max(1, Math.round(Math.abs(qty) / lotSize)),
           quantity: Math.abs(qty) || 1,
-          avg_price: avgPrice,
+          avg_price: qty >= 0 ? p.buy_price || 0 : p.sell_price || 0,
           ltp: p.last_price || null,
           status: qty === 0 ? "CLOSED" : "OPEN",
           strategy_name: "Zerodha Live Sync",
           account_id: zerodhaAccountId,
           notes: `Zerodha Contract: ${p.tradingsymbol} | MTM: ₹${p.m2m || 0}`,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso,
         });
         fnoSynced++;
+      }
+
+      if (fnoRowsToInsert.length > 0) {
+        await supabaseAdmin.from("fno_positions").insert(fnoRowsToInsert);
       }
     }
 
     // --- Section 3: Mutual Funds Sync ---
     if (mfHoldingsRes.status === "fulfilled" && Array.isArray(mfHoldingsRes.value)) {
       const activeFunds = new Set<string>();
+      const todayIso = new Date().toISOString().split("T")[0];
+      const nowIso = new Date().toISOString();
+      const mfRowsToUpsert: Array<Record<string, unknown>> = [];
+
       for (const mf of mfHoldingsRes.value) {
         const units = mf.quantity || 0;
         if (units <= 0) continue;
@@ -829,32 +833,33 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
         const schemeCode = mf.tradingsymbol || mf.folio || "MF_SCHEME";
         const folioNumber = mf.folio || "COIN_DEMAT";
         const avgNav = mf.average_price || 0;
-        const investedAmount = units * avgNav;
-        const currentNav = mf.last_price || avgNav;
         activeFunds.add(`${schemeCode}:${folioNumber}`);
 
-        await supabaseAdmin.from("mutual_fund_holdings").upsert(
-          {
-            user_id: userId,
-            scheme_code: schemeCode,
-            scheme_name: mf.fund || mf.tradingsymbol,
-            fund_house: "Zerodha Coin",
-            category: "Equity",
-            plan_type: "Direct",
-            dividend_option: "Growth",
-            folio_number: folioNumber,
-            units,
-            avg_nav: avgNav,
-            invested_amount: investedAmount,
-            current_nav: currentNav,
-            nav_date: new Date().toISOString().split("T")[0],
-            account_id: zerodhaAccountId,
-            notes: `Synced from Zerodha Coin DEMAT. Tradingsymbol: ${mf.tradingsymbol}`,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,folio_number,scheme_code" }
-        );
+        mfRowsToUpsert.push({
+          user_id: userId,
+          scheme_code: schemeCode,
+          scheme_name: mf.fund || mf.tradingsymbol,
+          fund_house: "Zerodha Coin",
+          category: "Equity",
+          plan_type: "Direct",
+          dividend_option: "Growth",
+          folio_number: folioNumber,
+          units,
+          avg_nav: avgNav,
+          invested_amount: units * avgNav,
+          current_nav: mf.last_price || avgNav,
+          nav_date: todayIso,
+          account_id: zerodhaAccountId,
+          notes: `Synced from Zerodha Coin DEMAT. Tradingsymbol: ${mf.tradingsymbol}`,
+          updated_at: nowIso,
+        });
         mfSynced++;
+      }
+
+      if (mfRowsToUpsert.length > 0) {
+        await supabaseAdmin
+          .from("mutual_fund_holdings")
+          .upsert(mfRowsToUpsert, { onConflict: "user_id,folio_number,scheme_code" });
       }
 
       // Cleanup previously synced Coin holdings that are no longer held
@@ -865,11 +870,11 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           .eq("user_id", userId)
           .ilike("notes", "%Synced from Zerodha Coin DEMAT%");
 
-        if (oldMfs && oldMfs.length > 0) {
-          const toDelete = oldMfs.filter((o) => !activeFunds.has(`${o.scheme_code}:${o.folio_number}`));
-          for (const d of toDelete) {
-            await supabaseAdmin.from("mutual_fund_holdings").delete().eq("id", d.id);
-          }
+        const deleteMfIds = (oldMfs || [])
+          .filter((o) => !activeFunds.has(`${o.scheme_code}:${o.folio_number}`))
+          .map((d) => d.id);
+        if (deleteMfIds.length > 0) {
+          await supabaseAdmin.from("mutual_fund_holdings").delete().in("id", deleteMfIds);
         }
       } catch (cleanupErr) {
         logger.warn("[Zerodha Sync] Old mutual fund holdings cleanup notice:", String(cleanupErr));

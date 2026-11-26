@@ -27,7 +27,6 @@ import {
   X,
   ChevronRight,
   Download,
-  Smartphone,
 } from "lucide-react";
 
 export type MobileNavGroup = "dashboard" | "portfolio" | "cashflow" | "more";

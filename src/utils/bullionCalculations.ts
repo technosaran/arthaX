@@ -5,6 +5,8 @@
  * valuation, making charge reconciliation, and portfolio analytics.
  */
 
+import { formatINRWhole } from "@/utils/money";
+
 export type MetalType = "GOLD" | "SILVER";
 
 export type GoldPurity = "24K" | "22K" | "18K" | "14K";
@@ -404,10 +406,4 @@ export function calculatePortfolioSummary(
 /**
  * Format currency in Indian Rupees format (e.g. ₹1,25,000)
  */
-export function formatCurrencyINR(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+export const formatCurrencyINR = (amount: number): string => formatINRWhole(amount);

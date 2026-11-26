@@ -7,7 +7,6 @@ import {
   EyeOff,
   ShieldCheck,
   AlertTriangle,
-  RefreshCw,
   KeyRound,
   CheckCircle2,
   HelpCircle,
@@ -138,8 +137,12 @@ export const StatementPasswordModal: React.FC<StatementPasswordModalProps> = ({
               New statement(s) found requiring decryption password
             </p>
             <p className="text-[11px] opacity-90 leading-relaxed">
-              ArthaX discovered monthly statement(s) from{" "}
-              <strong>{banks.map(getBankDisplayName).join(", ")}</strong>. Because these PDFs are encrypted by the bank, please enter your password below to unlock and extract your transactions.
+              {noticeMessage || (
+                <>
+                  ArthaX discovered monthly statement(s) from{" "}
+                  <strong>{banks.map(getBankDisplayName).join(", ")}</strong>. Because these PDFs are encrypted by the bank, please enter your password below to unlock and extract your transactions.
+                </>
+              )}
             </p>
           </div>
         </div>

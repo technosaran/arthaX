@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { formatINRWhole as formatINR } from "@/utils/money";
 import {
   Trophy,
   Plus,
@@ -24,7 +25,6 @@ import {
   Pause,
   X,
   Target,
-  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -34,7 +34,6 @@ import { saveToCache, invalidateCacheKeys, getFromLocalCache } from "@/utils/cac
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -236,13 +235,6 @@ export default function GoalsSection() {
   const [formStatus, setFormStatus] = useState<"active" | "completed" | "paused">("active");
   const [formNotes, setFormNotes] = useState("");
 
-  const formatINR = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
 
   // 1. Fetch Goals from Supabase
   const fetchGoals = useCallback(

@@ -5,6 +5,30 @@ let isSpawning = false;
 let lastSpawnAttempt = 0;
 
 /**
+ * Resolves the active Python calculation service base URL across dev and Vercel deployments.
+ */
+export function getPythonServiceUrl(originFallback?: string): string {
+  const explicit = process.env.PYTHON_BACKEND_URL || process.env.PYTHON_SERVICE_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const isProd =
+    process.env.NODE_ENV === "production" ||
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.VERCEL_ENV);
+
+  if (isProd) {
+    const fallback =
+      originFallback ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "https://arthax.vercel.app";
+    return fallback.replace(/\/+$/, "");
+  }
+
+  return "http://127.0.0.1:8000";
+}
+
+/**
  * Checks if the Python calculation engine service is online and healthy.
  */
 export async function isPythonServiceHealthy(baseUrl: string): Promise<boolean> {
