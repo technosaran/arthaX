@@ -211,7 +211,7 @@ export default function PwaInstallPrompt() {
                   <PlusSquare size={15} />
                 </div>
                 <div>
-                  <div className="text-xs font-bold">2. Tap "Add to Home Screen"</div>
+                  <div className="text-xs font-bold">2. Tap &quot;Add to Home Screen&quot;</div>
                   <div className="text-[11px] text-[var(--app-muted)] mt-0.5">
                     Scroll down the share sheet and select the Add to Home Screen option.
                   </div>
@@ -224,7 +224,7 @@ export default function PwaInstallPrompt() {
               onClick={() => setShowIosModal(false)}
               className="w-full py-2.5 rounded-xl text-xs font-bold bg-[var(--app-accent)] hover:bg-[var(--app-accent-hover)] text-white cursor-pointer transition-all active:scale-95"
             >
-              Got it, let's go
+              Got it, let&apos;s go
             </button>
           </div>
         </div>

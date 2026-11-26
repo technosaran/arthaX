@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/utils/supabase/admin";
 import { logger } from "@/utils/logger";
 import { constantTimeCompare } from "@/utils/crypto";
-import { getZerodhaIntegration, syncAllZerodhaSections } from "@/utils/zerodha";
-import { performZerodhaAutoLogin, getAutoLoginCredentials } from "@/utils/zerodhaAutoLogin";
-import { encryptSensitiveData } from "@/utils/crypto";
-import { checkAndSetIdempotency } from "@/utils/rateLimit";
+import { runZerodhaCronSync } from "@/utils/zerodhaCron";
+
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 async function handleZerodhaCron(req: NextRequest) {
   // 1. Authenticate Job Invoker (Strict CRON_SECRET constant-time validation)
@@ -25,153 +24,11 @@ async function handleZerodhaCron(req: NextRequest) {
     }
   }
 
-  // 2. Distributed lock to prevent concurrent cron / action execution collisions
-  if (!isTest) {
-    const lockAcquired = await checkAndSetIdempotency("zerodha_cron_lock", 300);
-    if (!lockAcquired) {
-      logger.info("[Zerodha Cron] Sync already in progress or recently executed. Skipping redundant run.", "ZerodhaCron");
-      return NextResponse.json({
-        status: "skipped",
-        message: "Sync already in progress or recently completed",
-        timestamp: new Date().toISOString(),
-        results: [],
-      }, { status: 200 });
-    }
-  }
-
-  logger.info(`[Zerodha Cron] Initiating automated scheduled sync at ${new Date().toISOString()}`, "ZerodhaCron");
-
-  const rawTargetUserId =
-    process.env.ZERODHA_AUTHORIZED_USER_ID ||
-    process.env.DEFAULT_SYNC_USER_ID;
-
-  if (!rawTargetUserId || rawTargetUserId === "default_user") {
-    logger.info("[Zerodha Cron] No valid ZERODHA_AUTHORIZED_USER_ID configured. Skipping cron sync.", "ZerodhaCron");
-    return NextResponse.json({
-      status: "skipped",
-      message: "No authorized user configured for auto-sync",
-      timestamp: new Date().toISOString(),
-      results: [],
-    }, { status: 200 });
-  }
-
-  const targetUserIds = rawTargetUserId
-    .split(",")
-    .map((u) => u.trim())
-    .filter((u) => u && u !== "default_user");
-
-  const results: Array<{
-    userId: string;
-    autoLoginSuccess: boolean;
-    syncSuccess: boolean;
-    stocksSynced?: number;
-    bondsSynced?: number;
-    fnoSynced?: number;
-    mfSynced?: number;
-    walletBalance?: number;
-    error?: string;
-  }> = [];
-
-  for (const targetUserId of targetUserIds) {
-    try {
-      const { configured, connected, integration, isTokenExpired } =
-        await getZerodhaIntegration(targetUserId);
-
-      if (!configured || !integration) {
-        logger.info(`[Zerodha Cron] Integration not configured for user: ${targetUserId}`, "ZerodhaCron");
-        results.push({
-          userId: targetUserId,
-          autoLoginSuccess: false,
-          syncSuccess: false,
-          error: "Zerodha integration not configured in database",
-        });
-        continue;
-      }
-
-      let autoLoginSucceeded = false;
-
-      // Renew session if expired for today or not connected
-      if (isTokenExpired || !connected || !integration.access_token) {
-        const autoCreds = getAutoLoginCredentials(integration, targetUserId);
-        if (!autoCreds) {
-          results.push({
-            userId: targetUserId,
-            autoLoginSuccess: false,
-            syncSuccess: false,
-            error: "Auto-login credentials missing or unauthorized in environment",
-          });
-          continue;
-        }
-
-        const loginResult = await performZerodhaAutoLogin(autoCreds);
-        if (!loginResult.success || !loginResult.accessToken) {
-          results.push({
-            userId: targetUserId,
-            autoLoginSuccess: false,
-            syncSuccess: false,
-            error: loginResult.error || "Headless auto-login failed",
-          });
-          continue;
-        }
-
-        // Persist fresh access token to Supabase
-        await supabaseAdmin
-          .from("zerodha_integrations")
-          .upsert(
-            {
-              user_id: targetUserId,
-              api_key: autoCreds.apiKey,
-              api_secret: encryptSensitiveData(autoCreds.apiSecret, "broker-credentials"),
-              access_token: encryptSensitiveData(loginResult.accessToken, "broker-credentials"),
-              public_token: encryptSensitiveData(loginResult.publicToken || null, "broker-credentials"),
-              request_token: encryptSensitiveData(loginResult.requestToken || null, "broker-credentials"),
-              token_generated_at: new Date().toISOString(),
-              user_profile: loginResult.profile || integration.user_profile || null,
-              is_active: true,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id" }
-          );
-
-        autoLoginSucceeded = true;
-      } else {
-        autoLoginSucceeded = true;
-      }
-
-      // Sync all portfolio sections
-      const syncResult = await syncAllZerodhaSections(targetUserId);
-
-      results.push({
-        userId: targetUserId,
-        autoLoginSuccess: autoLoginSucceeded,
-        syncSuccess: syncResult.success,
-        stocksSynced: syncResult.stocksSynced,
-        bondsSynced: syncResult.bondsSynced,
-        fnoSynced: syncResult.fnoSynced,
-        mfSynced: syncResult.mfSynced,
-        walletBalance: syncResult.walletBalance,
-        error: syncResult.error,
-      });
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      logger.error(`[Zerodha Cron] Unexpected error processing user ${targetUserId}`, "ZerodhaCron", { error: errorMsg });
-      results.push({
-        userId: targetUserId,
-        autoLoginSuccess: false,
-        syncSuccess: false,
-        error: errorMsg,
-      });
-    }
-  }
-
-  return NextResponse.json({
-    success: results.some((r) => r.syncSuccess),
-    results,
-    timestamp: new Date().toISOString(),
-  });
+  const summary = await runZerodhaCronSync();
+  return NextResponse.json(summary, { status: 200 });
 }
 
-// GET handler (used by Vercel Cron)
+// GET handler (used by Vercel Cron / Schedules)
 export async function GET(req: NextRequest) {
   return handleZerodhaCron(req);
 }

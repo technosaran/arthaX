@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, apiSuccess } from "@/utils/apiResponse";
@@ -72,10 +72,21 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          // Asynchronously trigger portfolio sync without blocking GET response
-          syncAllZerodhaSections(userId).catch((err) => {
-            logger.warn(`[Zerodha] Background portfolio sync failed after auto-login: ${err?.message || err}`);
-          });
+          // Schedule portfolio sync via Next.js after() so serverless keeps alive post-response
+          const runSync = async () => {
+            try {
+              await syncAllZerodhaSections(userId);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              logger.warn(`[Zerodha] Background portfolio sync failed after auto-login: ${msg}`);
+            }
+          };
+
+          if (process.env.NODE_ENV === "test" || process.env.VITEST) {
+            void runSync();
+          } else {
+            after(runSync);
+          }
         } else {
           logger.warn(`[Zerodha] Seamless auto-login failed: ${loginRes.error}`);
         }

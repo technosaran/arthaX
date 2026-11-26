@@ -1,9 +1,18 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["bom1"],
-  "crons": [
-    {
+  "schedules": {
+    "daily-automation": {
+      "schedule": "30 9 * * *",
+      "timezone": "Asia/Kolkata",
       "path": "/api/v1/automation/cron",
-      "schedule": "0 4 * * *"
+      "requestMethod": "GET"
+    },
+    "zerodha-post-market-sync": {
+      "schedule": "45 15 * * 1-5",
+      "timezone": "Asia/Kolkata",
+      "path": "/api/v1/integrations/zerodha/cron",
+      "requestMethod": "GET"
     }
-  ]
+  }
 }

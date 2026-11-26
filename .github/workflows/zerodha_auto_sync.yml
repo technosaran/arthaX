@@ -15,10 +15,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
@@ -35,4 +35,4 @@ jobs:
           ZERODHA_TOTP_SECRET: ${{ secrets.ZERODHA_TOTP_SECRET }}
           ZERODHA_AUTHORIZED_USER_ID: ${{ secrets.ZERODHA_AUTHORIZED_USER_ID }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
-        run: npx tsx scripts/zerodhaAutoSync.ts
+        run: npx --yes tsx scripts/zerodhaAutoSync.ts

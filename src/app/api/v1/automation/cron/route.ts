@@ -4,12 +4,17 @@ import { logger } from "@/utils/logger";
 import { constantTimeCompare } from "@/utils/crypto";
 import { checkAndSetIdempotency } from "@/utils/rateLimit";
 import { syncUserGmailStatements } from "@/utils/gmail";
+import { runRecurringJobs } from "@/utils/recurringJobs";
+import { runZerodhaCronSync } from "@/utils/zerodhaCron";
+
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 /**
  * Universal Background Automation Cron Endpoint
- * Scheduled via Vercel Cron or QStash.
- * Executes automated Gmail discovery, bank statement ingestion,
- * transaction classification, balance reconciliation, and financial recalculation.
+ * Scheduled via Vercel Schedules / Cron or QStash.
+ * Executes recurring transaction rules, Zerodha daily auto-login & sync,
+ * automated Gmail discovery, bank statement ingestion, and job recovery.
  */
 async function handleAutomationCron(req: NextRequest) {
   // 1. Authenticate Invoker using CRON_SECRET with constant-time comparison
@@ -74,23 +79,36 @@ async function handleAutomationCron(req: NextRequest) {
       logger.warn("Failed to check or recover abandoned jobs", "AutomationCron", { error: String(recErr) });
     }
 
-    // 2c. Non-blocking trigger of recurring transactions & broker daily sync for unified Vercel cron
-    if (!isTest) {
-      try {
-        const origin = req.nextUrl?.origin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
-        const cronAuth = `Bearer ${cronSecret}`;
-        // Trigger recurring transactions processing asynchronously
-        fetch(`${origin}/api/v1/jobs/recurring`, {
-          method: "POST",
-          headers: { authorization: cronAuth },
-        }).catch((err) => logger.warn("Recurring job trigger error in unified cron", "AutomationCron", { error: String(err) }));
-        // Trigger Zerodha auto-sync asynchronously
-        fetch(`${origin}/api/v1/integrations/zerodha/cron`, {
-          method: "POST",
-          headers: { authorization: cronAuth },
-        }).catch((err) => logger.warn("Zerodha cron trigger error in unified cron", "AutomationCron", { error: String(err) }));
-      } catch (triggerErr) {
-        logger.warn("Failed to dispatch sub-crons in unified automation", "AutomationCron", { error: String(triggerErr) });
+    // 2c. Directly await recurring transactions & Zerodha daily auto-sync in-process
+    // so Vercel never drops unawaited background fetch promises upon returning.
+    let recurringJobs: unknown = null;
+    let zerodhaSync: unknown = null;
+    if (!isTest || process.env.RUN_SUB_CRONS_IN_TEST === "1") {
+      const [recOutcome, zerodhaOutcome] = await Promise.allSettled([
+        runRecurringJobs(),
+        runZerodhaCronSync(),
+      ]);
+
+      if (recOutcome.status === "fulfilled") {
+        recurringJobs = recOutcome.value;
+      } else {
+        const msg = recOutcome.reason instanceof Error ? recOutcome.reason.message : String(recOutcome.reason);
+        logger.error("Recurring job execution failed inside unified cron", "AutomationCron", recOutcome.reason);
+        recurringJobs = { success: false, error: msg };
+      }
+
+      if (zerodhaOutcome.status === "fulfilled") {
+        zerodhaSync = zerodhaOutcome.value;
+        if (zerodhaOutcome.value.status === "failed" || zerodhaOutcome.value.status === "partial_failure") {
+          logger.error("Zerodha sync reported errors inside unified cron", "AutomationCron", undefined, {
+            status: zerodhaOutcome.value.status,
+            results: zerodhaOutcome.value.results,
+          });
+        }
+      } else {
+        const msg = zerodhaOutcome.reason instanceof Error ? zerodhaOutcome.reason.message : String(zerodhaOutcome.reason);
+        logger.error("Zerodha sync execution threw inside unified cron", "AutomationCron", zerodhaOutcome.reason);
+        zerodhaSync = { status: "failed", success: false, error: msg };
       }
     }
 
@@ -142,6 +160,8 @@ async function handleAutomationCron(req: NextRequest) {
       processedUsers: results.length,
       timestamp: new Date().toISOString(),
       results,
+      ...(recurringJobs !== null ? { recurringJobs } : {}),
+      ...(zerodhaSync !== null ? { zerodhaSync } : {}),
     }, { status: 200 });
 
   } catch (err: unknown) {

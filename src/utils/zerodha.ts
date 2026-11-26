@@ -469,65 +469,116 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
 
     let activeApiKey = integration.api_key;
     let activeAccessToken = integration.access_token;
+    let didAutoLogin = false;
+
+    const persistAutoLoginFailure = async (errorMsg: string) => {
+      try {
+        await supabaseAdmin
+          .from("zerodha_integrations")
+          .update({
+            last_sync_at: new Date().toISOString(),
+            last_sync_status: "FAILED",
+            last_sync_error: errorMsg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+      } catch {
+        // Non-blocking error status persistence
+      }
+    };
+
+    const renewSessionViaAutoLogin = async () => {
+      const autoCreds = getAutoLoginCredentials(integration, userId);
+      if (!autoCreds) {
+        return {
+          ok: false as const,
+          error:
+            "Zerodha session expired or not authenticated. Please log in with Zerodha today or configure auto-login in environment variables.",
+        };
+      }
+
+      logger.info("[Zerodha Sync] Attempting automated TOTP auto-login...");
+      const loginRes = await performZerodhaAutoLogin(autoCreds);
+
+      if (loginRes.success && loginRes.accessToken) {
+        activeAccessToken = loginRes.accessToken;
+        activeApiKey = autoCreds.apiKey;
+        didAutoLogin = true;
+
+        await supabaseAdmin
+          .from("zerodha_integrations")
+          .update({
+            access_token: encryptSensitiveData(loginRes.accessToken, "broker-credentials"),
+            public_token: encryptSensitiveData(loginRes.publicToken || null, "broker-credentials"),
+            request_token: encryptSensitiveData(loginRes.requestToken || null, "broker-credentials"),
+            token_generated_at: new Date().toISOString(),
+            user_profile: loginRes.profile || integration.user_profile,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        logger.info("[Zerodha Sync] Automated TOTP login successful! Daily session renewed.");
+        return { ok: true as const };
+      }
+
+      logger.warn("[Zerodha Sync] Auto-login failed:", loginRes.error);
+      return {
+        ok: false as const,
+        error: `Zerodha session expired. Auto-login failed (${loginRes.error || "Unknown"}). Please click 'Login with Kite' in Settings.`,
+      };
+    };
 
     // Check if session needs renewal (daily 6:00 AM IST reset)
     if (!connected || !activeAccessToken || isTokenExpired) {
-      const autoCreds = getAutoLoginCredentials(integration, userId);
-      if (autoCreds) {
-        logger.info("[Zerodha Sync] Daily session expired. Attempting automated TOTP auto-login...");
-        const loginRes = await performZerodhaAutoLogin(autoCreds);
-
-        if (loginRes.success && loginRes.accessToken) {
-          activeAccessToken = loginRes.accessToken;
-          activeApiKey = autoCreds.apiKey;
-
-          await supabaseAdmin
-            .from("zerodha_integrations")
-            .update({
-              access_token: encryptSensitiveData(loginRes.accessToken, "broker-credentials"),
-              public_token: encryptSensitiveData(loginRes.publicToken || null, "broker-credentials"),
-              request_token: encryptSensitiveData(loginRes.requestToken || null, "broker-credentials"),
-              token_generated_at: new Date().toISOString(),
-              user_profile: loginRes.profile || integration.user_profile,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-          logger.info("[Zerodha Sync] Automated TOTP login successful! Daily session renewed.");
-        } else {
-          logger.warn("[Zerodha Sync] Auto-login failed:", loginRes.error);
-          return {
-            success: false,
-            stocksSynced: 0,
-            bondsSynced: 0,
-            fnoSynced: 0,
-            mfSynced: 0,
-            error: `Zerodha session expired. Auto-login failed (${loginRes.error || "Unknown"}). Please click 'Login with Kite' in Settings.`,
-          };
-        }
-      } else {
+      const renewed = await renewSessionViaAutoLogin();
+      if (!renewed.ok) {
+        await persistAutoLoginFailure(renewed.error);
         return {
           success: false,
           stocksSynced: 0,
           bondsSynced: 0,
           fnoSynced: 0,
           mfSynced: 0,
-          error: "Zerodha session expired or not authenticated. Please log in with Zerodha today or configure auto-login in .env.local.",
+          error: renewed.error,
         };
       }
     }
 
-    const apiKey = activeApiKey;
-    const accessToken = activeAccessToken;
+    const fetchAllKiteData = async (key: string, token: string) =>
+      Promise.allSettled([
+        fetchKiteHoldings(key, token),
+        fetchKitePositions(key, token),
+        fetchKiteMfHoldings(key, token),
+        fetchKiteMargins(key, token),
+      ]);
 
     // 1. Fetch data from Kite API for holdings, positions, mutual funds, and cash margins in parallel
-    const [holdingsRes, positionsRes, mfHoldingsRes, marginsRes] = await Promise.allSettled([
-      fetchKiteHoldings(apiKey, accessToken),
-      fetchKitePositions(apiKey, accessToken),
-      fetchKiteMfHoldings(apiKey, accessToken),
-      fetchKiteMargins(apiKey, accessToken),
-    ]);
+    let [holdingsRes, positionsRes, mfHoldingsRes, marginsRes] = await fetchAllKiteData(
+      activeApiKey,
+      activeAccessToken!
+    );
 
-    // If all portfolio endpoints failed, return error immediately
+    // If all portfolio endpoints rejected with a token/session error and we haven't already
+    // attempted auto-login in this sync call, perform a single guarded token refresh and retry once.
+    if (
+      holdingsRes.status === "rejected" &&
+      positionsRes.status === "rejected" &&
+      mfHoldingsRes.status === "rejected"
+    ) {
+      const firstError =
+        (holdingsRes.reason as Error)?.message || "Failed to fetch portfolio data from Zerodha Kite API";
+
+      if (!didAutoLogin && /token|session|api_key|unauthorized|forbidden|invalid/i.test(firstError)) {
+        const renewed = await renewSessionViaAutoLogin();
+        if (renewed.ok && activeAccessToken) {
+          [holdingsRes, positionsRes, mfHoldingsRes, marginsRes] = await fetchAllKiteData(
+            activeApiKey,
+            activeAccessToken
+          );
+        }
+      }
+    }
+
+    // If all portfolio endpoints still failed, persist failure and return error
     if (
       holdingsRes.status === "rejected" &&
       positionsRes.status === "rejected" &&
@@ -535,6 +586,7 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
     ) {
       const firstError = (holdingsRes.reason as Error)?.message || "Failed to fetch portfolio data from Zerodha Kite API";
       logger.error("[Zerodha Sync] All portfolio endpoints failed:", firstError);
+      await persistAutoLoginFailure(firstError);
       return {
         success: false,
         stocksSynced: 0,

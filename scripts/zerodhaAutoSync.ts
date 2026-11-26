@@ -12,7 +12,7 @@
 
 import { supabaseAdmin } from "../src/utils/supabase/admin";
 import { getZerodhaIntegration, syncAllZerodhaSections } from "../src/utils/zerodha";
-import { performZerodhaAutoLogin, getAutoLoginCredentials } from "../src/utils/zerodhaAutoLogin";
+import { performZerodhaAutoLogin, getAutoLoginCredentials, type ZerodhaAutoLoginResult } from "../src/utils/zerodhaAutoLogin";
 import { encryptSensitiveData } from "../src/utils/crypto";
 
 async function main() {
@@ -30,10 +30,16 @@ async function main() {
     return;
   }
 
-  const targetUserIds = rawTargetUserId
-    .split(",")
-    .map((u) => u.trim())
-    .filter((u) => u && u !== "default_user");
+  const targetUserIds = Array.from(
+    new Set(
+      rawTargetUserId
+        .split(",")
+        .map((u) => u.trim())
+        .filter((u) => u && u !== "default_user")
+    )
+  );
+
+  const freshSessions = new Map<string, ZerodhaAutoLoginResult>();
 
   for (const targetUserId of targetUserIds) {
     console.log(`\n-------------------------------------------------`);
@@ -47,11 +53,33 @@ async function main() {
     console.log(`Connected: ${connected ? "YES" : "NO"}`);
     console.log(`Session Expired Today: ${isTokenExpired ? "YES" : "NO"}`);
 
-    if (!isTokenExpired && connected && integration?.access_token) {
+    const autoCreds = getAutoLoginCredentials(integration, targetUserId);
+    const sessionKey = autoCreds ? `${autoCreds.apiKey}:${autoCreds.userId}` : null;
+    const cachedFreshSession = sessionKey ? freshSessions.get(sessionKey) : undefined;
+
+    if (cachedFreshSession?.accessToken && autoCreds) {
+      console.log("♻️ Reusing fresh Zerodha session obtained earlier in this run...");
+      await supabaseAdmin
+        .from("zerodha_integrations")
+        .upsert(
+          {
+            user_id: targetUserId,
+            api_key: autoCreds.apiKey,
+            api_secret: encryptSensitiveData(autoCreds.apiSecret, "broker-credentials"),
+            access_token: encryptSensitiveData(cachedFreshSession.accessToken, "broker-credentials"),
+            public_token: encryptSensitiveData(cachedFreshSession.publicToken || null, "broker-credentials"),
+            request_token: encryptSensitiveData(cachedFreshSession.requestToken || null, "broker-credentials"),
+            token_generated_at: new Date().toISOString(),
+            user_profile: cachedFreshSession.profile || integration?.user_profile || null,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+    } else if (!isTokenExpired && connected && integration?.access_token) {
       console.log("✅ Today's Zerodha session is already active. Proceeding with portfolio sync...");
     } else {
       console.log("⚠️ Daily session expired or not active. Attempting headless TOTP auto-login...");
-      const autoCreds = getAutoLoginCredentials(integration, targetUserId);
 
       if (!autoCreds) {
         console.error(
@@ -66,6 +94,10 @@ async function main() {
       if (!loginResult.success || !loginResult.accessToken) {
         console.error("❌ Auto-login failed:", loginResult.error);
         continue;
+      }
+
+      if (sessionKey) {
+        freshSessions.set(sessionKey, loginResult);
       }
 
       console.log("✅ Auto-login succeeded! Saving access token to Supabase...");

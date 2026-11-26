@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         .eq("user_id", userId),
       supabaseAdmin
         .from("zerodha_integrations")
-        .select("id, api_key_encrypted, last_sync_at, last_sync_status, last_sync_error")
+        .select("id, api_key, last_sync_at, last_sync_status, last_sync_error")
         .eq("user_id", userId)
         .maybeSingle(),
       supabaseAdmin
