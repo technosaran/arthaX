@@ -5,11 +5,11 @@ import {
   SectionList,
   TextInput,
   TouchableOpacity,
-  Modal,
   RefreshControl,
   Alert,
-  Clipboard,
+  Share,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   Search,
@@ -23,19 +23,16 @@ import {
   TrendingUp,
   CircleDollarSign,
   X,
-  CheckCircle2,
-  Calendar,
-  CreditCard,
-  Building,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useFinancial } from '../../context/FinancialContext';
 import { Header } from '../../components/Header';
-import { Card } from '../../components/Card';
-import { CurrencyText, formatIndianCurrency } from '../../components/CurrencyText';
+import { CurrencyText } from '../../components/CurrencyText';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
+import { BottomSheetModal } from '../../components/BottomSheetModal';
 import { CanonicalTransaction } from '../../types';
+import { COMPACT_HIT_SLOP, getScrollBottomPadding, MONO_FONT } from '../../theme/platform';
 
 // Helper to resolve dynamic merchant icons
 export function getMerchantIcon(name: string, category?: string) {
@@ -64,7 +61,8 @@ export function getMerchantIcon(name: string, category?: string) {
 }
 
 export const TransactionsScreen = () => {
-  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { transactions, isRefreshing, refreshData } = useFinancial();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,13 +102,16 @@ export const TransactionsScreen = () => {
     data: sectionsMap[title],
   }));
 
-  const handleCopyReference = (ref?: string) => {
+  const handleCopyReference = async (ref?: string) => {
     if (!ref) return;
     try {
-      Clipboard.setString(ref);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
-    Alert.alert('Copied to Clipboard', ref);
+    try {
+      await Share.share({ message: ref, title: 'Transaction Reference' });
+    } catch {
+      Alert.alert('Reference UTR', ref);
+    }
   };
 
   return (
@@ -142,6 +143,10 @@ export const TransactionsScreen = () => {
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
             style={{ flex: 1, marginLeft: 8, color: colors.text, fontSize: 14 }}
           />
         </View>
@@ -155,6 +160,9 @@ export const TransactionsScreen = () => {
               <TouchableOpacity
                 key={filter}
                 onPress={() => setDirectionFilter(filter)}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
                 style={{
                   paddingHorizontal: 12,
                   paddingVertical: 6,
@@ -183,7 +191,10 @@ export const TransactionsScreen = () => {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        stickySectionHeadersEnabled
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshData} tintColor={colors.primary} />}
         renderSectionHeader={({ section: { title } }) => (
           <View style={{ paddingVertical: 10, backgroundColor: colors.background }}>
@@ -259,18 +270,7 @@ export const TransactionsScreen = () => {
       />
 
       {/* Digital Receipt / Transaction Detail Modal */}
-      <Modal visible={!!selectedTx} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
-          <View
-            style={{
-              backgroundColor: colors.card,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
+      <BottomSheetModal visible={!!selectedTx} onClose={() => setSelectedTx(null)}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -279,7 +279,13 @@ export const TransactionsScreen = () => {
                   Transaction Intelligence
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedTx(null)} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onPress={() => setSelectedTx(null)}
+                hitSlop={COMPACT_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Close transaction details"
+                style={{ padding: 4 }}
+              >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -317,10 +323,13 @@ export const TransactionsScreen = () => {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13, color: colors.textSecondary }}>Reference UTR</Text>
                     <TouchableOpacity
-                      onPress={() => handleCopyReference(selectedTx.transaction_reference)}
+                      onPress={() => handleCopyReference(selectedTx.transaction_reference || 'REF-882194')}
+                      hitSlop={COMPACT_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel="Share or copy transaction reference"
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'monospace', color: colors.primary, fontWeight: '700' }}>
+                      <Text style={{ fontSize: 12, fontFamily: MONO_FONT, color: colors.primary, fontWeight: '700' }}>
                         {selectedTx.transaction_reference || 'REF-882194'}
                       </Text>
                       <Copy size={12} color={colors.primary} />
@@ -339,7 +348,7 @@ export const TransactionsScreen = () => {
                     <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', marginBottom: 4 }}>
                       Original Bank Narration
                     </Text>
-                    <Text style={{ fontSize: 12, fontFamily: 'monospace', color: colors.textSecondary, lineHeight: 16 }}>
+                    <Text style={{ fontSize: 12, fontFamily: MONO_FONT, color: colors.textSecondary, lineHeight: 16 }}>
                       {selectedTx.original_narration}
                     </Text>
                   </View>
@@ -348,9 +357,7 @@ export const TransactionsScreen = () => {
                 <Button title="Done" variant="secondary" onPress={() => setSelectedTx(null)} />
               </>
             )}
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 };

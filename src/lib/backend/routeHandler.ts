@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
-import { rateLimit, checkAndSetIdempotency } from "@/utils/rateLimit";
+import { rateLimit, checkAndSetIdempotency, releaseIdempotency } from "@/utils/rateLimit";
 import { claimDatabaseIdempotency, completeDatabaseIdempotency } from "./databaseIdempotency";
 import {
   extractRequestId,
@@ -34,10 +34,7 @@ function verifyAdminOrCron(req: NextRequest, userId: string | null, mode: "admin
   const tokenToVerify = headerToken || customHeader.trim();
 
   if (mode === "cron") {
-    // Vercel Cron header check
-    const isVercelCron = req.headers.get("x-vercel-cron") === "1";
-    if (isVercelCron) return true;
-
+    // Always enforce CRON_SECRET rather than trusting unauthenticated x-vercel-cron headers
     if (cronSecret && tokenToVerify && constantTimeCompare(tokenToVerify, cronSecret.trim())) {
       return true;
     }
@@ -139,40 +136,11 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
       }
     }
 
-    // 4. Rate Limiting & Atomic Idempotency Check (for POST/PUT mutations)
-    const idempotencyKey = req.headers.get("idempotency-key");
-    if (config.idempotent && ["POST", "PUT", "PATCH"].includes(req.method)) {
-      if (idempotencyKey) {
-        const scope = userId || "global";
-        const lockKey = `route_idemp:${scope}:${idempotencyKey.trim()}`;
-        const isFirstAttempt = await checkAndSetIdempotency(lockKey, 86400); // 24hr TTL
-        if (!isFirstAttempt) {
-          logger.warn(`Duplicate transaction rejected via idempotency-key`, "Idempotency", {
-            requestId,
-            userId,
-            idempotencyKey,
-          });
-          return NextResponse.json(
-            {
-              success: false,
-              error: {
-                code: "CONFLICT",
-                message: "Duplicate operation rejected (Idempotency conflict)",
-              },
-              requestId,
-              timestamp: new Date().toISOString(),
-            },
-            { status: 409, headers: { "X-Request-Id": requestId } }
-          );
-        }
-      }
-    }
-
-    // 5. Parse and Validate Request Body
+    // 4. Parse and Validate Request Body before claiming idempotency
     let body: TBody = undefined as unknown as TBody;
     if (["POST", "PUT", "PATCH"].includes(req.method)) {
       const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
-      if (contentLength > maxBytes) {
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
         return apiError(`Payload too large. Maximum size is ${maxBytes} bytes.`, "BAD_REQUEST", 413, undefined, req);
       }
 
@@ -181,7 +149,12 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
 
       if (!isMultipart) {
         try {
-          const rawJson = await req.json();
+          const rawText = await req.clone().text();
+          if (Buffer.byteLength(rawText, "utf8") > maxBytes) {
+            return apiError(`Payload too large. Maximum size is ${maxBytes} bytes.`, "BAD_REQUEST", 413, undefined, req);
+          }
+
+          const rawJson = rawText.trim() ? JSON.parse(rawText) : {};
           if (config.schema) {
             const parsed = config.schema.safeParse(rawJson);
             if (!parsed.success) {
@@ -193,7 +166,6 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
             body = rawJson as TBody;
           }
         } catch {
-          // If schema was required, empty/malformed json is an error
           if (config.schema) {
             return apiError("Malformed or missing JSON request body", "VALIDATION_ERROR", 400, undefined, req);
           }
@@ -202,7 +174,11 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
       }
     }
 
-    // 5b. Database-Enforced Idempotency Verification
+    // 5. Database-First Idempotency with Redis/Memory Fallback (supports cached replay + prevents invalid-body lockouts)
+    const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null;
+    let fallbackRedisLockKey: string | null = null;
+    let usesDatabaseIdempotency = false;
+
     if (config.idempotent && idempotencyKey && ["POST", "PUT", "PATCH"].includes(req.method)) {
       const dbClaim = await claimDatabaseIdempotency(
         userId || "anonymous",
@@ -232,6 +208,34 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
           { status: 409, headers: { "X-Request-Id": requestId } }
         );
       }
+
+      if (dbClaim.action === "FALLBACK") {
+        const scope = userId || "global";
+        const lockKey = `route_idemp:${scope}:${idempotencyKey}`;
+        const isFirstAttempt = await checkAndSetIdempotency(lockKey, 86400);
+        if (!isFirstAttempt) {
+          logger.warn(`Duplicate transaction rejected via idempotency-key`, "Idempotency", {
+            requestId,
+            userId,
+            idempotencyKey,
+          });
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "CONFLICT",
+                message: "Duplicate operation rejected (Idempotency conflict)",
+              },
+              requestId,
+              timestamp: new Date().toISOString(),
+            },
+            { status: 409, headers: { "X-Request-Id": requestId } }
+          );
+        }
+        fallbackRedisLockKey = lockKey;
+      } else {
+        usesDatabaseIdempotency = true;
+      }
     }
 
     // 6. Build Type-Safe Context and Execute Handler
@@ -250,15 +254,15 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
       const result = await config.handler(ctx);
       const durationMs = Date.now() - startTime;
 
-      // Complete database idempotency on successful mutation
-      if (config.idempotent && idempotencyKey) {
-        const statusCode = result instanceof NextResponse ? result.status : 200;
-        await completeDatabaseIdempotency(userId || "anonymous", idempotencyKey, statusCode, result);
-      }
-
-      // If handler returned a NextResponse directly, ensure headers and return
+      // If handler returned a NextResponse directly, ensure headers and cache body on non-5xx
       if (result instanceof NextResponse) {
         result.headers.set("X-Request-Id", requestId);
+        if (usesDatabaseIdempotency && idempotencyKey && result.status < 500) {
+          const clonedBody = await result.clone().json().catch(() => null);
+          await completeDatabaseIdempotency(userId || "anonymous", idempotencyKey, result.status, clonedBody);
+        } else if (fallbackRedisLockKey && result.status >= 500) {
+          await releaseIdempotency(fallbackRedisLockKey);
+        }
         logger.info(`${req.method} ${pathname} -> ${result.status} (${durationMs}ms)`, "API", {
           requestId,
           status: result.status,
@@ -267,21 +271,33 @@ export function createApiRoute<TBody = unknown, TParams = Record<string, string>
         return result;
       }
 
-      // Automatically wrap raw return data in standardized apiSuccess
+      const wrappedResponse = apiSuccess(result, undefined, 200, req);
+      if (usesDatabaseIdempotency && idempotencyKey) {
+        const wrappedPayload = await wrappedResponse.clone().json().catch(() => result);
+        await completeDatabaseIdempotency(userId || "anonymous", idempotencyKey, 200, wrappedPayload);
+      }
+
       logger.info(`${req.method} ${pathname} -> 200 (${durationMs}ms)`, "API", {
         requestId,
         durationMs,
       });
-      return apiSuccess(result, undefined, 200, req);
+      return wrappedResponse;
     } catch (err: unknown) {
       const durationMs = Date.now() - startTime;
-      const errorMsg = err instanceof Error ? err.message : "Internal Server Error";
-      logger.error(`${req.method} ${pathname} failed after ${durationMs}ms: ${errorMsg}`, "API", err, {
+      const rawErrorMsg = err instanceof Error ? err.message : "Internal Server Error";
+      if (fallbackRedisLockKey) {
+        await releaseIdempotency(fallbackRedisLockKey);
+      }
+      logger.error(`${req.method} ${pathname} failed after ${durationMs}ms: ${rawErrorMsg}`, "API", err, {
         requestId,
         userId,
       });
 
-      return apiError(errorMsg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+      const publicMsg =
+        process.env.NODE_ENV === "production"
+          ? "An unexpected server error occurred."
+          : rawErrorMsg;
+      return apiError(publicMsg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
   };
 }

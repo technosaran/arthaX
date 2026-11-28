@@ -1279,7 +1279,8 @@ export default function BondsSection() {
             />
           ) : (
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] overflow-hidden shadow-xs">
-              <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[680px]">
                 <thead className="bg-[var(--app-card-elevated)] border-b border-[var(--app-border)] text-[var(--app-muted)] font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="py-3 px-4">Date</th>
@@ -1332,7 +1333,8 @@ export default function BondsSection() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           )}
         </div>

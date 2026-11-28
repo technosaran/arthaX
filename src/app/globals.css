@@ -44,6 +44,7 @@
   --app-badge-fg: #34d399;
   --app-track-bg: rgba(255, 255, 255, 0.06);
   --app-input-bg: #0a0c12;
+  --app-nav-bg: rgba(7, 8, 12, 0.84);
   --app-shimmer-from: rgba(255, 255, 255, 0.04);
   --app-shimmer-to: rgba(255, 255, 255, 0.09);
 }
@@ -81,6 +82,7 @@
   --app-badge-fg: #059669;
   --app-track-bg: #e2e8f0;
   --app-input-bg: #ffffff;
+  --app-nav-bg: rgba(248, 250, 252, 0.88);
   --app-shimmer-from: rgba(0, 0, 0, 0.04);
   --app-shimmer-to: rgba(0, 0, 0, 0.08);
 }
@@ -95,7 +97,8 @@ body {
   font-family: var(--font-plus-jakarta), var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
   letter-spacing: -0.012em;
-  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -372,6 +375,8 @@ input::-ms-clear {
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 button,

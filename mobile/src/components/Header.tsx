@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, RefreshCw, Eye, EyeOff } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -21,13 +21,27 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { isPrivacyMasked, togglePrivacyMask } = useFinancial();
+  const { isPrivacyMasked, togglePrivacyMask, insights } = useFinancial();
 
   const handleTogglePrivacy = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     togglePrivacyMask();
+  };
+
+  const handleNotifications = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (insights.length === 0) {
+      Alert.alert('Notifications', 'You are all caught up. No new alerts.');
+      return;
+    }
+    Alert.alert(
+      `Financial Alerts (${insights.length})`,
+      insights.map((item) => `• ${item.title}: ${item.description}`).join('\n\n')
+    );
   };
 
   return (
@@ -44,25 +58,33 @@ export const Header: React.FC<HeaderProps> = ({
         justifyContent: 'space-between',
       }}
     >
-      <View>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text
+          numberOfLines={1}
+          style={{ fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}
+        >
           {title}
         </Text>
         {subtitle && (
-          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+          <Text numberOfLines={1} style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
             {subtitle}
           </Text>
         )}
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {/* Privacy Mask Toggle Button */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* Privacy Mask Toggle Button (44x44pt Apple HIG target) */}
         <TouchableOpacity
           onPress={handleTogglePrivacy}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={isPrivacyMasked ? 'Show balances' : 'Hide balances'}
           style={{
-            padding: 8,
-            borderRadius: 20,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
             backgroundColor: isPrivacyMasked ? colors.primaryGlow : colors.card,
             borderWidth: 1,
             borderColor: isPrivacyMasked ? colors.primary : colors.border,
@@ -77,11 +99,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {onRefresh && (
           <TouchableOpacity
-            onPress={onRefresh}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              onRefresh();
+            }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh financial data"
             style={{
-              padding: 8,
-              borderRadius: 20,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
               backgroundColor: colors.card,
               borderWidth: 1,
               borderColor: colors.border,
@@ -94,17 +126,24 @@ export const Header: React.FC<HeaderProps> = ({
           </TouchableOpacity>
         )}
 
-        <View
+        <TouchableOpacity
+          onPress={handleNotifications}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="View financial alerts"
           style={{
-            padding: 8,
-            borderRadius: 20,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
           }}
         >
           <Bell size={18} color={colors.textSecondary} />
-        </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

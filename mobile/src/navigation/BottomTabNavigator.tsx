@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard,
   CreditCard,
@@ -17,23 +18,28 @@ import { InvestmentsScreen } from '../screens/investments/InvestmentsScreen';
 import { HubScreen } from '../screens/hub/HubScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { FloatingActionHub } from '../components/FloatingActionHub';
+import { getTabBarBottomPadding, getTabBarHeight } from '../theme/platform';
 
 const Tab = createBottomTabNavigator();
 
 export const BottomTabNavigator = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = getTabBarHeight(insets.bottom);
+  const tabBarBottomPadding = getTabBarBottomPadding(insets.bottom);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
+          tabBarHideOnKeyboard: true,
           tabBarStyle: {
             backgroundColor: colors.tabBar,
             borderTopColor: colors.borderSubtle,
             borderTopWidth: 1,
-            height: 64,
-            paddingBottom: 8,
+            height: tabBarHeight,
+            paddingBottom: tabBarBottomPadding,
             paddingTop: 8,
           },
           tabBarActiveTintColor: colors.tabBarActive,

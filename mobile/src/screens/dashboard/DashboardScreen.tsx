@@ -6,6 +6,7 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   TrendingUp,
   CreditCard,
@@ -25,8 +26,10 @@ import { Badge } from '../../components/Badge';
 import { NetWorthSparkline } from '../../components/NetWorthSparkline';
 import { AssetAllocationBar } from '../../components/AssetAllocationBar';
 import { InsightsCarousel } from '../../components/InsightsCarousel';
+import { COMPACT_HIT_SLOP, getScrollBottomPadding } from '../../theme/platform';
 
 export const DashboardScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { netWorth, cashFlow, accounts, transactions, investments, insights, isRefreshing, refreshData } = useFinancial();
 
@@ -42,7 +45,7 @@ export const DashboardScreen = ({ navigation }: any) => {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -159,7 +162,12 @@ export const DashboardScreen = ({ navigation }: any) => {
                 Portfolio Allocation
               </Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Investments')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Investments')}
+              hitSlop={COMPACT_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="View Markets"
+            >
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
                 View Markets
               </Text>
@@ -193,7 +201,12 @@ export const DashboardScreen = ({ navigation }: any) => {
           <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
             Recent Activity
           </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Ledger')}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Ledger')}
+            hitSlop={COMPACT_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="View Full Ledger"
+          >
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
               Full Ledger ({transactions.length})
             </Text>

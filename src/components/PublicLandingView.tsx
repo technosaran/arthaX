@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import Logo from "@/components/Logo";
 import {
   ShieldCheck,
   Lock,
@@ -15,11 +14,11 @@ import {
   FileText,
   Mail,
   CheckCircle2,
-  ExternalLink,
   ChevronRight,
+  ExternalLink,
   Sparkles,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { Card } from "@/components/ui/Card";
 
 export default function PublicLandingView() {
@@ -29,40 +28,7 @@ export default function PublicLandingView() {
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
       {/* 1. Header & Navigation */}
-      <header className="sticky top-0 z-50 backdrop-blur-md border-b border-[var(--app-border-subtle)] bg-[var(--app-bg)]/85 px-4 sm:px-8 py-3.5 transition-colors">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group focus:outline-none">
-            <Logo size={36} showText={true} />
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-6 text-xs font-medium opacity-80">
-            <a href="#features" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Features
-            </a>
-            <a href="#transparency" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Data Transparency
-            </a>
-            <a href="#security" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Security
-            </a>
-            <Link href="/privacy" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Terms of Service
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="primary" size="sm" className="gap-1.5 shadow-sm">
-                <span>Sign In</span>
-                <ArrowRight size={14} />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader currentPath="/" />
 
       {/* 2. Main Content */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-8 py-12 sm:py-20 space-y-20">
@@ -84,17 +50,19 @@ export default function PublicLandingView() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Link href="/login" className="w-full sm:w-auto">
-              <Button variant="primary" size="lg" className="w-full sm:w-auto gap-2 text-sm font-semibold">
-                <span>Access Your Portfolio</span>
-                <ChevronRight size={16} />
-              </Button>
+            <Link
+              href="/login"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold text-sm px-5 py-3 shadow-sm transition-colors"
+            >
+              <span>Access Your Portfolio</span>
+              <ChevronRight size={16} />
             </Link>
-            <a href="#transparency" className="w-full sm:w-auto">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2 text-sm">
-                <ShieldCheck size={16} className="text-emerald-400" />
-                <span>Google Data Transparency</span>
-              </Button>
+            <a
+              href="#transparency"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] hover:border-emerald-500/40 font-medium text-sm px-5 py-3 transition-colors"
+            >
+              <ShieldCheck size={16} className="text-emerald-400" />
+              <span>Google Data Transparency</span>
             </a>
           </div>
 
@@ -329,50 +297,19 @@ export default function PublicLandingView() {
             Join arthaX today. Free forever for personal use, completely open, and private by design.
           </p>
           <div className="pt-2">
-            <Link href="/login">
-              <Button variant="primary" size="lg" className="gap-2 font-semibold shadow-md">
-                <span>Get Started Now</span>
-                <ArrowRight size={16} />
-              </Button>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold text-sm sm:text-base px-6 py-3 shadow-md transition-colors"
+            >
+              <span>Get Started Now</span>
+              <ArrowRight size={16} />
             </Link>
           </div>
         </section>
       </main>
 
       {/* 3. Footer */}
-      <footer className="border-t border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]/50 px-4 sm:px-8 py-10 transition-colors">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs opacity-75">
-          <div className="flex items-center gap-3">
-            <Logo size={28} showText={true} />
-            <span className="opacity-40">|</span>
-            <span>© 2026 arthaX. All rights reserved.</span>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-6">
-            <Link href="/privacy" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:opacity-100 hover:text-emerald-400 transition-colors">
-              Terms of Service
-            </Link>
-            <a
-              href="https://developers.google.com/terms/api-services-user-data-policy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:opacity-100 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
-            >
-              <span>Google API User Data Policy</span>
-              <ExternalLink size={11} />
-            </a>
-            <a
-              href="mailto:support@arthax.app"
-              className="hover:opacity-100 hover:text-emerald-400 transition-colors"
-            >
-              Contact Support
-            </a>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

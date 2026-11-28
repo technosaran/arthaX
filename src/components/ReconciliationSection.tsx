@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/context/ToastContext";
 
 interface ReconciliationData {
@@ -83,23 +84,41 @@ export default function ReconciliationSection() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"accounts" | "statements" | "duplicates" | "reversals">("accounts");
 
+  const loadReconciliationData = useCallback(async () => {
+    const res = await fetch("/api/v1/reconciliation/dashboard");
+    if (!res.ok) throw new Error("Failed to load reconciliation data");
+    const json = await res.json();
+    return (json.data || json) as ReconciliationData;
+  }, []);
+
   const fetchReconciliation = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/v1/reconciliation/dashboard");
-      if (!res.ok) throw new Error("Failed to load reconciliation data");
-      const json = await res.json();
-      setData(json.data || json);
+      const nextData = await loadReconciliationData();
+      setData(nextData);
     } catch {
       showToast("Could not load reconciliation dashboard", "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [loadReconciliationData, showToast]);
 
   useEffect(() => {
-    fetchReconciliation();
-  }, [fetchReconciliation]);
+    let active = true;
+    (async () => {
+      try {
+        const nextData = await loadReconciliationData();
+        if (active) setData(nextData);
+      } catch {
+        if (active) showToast("Could not load reconciliation dashboard", "error");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [loadReconciliationData, showToast]);
 
   const handleTriggerReconcile = async () => {
     try {
@@ -112,7 +131,7 @@ export default function ReconciliationSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to trigger reconciliation");
       showToast(json.data?.message || "Reconciliation completed", "success");
-      fetchReconciliation();
+      void fetchReconciliation();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Error reconciling", "error");
     } finally {
@@ -133,7 +152,7 @@ export default function ReconciliationSection() {
       });
       if (!res.ok) throw new Error("Failed to acknowledge");
       showToast("Statement marked as acknowledged", "success");
-      fetchReconciliation();
+      void fetchReconciliation();
     } catch {
       showToast("Error acknowledging statement", "error");
     }
@@ -147,13 +166,13 @@ export default function ReconciliationSection() {
       <PageHeader
         title="Financial Reconciliation"
         description="Verify accounting balance invariants, double-entry integrity, statement math, and detect suspicious duplicates."
-        icon={<ShieldCheck size={20} className="text-emerald-400" />}
+        icon={<ShieldCheck size={20} className="text-emerald-500 dark:text-emerald-400" />}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchReconciliation}
+              onClick={() => void fetchReconciliation()}
               disabled={loading}
               className="gap-2"
             >
@@ -174,285 +193,340 @@ export default function ReconciliationSection() {
         }
       />
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        <StatCard
-          title="Reconciliation Score"
-          value={`${data?.health_score ?? 100}%`}
-          subtitle={data?.health_score && data.health_score < 90 ? "Discrepancies Detected" : "Accounting Invariants Verified"}
-          icon={<ShieldCheck size={18} />}
-          trend={{ direction: data?.health_score && data.health_score >= 95 ? "up" : "down" }}
-        />
-        <StatCard
-          title="Account Invariants"
-          value={`${data?.summary.reconciled_accounts ?? 0} / ${data?.summary.total_accounts ?? 0}`}
-          subtitle="Balances match verified statements"
-          icon={<Building2 size={18} />}
-        />
-        <StatCard
-          title="Statement Invariants"
-          value={`${data?.summary.reconciled_statements ?? 0} / ${data?.summary.total_statements ?? 0}`}
-          subtitle="Opening + Cr - Dr = Closing validated"
-          icon={<FileText size={18} />}
-        />
-        <StatCard
-          title="Suspected Duplicates"
-          value={String(data?.summary.detected_duplicates_count ?? 0)}
-          subtitle={data?.summary.detected_reversals_count ? `${data.summary.detected_reversals_count} reversals tracked` : "Zero duplicate writes detected"}
-          icon={<Copy size={18} />}
-          trend={{ direction: data?.summary.detected_duplicates_count ? "down" : "up" }}
-        />
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--app-border)] pb-3">
-        <button
-          onClick={() => setActiveTab("accounts")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === "accounts"
-              ? "bg-[var(--app-card-bg)] text-[var(--app-fg)] border border-[var(--app-border)]"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          Account Audit ({data?.accounts.length ?? 0})
-        </button>
-        <button
-          onClick={() => setActiveTab("statements")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === "statements"
-              ? "bg-[var(--app-card-bg)] text-[var(--app-fg)] border border-[var(--app-border)]"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          Bank Statements ({data?.statements.length ?? 0})
-        </button>
-        <button
-          onClick={() => setActiveTab("duplicates")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === "duplicates"
-              ? "bg-[var(--app-card-bg)] text-[var(--app-fg)] border border-[var(--app-border)]"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          Duplicates ({data?.duplicates.length ?? 0})
-        </button>
-        <button
-          onClick={() => setActiveTab("reversals")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === "reversals"
-              ? "bg-[var(--app-card-bg)] text-[var(--app-fg)] border border-[var(--app-border)]"
-              : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
-          }`}
-        >
-          Reversals ({data?.reversals.length ?? 0})
-        </button>
-      </div>
-
-      {/* TAB 1: ACCOUNTS */}
-      {activeTab === "accounts" && (
-        <Card className="p-0 overflow-hidden">
-          <div className="p-4 border-b border-[var(--app-border)] flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Account Balance Reconciliation</h3>
-            <span className="text-xs text-[var(--app-muted)]">Verified against latest ingested statement closing balance</span>
+      {loading && !data ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--app-bg)] border-b border-[var(--app-border)] text-[var(--app-muted)] text-xs uppercase">
-                <tr>
-                  <th className="p-3 pl-4">Account Name</th>
-                  <th className="p-3">Type</th>
-                  <th className="p-3">Ledger Balance</th>
-                  <th className="p-3">Statement Closing</th>
-                  <th className="p-3">Last Verified Period</th>
-                  <th className="p-3 text-right pr-4">Audit Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {(data?.accounts || []).map((acc) => (
-                  <tr key={acc.id} className="hover:bg-[var(--app-card-hover)] transition-colors">
-                    <td className="p-3 pl-4 font-medium flex items-center gap-2">
-                      <Building2 size={16} className="text-[var(--app-muted)]" />
-                      <span>{acc.name}</span>
-                      {acc.last_four && <span className="text-xs text-[var(--app-muted)]">••••{acc.last_four}</span>}
-                    </td>
-                    <td className="p-3 text-xs text-[var(--app-muted)]">{acc.type}</td>
-                    <td className="p-3 font-semibold">₹{acc.current_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 text-sm">
-                      {acc.latest_statement_closing_balance !== null
-                        ? `₹${acc.latest_statement_closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-                        : "—"}
-                    </td>
-                    <td className="p-3 text-xs text-[var(--app-muted)]">{acc.latest_statement_date || "No Statements"}</td>
-                    <td className="p-3 text-right pr-4">
-                      {acc.status === "RECONCILED" ? (
-                        <Badge variant="success" className="gap-1">
-                          <CheckCircle2 size={12} />
-                          Reconciled
-                        </Badge>
-                      ) : acc.status === "DISCREPANCY" ? (
-                        <Badge variant="danger" className="gap-1">
-                          <AlertTriangle size={12} />
-                          Diff: ₹{acc.discrepancy_amount}
-                        </Badge>
-                      ) : (
-                        <Badge variant="neutral">Unverified</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardSkeleton rows={5} />
+        </div>
+      ) : !data ? (
+        <Card className="p-8 text-center space-y-4">
+          <p className="text-sm text-[var(--app-muted)]">
+            Unable to load reconciliation audit data right now.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => void fetchReconciliation()}>
+            Retry
+          </Button>
         </Card>
-      )}
-
-      {/* TAB 2: STATEMENTS */}
-      {activeTab === "statements" && (
-        <Card className="p-0 overflow-hidden">
-          <div className="p-4 border-b border-[var(--app-border)] flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Bank Statement Invariant Validation</h3>
-            <span className="text-xs text-[var(--app-muted)]">Rule: Opening Balance + Total Credits − Total Debits = Closing Balance</span>
+      ) : (
+        <>
+          {/* Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            <StatCard
+              title="Reconciliation Score"
+              value={`${data.health_score ?? 100}%`}
+              subtitle={data.health_score < 90 ? "Discrepancies Detected" : "Accounting Invariants Verified"}
+              icon={<ShieldCheck size={18} />}
+              trend={{ direction: data.health_score >= 95 ? "up" : "down" }}
+            />
+            <StatCard
+              title="Account Invariants"
+              value={`${data.summary.reconciled_accounts ?? 0} / ${data.summary.total_accounts ?? 0}`}
+              subtitle="Balances match verified statements"
+              icon={<Building2 size={18} />}
+            />
+            <StatCard
+              title="Statement Invariants"
+              value={`${data.summary.reconciled_statements ?? 0} / ${data.summary.total_statements ?? 0}`}
+              subtitle="Opening + Cr - Dr = Closing validated"
+              icon={<FileText size={18} />}
+            />
+            <StatCard
+              title="Suspected Duplicates"
+              value={String(data.summary.detected_duplicates_count ?? 0)}
+              subtitle={data.summary.detected_reversals_count ? `${data.summary.detected_reversals_count} reversals tracked` : "Zero duplicate writes detected"}
+              icon={<Copy size={18} />}
+              trend={{ direction: data.summary.detected_duplicates_count ? "down" : "up" }}
+            />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--app-bg)] border-b border-[var(--app-border)] text-[var(--app-muted)] text-xs uppercase">
-                <tr>
-                  <th className="p-3 pl-4">Bank / Source</th>
-                  <th className="p-3">Period</th>
-                  <th className="p-3">Opening</th>
-                  <th className="p-3 text-emerald-600">Credits</th>
-                  <th className="p-3 text-rose-600">Debits</th>
-                  <th className="p-3">Expected Closing</th>
-                  <th className="p-3">Reported Closing</th>
-                  <th className="p-3 text-right pr-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {(data?.statements || []).map((stmt) => (
-                  <tr key={stmt.id} className="hover:bg-[var(--app-card-hover)] transition-colors">
-                    <td className="p-3 pl-4 font-medium">
-                      <div className="text-sm">{stmt.bank_name}</div>
-                      <div className="text-xs text-[var(--app-muted)] truncate max-w-xs">{stmt.file_name}</div>
-                    </td>
-                    <td className="p-3 text-xs text-[var(--app-muted)] whitespace-nowrap">
-                      {stmt.period_start} to {stmt.period_end}
-                    </td>
-                    <td className="p-3">₹{stmt.opening_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 text-emerald-600 font-medium">+₹{stmt.total_credits.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 text-rose-600 font-medium">-₹{stmt.total_debits.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 font-medium">₹{stmt.expected_closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 font-semibold">₹{stmt.closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3 text-right pr-4">
-                      {stmt.reconciliation_status === "RECONCILED" ? (
-                        <Badge variant="success" className="gap-1">
-                          <CheckCircle2 size={12} />
-                          Reconciled
-                        </Badge>
-                      ) : stmt.reconciliation_status === "ACKNOWLEDGED" ? (
-                        <Badge variant="neutral">Acknowledged</Badge>
-                      ) : (
-                        <div className="flex items-center justify-end gap-2">
-                          <Badge variant="danger" className="gap-1">
-                            <AlertTriangle size={12} />
-                            Diff: ₹{stmt.discrepancy_amount}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAcknowledgeStatement(stmt.id)}
-                            className="text-xs py-0.5 px-2"
-                          >
-                            Acknowledge
-                          </Button>
+
+          {/* Navigation Tabs */}
+          <div role="tablist" aria-label="Reconciliation views" className="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] pb-3">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "accounts"}
+              onClick={() => setActiveTab("accounts")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "accounts"
+                  ? "bg-[var(--app-card)] text-[var(--app-fg)] border border-[var(--app-border)]"
+                  : "text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-transparent"
+              }`}
+            >
+              Account Audit ({data.accounts.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "statements"}
+              onClick={() => setActiveTab("statements")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "statements"
+                  ? "bg-[var(--app-card)] text-[var(--app-fg)] border border-[var(--app-border)]"
+                  : "text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-transparent"
+              }`}
+            >
+              Bank Statements ({data.statements.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "duplicates"}
+              onClick={() => setActiveTab("duplicates")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "duplicates"
+                  ? "bg-[var(--app-card)] text-[var(--app-fg)] border border-[var(--app-border)]"
+                  : "text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-transparent"
+              }`}
+            >
+              Duplicates ({data.duplicates.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "reversals"}
+              onClick={() => setActiveTab("reversals")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "reversals"
+                  ? "bg-[var(--app-card)] text-[var(--app-fg)] border border-[var(--app-border)]"
+                  : "text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-transparent"
+              }`}
+            >
+              Reversals ({data.reversals.length})
+            </button>
+          </div>
+
+          {/* TAB 1: ACCOUNTS */}
+          {activeTab === "accounts" && (
+            <Card className="p-0 overflow-hidden">
+              <div className="p-4 border-b border-[var(--app-border)] flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm">Account Balance Reconciliation</h3>
+                <span className="text-xs text-[var(--app-muted)]">Verified against latest ingested statement closing balance</span>
+              </div>
+              {data.accounts.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    title="No accounts found to audit"
+                    description="Add an account or upload a bank statement to verify ledger closing balances."
+                    icon={<Building2 size={28} className="text-[var(--app-muted)]" />}
+                  />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[var(--app-bg)] border-b border-[var(--app-border)] text-[var(--app-muted)] text-xs uppercase">
+                      <tr>
+                        <th className="p-3 pl-4">Account Name</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Ledger Balance</th>
+                        <th className="p-3">Statement Closing</th>
+                        <th className="p-3">Last Verified Period</th>
+                        <th className="p-3 text-right pr-4">Audit Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {data.accounts.map((acc) => (
+                        <tr key={acc.id} className="hover:bg-[var(--app-card-hover)] transition-colors">
+                          <td className="p-3 pl-4 font-medium flex items-center gap-2 whitespace-nowrap">
+                            <Building2 size={16} className="text-[var(--app-muted)] shrink-0" />
+                            <span>{acc.name}</span>
+                            {acc.last_four && <span className="text-xs text-[var(--app-muted)] font-mono">••••{acc.last_four}</span>}
+                          </td>
+                          <td className="p-3 text-xs text-[var(--app-muted)]">{acc.type}</td>
+                          <td className="p-3 font-semibold font-mono tabular-nums whitespace-nowrap">₹{acc.current_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-sm font-mono tabular-nums whitespace-nowrap">
+                            {acc.latest_statement_closing_balance !== null
+                              ? `₹${acc.latest_statement_closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                              : "—"}
+                          </td>
+                          <td className="p-3 text-xs text-[var(--app-muted)]">{acc.latest_statement_date || "No Statements"}</td>
+                          <td className="p-3 text-right pr-4 whitespace-nowrap">
+                            {acc.status === "RECONCILED" ? (
+                              <Badge variant="success" className="gap-1">
+                                <CheckCircle2 size={12} />
+                                Reconciled
+                              </Badge>
+                            ) : acc.status === "DISCREPANCY" ? (
+                              <Badge variant="danger" className="gap-1">
+                                <AlertTriangle size={12} />
+                                Diff: ₹{acc.discrepancy_amount}
+                              </Badge>
+                            ) : (
+                              <Badge variant="neutral">Unverified</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* TAB 2: STATEMENTS */}
+          {activeTab === "statements" && (
+            <Card className="p-0 overflow-hidden">
+              <div className="p-4 border-b border-[var(--app-border)] flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm">Bank Statement Invariant Validation</h3>
+                <span className="text-xs text-[var(--app-muted)]">Rule: Opening Balance + Total Credits − Total Debits = Closing Balance</span>
+              </div>
+              {data.statements.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    title="No bank statements uploaded yet"
+                    description="Upload a PDF or CSV statement to validate mathematical opening-to-closing balance invariants."
+                    icon={<FileText size={28} className="text-[var(--app-muted)]" />}
+                  />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[var(--app-bg)] border-b border-[var(--app-border)] text-[var(--app-muted)] text-xs uppercase">
+                      <tr>
+                        <th className="p-3 pl-4">Bank / Source</th>
+                        <th className="p-3">Period</th>
+                        <th className="p-3">Opening</th>
+                        <th className="p-3 text-emerald-600 dark:text-emerald-400">Credits</th>
+                        <th className="p-3 text-rose-600 dark:text-rose-400">Debits</th>
+                        <th className="p-3">Expected Closing</th>
+                        <th className="p-3">Reported Closing</th>
+                        <th className="p-3 text-right pr-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {data.statements.map((stmt) => (
+                        <tr key={stmt.id} className="hover:bg-[var(--app-card-hover)] transition-colors">
+                          <td className="p-3 pl-4 font-medium">
+                            <div className="text-sm">{stmt.bank_name}</div>
+                            <div className="text-xs text-[var(--app-muted)] truncate max-w-xs">{stmt.file_name}</div>
+                          </td>
+                          <td className="p-3 text-xs text-[var(--app-muted)] whitespace-nowrap">
+                            {stmt.period_start} to {stmt.period_end}
+                          </td>
+                          <td className="p-3 font-mono tabular-nums whitespace-nowrap">₹{stmt.opening_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-emerald-600 dark:text-emerald-400 font-medium font-mono tabular-nums whitespace-nowrap">+₹{stmt.total_credits.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-rose-600 dark:text-rose-400 font-medium font-mono tabular-nums whitespace-nowrap">-₹{stmt.total_debits.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 font-medium font-mono tabular-nums whitespace-nowrap">₹{stmt.expected_closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 font-semibold font-mono tabular-nums whitespace-nowrap">₹{stmt.closing_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-right pr-4 whitespace-nowrap">
+                            {stmt.reconciliation_status === "RECONCILED" ? (
+                              <Badge variant="success" className="gap-1">
+                                <CheckCircle2 size={12} />
+                                Reconciled
+                              </Badge>
+                            ) : stmt.reconciliation_status === "ACKNOWLEDGED" ? (
+                              <Badge variant="neutral">Acknowledged</Badge>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <Badge variant="danger" className="gap-1">
+                                  <AlertTriangle size={12} />
+                                  Diff: ₹{stmt.discrepancy_amount}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void handleAcknowledgeStatement(stmt.id)}
+                                  className="text-xs py-0.5 px-2"
+                                >
+                                  Acknowledge
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* TAB 3: DUPLICATES */}
+          {activeTab === "duplicates" && (
+            <Card className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--app-border)]">
+                <h3 className="font-semibold text-sm">Suspected Duplicate Transactions</h3>
+                <span className="text-xs text-[var(--app-muted)]">Matched on Date, Amount, Direction & Narration fingerprint</span>
+              </div>
+
+              {data.duplicates.length === 0 ? (
+                <EmptyState
+                  title="No duplicate transactions detected"
+                  description="Your ledger and canonical transactions are cleanly deduplicated."
+                  icon={<CheckCircle2 size={32} className="text-emerald-500" />}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {data.duplicates.map((dup, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] flex flex-wrap items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          <Copy size={14} className="text-amber-500 shrink-0" />
+                          <span className="truncate">{dup.narration}</span>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* TAB 3: DUPLICATES */}
-      {activeTab === "duplicates" && (
-        <Card className="p-4 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border)]">
-            <h3 className="font-semibold text-sm">Suspected Duplicate Transactions</h3>
-            <span className="text-xs text-[var(--app-muted)]">Matched on Date, Amount, Direction & Narration fingerprint</span>
-          </div>
-
-          {(data?.duplicates || []).length === 0 ? (
-            <EmptyState
-              title="No duplicate transactions detected"
-              description="Your ledger and canonical transactions are cleanly deduplicated."
-              icon={<CheckCircle2 size={32} className="text-emerald-500" />}
-            />
-          ) : (
-            <div className="space-y-3">
-              {(data?.duplicates || []).map((dup, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] flex items-center justify-between"
-                >
-                  <div className="space-y-1">
-                    <div className="font-medium text-sm flex items-center gap-2">
-                      <Copy size={14} className="text-amber-500" />
-                      <span>{dup.narration}</span>
+                        <div className="text-xs text-[var(--app-muted)]">
+                          Date: {dup.date} • Reason: {dup.reason}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-semibold text-sm font-mono tabular-nums">₹{dup.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                        <Badge variant="warning" className="text-xs">Flagged</Badge>
+                      </div>
                     </div>
-                    <div className="text-xs text-[var(--app-muted)]">
-                      Date: {dup.date} • Reason: {dup.reason}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-sm">₹{dup.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                    <Badge variant="warning" className="text-xs">Flagged</Badge>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </Card>
           )}
-        </Card>
-      )}
 
-      {/* TAB 4: REVERSALS */}
-      {activeTab === "reversals" && (
-        <Card className="p-4 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--app-border)]">
-            <h3 className="font-semibold text-sm">Tracked Refunds & Payment Reversals</h3>
-            <span className="text-xs text-[var(--app-muted)]">Matched debit/credit reversal pairs</span>
-          </div>
+          {/* TAB 4: REVERSALS */}
+          {activeTab === "reversals" && (
+            <Card className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--app-border)]">
+                <h3 className="font-semibold text-sm">Tracked Refunds & Payment Reversals</h3>
+                <span className="text-xs text-[var(--app-muted)]">Matched debit/credit reversal pairs</span>
+              </div>
 
-          {(data?.reversals || []).length === 0 ? (
-            <EmptyState
-              title="No payment reversals tracked"
-              description="Failed transactions or merchant refunds will appear here once identified."
-              icon={<RotateCcw size={32} className="text-amber-500" />}
-            />
-          ) : (
-            <div className="space-y-3">
-              {(data?.reversals || []).map((rev, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] flex items-center justify-between"
-                >
-                  <div className="space-y-1">
-                    <div className="font-medium text-sm flex items-center gap-2">
-                      <RotateCcw size={14} className="text-emerald-500" />
-                      <span>{rev.narration}</span>
+              {data.reversals.length === 0 ? (
+                <EmptyState
+                  title="No payment reversals tracked"
+                  description="Failed transactions or merchant refunds will appear here once identified."
+                  icon={<RotateCcw size={32} className="text-amber-500" />}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {data.reversals.map((rev, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-subtle)] flex flex-wrap items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          <RotateCcw size={14} className="text-emerald-500 shrink-0" />
+                          <span className="truncate">{rev.narration}</span>
+                        </div>
+                        <div className="text-xs text-[var(--app-muted)]">Date: {rev.date}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-semibold text-sm font-mono tabular-nums text-emerald-600 dark:text-emerald-400">+₹{rev.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                        <Badge variant="success" className="text-xs">Neutralized</Badge>
+                      </div>
                     </div>
-                    <div className="text-xs text-[var(--app-muted)]">Date: {rev.date}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-sm text-emerald-600">+₹{rev.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                    <Badge variant="success" className="text-xs">Neutralized</Badge>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </Card>
           )}
-        </Card>
+        </>
       )}
     </main>
   );

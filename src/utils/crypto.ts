@@ -149,20 +149,21 @@ export function decryptSensitiveData(
       throw new Error("Invalid IV or authentication tag length");
     }
 
-    let key: Buffer | null = null;
+    let key: Buffer;
     try {
       key = getDerivedKey("arthax-credential-salt", context);
     } catch (keyErr) {
-      // In environments where ENCRYPTION_MASTER_KEY is not yet configured,
-      // allow fallback to legacy derivation for decryption of historical data
-      const legacyServiceSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (legacyServiceSecret && legacyServiceSecret.trim()) {
-        const legacyKey = getDerivedKey("arthax-credential-salt", context, legacyServiceSecret.trim());
-        const legacyDecipher = crypto.createDecipheriv("aes-256-gcm", legacyKey, iv, { authTagLength: AUTH_TAG_LENGTH });
-        legacyDecipher.setAuthTag(authTag);
-        let decrypted = legacyDecipher.update(encryptedHex, "hex", "utf8");
-        decrypted += legacyDecipher.final("utf8");
-        return decrypted;
+      // Never fall back to SUPABASE_SERVICE_ROLE_KEY in production when ENCRYPTION_MASTER_KEY is missing
+      if (!isProd) {
+        const legacyServiceSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (legacyServiceSecret && legacyServiceSecret.trim()) {
+          const legacyKey = getDerivedKey("arthax-credential-salt", context, legacyServiceSecret.trim());
+          const legacyDecipher = crypto.createDecipheriv("aes-256-gcm", legacyKey, iv, { authTagLength: AUTH_TAG_LENGTH });
+          legacyDecipher.setAuthTag(authTag);
+          let decrypted = legacyDecipher.update(encryptedHex, "hex", "utf8");
+          decrypted += legacyDecipher.final("utf8");
+          return decrypted;
+        }
       }
       throw keyErr;
     }
@@ -282,17 +283,6 @@ export function maskApiKey(apiKey: string | null | undefined): string | null {
   const clean = apiKey.trim();
   if (clean.length <= 6) return "••••••";
   return `${clean.slice(0, 3)}•••••${clean.slice(-3)}`;
-}
-
-/**
- * Masks a financial account or card number.
- * Example: '123456789012' -> '••••••••9012'
- */
-export function maskAccountNumber(accountNumber: string | null | undefined): string | null {
-  if (!accountNumber || typeof accountNumber !== "string") return null;
-  const clean = accountNumber.replace(/\s+/g, "");
-  if (clean.length <= 4) return "••••";
-  return `••••••••${clean.slice(-4)}`;
 }
 
 /**

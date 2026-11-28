@@ -788,6 +788,7 @@ export default function FamilySection() {
               }}
             >
               <button
+                type="button"
                 onClick={handlePrevMonth}
                 disabled={!canGoPrev}
                 title={!canGoPrev ? "No earlier transfer records" : "Previous Month"}
@@ -803,6 +804,7 @@ export default function FamilySection() {
                 {monthDisplayTitle}
               </span>
               <button
+                type="button"
                 onClick={handleNextMonth}
                 disabled={!canGoNext}
                 title={!canGoNext ? "Future months are not yet available" : "Next Month"}
@@ -816,6 +818,7 @@ export default function FamilySection() {
               </button>
               {!isCurrentMonth && !isAllTime && (
                 <button
+                  type="button"
                   onClick={handleResetToCurrentMonth}
                   className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
                   style={{ borderColor: "var(--app-border-subtle)" }}
@@ -1277,8 +1280,9 @@ export default function FamilySection() {
                         {(member.phone || member.email) && (
                           <div className="flex flex-wrap items-center gap-2 pt-0.5">
                             {member.phone && (
-                              <div
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                              <a
+                                href={`tel:${member.phone.replace(/[^\d+]/g, "")}`}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-80 hover:opacity-100 hover:border-emerald-500/40 transition-colors"
                                 style={{
                                   borderColor: "var(--app-border-subtle)",
                                   backgroundColor: "var(--app-card-subtle)",
@@ -1286,11 +1290,12 @@ export default function FamilySection() {
                               >
                                 <Phone size={10} className="text-emerald-400" />
                                 <span>{member.phone}</span>
-                              </div>
+                              </a>
                             )}
                             {member.email && (
-                              <div
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-70"
+                              <a
+                                href={`mailto:${member.email}`}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono opacity-80 hover:opacity-100 hover:border-sky-500/40 transition-colors"
                                 style={{
                                   borderColor: "var(--app-border-subtle)",
                                   backgroundColor: "var(--app-card-subtle)",
@@ -1298,7 +1303,7 @@ export default function FamilySection() {
                               >
                                 <Mail size={10} className="text-sky-400" />
                                 <span>{member.email}</span>
-                              </div>
+                              </a>
                             )}
                           </div>
                         )}
@@ -1398,11 +1403,21 @@ export default function FamilySection() {
                                   <div className="font-bold text-sm tracking-tight truncate capitalize">
                                     {displayName}
                                   </div>
-                                  {(member.phone || member.email) && (
-                                    <div className="text-[11px] font-mono opacity-50 truncate">
-                                      {member.phone || member.email}
-                                    </div>
-                                  )}
+                                  {member.phone ? (
+                                    <a
+                                      href={`tel:${member.phone.replace(/[^\d+]/g, "")}`}
+                                      className="block text-[11px] font-mono opacity-65 hover:opacity-100 hover:text-emerald-400 truncate transition-colors"
+                                    >
+                                      {member.phone}
+                                    </a>
+                                  ) : member.email ? (
+                                    <a
+                                      href={`mailto:${member.email}`}
+                                      className="block text-[11px] font-mono opacity-65 hover:opacity-100 hover:text-sky-400 truncate transition-colors"
+                                    >
+                                      {member.email}
+                                    </a>
+                                  ) : null}
                                 </div>
                               </div>
                             </td>

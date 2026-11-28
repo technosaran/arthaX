@@ -27,7 +27,7 @@ export function SegmentedControl<T extends string>({
 
   return (
     <div
-      className={`inline-flex items-center p-1 rounded-xl border border-[var(--app-border)] select-none ${className}`}
+      className={`inline-flex max-w-full overflow-x-auto items-center p-1 rounded-xl border border-[var(--app-border)] select-none ${className}`}
       style={{
         backgroundColor: "var(--app-card-subtle)",
       }}
@@ -39,7 +39,7 @@ export function SegmentedControl<T extends string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`flex items-center justify-center gap-1.5 rounded-lg transition-all duration-150 cursor-pointer font-semibold ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer font-semibold ${
               isSm
                 ? "px-2.5 py-1 text-[11px]"
                 : "px-3.5 py-1.5 text-xs"

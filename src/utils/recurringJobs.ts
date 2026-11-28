@@ -1,154 +1,229 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { logger } from "@/utils/logger";
-import { invalidateCachedData, getUserCacheKey, CACHE_KEYS } from "@/utils/redis";
+import { getLocalDateString } from "@/utils/monthUtils";
+import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { checkAndSetIdempotency } from "@/utils/rateLimit";
+import * as rateLimitModule from "@/utils/rateLimit";
+
+async function safeReleaseIdempotency(key: string): Promise<void> {
+  try {
+    const mod = rateLimitModule as { releaseIdempotency?: (k: string) => Promise<void> };
+    if (typeof mod.releaseIdempotency === "function") {
+      await mod.releaseIdempotency(key);
+    }
+  } catch {
+    // Safe no-op under partial mocks
+  }
+}
 
 export interface RecurringJobsSummary {
   success: boolean;
   processed: number;
-  errors?: Array<{ ruleId: string; error: string }>;
+  skippedIdempotent?: number;
+  errors: string[];
   message?: string;
-}
-
-export function computeNextRunDate(currentDateStr: string, frequency: string): string {
-  if (!currentDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(currentDateStr)) {
-    currentDateStr = new Date().toISOString().split("T")[0];
-  }
-
-  const parts = currentDateStr.split("-");
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1; // 0-indexed
-  const day = parseInt(parts[2], 10);
-
-  if (frequency === "daily") {
-    const d = new Date(Date.UTC(year, month, day + 1));
-    return d.toISOString().split("T")[0];
-  } else if (frequency === "weekly") {
-    const d = new Date(Date.UTC(year, month, day + 7));
-    return d.toISOString().split("T")[0];
-  } else if (frequency === "monthly" || frequency === "quarterly") {
-    const monthsToAdd = frequency === "quarterly" ? 3 : 1;
-    const targetMonth = month + monthsToAdd;
-    const targetYear = year + Math.floor(targetMonth / 12);
-    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
-    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
-    const targetDay = Math.min(day, lastDayOfTargetMonth);
-    const d = new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
-    return d.toISOString().split("T")[0];
-  } else if (frequency === "yearly") {
-    const targetYear = year + 1;
-    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, month + 1, 0)).getUTCDate();
-    const targetDay = Math.min(day, lastDayOfTargetMonth);
-    const d = new Date(Date.UTC(targetYear, month, targetDay));
-    return d.toISOString().split("T")[0];
-  } else {
-    const targetMonth = month + 1;
-    const targetYear = year + Math.floor(targetMonth / 12);
-    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
-    const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
-    const targetDay = Math.min(day, lastDayOfTargetMonth);
-    const d = new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
-    return d.toISOString().split("T")[0];
-  }
+  timestamp: string;
 }
 
 /**
- * Processes all due active recurring transaction rules atomically.
+ * Safely computes next run date strictly clamping month-end dates (e.g. Jan 31 -> Feb 28/29).
+ * Gracefully falls back to current IST date when input is empty or malformed.
+ */
+export function computeNextRunDate(currentDateStr: string, frequency: string): string {
+  const isoMatch = typeof currentDateStr === "string" ? currentDateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+  let y: number;
+  let m: number;
+  let d: number;
+
+  if (isoMatch) {
+    y = Number(isoMatch[1]);
+    m = Number(isoMatch[2]);
+    d = Number(isoMatch[3]);
+  } else {
+    const parsed = currentDateStr ? new Date(currentDateStr) : new Date(NaN);
+    if (!Number.isNaN(parsed.getTime())) {
+      y = parsed.getUTCFullYear();
+      m = parsed.getUTCMonth() + 1;
+      d = parsed.getUTCDate();
+    } else {
+      const istToday = getLocalDateString(new Date(), "Asia/Kolkata").split("-");
+      y = Number(istToday[0]);
+      m = Number(istToday[1]);
+      d = Number(istToday[2]);
+    }
+  }
+
+  const normalizedFreq = (frequency || "monthly").trim().toLowerCase();
+
+  if (normalizedFreq === "daily") {
+    const dt = new Date(Date.UTC(y, m - 1, d + 1));
+    return dt.toISOString().split("T")[0];
+  }
+
+  if (normalizedFreq === "weekly") {
+    const dt = new Date(Date.UTC(y, m - 1, d + 7));
+    return dt.toISOString().split("T")[0];
+  }
+
+  if (normalizedFreq === "biweekly" || normalizedFreq === "fortnightly") {
+    const dt = new Date(Date.UTC(y, m - 1, d + 14));
+    return dt.toISOString().split("T")[0];
+  }
+
+  let monthsToAdd = 1;
+  if (normalizedFreq === "quarterly") monthsToAdd = 3;
+  else if (normalizedFreq === "half-yearly" || normalizedFreq === "semi-annual") monthsToAdd = 6;
+  else if (normalizedFreq === "yearly" || normalizedFreq === "annual" || normalizedFreq === "annually") {
+    monthsToAdd = 12;
+  }
+
+  const totalMonths = y * 12 + (m - 1) + monthsToAdd;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonth = (totalMonths % 12) + 1;
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+  const clampedDay = Math.min(d, daysInTargetMonth);
+
+  return `${String(targetYear).padStart(4, "0")}-${String(targetMonth).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`;
+}
+
+/**
+ * Executes all active due recurring rules in Asia/Kolkata (IST) with per-occurrence idempotency
+ * and cache invalidation.
  */
 export async function runRecurringJobs(): Promise<RecurringJobsSummary> {
-  const todayStr = new Date().toISOString().split("T")[0];
-  logger.info(`Starting recurring transactions run for ${todayStr}`, "QStashJob");
+  const todayStr = getLocalDateString(new Date(), "Asia/Kolkata");
+  const timestamp = new Date().toISOString();
 
-  const { data: dueRules, error: fetchErr } = await supabaseAdmin
+  const { data: dueRules, error: queryError } = await supabaseAdmin
     .from("recurring_rules")
     .select("*")
     .eq("is_active", true)
     .lte("next_run_date", todayStr);
 
-  if (fetchErr) {
-    logger.error("Failed to query due recurring rules", "QStashJob", fetchErr);
-    throw new Error(fetchErr.message);
+  if (queryError) {
+    logger.error("Failed to fetch recurring rules", "RecurringJobs", queryError);
+    throw new Error(queryError.message);
   }
 
   if (!dueRules || dueRules.length === 0) {
-    logger.info("No recurring rules due today.", "QStashJob");
-    return { success: true, processed: 0, message: "No due rules" };
+    return {
+      success: true,
+      processed: 0,
+      skippedIdempotent: 0,
+      errors: [],
+      message: "No due recurring transactions for today.",
+      timestamp,
+    };
   }
 
   let processedCount = 0;
-  const errors: Array<{ ruleId: string; error: string }> = [];
+  let skippedIdempotent = 0;
+  const errors: string[] = [];
+  const touchedUsers = new Set<string>();
 
   for (const rule of dueRules) {
+    const idempotencyKey = `recurring_rule_exec:${rule.id}:${rule.next_run_date}`;
+    const lockClaimed = await checkAndSetIdempotency(idempotencyKey, 86400 * 7);
+    if (!lockClaimed) {
+      skippedIdempotent += 1;
+      continue;
+    }
+
     try {
-      if (rule.transaction_type === "expense") {
-        const { error: rpcErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
+      let execError: { message?: string } | null = null;
+
+      if (rule.flow_type === "expense") {
+        const { error: expErr } = await supabaseAdmin.rpc("fn_record_expense_atomic", {
           p_user_id: rule.user_id,
-          p_title: rule.title,
-          p_amount: rule.amount,
-          p_category: rule.category || "Subscriptions & SaaS",
-          p_account_id: rule.from_account_id || null,
-          p_expense_date: todayStr,
-          p_notes: `Automated recurring: ${rule.notes || rule.title}`,
+          p_title: `${rule.title} (Auto)`,
+          p_amount: Number(rule.amount),
+          p_category: rule.category,
+          p_account_id: rule.account_id || null,
+          p_expense_date: rule.next_run_date || todayStr,
+          p_notes: "Automatically recorded via ArthaX Recurring Automation",
           p_tags: ["recurring", "automated"],
         });
-        if (rpcErr) throw rpcErr;
-      } else if (rule.transaction_type === "income") {
-        const { error: rpcErr } = await supabaseAdmin.rpc("fn_record_income_atomic", {
+        execError = expErr;
+      } else if (rule.flow_type === "income") {
+        const { error: incErr } = await supabaseAdmin.rpc("fn_record_income_atomic", {
           p_user_id: rule.user_id,
-          p_title: rule.title,
-          p_amount: rule.amount,
-          p_category: rule.category || "Salary",
-          p_frequency: rule.frequency,
-          p_account_id: rule.to_account_id || null,
-          p_received_date: todayStr,
-          p_notes: `Automated recurring: ${rule.notes || rule.title}`,
+          p_title: `${rule.title} (Auto)`,
+          p_amount: Number(rule.amount),
+          p_category: rule.category,
+          p_frequency: rule.frequency || "monthly",
+          p_account_id: rule.account_id || null,
+          p_received_date: rule.next_run_date || todayStr,
+          p_notes: "Automatically recorded via ArthaX Recurring Automation",
           p_tags: ["recurring", "automated"],
         });
-        if (rpcErr) throw rpcErr;
-      } else if (rule.transaction_type === "transfer" && rule.from_account_id && rule.to_account_id) {
-        const { error: rpcErr } = await supabaseAdmin.rpc("fn_record_transfer_atomic", {
-          p_user_id: rule.user_id,
-          p_from_account_id: rule.from_account_id,
-          p_to_account_id: rule.to_account_id,
-          p_amount: rule.amount,
-          p_transfer_date: todayStr,
-          p_notes: `Automated recurring transfer: ${rule.notes || rule.title}`,
-        });
-        if (rpcErr) throw rpcErr;
+        execError = incErr;
       }
 
-      const nextDate = computeNextRunDate(rule.next_run_date, rule.frequency);
-      await supabaseAdmin
+      if (execError) {
+        await safeReleaseIdempotency(idempotencyKey);
+        errors.push(`Rule ${rule.id}: ${execError.message || "RPC failed"}`);
+        continue;
+      }
+
+      // Compute next schedule date; if catch-up date is still before todayStr, advance iteratively capped safely
+      let nextDate = computeNextRunDate(rule.next_run_date, rule.frequency);
+      let safetyHops = 0;
+      while (nextDate < todayStr && safetyHops < 24) {
+        nextDate = computeNextRunDate(nextDate, rule.frequency);
+        safetyHops += 1;
+      }
+
+      const { error: updErr } = await supabaseAdmin
         .from("recurring_rules")
         .update({
-          last_run_date: todayStr,
           next_run_date: nextDate,
+          last_run_at: new Date().toISOString(),
         })
-        .eq("id", rule.id);
+        .eq("id", rule.id)
+        .eq("user_id", rule.user_id);
 
-      await invalidateCachedData([
-        getUserCacheKey(rule.user_id, CACHE_KEYS.EXPENSES),
-        getUserCacheKey(rule.user_id, CACHE_KEYS.INCOME),
-        getUserCacheKey(rule.user_id, CACHE_KEYS.ACCOUNTS),
-        getUserCacheKey(rule.user_id, CACHE_KEYS.PORTFOLIO),
-        getUserCacheKey(rule.user_id, CACHE_KEYS.LEDGER),
-      ]);
-
-      processedCount++;
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error(`Error processing rule ${rule.id}`, "QStashJob", err);
-      errors.push({ ruleId: rule.id, error: errorMsg });
+      if (updErr) {
+        errors.push(`Rule ${rule.id} schedule update: ${updErr.message}`);
+      } else {
+        processedCount += 1;
+        if (rule.user_id) touchedUsers.add(rule.user_id);
+      }
+    } catch (e: unknown) {
+      await safeReleaseIdempotency(idempotencyKey);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      errors.push(`Rule ${rule.id} exception: ${errMsg}`);
     }
   }
 
+  // Invalidate affected user caches and write audit telemetry (non-blocking)
+  await Promise.allSettled([
+    ...Array.from(touchedUsers).map(async (uid) => {
+      await invalidateUserCaches(uid, ["ACCOUNTS", "EXPENSES", "INCOME", "PORTFOLIO", "LEDGER"]);
+      try {
+        await supabaseAdmin.from("automation_jobs").insert({
+          user_id: uid,
+          job_type: "RECURRING_RULES",
+          status: errors.length > 0 ? "PARTIAL" : "COMPLETED",
+          started_at: timestamp,
+          completed_at: new Date().toISOString(),
+          stats: { processedCount, skippedIdempotent, runDateIst: todayStr },
+        });
+      } catch {
+        // Non-fatal telemetry log
+      }
+    }),
+  ]);
+
   logger.info(
-    `Recurring job completed. Processed: ${processedCount}, Errors: ${errors.length}`,
-    "QStashJob"
+    `Recurring job completed. Processed: ${processedCount}, Skipped: ${skippedIdempotent}, Errors: ${errors.length}`,
+    "RecurringJobs"
   );
 
   return {
-    success: true,
+    success: errors.length === 0,
     processed: processedCount,
-    errors: errors.length > 0 ? errors : undefined,
+    skippedIdempotent,
+    errors,
+    timestamp: new Date().toISOString(),
   };
 }

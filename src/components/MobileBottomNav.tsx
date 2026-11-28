@@ -82,12 +82,32 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottomNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const currentGroup = getMobileNavGroup(activeTab);
 
-  // Close sheet on popstate / route changes
   useEffect(() => {
-    setSheetOpen(false);
-  }, [activeTab]);
+    if (typeof window === "undefined") return;
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes("android-app://");
+    setIsStandalone(standalone);
+  }, []);
+
+  // Close sheet on Escape key or browser back navigation
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSheetOpen(false);
+    };
+    const handlePop = () => setSheetOpen(false);
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("popstate", handlePop);
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("popstate", handlePop);
+    };
+  }, [sheetOpen]);
 
   const handleDestinationClick = (dest: MobileNavDestination) => {
     if (dest.id === "more") {
@@ -99,8 +119,8 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
   };
 
   const handleSelectModule = (tab: string) => {
-    onSelectTab(tab);
     setSheetOpen(false);
+    onSelectTab(tab);
   };
 
   return (
@@ -110,7 +130,7 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
         aria-label="Mobile Bottom Navigation"
         className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t safe-bottom-nav select-none transition-colors backdrop-blur-xl"
         style={{
-          backgroundColor: "rgba(10, 12, 18, 0.88)",
+          backgroundColor: "var(--app-nav-bg)",
           borderColor: "var(--app-border)",
         }}
       >
@@ -124,16 +144,17 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
                 key={dest.id}
                 type="button"
                 onClick={() => handleDestinationClick(dest)}
+                aria-current={isGroupActive ? "page" : undefined}
                 className={`flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-xl transition-all duration-150 cursor-pointer active:scale-95 ${
                   isGroupActive
-                    ? "text-emerald-400 font-bold"
-                    : "text-[var(--app-muted)] hover:text-[var(--app-fg)] opacity-80"
+                    ? "text-[var(--app-accent)] font-bold"
+                    : "text-[var(--app-muted)] hover:text-[var(--app-fg)] opacity-85"
                 }`}
               >
                 <div className="relative">
-                  <Icon size={20} className={isGroupActive ? "text-emerald-400" : ""} />
+                  <Icon size={20} className={isGroupActive ? "text-[var(--app-accent)]" : ""} />
                   {isGroupActive && (
-                    <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                    <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[var(--app-accent)] shadow-[0_0_6px_var(--app-accent)]" />
                   )}
                 </div>
                 <span className="text-[10px] tracking-tight mt-1 truncate">{dest.label}</span>
@@ -145,7 +166,12 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
 
       {/* 2. Slide-up All Modules Sheet */}
       {sheetOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end animate-in fade-in duration-200">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sovereign Financial Suite"
+          className="fixed inset-0 z-50 md:hidden flex flex-col justify-end animate-in fade-in duration-200"
+        >
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/75 backdrop-blur-xs cursor-pointer"
@@ -319,32 +345,29 @@ export default function MobileBottomNav({ activeTab, onSelectTab }: MobileBottom
               </div>
 
               {/* Install PWA Quick Tile */}
-              <div className="pt-2 border-t border-[var(--app-border-subtle)]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSheetOpen(false);
-                    const promptEvent = (window as any).deferredPrompt;
-                    if (promptEvent) {
-                      promptEvent.prompt();
-                    } else {
-                      window.dispatchEvent(new CustomEvent("arthax:pwa-installable"));
-                    }
-                  }}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-400 transition-all cursor-pointer active:scale-98"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                      <Download size={16} className="text-emerald-400" />
+              {!isStandalone && (
+                <div className="pt-2 border-t border-[var(--app-border-subtle)]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSheetOpen(false);
+                      window.dispatchEvent(new CustomEvent("arthax:open-pwa-install"));
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-400 transition-all cursor-pointer active:scale-98"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                        <Download size={16} className="text-emerald-400" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs font-bold text-[var(--app-fg)]">Install ArthaX Mobile App</div>
+                        <div className="text-[10px] text-emerald-400/80">Add to Home Screen for native fullscreen</div>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <div className="text-xs font-bold text-[var(--app-fg)]">Install ArthaX Mobile App</div>
-                      <div className="text-[10px] text-emerald-400/80">Add to Home Screen for native fullscreen</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="opacity-60" />
-                </button>
-              </div>
+                    <ChevronRight size={14} className="opacity-60" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, isRedisConfigured } from "@/utils/redis";
 import { extractRequestId } from "@/utils/apiResponse";
 import { BullionRates, GRAMS_PER_TROY_OUNCE } from "@/utils/bullionCalculations";
+import { rateLimit } from "@/utils/rateLimit";
 
 // In-memory fallback cache (TTL: 60 seconds)
 let memoryCache: { data: BullionRates; expiry: number } | null = null;
@@ -89,6 +90,23 @@ export async function GET(req: NextRequest) {
   const requestId = extractRequestId(req);
   const { searchParams } = new URL(req.url);
   const forceRefresh = searchParams.get("refresh") === "true";
+
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anonymous";
+  const rl = await rateLimit(
+    forceRefresh ? `bullion_rates_refresh:${clientIp}` : `bullion_rates:${clientIp}`,
+    forceRefresh ? 10 : 60,
+    60
+  );
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
+  }
+
   const now = Date.now();
 
   // 1. Check in-memory cache if not force refreshing

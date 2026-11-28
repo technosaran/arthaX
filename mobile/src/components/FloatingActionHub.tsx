@@ -3,11 +3,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Modal,
   TextInput,
   Alert,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   Plus,
@@ -16,15 +16,17 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   ArrowLeftRight,
-  ShieldAlert,
   Lock,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useFinancial } from '../context/FinancialContext';
 import { Button } from './Button';
+import { BottomSheetModal } from './BottomSheetModal';
 import { CanonicalTransaction } from '../types';
+import { COMPACT_HIT_SLOP, getTabBarHeight, NUMERIC_KEYBOARD } from '../theme/platform';
 
 export const FloatingActionHub: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { accounts, addNewTransaction } = useFinancial();
 
@@ -149,13 +151,15 @@ export const FloatingActionHub: React.FC = () => {
 
   return (
     <>
-      {/* Floating Center Button */}
+      {/* Floating Center Button (cleared above iOS tab bar + home indicator) */}
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={handleOpenSheet}
+        accessibilityRole="button"
+        accessibilityLabel="Open quick financial actions"
         style={{
           position: 'absolute',
-          bottom: 24,
+          bottom: getTabBarHeight(insets.bottom) + 12,
           alignSelf: 'center',
           backgroundColor: '#10b981',
           width: 58,
@@ -175,19 +179,7 @@ export const FloatingActionHub: React.FC = () => {
       </TouchableOpacity>
 
       {/* Action Hub Modal */}
-      <Modal visible={isOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
-          <View
-            style={{
-              backgroundColor: colors.card,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
-              borderWidth: 1,
-              borderColor: colors.border,
-              maxHeight: '85%',
-            }}
-          >
+      <BottomSheetModal visible={isOpen} onClose={handleClose}>
             {/* Modal Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>
@@ -201,7 +193,13 @@ export const FloatingActionHub: React.FC = () => {
                   ? 'Account Transfer'
                   : 'Ingest Bank Statement'}
               </Text>
-              <TouchableOpacity onPress={handleClose} style={{ padding: 6 }}>
+              <TouchableOpacity
+                onPress={handleClose}
+                hitSlop={COMPACT_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Close action hub"
+                style={{ padding: 6 }}
+              >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -297,12 +295,12 @@ export const FloatingActionHub: React.FC = () => {
 
             {/* Sub-form: Expense or Income */}
             {(activeAction === 'EXPENSE' || activeAction === 'INCOME') && (
-              <ScrollView keyboardShouldPersistTaps="handled">
+              <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
                 <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>Amount (₹)</Text>
                 <TextInput
                   placeholder="0.00"
                   placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
+                  keyboardType={NUMERIC_KEYBOARD}
                   value={amount}
                   onChangeText={setAmount}
                   style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, color: colors.text, fontSize: 20, fontWeight: '800', marginBottom: 14 }}
@@ -340,12 +338,12 @@ export const FloatingActionHub: React.FC = () => {
 
             {/* Sub-form: Transfer */}
             {activeAction === 'TRANSFER' && (
-              <ScrollView keyboardShouldPersistTaps="handled">
+              <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
                 <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>Transfer Amount (₹)</Text>
                 <TextInput
                   placeholder="0.00"
                   placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
+                  keyboardType={NUMERIC_KEYBOARD}
                   value={amount}
                   onChangeText={setAmount}
                   style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, color: colors.text, fontSize: 20, fontWeight: '800', marginBottom: 16 }}
@@ -436,9 +434,7 @@ export const FloatingActionHub: React.FC = () => {
                 </View>
               </View>
             )}
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 };

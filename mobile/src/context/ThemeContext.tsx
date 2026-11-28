@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Appearance, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkColors, lightColors, ThemeColors } from '../theme/colors';
+
+const syncNativeColorScheme = (dark: boolean) => {
+  if (Platform.OS !== 'web') {
+    Appearance.setColorScheme?.(dark ? 'dark' : 'light');
+  }
+};
 
 interface ThemeContextType {
   isDark: boolean;
@@ -19,9 +26,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     AsyncStorage.getItem('@arthax_theme').then((saved) => {
-      if (saved) {
-        setIsDark(saved === 'dark');
-      }
+      const dark = saved ? saved === 'dark' : true;
+      setIsDark(dark);
+      syncNativeColorScheme(dark);
     });
   }, []);
 
@@ -29,6 +36,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsDark((prev) => {
       const next = !prev;
       AsyncStorage.setItem('@arthax_theme', next ? 'dark' : 'light');
+      syncNativeColorScheme(next);
       return next;
     });
   };

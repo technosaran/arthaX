@@ -187,16 +187,18 @@ describe("Gmail Bank Statement Integration & Auto-Account Creation", () => {
           }),
           update: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: {
-                    id: "g_int_1",
-                    user_id: "user_123",
-                    email_address: "new@gmail.com",
-                    access_token_encrypted: realTokenEncrypted,
-                    sync_status: "ACTIVE",
-                  },
-                  error: null,
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      id: "g_int_1",
+                      user_id: "user_123",
+                      email_address: "new@gmail.com",
+                      access_token_encrypted: realTokenEncrypted,
+                      sync_status: "ACTIVE",
+                    },
+                    error: null,
+                  }),
                 }),
               }),
             }),

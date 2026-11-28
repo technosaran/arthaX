@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiSuccess, apiError } from "@/utils/apiResponse";
+import { apiSuccess, apiError, apiNotFound } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { getMonthBounds, isValidUuid, parseIntParam, parseMonthParam } from "@/lib/backend/queryParams";
 import { z } from "zod";
 
 const TransactionSchema = z.object({
@@ -16,26 +17,30 @@ const TransactionSchema = z.object({
   tags: z.array(z.string()).default([]),
 });
 
-function getMonthBounds(monthStr: string): { start: string; nextMonthStart: string } {
-  const [yearStr, monthNumStr] = monthStr.split("-");
-  const year = parseInt(yearStr, 10);
-  const m = parseInt(monthNumStr, 10);
-  const start = `${monthStr}-01`;
-  const nextMonthStart = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, "0")}-01`;
-  return { start, nextMonthStart };
-}
-
 export const GET = createApiRoute({
   rateLimit: { limit: 120, windowSeconds: 60 },
   handler: async ({ userId, query, req }) => {
     const type = query.get("type") || "all"; // 'all' | 'expense' | 'income'
-    const month = query.get("month"); // 'YYYY-MM'
-    const accountId = query.get("account_id");
+    if (!["all", "expense", "income"].includes(type)) {
+      return apiError("Invalid type parameter. Expected all, expense, or income.", "VALIDATION_ERROR", 400, undefined, req);
+    }
+
+    const monthCheck = parseMonthParam(query.get("month"));
+    if (!monthCheck.valid) {
+      return apiError("Invalid month format. Expected YYYY-MM.", "VALIDATION_ERROR", 400, undefined, req);
+    }
+    const month = monthCheck.value;
+
+    const accountId = query.get("account_id")?.trim() || null;
+    if (accountId && !isValidUuid(accountId)) {
+      return apiError("Invalid account_id UUID.", "VALIDATION_ERROR", 400, undefined, req);
+    }
+
     const category = query.get("category");
     const rawSearch = query.get("search");
     const search = rawSearch ? rawSearch.replace(/[,()%"']/g, " ").trim() : null;
-    const limit = Math.min(parseInt(query.get("limit") || "50", 10), 100);
-    const page = Math.max(parseInt(query.get("page") || "1", 10), 1);
+    const limit = parseIntParam(query.get("limit"), 50, 1, 100);
+    const page = parseIntParam(query.get("page"), 1, 1, 10000);
     const offset = (page - 1) * limit;
 
     type SupabaseListResult = { data: Record<string, unknown>[] | null; count: number | null; error: { message: string } | null };
@@ -49,7 +54,7 @@ export const GET = createApiRoute({
         .eq("user_id", userId!)
         .order("expense_date", { ascending: false });
 
-      if (month && /^\d{4}-\d{2}$/.test(month)) {
+      if (month) {
         const { start, nextMonthStart } = getMonthBounds(month);
         expQuery = expQuery.gte("expense_date", start).lt("expense_date", nextMonthStart);
       }
@@ -58,7 +63,7 @@ export const GET = createApiRoute({
       if (search) expQuery = expQuery.ilike("title", `%${search}%`);
 
       const queryStart = type === "all" ? 0 : offset;
-      const queryEnd = type === "all" ? offset + limit - 1 : offset + limit - 1;
+      const queryEnd = offset + limit - 1;
       expensesPromise = expQuery.range(queryStart, queryEnd) as unknown as Promise<SupabaseListResult>;
     }
 
@@ -69,7 +74,7 @@ export const GET = createApiRoute({
         .eq("user_id", userId!)
         .order("received_date", { ascending: false });
 
-      if (month && /^\d{4}-\d{2}$/.test(month)) {
+      if (month) {
         const { start, nextMonthStart } = getMonthBounds(month);
         incQuery = incQuery.gte("received_date", start).lt("received_date", nextMonthStart);
       }
@@ -78,7 +83,7 @@ export const GET = createApiRoute({
       if (search) incQuery = incQuery.ilike("title", `%${search}%`);
 
       const queryStart = type === "all" ? 0 : offset;
-      const queryEnd = type === "all" ? offset + limit - 1 : offset + limit - 1;
+      const queryEnd = offset + limit - 1;
       incomePromise = incQuery.range(queryStart, queryEnd) as unknown as Promise<SupabaseListResult>;
     }
 
@@ -171,7 +176,7 @@ export const DELETE = createApiRoute({
     const id = query.get("id");
     const type = query.get("type"); // 'expense' | 'income'
 
-    if (!id || !/^[0-9a-fA-F-]{36}$/.test(id) || !type || !["expense", "income"].includes(type)) {
+    if (!id || !isValidUuid(id) || !type || !["expense", "income"].includes(type)) {
       return apiError("Missing or invalid id / type parameters", "BAD_REQUEST", 400, undefined, req);
     }
 
@@ -192,6 +197,13 @@ export const DELETE = createApiRoute({
       result = rpcResult;
     }
 
+    if (
+      !result ||
+      (typeof result === "object" && "success" in result && (result as { success?: boolean }).success === false)
+    ) {
+      return apiNotFound("Transaction not found or already deleted.", req);
+    }
+
     await invalidateUserCaches(userId, [
       "EXPENSES",
       "INCOME",
@@ -202,6 +214,6 @@ export const DELETE = createApiRoute({
       "ANALYTICS",
     ]);
 
-    return result;
+    return apiSuccess(result, undefined, 200, req);
   },
 });

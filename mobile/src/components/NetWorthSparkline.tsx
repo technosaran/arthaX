@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
+import { COMPACT_HIT_SLOP } from '../theme/platform';
 
 interface NetWorthSparklineProps {
   currentValue: number;
@@ -17,13 +18,14 @@ const timelineData: Record<string, number[]> = {
 
 export const NetWorthSparkline: React.FC<NetWorthSparklineProps> = ({ currentValue }) => {
   const { colors } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const [selectedRange, setSelectedRange] = useState<'1M' | '3M' | '6M' | '1Y'>('3M');
 
   const data = timelineData[selectedRange];
   const min = Math.min(...data);
   const max = Math.max(...data);
 
-  const width = Dimensions.get('window').width - 72; // Padding offset
+  const width = Math.max(windowWidth - 72, 180); // Responsive padding offset for iPhone/iPad
   const height = 90;
 
   // Build SVG Path
@@ -77,9 +79,13 @@ export const NetWorthSparkline: React.FC<NetWorthSparklineProps> = ({ currentVal
             <TouchableOpacity
               key={range}
               onPress={() => handleRangeChange(range)}
+              hitSlop={COMPACT_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${range} trajectory`}
+              accessibilityState={{ selected: isSelected }}
               style={{
                 paddingHorizontal: 14,
-                paddingVertical: 4,
+                paddingVertical: 6,
                 borderRadius: 10,
                 backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
               }}

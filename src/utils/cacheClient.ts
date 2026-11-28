@@ -16,7 +16,7 @@ interface CacheEntry<T> {
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 
 // Default max freshness for financial data in local storage: 120 seconds (2 mins)
-export const DEFAULT_MAX_STALENESS_MS = 120 * 1000;
+const DEFAULT_MAX_STALENESS_MS = 120 * 1000;
 
 /**
  * Synchronous instant retrieval from Tier 1 (Memory) or Tier 2 (LocalStorage).
@@ -81,48 +81,6 @@ export function saveToLocalCache<T>(key: string, value: T, ttlSeconds: number = 
   } catch {
     // Non-blocking quota fallback
   }
-}
-
-/**
- * Async fetch helper: checks Tier 1/2 first, falls back to /api/cache with a fast timeout (800ms)
- */
-export async function fetchFromCache<T>(key: string, maxAgeMs: number = DEFAULT_MAX_STALENESS_MS): Promise<T | null> {
-  if (!key) return null;
-
-  // 1. Instant local check
-  const local = getFromLocalCache<T>(key, maxAgeMs);
-  if (local !== null) {
-    return local;
-  }
-
-  // 2. Fallback to API cache with 800ms timeout so it NEVER delays the app
-  if (typeof window !== "undefined") {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 800);
-
-      const res = await fetch(`/api/cache?key=${encodeURIComponent(key)}`, {
-        method: "GET",
-        signal: controller.signal,
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-      });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.hit && json.data !== null && json.data !== undefined) {
-          saveToLocalCache(key, json.data, 120);
-          return json.data as T;
-        }
-      }
-    } catch {
-      // Non-blocking timeout or error
-    }
-  }
-
-  return null;
 }
 
 /**

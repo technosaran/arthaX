@@ -7,8 +7,8 @@ import { extractRequestId } from "@/utils/apiResponse";
 import { logger } from "@/utils/logger";
 
 function generateCode(): string {
-  // Generates clean, human-readable 6-character uppercase alphanumeric code (e.g. AX-7K9P2X)
-  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
+  // High-entropy 12-character uppercase hex token (48 bits) to thwart link-code brute force
+  const random = crypto.randomBytes(6).toString("hex").toUpperCase();
   return `AX-${random}`;
 }
 

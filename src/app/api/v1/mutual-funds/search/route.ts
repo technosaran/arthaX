@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractRequestId } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
 
 export interface MutualFundSearchResult {
   schemeCode: string;
@@ -244,8 +245,20 @@ const POPULAR_COIN_FUNDS: MutualFundSearchResult[] = [
 
 export async function GET(req: NextRequest) {
   const requestId = extractRequestId(req);
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anonymous";
+  const rl = await rateLimit(`mf_search:${clientIp}`, 60, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q")?.trim() || "";
+  const q = (searchParams.get("q")?.trim() || "").slice(0, 80);
 
   // Return popular Zerodha Coin funds when query is empty
   if (!q) {

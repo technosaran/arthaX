@@ -69,8 +69,13 @@ export const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.8}
       onPress={handlePress}
       disabled={disabled || loading}
+      hitSlop={size === 'sm' ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: disabled || loading }}
       style={[
         {
+          minHeight: size === 'sm' ? 36 : 44,
           backgroundColor: bg,
           borderWidth: variant === 'outline' || variant === 'secondary' ? 1 : 0,
           borderColor,

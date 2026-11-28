@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/utils/auth";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { apiUnauthorized, apiError, extractRequestId } from "@/utils/apiResponse";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { parseIntParam } from "@/lib/backend/queryParams";
 import { rateLimit } from "@/utils/rateLimit";
 import { z } from "zod";
 
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 200);
+  const limit = parseIntParam(searchParams.get("limit"), 50, 1, 200);
 
   try {
     const { data, error } = await supabaseAdmin
@@ -153,7 +154,11 @@ export async function POST(req: NextRequest) {
       const remainingWeight = currentTotalWeight - tx.weight_grams;
       if (remainingWeight <= 0.001) {
         // Complete liquidation: delete holding
-        await supabaseAdmin.from("bullion_holdings").delete().eq("id", holding.id);
+        await supabaseAdmin
+          .from("bullion_holdings")
+          .delete()
+          .eq("id", holding.id)
+          .eq("user_id", userId);
       } else {
         // Pro-rate remaining total buy price
         const fractionRemaining = remainingWeight / currentTotalWeight;
@@ -167,7 +172,8 @@ export async function POST(req: NextRequest) {
             total_buy_price: remainingBuyPrice,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", holding.id);
+          .eq("id", holding.id)
+          .eq("user_id", userId);
       }
 
       await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
@@ -218,7 +224,8 @@ export async function POST(req: NextRequest) {
           total_buy_price: newTotalBuyPrice,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", holding.id);
+        .eq("id", holding.id)
+        .eq("user_id", userId);
 
       await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
 

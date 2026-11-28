@@ -1,245 +1,279 @@
-import { parseExpenseMessage, matchAccount, AccountSummary, ParsedExpense, escapeRegExp } from "./expenseParser";
+import {
+  parseExpenseMessage,
+  matchAccount,
+  AccountSummary,
+  ParsedExpense,
+  escapeRegExp,
+  INDIAN_NUMBER_PATTERN,
+  parseFormattedNumber,
+  applyIndianMultiplier,
+  extractAmountFromText,
+} from "./expenseParser";
 
-export type { AccountSummary };
+export type FinancialIntentType = "expense" | "income" | "transfer" | "unknown";
 
-export interface ParsedIncome {
-  amount: number;
-  title: string;
-  category: string;
-  accountQuery?: string;
-  rawText: string;
-}
-
-export interface ParsedTransfer {
-  amount: number;
-  fromAccountQuery: string;
-  toAccountQuery: string;
-  rawText: string;
-}
-
-export type FinancialIntent =
-  | { type: "transfer"; data: ParsedTransfer }
-  | { type: "income"; data: ParsedIncome }
+export type ParsedFinancialIntent =
   | { type: "expense"; data: ParsedExpense }
+  | {
+      type: "income";
+      data: {
+        amount: number;
+        title: string;
+        category: string;
+        accountQuery?: string;
+        rawText: string;
+      };
+    }
+  | {
+      type: "transfer";
+      data: {
+        amount: number;
+        fromAccountQuery: string;
+        toAccountQuery: string;
+        rawText: string;
+      };
+    }
   | { type: "unknown"; rawText: string };
 
 const INCOME_KEYWORDS = [
-  "salary", "freelance", "stipend", "bonus", "dividend", "interest",
-  "credited", "earned", "revenue", "consulting", "refund", "cashback",
-  "received from", "received", "payout", "profit"
+  "salary",
+  "credited",
+  "received",
+  "earned",
+  "income",
+  "freelance",
+  "payout",
+  "dividend",
+  "dividends",
+  "bonus",
+  "cashback",
+  "refund",
+  "deposited",
+  "reimbursement",
+  "stipend",
+  "interest credited",
+  "interest paid",
+  "profit",
+  "rental income",
+  "got paid",
 ];
 
-function extractAmountValue(str: string): number {
-  const clean = str.replace(/,/g, "").trim().toLowerCase();
-  if (clean.endsWith("k")) {
-    const val = parseFloat(clean.slice(0, -1));
-    return isNaN(val) ? 0 : val * 1000;
+const TRANSFER_VERBS = /\b(?:transfer|transferred|move|moved|shift|shifted|send|sent)\b/i;
+
+function matchesWordOrPhrase(text: string, phrase: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "i").test(text);
+}
+
+function isConversationalQuestion(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (lower.endsWith("?")) return true;
+  return /^(?:how|what|why|when|where|who|which|can\s+i|should\s+i|could\s+i|would\s+i|is\s+my|are\s+my|tell\s+me|show\s+me|explain|compare|suggest|advise|help)\b/i.test(
+    lower
+  );
+}
+
+function inferIncomeCategory(clean: string): { category: string; defaultTitle: string } {
+  if (/\bsalary|payroll|stipend\b/i.test(clean)) return { category: "Salary", defaultTitle: "Monthly Salary" };
+  if (/\bfreelance|consulting|client|payout|invoice\b/i.test(clean)) {
+    return { category: "Freelance", defaultTitle: "Freelance Payout" };
   }
-  const val = parseFloat(clean);
-  return isNaN(val) ? 0 : val;
+  if (/\bdividend|dividends|interest|yield|fd\s+interest\b/i.test(clean)) {
+    return { category: "Investments & Dividends", defaultTitle: "Dividend / Interest" };
+  }
+  if (/\bbusiness|revenue|sales\b/i.test(clean)) return { category: "Business", defaultTitle: "Business Revenue" };
+  if (/\brent|rental\b/i.test(clean)) return { category: "Rental Income", defaultTitle: "Rental Income" };
+  if (/\brefund|reversal|cashback\b/i.test(clean)) return { category: "Refund & Cashback", defaultTitle: "Refund Credit" };
+  if (/\bbonus|incentive|gift\b/i.test(clean)) return { category: "Bonus & Gifts", defaultTitle: "Bonus" };
+  return { category: "Other Income", defaultTitle: "Income Credit" };
+}
+
+function resolveAccountHint(rawHint: string, userAccounts: AccountSummary[]): string | undefined {
+  const trimmed = rawHint.trim().replace(/[.,;:]+$/, "");
+  if (!trimmed) return undefined;
+  const matched = matchAccount(trimmed, userAccounts);
+  if (matched) {
+    // Only return matched account name if rawHint actually points to this account (not default fallback)
+    const lowerHint = trimmed.toLowerCase();
+    const isDirect =
+      matched.name.toLowerCase().includes(lowerHint) ||
+      lowerHint.includes(matched.name.toLowerCase()) ||
+      Boolean(matched.last_four && matched.last_four.toLowerCase() === lowerHint) ||
+      matched.name
+        .toLowerCase()
+        .split(/\s+/)
+        .some((w) => w.length >= 3 && new RegExp(`\\b${escapeRegExp(w)}\\b`, "i").test(lowerHint));
+    if (isDirect) return matched.name;
+  }
+  return trimmed;
 }
 
 /**
- * Intelligent Intent Classifier for financial chat messages:
- * Distinguishes between Transfer, Income, and Expense messages.
+ * Classifies a natural-language financial message or Indian bank SMS into Expense, Income, Transfer, or Unknown.
  */
 export function classifyFinancialMessage(
   text: string,
   userAccounts: AccountSummary[] = []
-): FinancialIntent {
-  const clean = text.trim();
-  if (!clean) return { type: "unknown", rawText: text };
+): ParsedFinancialIntent {
+  const clean = (text || "").trim().replace(/\s+/g, " ");
+  if (!clean) return { type: "unknown", rawText: "" };
 
-  // -------------------------------------------------------------
-  // 1. Detect Inter-Account Transfer
-  // Examples:
-  // "Transfer 5000 from HDFC to Cash"
-  // "Moved 2000 SBI to ICICI"
-  // "Transfer 1500 Cash to HDFC"
-  // "/transfer 5000 HDFC to Cash"
-  // -------------------------------------------------------------
-  const transferRegex = /(?:^\/transfer\s+|transfer(?:red)?\s+|move(?:d)?\s+|shift(?:ed)?\s+)(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d+)?k?)\s+(?:from\s+)?([a-z0-9\s]+?)\s+(?:to|into)\s+([a-z0-9\s]+)$/i;
-  const transferMatch = clean.match(transferRegex);
+  // Never misclassify general conversational advice questions unless it looks like a bank SMS alert
+  const looksLikeBankSms = /\b(?:a\/c|acct|account|credited|debited|spent|upi|neft|imps)\b/i.test(clean);
+  if (isConversationalQuestion(clean) && !looksLikeBankSms) {
+    return { type: "unknown", rawText: clean };
+  }
 
-  if (transferMatch) {
-    const amount = extractAmountValue(transferMatch[1]);
-    const fromQuery = transferMatch[2].trim();
-    const toQuery = transferMatch[3].trim();
+  // 1. Transfer Intent Detection
+  // Supports: "Transfer 5,000 from HDFC to Cash", "Moved 1.5k from SBI 5678 to HDFC",
+  // "Pay HDFC Credit Card bill 15,000 from SBI"
+  const amtPattern = `(?:₹|rs\\.?|inr)?\\s*(${INDIAN_NUMBER_PATTERN})\\s*(k|thousand|lac|lacs|lakh|lakhs|cr|crore|crores|l)?`;
 
-    if (amount > 0 && fromQuery && toQuery) {
+  const ccBillTransferMatch = clean.match(
+    new RegExp(
+      `^(?:pay|paid|clear)\\s+(.+?(?:credit\\s*card|card))\\s*(?:bill)?\\s+${amtPattern}\\s+from\\s+(.+)$`,
+      "i"
+    )
+  );
+  if (ccBillTransferMatch) {
+    const val = applyIndianMultiplier(
+      parseFormattedNumber(ccBillTransferMatch[2]),
+      ccBillTransferMatch[3]
+    );
+    if (val > 0) {
       return {
         type: "transfer",
         data: {
-          amount: Number(amount.toFixed(2)),
-          fromAccountQuery: fromQuery,
-          toAccountQuery: toQuery,
+          amount: val,
+          fromAccountQuery: ccBillTransferMatch[4].trim(),
+          toAccountQuery: ccBillTransferMatch[1].trim(),
           rawText: clean,
         },
       };
     }
   }
 
-  // -------------------------------------------------------------
-  // 2. Detect Income (Credits / Salary / Freelance / Received Money)
-  // Examples:
-  // "Salary 85000 HDFC"
-  // "Freelance 15000 SBI"
-  // "Received 12000 from Client into HDFC"
-  // "Dividend 450 Cash"
-  // "Your a/c ending 1234 credited by Rs. 50,000 on 14-Nov-2026"
-  // -------------------------------------------------------------
-  const isCreditSMS = /(?:credited|credited with|received|deposited)/i.test(clean) && /(?:a\/c|account|card|upi|rs\.?|inr|₹)/i.test(clean);
-  const lowerClean = clean.toLowerCase();
-  const hasIncomeKeyword = INCOME_KEYWORDS.some((kw) => lowerClean.includes(kw));
+  const isExplicitTransfer =
+    TRANSFER_VERBS.test(clean) && /\bfrom\b/i.test(clean) && /(?:\bto\b|->|=>)/i.test(clean);
 
-  // Ensure it's not a debit (which is an expense)
-  const isDebit = /(?:debited|spent|paid|withdrawn)/i.test(clean);
+  if (isExplicitTransfer) {
+    const transferRegex = new RegExp(
+      `(?:transfer(?:red)?|move(?:d)?|shift(?:ed)?|send|sent)\\s+${amtPattern}\\s+from\\s+(.+?)\\s+(?:to|->|=>)\\s+(.+)$`,
+      "i"
+    );
+    const arrowRegex = new RegExp(
+      `(?:transfer(?:red)?|move(?:d)?|send|sent)\\s+${amtPattern}\\s+(.+?)\\s*(?:->|=>)\\s*(.+)$`,
+      "i"
+    );
+    const tMatch = clean.match(transferRegex) || clean.match(arrowRegex);
+    if (tMatch) {
+      const amount = applyIndianMultiplier(parseFormattedNumber(tMatch[1]), tMatch[2]);
+      if (amount > 0) {
+        return {
+          type: "transfer",
+          data: {
+            amount,
+            fromAccountQuery: tMatch[3].trim(),
+            toAccountQuery: tMatch[4].trim(),
+            rawText: clean,
+          },
+        };
+      }
+    }
+  }
 
-  if (!isDebit && (isCreditSMS || hasIncomeKeyword)) {
+  // Check if message has explicit debit SMS phrasing (never misclassify a debit alert as income)
+  const isDebitSms =
+    /\b(?:debited|spent|withdrawn|charged|purchase\s+of)\b/i.test(clean) &&
+    !/\bcredited\b/i.test(clean);
+
+  // 2. Income Intent Detection (Strict word/phrase boundary — prevents "learned" matching "earned")
+  const hasIncomeKeyword =
+    !isDebitSms && INCOME_KEYWORDS.some((kw) => matchesWordOrPhrase(clean, kw));
+
+  if (hasIncomeKeyword) {
+    const withoutBal = clean.replace(/\b(?:avl|available|clear|closing)?\s*bal(?:ance)?[:\s].*$/i, "");
     let amount = 0;
 
-    // Priority 1: Credited with / by / for pattern
-    const creditAmtMatch = clean.match(
-      /(?:credited(?:\s+(?:with|by|for))?|deposited|received)\s+(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d+)?k?)/i
+    // SMS/phrase specific income extraction: "credited with Rs. 25,000.00", "received ₹1,25,000", "Salary 85000"
+    const creditAmtRe = new RegExp(
+      `(?:credited(?:\\s+(?:with|by|for|of))?|received|deposited|earned|salary|payout|dividend|bonus|refund|cashback)\\s*(?:of|rs\\.?|inr|₹)?\\s*(${INDIAN_NUMBER_PATTERN})\\s*(k|thousand|lac|lacs|lakh|lakhs|cr|crore|crores|l)?\\b`,
+      "i"
     );
-    if (creditAmtMatch) {
-      amount = extractAmountValue(creditAmtMatch[1]);
+    const cMatch = withoutBal.match(creditAmtRe);
+    if (cMatch) {
+      amount = applyIndianMultiplier(parseFormattedNumber(cMatch[1]), cMatch[2]);
     }
-
-    // Priority 2: Explicit currency prefix (Rs. / INR / ₹)
-    if (!amount) {
-      const currencyPrefixMatch = clean.match(/(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d+)?k?)/i);
-      if (currencyPrefixMatch) {
-        amount = extractAmountValue(currencyPrefixMatch[1]);
-      }
-    }
-
-    // Priority 3: Currency postfix (e.g. 50000 INR)
-    if (!amount) {
-      const currencyPostfixMatch = clean.match(/([\d,]+(?:\.\d+)?k?)\s*(?:rs\.?|inr|₹)/i);
-      if (currencyPostfixMatch) {
-        amount = extractAmountValue(currencyPostfixMatch[1]);
-      }
-    }
-
-    // Priority 4: Keyword + amount (e.g. Salary 85000, Freelance 15k)
-    if (!amount) {
-      const kwMatch = clean.match(
-        /(?:salary|freelance|stipend|bonus|dividend|interest|cashback|refund|profit)\s+(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d+)?k?)/i
-      );
-      if (kwMatch) {
-        amount = extractAmountValue(kwMatch[1]);
-      }
-    }
-
-    // Priority 5: Fallback standalone number not preceded by account/date indicators
-    if (!amount) {
-      const tokens = clean.split(/\s+/);
-      for (let i = 0; i < tokens.length; i++) {
-        const prev = (tokens[i - 1] || "").toLowerCase();
-        if (/(?:a\/c|ac|ending|card|xx|\*\*|no\.?|code|pin|date|on|at)/i.test(prev)) continue;
-        const rawNum = tokens[i].replace(/[^0-9.kK]/g, "");
-        const val = extractAmountValue(rawNum);
-        if (val > 0 && !(val >= 2020 && val <= 2035 && rawNum.length === 4)) {
-          amount = val;
-          break;
-        }
-      }
+    if (amount <= 0) {
+      amount = extractAmountFromText(withoutBal).amount;
     }
 
     if (amount > 0) {
-      // Determine Income Category
-      let category = "Other Income";
-      if (/salary|payroll/i.test(clean)) category = "Salary";
-      else if (/freelance|consulting|client/i.test(clean)) category = "Freelance & Consulting";
-      else if (/dividend|interest|yield|stock|mf/i.test(clean)) category = "Investment Returns";
-      else if (/bonus|incentive/i.test(clean)) category = "Bonus & Incentives";
-      else if (/refund|cashback/i.test(clean)) category = "Refunds & Cashbacks";
-      else if (/gift/i.test(clean)) category = "Gifts & Grants";
+      const { category, defaultTitle } = inferIncomeCategory(clean);
 
-      // Match target account
-      let matchedAcc: string | undefined;
-
-      // 1. Check last four of accounts
-      for (const acc of userAccounts) {
-        if (acc.last_four && new RegExp(`\\b${escapeRegExp(acc.last_four)}\\b`, "i").test(clean)) {
-          matchedAcc = acc.name;
-          break;
-        }
+      // Account detection for income (check explicit digits, then "to/in/on ACCOUNT", then parseExpenseMessage)
+      let accountQuery: string | undefined;
+      const toAccountMatch = withoutBal.match(/(?:\b(?:to|in|into|on)\b)\s+(?:your\s+|my\s+)?([a-zA-Z0-9\s]{2,35}?)(?=\s+(?:on\s+\d|avl\b|bal\b|ref\b|$)|[.,]|$)/i);
+      if (toAccountMatch && toAccountMatch[1]) {
+        accountQuery = resolveAccountHint(toAccountMatch[1], userAccounts);
       }
 
-      // 2. Check full account name
-      if (!matchedAcc) {
-        for (const acc of userAccounts) {
-          if (new RegExp(`\\b${escapeRegExp(acc.name)}\\b`, "i").test(clean)) {
-            matchedAcc = acc.name;
-            break;
-          }
-        }
+      const fallbackParsed = parseExpenseMessage(clean, userAccounts);
+      if (!accountQuery || !userAccounts.some((a) => a.name === accountQuery)) {
+        accountQuery = fallbackParsed.accountQuery;
       }
 
-      // 3. Check distinctive brand words from account name (e.g. "HDFC", "SBI", "ICICI")
-      if (!matchedAcc) {
-        for (const acc of userAccounts) {
-          const distinctWords = acc.name
-            .toLowerCase()
-            .split(/\s+/)
-            .map((w) => w.replace(/[^a-z0-9]/g, ""))
-            .filter((w) => w.length >= 3 && !["bank", "account", "card", "salary"].includes(w));
-
-          for (const word of distinctWords) {
-            if (new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(clean)) {
-              matchedAcc = acc.name;
-              break;
-            }
-          }
-          if (matchedAcc) break;
-        }
-      }
-
-      // 4. Try matching tokens via matchAccount
-      if (!matchedAcc && userAccounts.length > 0) {
-        const tokens = clean.split(/\s+/).map((t) => t.replace(/[^a-zA-Z0-9]/g, "").trim()).filter(Boolean);
-        for (const token of tokens) {
-          if (/^(?:salary|income|credited|received|on|at|for|from|into|rs|inr)$/i.test(token)) continue;
-          const found = matchAccount(token, userAccounts);
-          if (found && (found.name.toLowerCase().includes(token.toLowerCase()) || token.toLowerCase().includes(found.name.toLowerCase()))) {
-            matchedAcc = found.name;
-            break;
-          }
-        }
-      }
-
-      // Extract title
-      let title = clean
-        .replace(/(?:rs\.?|inr|₹)\s*[\d,]+(?:\.\d+)?k?/gi, "")
-        .replace(/\b(?:into|in|to)\s+[a-z0-9]+\b/gi, "")
-        .replace(/\b(?:from|for)\b/gi, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      if (!title || title.length < 2) {
-        title = category;
+      // Extract clean title without trailing account or date words
+      let title = defaultTitle;
+      const explicitSource = clean.match(
+        /(?:from|by)\s+([A-Za-z0-9\s.&'-]{2,40}?)(?=\s+(?:credited|to|in|into|on|for|via|avl|bal|$)|[.,]|$)/i
+      );
+      if (
+        explicitSource?.[1] &&
+        !/^(?:your|my|a\/c|account|bank|neft|imps|upi)$/i.test(explicitSource[1].trim())
+      ) {
+        title = `${defaultTitle.split(" ")[0]} - ${explicitSource[1].trim()}`;
       } else {
-        title = title.charAt(0).toUpperCase() + title.slice(1);
+        const stripped = withoutBal
+          .replace(
+            new RegExp(
+              `(?:₹|rs\\.?|inr)?\\s*${INDIAN_NUMBER_PATTERN}\\s*(?:₹|rs\\.?|inr|rupees|/-|k|thousand|lac|lacs|lakh|lakhs|cr|crore|crores|l)?\\b`,
+              "gi"
+            ),
+            " "
+          )
+          .replace(/\b(?:credited|received|deposited|with|your|dear|customer|has|been|a\/c|account|ending|on|to|in|into|from)\b/gi, " ")
+          .replace(/\bending\s+\d{4}\b/gi, " ")
+          .replace(/\b[xX*]*\d{4,}\b/g, " ")
+          .replace(/\b\d{1,2}[/-](?:[a-zA-Z]{3,9}|\d{1,2})[/-]\d{2,4}\b/g, " ")
+          .trim();
+
+        const accNameRegex = accountQuery ? new RegExp(`\\b${escapeRegExp(accountQuery)}\\b`, "gi") : null;
+        const cleanWords = (accNameRegex ? stripped.replace(accNameRegex, " ") : stripped)
+          .replace(/[^\w\s&'-]/g, " ")
+          .split(/\s+/)
+          .filter((w) => w.length > 1 && !["the", "rs", "inr", "bank"].includes(w.toLowerCase()));
+
+        if (cleanWords.length > 0 && cleanWords.length <= 5) {
+          title = cleanWords
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+        }
       }
 
       return {
         type: "income",
         data: {
-          amount: Number(amount.toFixed(2)),
+          amount,
           title,
           category,
-          accountQuery: matchedAcc,
+          accountQuery,
           rawText: clean,
         },
       };
     }
   }
 
-  // -------------------------------------------------------------
-  // 3. Fallback to Expense Parser
-  // -------------------------------------------------------------
+  // 3. Expense Parsing (Natural commands + Debit SMS)
   const expense = parseExpenseMessage(clean, userAccounts);
   if (expense.amount > 0) {
     return {

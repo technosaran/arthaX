@@ -191,16 +191,17 @@ export default function MutualFundsSection() {
 
       const holdingsRes = await fetch("/api/v1/mutual-funds/holdings", { headers });
 
-      if (holdingsRes.ok) {
-        const json = await holdingsRes.json();
-        const holdingsData: MutualFundHolding[] = json.holdings || [];
-        setHoldings(holdingsData);
-        setTransactions(json.transactions || []);
+      if (!holdingsRes.ok) {
+        throw new Error(`HTTP ${holdingsRes.status}`);
+      }
+      const json = await holdingsRes.json();
+      const holdingsData: MutualFundHolding[] = json.holdings || [];
+      setHoldings(holdingsData);
+      setTransactions(json.transactions || []);
 
-        // Immediately fetch live NAVs for all holdings
-        if (holdingsData.length > 0) {
-          fetchNavsForHoldings(holdingsData, false);
-        }
+      // Immediately fetch live NAVs for all holdings
+      if (holdingsData.length > 0) {
+        fetchNavsForHoldings(holdingsData, false);
       }
     } catch (err) {
       console.error("[Mutual Funds] Error loading portfolio:", err);
@@ -525,7 +526,7 @@ export default function MutualFundsSection() {
       </div>
 
       {/* 3. TABS NAVIGATION */}
-      <div className="flex items-center justify-between border-b border-[var(--app-border)] pb-1 overflow-x-auto">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border)] pb-1 overflow-x-auto max-w-full">
         <div className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"

@@ -95,6 +95,18 @@ export async function POST(req: NextRequest) {
       return apiError("Bond holding not found", "NOT_FOUND", 404, undefined, req);
     }
 
+    // Validate SELL quantity BEFORE writing transaction row (prevents phantom sell logs)
+    const currentQty = Number(holding.quantity) || 0;
+    if (type === "SELL" && quantity > currentQty) {
+      return apiError(
+        `Cannot sell ${quantity} bonds. Current holding has only ${currentQty} units.`,
+        "BAD_REQUEST",
+        400,
+        undefined,
+        req
+      );
+    }
+
     // Insert transaction
     const { data: tx, error: txErr } = await supabaseAdmin
       .from("bond_transactions")
@@ -121,45 +133,38 @@ export async function POST(req: NextRequest) {
     // If Coupon Payout and auto_advance_next_coupon is true, calculate next coupon date
     if (type === "COUPON_PAYOUT" && auto_advance_next_coupon && holding.next_coupon_date) {
       const currentNext = new Date(holding.next_coupon_date);
-      const freq = holding.coupon_frequency;
+      if (!Number.isNaN(currentNext.getTime())) {
+        const freq = holding.coupon_frequency;
 
-      if (freq === "MONTHLY") {
-        currentNext.setMonth(currentNext.getMonth() + 1);
-      } else if (freq === "QUARTERLY") {
-        currentNext.setMonth(currentNext.getMonth() + 3);
-      } else if (freq === "SEMI_ANNUAL") {
-        currentNext.setMonth(currentNext.getMonth() + 6);
-      } else if (freq === "ANNUAL") {
-        currentNext.setFullYear(currentNext.getFullYear() + 1);
+        if (freq === "MONTHLY") {
+          currentNext.setMonth(currentNext.getMonth() + 1);
+        } else if (freq === "QUARTERLY") {
+          currentNext.setMonth(currentNext.getMonth() + 3);
+        } else if (freq === "SEMI_ANNUAL") {
+          currentNext.setMonth(currentNext.getMonth() + 6);
+        } else if (freq === "ANNUAL") {
+          currentNext.setFullYear(currentNext.getFullYear() + 1);
+        }
+
+        const nextIso = currentNext.toISOString().split("T")[0];
+        await supabaseAdmin
+          .from("bond_holdings")
+          .update({
+            next_coupon_date: nextIso,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", holding_id)
+          .eq("user_id", userId);
       }
-
-      const nextIso = currentNext.toISOString().split("T")[0];
-      await supabaseAdmin
-        .from("bond_holdings")
-        .update({
-          next_coupon_date: nextIso,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", holding_id);
     }
 
-    // If SELL, validate holding quantity and reduce
+    // If SELL, update remaining holding quantity
     if (type === "SELL") {
-      const currentQty = Number(holding.quantity) || 0;
-      if (quantity > currentQty) {
-        return apiError(
-          `Cannot sell ${quantity} bonds. Current holding has only ${currentQty} units.`,
-          "BAD_REQUEST",
-          400,
-          undefined,
-          req
-        );
-      }
       const remainingQty = currentQty - quantity;
       const newInvested = remainingQty * (Number(holding.avg_buy_price) || 0);
 
-      if (remainingQty === 0) {
-        await supabaseAdmin.from("bond_holdings").delete().eq("id", holding_id);
+      if (remainingQty <= 0) {
+        await supabaseAdmin.from("bond_holdings").delete().eq("id", holding_id).eq("user_id", userId);
       } else {
         await supabaseAdmin
           .from("bond_holdings")
@@ -168,7 +173,8 @@ export async function POST(req: NextRequest) {
             invested_amount: Math.round(newInvested * 100) / 100,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", holding_id);
+          .eq("id", holding_id)
+          .eq("user_id", userId);
       }
     }
 

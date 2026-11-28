@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis, isRedisConfigured } from "@/utils/redis";
 import { extractRequestId } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
 import { inferCategoryAndAsset, inferFundHouse } from "../search/route";
 
 export interface MutualFundNavQuote {
@@ -21,6 +22,15 @@ export interface MutualFundNavQuote {
 // In-memory cache (TTL: 1 hour since AMFI NAVs update once daily in the evening)
 const memoryCache = new Map<string, { data: MutualFundNavQuote; expiry: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_MF_NAV_CACHE_SIZE = 2000;
+
+function setNavMemoryCache(code: string, data: MutualFundNavQuote) {
+  if (memoryCache.size >= MAX_MF_NAV_CACHE_SIZE) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey) memoryCache.delete(oldestKey);
+  }
+  memoryCache.set(code, { data, expiry: Date.now() + CACHE_TTL_MS });
+}
 
 async function fetchSchemeNav(schemeCode: string): Promise<MutualFundNavQuote | null> {
   const cleanCode = schemeCode.trim();
@@ -38,7 +48,7 @@ async function fetchSchemeNav(schemeCode: string): Promise<MutualFundNavQuote | 
       const redisKey = `arthax:mf_nav:${cleanCode}`;
       const redisData = await redis.get<MutualFundNavQuote>(redisKey);
       if (redisData && typeof redisData === "object" && redisData.currentNav) {
-        memoryCache.set(cleanCode, { data: redisData, expiry: Date.now() + CACHE_TTL_MS });
+        setNavMemoryCache(cleanCode, redisData);
         return redisData;
       }
     } catch (e) {
@@ -100,8 +110,8 @@ async function fetchSchemeNav(schemeCode: string): Promise<MutualFundNavQuote | 
       isin: meta?.isin_growth || null,
     };
 
-    // Store in memory
-    memoryCache.set(cleanCode, { data: quote, expiry: Date.now() + CACHE_TTL_MS });
+    // Store in memory (bounded)
+    setNavMemoryCache(cleanCode, quote);
 
     // Store in Redis (1 hour TTL)
     if (isRedisConfigured && redis) {
@@ -118,6 +128,18 @@ async function fetchSchemeNav(schemeCode: string): Promise<MutualFundNavQuote | 
 
 export async function GET(req: NextRequest) {
   const requestId = extractRequestId(req);
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anonymous";
+  const rl = await rateLimit(`mf_nav:${clientIp}`, 120, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down.", requestId },
+      { status: 429, headers: { "X-Request-Id": requestId } }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
 
   const code = searchParams.get("code")?.trim();

@@ -1,11 +1,10 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError, apiSuccess } from "@/utils/apiResponse";
+import { apiError, apiNotFound, apiSuccess } from "@/utils/apiResponse";
 import { calculateZerodhaCharges } from "@/utils/fnoCalculations";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { isValidUuid } from "@/lib/backend/queryParams";
 import { z } from "zod";
-
-export { calculateZerodhaCharges };
 
 // Validation schemas for F&O positions
 const AddFnoPositionSchema = z.object({
@@ -301,10 +300,13 @@ export const PUT = createApiRoute({
       .eq("id", id)
       .eq("user_id", userId!)
       .select()
-      .single();
+      .maybeSingle();
 
     if (err) {
       return apiError(err.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!updated) {
+      return apiNotFound("Position not found or unauthorized", req);
     }
 
     await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);
@@ -321,18 +323,23 @@ export const DELETE = createApiRoute({
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    if (!id) {
-      return apiError("Position ID is required", "BAD_REQUEST", 400, undefined, req);
+    if (!isValidUuid(id)) {
+      return apiError("Valid Position ID is required", "BAD_REQUEST", 400, undefined, req);
     }
 
-    const { error: delErr } = await supabaseAdmin
+    const { data: deleted, error: delErr } = await supabaseAdmin
       .from("fno_positions")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId!);
+      .eq("user_id", userId!)
+      .select("id")
+      .maybeSingle();
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!deleted) {
+      return apiNotFound("Position not found or unauthorized", req);
     }
 
     await invalidateUserCaches(userId!, ["PORTFOLIO", "ANALYTICS"]);

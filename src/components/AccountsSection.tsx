@@ -1086,6 +1086,7 @@ export default function AccountsSection() {
                 ].map((tab) => (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setHistoryTypeFilter(tab.id as "all" | "inflow" | "outflow")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
                       historyTypeFilter === tab.id
@@ -1136,6 +1137,8 @@ export default function AccountsSection() {
                 />
                 {historySearch && (
                   <button
+                    type="button"
+                    aria-label="Clear transfer search"
                     onClick={() => setHistorySearch("")}
                     className="absolute right-2 top-2 text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
                   >
@@ -1148,7 +1151,7 @@ export default function AccountsSection() {
 
           {/* Quick Metrics Strip */}
           <div
-            className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] flex items-center justify-between text-xs font-mono"
+            className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs font-mono"
           >
             {selectedAccountId ? (
               <div className="flex items-center gap-4 flex-wrap">

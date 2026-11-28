@@ -1,294 +1,353 @@
-export interface GeminiMessageOptions {
-  prompt: string;
-  userName?: string;
-  accountsSummary?: Array<{ name: string; balance: number; type: string }>;
-}
+import { z } from "zod";
+import { inferExpenseCategory } from "@/utils/expenseParser";
 
-export interface GeminiResponse {
-  success: boolean;
-  text?: string;
-  error?: string;
-}
+const DEFAULT_GEMINI_MODELS = [
+  process.env.GEMINI_MODEL?.trim(),
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+].filter((m): m is string => Boolean(m));
 
-export interface GeminiMultimodalOptions {
-  text?: string;
-  mediaBase64?: string;
-  mediaMimeType?: string;
-  userName?: string;
-  accountsSummary?: Array<{ name: string; balance: number; type: string }>;
-}
+export const GEMINI_MODELS = Array.from(new Set(DEFAULT_GEMINI_MODELS));
+
+const NORMALIZED_EXPENSE_CATEGORIES = new Set([
+  "Housing & Rent",
+  "Groceries & Essentials",
+  "Food & Dining",
+  "Utilities & Bills",
+  "Transport & Fuel",
+  "Vehicle & Servicing",
+  "Shopping & Lifestyle",
+  "Electronics & Gadgets",
+  "Health & Medical",
+  "Fitness & Sports",
+  "Entertainment & OTT",
+  "Travel & Vacations",
+  "Subscriptions & SaaS",
+  "Debt & Loan EMI",
+  "Insurance & Protection",
+  "Education & Learning",
+  "Personal Care & Grooming",
+  "Investments & Wealth",
+  "Taxes & Professional Fees",
+  "Home & Maintenance",
+  "Family & Child Care",
+  "Gifts & Celebrations",
+  "Other & Contingency",
+]);
+
+const GEMINI_INTENTS = [
+  "expense",
+  "income",
+  "transfer",
+  "advice",
+  "unknown",
+  "balance_query",
+  "spending_query",
+  "budget_query",
+  "chart_query",
+  "portfolio_query",
+  "stocks_query",
+  "quote_query",
+  "add_stock",
+  "mf_query",
+  "bullion_query",
+  "set_budget",
+  "undo",
+] as const;
+
+export type GeminiIntent = (typeof GEMINI_INTENTS)[number];
+
+const ParsedFinancialAISchema = z.object({
+  intent: z.enum(GEMINI_INTENTS).default("unknown"),
+  amount: z.union([z.number(), z.string(), z.null()]).optional(),
+  title: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  accountQuery: z.string().nullable().optional(),
+  fromAccountQuery: z.string().nullable().optional(),
+  toAccountQuery: z.string().nullable().optional(),
+  transcribedText: z.string().nullable().optional(),
+  adviceResponse: z.string().nullable().optional(),
+  symbol: z.string().nullable().optional(),
+  quantity: z.union([z.number(), z.string(), z.null()]).optional(),
+  price: z.union([z.number(), z.string(), z.null()]).optional(),
+  exchange: z.string().nullable().optional(),
+  confidence: z.union([z.number(), z.string()]).optional(),
+});
 
 export interface ParsedFinancialAI {
-  intent:
-    | "expense"
-    | "income"
-    | "transfer"
-    | "balance_query"
-    | "spending_query"
-    | "budget_query"
-    | "set_budget"
-    | "stocks_query"
-    | "quote_query"
-    | "mf_query"
-    | "bullion_query"
-    | "portfolio_query"
-    | "chart_query"
-    | "add_stock"
-    | "undo"
-    | "advice"
-    | "ambiguous"
-    | "unknown";
+  intent: GeminiIntent;
   amount?: number;
   title?: string;
   category?: string;
   accountQuery?: string;
   fromAccountQuery?: string;
   toAccountQuery?: string;
-  isFamilyTransfer?: boolean;
   transcribedText?: string;
   adviceResponse?: string;
-  confidence: number;
   symbol?: string;
   quantity?: number;
   price?: number;
-  exchange?: "NSE" | "BSE";
+  exchange?: string;
+  confidence: number;
 }
 
-const SYSTEM_INSTRUCTION = `You are ArthaX AI, an elite, highly intelligent personal finance assistant embedded in the arthaX Telegram Bot.
-Your goal is to answer financial questions, budgeting queries, investing concepts, saving tips, and conversational queries with warmth, precision, and actionable advice.
+const SYSTEM_INSTRUCTIONS = `You are arthaX AI — a sharp, authoritative, warm Personal Financial Concierge & CFO for an Indian user.
+All currency values are in Indian Rupees (₹ / INR). Treat Indian numbering (Lakhs / Crores) and Indian context (UPI, SIP, Mutual Funds, FD, EPF, PPF, Nifty 50, Indian Taxes under New/Old Regimes, Indian Bank Accounts) naturally.
 
-Formatting Rules:
-1. Format output using Telegram-supported HTML: <b>bold</b>, <i>italic</i>, and <code>code</code>.
-2. Keep responses concise (typically 2-4 sentences or short, punchy bullet points) suitable for instant reading on mobile Telegram.
-3. If the user mentions spending, buying something, or asking how to log an expense in arthaX, remind them they can log it right here in this chat by typing:
-• <code>Dinner 500 HDFC</code>
-• <code>Petrol 1200 Cash</code>
-• <code>Uber 320</code>
-• Or by sending a voice note or photo of any receipt/bill.
-4. Always be helpful, financially prudent, and encouraging. Never invent inaccurate financial figures.`;
+Formatting Rules (STRICT):
+1. Format output using simple Telegram HTML tags ONLY: <b>bold</b>, <i>italic</i>, <code>code</code>.
+2. NEVER use Markdown syntax like **asterisks**, _underscores_, # headings, or backticks! Write bullet lists with plain "•" dots or emojis.
+3. Keep answers punchy, clear, actionable, and concise (under 250 words unless a detailed breakdown is explicitly asked).
+4. Tailor advice directly to the user's real live numbers provided in the prompt when available.`;
 
-const PARSER_SYSTEM_INSTRUCTION = `You are ArthaX AI, an elite financial parser, multimodal speech transcriber, and intelligence engine.
-Analyze the user's input (which may be natural text, a voice audio recording, a photo of a receipt/invoice/bill, a UPI payment screenshot, or an investment screenshot) and extract the financial intent into structured JSON.
+function isRetryableGeminiStatus(status: number): boolean {
+  return status === 404 || status === 408 || status === 429 || status >= 500;
+}
 
-Allowed intent values:
-- "expense": A purchase, payment, restaurant/grocery bill, debit SMS, or expense (e.g. "Dinner 500", "Spent 150 on coffee", receipt photos, UPI sent payment screenshots).
-- "income": Money received, salary, freelance, dividend, credit SMS, or received payment screenshot (e.g. "Salary 85000", "Received 5000 from client", "UPI received 1200").
-- "transfer": Moving money between user's own accounts (e.g. "Transfer 5000 HDFC to Cash", "Move 2000 from SBI to ICICI").
-- "balance_query": Inquiring about bank balance, liquid cash, or account balances (e.g. "How much in ICICI?", "What is my balance?", "Check accounts").
-- "spending_query": Inquiring about spending history (e.g. "How much did I spend today?", "What did I spend this week?", "Monthly spending").
-- "chart_query": Asking for a visual spending breakdown, chart, or graph (e.g. "Show my spending chart", "Generate pie chart", "/chart").
-- "budget_query": Inquiring about budgets, category limits, or progress bars (e.g. "How are my budgets?", "Show budget").
-- "set_budget": Setting or updating a monthly budget for a category (e.g. "Set food budget to 8000", "/setbudget Shopping 5000", "Limit dining to 10k").
-- "portfolio_query": Asking for total net worth or overall portfolio overview (e.g. "What is my net worth?", "Portfolio summary", "Total assets").
-- "stocks_query": Checking stock holdings, equity portfolio, or stock performance (e.g. "Show my stocks", "My stock portfolio", "How are my shares?").
-- "quote_query": Inquiring about the live price or quote of a specific stock ticker (e.g. "Price of Reliance", "/quote TCS", "What is Tata Motors trading at?").
-- "add_stock": Recording a stock buy transaction (e.g. "Bought 10 shares of RELIANCE at 2400", "/addstock INFY 5 1850").
-- "mf_query": Checking mutual fund holdings, SIPs, or mutual fund portfolio (e.g. "My mutual funds", "Check SIPs").
-- "bullion_query": Checking physical gold or silver holdings and rates (e.g. "How much gold do I have?", "Check silver holdings", "Bullion value").
-- "undo": Asking to undo, delete, or cancel the last transaction (e.g. "Undo", "Cancel last", "Delete that expense").
-- "advice": Financial question, general advice, savings advice, or affordability inquiry (e.g. "Can I afford dinner?", "How can I save more?").
-- "ambiguous": The user only provided a standalone number or very vague input without merchant or purpose (e.g. "623", "500").
-- "unknown": Unrecognized query.
+function sanitizePositiveNumber(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  const cleaned =
+    typeof raw === "string" ? Number(raw.replace(/[₹,\s]/g, "").trim()) : Number(raw);
+  if (!Number.isFinite(cleaned) || cleaned <= 0) return undefined;
+  return Number(cleaned.toFixed(4));
+}
 
-Standard Categories:
-- Food & Dining
-- Groceries & Essentials
-- Transport & Fuel
-- Utilities & Bills
-- Housing & Rent
-- Shopping & Lifestyle
-- Electronics & Gadgets
-- Health & Medical
-- Fitness & Sports
-- Entertainment & OTT
-- Subscriptions & SaaS
-- Personal Care & Grooming
-- Education & Learning
-- Vehicle & Servicing
-- Investments & Wealth
-- Family & Child Care
-- Gifts & Celebrations
-- Other & Contingency
+function normalizeAiCategory(
+  intent: GeminiIntent,
+  rawCategory: string | null | undefined,
+  title: string | undefined,
+  rawText: string
+): string | undefined {
+  if (intent === "expense" || intent === "set_budget") {
+    if (rawCategory && NORMALIZED_EXPENSE_CATEGORIES.has(rawCategory.trim())) {
+      return rawCategory.trim();
+    }
+    return inferExpenseCategory(`${title || ""} ${rawCategory || ""} ${rawText}`);
+  }
+  if (intent === "income") {
+    return rawCategory?.trim() || "Salary";
+  }
+  return rawCategory?.trim() || undefined;
+}
 
-Rules:
-1. Multimodal Audio (Voice notes):
-   - Always accurately transcribe speech into "transcribedText".
-   - Determine the user's intent from the spoken words (could be expense, income, transfer, balance_query, spending_query, chart_query, budget_query, set_budget, portfolio_query, stocks_query, quote_query, add_stock, mf_query, bullion_query, undo, or advice).
-2. Multimodal Photos (Receipts, Bills, Screenshots):
-   - For Receipts/Bills: Extract merchant name (title), total payable amount (amount), and appropriate category. Set intent: "expense".
-   - For UPI Payment Screenshots (GPay, PhonePe, Paytm, BHIM):
-     - If "Paid to" or "Sent to" or debit: intent: "expense", title: recipient name, amount: transaction amount, category: appropriate category based on merchant, accountQuery: bank name/last four digits if visible.
-     - If "Received from" or credited: intent: "income", title: sender name, amount: transaction amount, category: "Payment Received", accountQuery: bank name if visible.
-   - For Stock/Investment Screenshots: Extract symbol, quantity, and price if an order/holding is visible, or set intent: "stocks_query".
-3. For Advice: Provide a helpful, concise HTML answer in adviceResponse.
-4. For Stocks: If stock ticker/symbol is mentioned, set "symbol" (uppercase e.g. "RELIANCE", "TCS", "INFY"), "exchange": "NSE" (or "BSE" if mentioned).
-5. For Set Budget: Extract "category" and "amount".
-6. Return JSON ONLY with keys: intent, amount, title, category, accountQuery, fromAccountQuery, toAccountQuery, isFamilyTransfer, transcribedText, adviceResponse, confidence, symbol, quantity, price, exchange.`;
+function extractJsonObject(rawText: string): unknown {
+  const cleaned = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const startIdx = cleaned.indexOf("{");
+  const endIdx = cleaned.lastIndexOf("}");
+  if (startIdx === -1 || endIdx <= startIdx) return null;
+  return JSON.parse(cleaned.slice(startIdx, endIdx + 1));
+}
 
-const GEMINI_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-flash-latest",
-  "gemini-2.5-flash-lite",
-  "gemini-flash-lite-latest",
-  "gemini-3.5-flash-lite",
-];
-
-/**
- * Calls Google Gemini Generative Language API using fast flash models.
- */
 export async function generateFinancialAnswer({
-  prompt,
-  userName = "Friend",
-  accountsSummary = [],
-}: GeminiMessageOptions): Promise<GeminiResponse> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  prompt: userPrompt,
+  question,
+  financialContext,
+  accountsSummary,
+  userName,
+}: {
+  prompt?: string;
+  question?: string;
+  financialContext?: string;
+  accountsSummary?: { name: string; balance: number; type: string }[];
+  userName?: string;
+}): Promise<{ success: boolean; text: string; answer: string | null; error?: string }> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    return { success: false, error: "GEMINI_API_KEY is not configured." };
+    return { success: false, text: "", answer: null, error: "Gemini API key not configured" };
   }
 
-  let contextSnippet = `User's Name: ${userName}.\n`;
-  if (accountsSummary.length > 0) {
-    const accList = accountsSummary
-      .map((a) => `${a.name} (${a.type}): ₹${a.balance}`)
-      .join(", ");
-    contextSnippet += `User's linked accounts summary: ${accList}.\n`;
-  }
+  const effectiveQuery = (userPrompt || question || "").trim();
+  const contextSummary =
+    financialContext ||
+    (accountsSummary && accountsSummary.length > 0
+      ? `Linked Accounts: ${accountsSummary.map((a) => `${a.name} (${a.type}: ₹${a.balance})`).join(", ")}`
+      : "No pre-loaded summary.");
 
-  const fullPrompt = `${contextSnippet}\nUser Query: ${prompt}`;
+  const fullPrompt = `${SYSTEM_INSTRUCTIONS}
 
-  const payload = {
-    system_instruction: {
-      parts: [{ text: SYSTEM_INSTRUCTION }],
-    },
-    contents: [
-      {
-        parts: [{ text: fullPrompt }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 500,
-    },
-  };
+${userName ? `User Name: ${userName}` : ""}
+=== USER LIVE FINANCIAL SUMMARY ===
+${contextSummary}
+====================================
+
+User Question: "${effectiveQuery}"
+
+Respond directly to the user in helpful, insightful, HTML-formatted text.`;
+
+  let lastError = "Failed to generate answer from Gemini";
 
   for (const model of GEMINI_MODELS) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 9000);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(9000),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+              temperature: 0.35,
+              maxOutputTokens: 800,
+            },
+          }),
+        }
+      );
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        lastError = `HTTP ${response.status} on ${model}: ${errBody.slice(0, 120)}`;
+        if (!isRetryableGeminiStatus(response.status)) {
+          return { success: false, text: "", answer: null, error: lastError };
+        }
         continue;
       }
 
-      const data = await res.json();
-      const answerText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (answerText && typeof answerText === "string") {
-        return { success: true, text: answerText.trim() };
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (typeof text === "string" && text.trim()) {
+        const trimmed = text.trim();
+        return { success: true, text: trimmed, answer: trimmed };
       }
-    } catch {
-      // try fallback model
+      lastError = `Empty response from ${model}`;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
     }
   }
 
-  return { success: false, error: "All Gemini model attempts were exhausted or timed out." };
+  return { success: false, text: "", answer: null, error: lastError };
 }
 
-/**
- * Multimodal AI Parser for Text, Voice Audio, and Receipt Photos
- */
 export async function parseFinancialInputWithGemini({
   text,
   mediaBase64,
   mediaMimeType,
-  userName = "User",
-  accountsSummary = [],
-}: GeminiMultimodalOptions): Promise<ParsedFinancialAI | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
+  userName,
+  accountsSummary,
+}: {
+  text?: string;
+  mediaBase64?: string;
+  mediaMimeType?: string;
+  userName?: string;
+  accountsSummary?: { name: string; balance: number; type: string }[];
+}): Promise<ParsedFinancialAI | null> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return null;
 
-  const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [];
+  const accountNames = accountsSummary?.map((a) => `${a.name} (${a.type}, ₹${a.balance})`).join(", ") || "Cash in Hand";
 
+  const prompt = `You are a precision Indian Financial Data Extractor & Assistant for arthaX.
+User accounts: [${accountNames}]
+${userName ? `User: ${userName}` : ""}
+
+Task:
+Analyze the provided input (text, voice audio, or image receipt / UPI screenshot) and extract structured JSON matching schema:
+{
+  "intent": "expense"|"income"|"transfer"|"advice"|"unknown"|"balance_query"|"spending_query"|"budget_query"|"chart_query"|"portfolio_query"|"stocks_query"|"quote_query"|"add_stock"|"mf_query"|"bullion_query"|"set_budget"|"undo",
+  "amount": number|null,
+  "title": string|null,
+  "category": string|null,
+  "accountQuery": string|null,
+  "fromAccountQuery": string|null,
+  "toAccountQuery": string|null,
+  "transcribedText": string|null,
+  "adviceResponse": string|null,
+  "symbol": string|null,
+  "quantity": number|null,
+  "price": number|null,
+  "exchange": "NSE"|"BSE"|null,
+  "confidence": number
+}
+
+Rules:
+- EXPENSE categories MUST be one of: "Food & Dining", "Groceries & Essentials", "Transport & Fuel", "Travel & Vacations", "Utilities & Bills", "Housing & Rent", "Health & Medical", "Fitness & Sports", "Subscriptions & SaaS", "Entertainment & OTT", "Electronics & Gadgets", "Shopping & Lifestyle", "Education & Learning", "Investments & Wealth", "Debt & Loan EMI", "Insurance & Protection", "Other & Contingency".
+- For query commands like showing balance/spending/budget/chart/portfolio/stocks/mf/bullion or undo last transaction, map to the matching intent.
+- For stock quote or add_stock voice commands, populate "symbol", "quantity", "price", and "exchange" ("NSE" default).
+- For set_budget commands, set intent="set_budget", category, amount.
+- For ADVICE / QUESTION, set intent="advice" and provide an HTML formatted response (only <b>, <i>, <code>) in "adviceResponse".
+- Transcribe audio accurately in "transcribedText".
+
+Input text/caption: "${(text || "").trim()}"`;
+
+  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
   if (mediaBase64 && mediaMimeType) {
     parts.push({
-      inline_data: {
-        mime_type: mediaMimeType,
+      inlineData: {
+        mimeType: mediaMimeType,
         data: mediaBase64,
       },
     });
   }
 
-  let promptInstruction = "";
-  if (mediaBase64 && mediaMimeType?.startsWith("image/")) {
-    promptInstruction = `Examine this photo (receipt, bill, invoice, UPI payment screenshot, or investment screenshot). Extract the financial details, whether money was paid (expense), received (income), or invested (stocks/mf). ${text ? `User note: "${text}"` : ""}`;
-  } else if (mediaBase64 && (mediaMimeType?.startsWith("audio/") || mediaMimeType === "application/octet-stream")) {
-    promptInstruction = `Listen to this voice message. Transcribe it into transcribedText, and identify the user's financial intent (expense, income, transfer, balance, spending, chart, budget, portfolio, stocks, quote, or advice).`;
-  } else {
-    promptInstruction = `Parse this financial input: "${text || ""}"`;
-  }
-
-  promptInstruction += ` User: ${userName}.`;
-  if (accountsSummary.length > 0) {
-    promptInstruction += `\nUser's existing accounts: ${accountsSummary.map((a) => a.name).join(", ")}. If an account name is mentioned or implied, map it to accountQuery.`;
-  }
-
-  parts.push({ text: promptInstruction });
-
-  const payload = {
-    system_instruction: {
-      parts: [{ text: PARSER_SYSTEM_INSTRUCTION }],
-    },
-    contents: [{ parts }],
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.2,
-      maxOutputTokens: 600,
-    },
-  };
-
   for (const model of GEMINI_MODELS) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(12000),
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 600,
+              responseMimeType: "application/json",
+            },
+          }),
+        }
+      );
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
+      if (!response.ok) {
+        if (!isRetryableGeminiStatus(response.status)) {
+          return null;
+        }
         continue;
       }
 
-      const data = await res.json();
-      const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const data = await response.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (typeof rawText !== "string" || !rawText.trim()) continue;
 
-      if (jsonText) {
-        const parsed = JSON.parse(jsonText) as ParsedFinancialAI;
-        return parsed;
-      }
-    } catch (err) {
-      console.warn(`[Gemini Multimodal] Model ${model} failed:`, err);
+      const rawJson = extractJsonObject(rawText);
+      const parsed = ParsedFinancialAISchema.safeParse(rawJson);
+      if (!parsed.success) continue;
+
+      const d = parsed.data;
+      const sanitizedAmount = sanitizePositiveNumber(d.amount);
+      const sanitizedQty = sanitizePositiveNumber(d.quantity);
+      const sanitizedPrice = sanitizePositiveNumber(d.price);
+      const cleanTitle = d.title?.trim() || undefined;
+      const confidenceRaw = Number(d.confidence);
+      const confidence =
+        Number.isFinite(confidenceRaw) && confidenceRaw >= 0 && confidenceRaw <= 1
+          ? confidenceRaw
+          : 0.85;
+
+      return {
+        intent: d.intent,
+        amount: sanitizedAmount !== undefined ? Number(sanitizedAmount.toFixed(2)) : undefined,
+        title: cleanTitle,
+        category: normalizeAiCategory(d.intent, d.category, cleanTitle, text || ""),
+        accountQuery: d.accountQuery?.trim() || undefined,
+        fromAccountQuery: d.fromAccountQuery?.trim() || undefined,
+        toAccountQuery: d.toAccountQuery?.trim() || undefined,
+        transcribedText: d.transcribedText?.trim() || undefined,
+        adviceResponse: d.adviceResponse?.trim() || undefined,
+        symbol: d.symbol?.trim().toUpperCase() || undefined,
+        quantity: sanitizedQty,
+        price: sanitizedPrice !== undefined ? Number(sanitizedPrice.toFixed(2)) : undefined,
+        exchange: d.exchange?.trim().toUpperCase() || undefined,
+        confidence,
+      };
+    } catch {
+      continue;
     }
   }
 
   return null;
 }
-

@@ -5,7 +5,6 @@ Comprehensive verification of enhancements to existing AFCE modules:
 - BudgetEngine: Pacing velocity, month-end projection, safe daily allowance, 50/30/20 audit.
 - NetWorthEngine: Net cash cushion, leverage multiplier, Indian wealth milestones.
 - PortfolioEngine: LTCG/STCG holding eligibility, winners & laggards, HHI concentration.
-- RebalancingEngine: Tax-free cash infusion rebalancing.
 - ReconciliationEngine: Transfer conservation check.
 - InvestmentEngine: Dividend yield, win rate, profit factor.
 """

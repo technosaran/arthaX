@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Sparkles,
   PieChart,
   Receipt,
-  Users,
   Bot,
   Zap,
   Target,
@@ -12,7 +11,6 @@ import {
   Scale,
   AlertTriangle,
   ArrowRight,
-  Shield,
   Clock,
   TrendingUp,
   TrendingDown,
@@ -25,10 +23,12 @@ import { Card } from '../../components/Card';
 import { CurrencyText } from '../../components/CurrencyText';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
-import { SavingsGoal } from '../../types';
+import { BottomSheetModal } from '../../components/BottomSheetModal';
+import { COMPACT_HIT_SLOP, getScrollBottomPadding, MONO_FONT, NUMERIC_KEYBOARD } from '../../theme/platform';
 
 export const HubScreen = () => {
-  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const {
     goals,
     addNewGoal,
@@ -86,7 +86,7 @@ export const HubScreen = () => {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
         showsVerticalScrollIndicator={false}
       >
         {/* Workspace Switcher (Personal vs Family) */}
@@ -264,7 +264,7 @@ export const HubScreen = () => {
           </View>
 
           <View style={{ backgroundColor: colors.background, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: 12, fontFamily: 'monospace', color: colors.textSecondary, lineHeight: 20 }}>
+            <Text style={{ fontSize: 12, fontFamily: MONO_FONT, color: colors.textSecondary, lineHeight: 20 }}>
               Opening Balance: ₹{reconciliation.openingBalance.toLocaleString('en-IN')}{'\n'}
               + Total Credits: ₹{reconciliation.totalCredits.toLocaleString('en-IN')}{'\n'}
               - Total Debits:  ₹{reconciliation.totalDebits.toLocaleString('en-IN')}{'\n'}
@@ -285,6 +285,9 @@ export const HubScreen = () => {
             </View>
             <TouchableOpacity
               onPress={() => setGoalModalVisible(true)}
+              hitSlop={COMPACT_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Create new savings goal"
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -426,66 +429,64 @@ export const HubScreen = () => {
       </ScrollView>
 
       {/* Add Goal Modal */}
-      <Modal visible={goalModalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 }}>
-              Create Savings Target
-            </Text>
+      <BottomSheetModal visible={goalModalVisible} onClose={() => setGoalModalVisible(false)}>
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 }}>
+            Create Savings Target
+          </Text>
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Goal Name
-            </Text>
-            <TextInput
-              placeholder="e.g. New Electric Car, Europe Trip"
-              placeholderTextColor={colors.textMuted}
-              value={goalTitle}
-              onChangeText={setGoalTitle}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Goal Name
+          </Text>
+          <TextInput
+            placeholder="e.g. New Electric Car, Europe Trip"
+            placeholderTextColor={colors.textMuted}
+            value={goalTitle}
+            onChangeText={setGoalTitle}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
+          />
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Target Amount (₹)
-            </Text>
-            <TextInput
-              placeholder="500000"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              value={goalTarget}
-              onChangeText={setGoalTarget}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 14 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Target Amount (₹)
+          </Text>
+          <TextInput
+            placeholder="500000"
+            placeholderTextColor={colors.textMuted}
+            keyboardType={NUMERIC_KEYBOARD}
+            value={goalTarget}
+            onChangeText={setGoalTarget}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 14 }}
+          />
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Already Saved Amount (₹)
-            </Text>
-            <TextInput
-              placeholder="100000"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              value={goalCurrent}
-              onChangeText={setGoalCurrent}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Already Saved Amount (₹)
+          </Text>
+          <TextInput
+            placeholder="100000"
+            placeholderTextColor={colors.textMuted}
+            keyboardType={NUMERIC_KEYBOARD}
+            value={goalCurrent}
+            onChangeText={setGoalCurrent}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
+          />
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Target Deadline
-            </Text>
-            <TextInput
-              placeholder="e.g. Dec 2027"
-              placeholderTextColor={colors.textMuted}
-              value={goalDeadline}
-              onChangeText={setGoalDeadline}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 20 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Target Deadline
+          </Text>
+          <TextInput
+            placeholder="e.g. Dec 2027"
+            placeholderTextColor={colors.textMuted}
+            value={goalDeadline}
+            onChangeText={setGoalDeadline}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 20 }}
+          />
 
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Button title="Cancel" variant="secondary" onPress={() => setGoalModalVisible(false)} style={{ flex: 1 }} />
-              <Button title="Create Goal" variant="primary" onPress={handleCreateGoal} style={{ flex: 1 }} />
-            </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Button title="Cancel" variant="secondary" onPress={() => setGoalModalVisible(false)} style={{ flex: 1 }} />
+            <Button title="Create Goal" variant="primary" onPress={handleCreateGoal} style={{ flex: 1 }} />
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
+      </BottomSheetModal>
     </View>
   );
 };

@@ -388,27 +388,6 @@ export function getCurrentTaxYearPreset(
 }
 
 /**
- * Lists all available Fiscal / Assessment Years sorted newest-first.
- */
-export function getAvailableTaxYears(
-  now: Date = new Date(),
-  customOverrides?: TaxRuleOverridesMap | null
-): Array<TaxYearPreset & { isCustomized: boolean }> {
-  const keys = new Set<string>(Object.keys(STATUTORY_TAX_PRESETS));
-  keys.add(getCurrentIndianAssessmentYear(now));
-
-  if (customOverrides) {
-    for (const k of Object.keys(customOverrides)) {
-      keys.add(normalizeAssessmentYear(k));
-    }
-  }
-
-  return Array.from(keys)
-    .sort((a, b) => b.localeCompare(a))
-    .map((ay) => resolveTaxYearPreset(ay, customOverrides?.[ay]));
-}
-
-/**
  * Computes progressive income tax across ordered slab brackets.
  */
 export function calculateProgressiveSlabTax(taxableIncome: number, slabs: TaxSlab[]): number {

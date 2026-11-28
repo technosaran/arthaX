@@ -325,12 +325,14 @@ export async function syncUserGmailStatements(
           error_details: null,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", integration.id);
+        .eq("id", integration.id)
+        .eq("user_id", userId);
     } else {
       await supabaseAdmin
         .from("gmail_integrations")
         .update({ sync_status: "EXPIRED", error_details: "OAuth token expired and refresh failed", updated_at: new Date().toISOString() })
-        .eq("id", integration.id);
+        .eq("id", integration.id)
+        .eq("user_id", userId);
       return {
         success: false,
         statementsCount: 0,
@@ -384,7 +386,8 @@ export async function syncUserGmailStatements(
                 encrypted_secret: encSecret,
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", existing.id);
+              .eq("id", existing.id)
+              .eq("user_id", userId);
           } else {
             await supabaseAdmin
               .from("statement_password_hints")
@@ -427,7 +430,7 @@ export async function syncUserGmailStatements(
       mergedCandidates.push(c);
     }
   }
-  const passwordCandidates = mergedCandidates.slice(0, 20);
+  const passwordCandidates = mergedCandidates.slice(0, 25);
 
   // 4. Create running automation_jobs record
   const { data: jobRecord } = await supabaseAdmin
@@ -446,7 +449,6 @@ export async function syncUserGmailStatements(
   const internalKey =
     process.env.INTERNAL_SERVICE_KEY ||
     process.env.CRON_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
 
   // Determine bounded batch size (min 5, max 100, default 25)
@@ -514,7 +516,8 @@ export async function syncUserGmailStatements(
               error_details: "Insufficient Gmail permissions. Please click 'Reconnect Google' to grant statement read access.",
               updated_at: new Date().toISOString(),
             })
-            .eq("id", integration.id);
+            .eq("id", integration.id)
+            .eq("user_id", userId);
           return {
             success: false,
             statementsCount: 0,
@@ -585,78 +588,6 @@ export async function syncUserGmailStatements(
     }
 
     const statements: any[] = pyData?.statements || [];
-
-    // Fallback: In unit test environment, discover mock statement for pipeline verification
-    if (statements.length === 0 && (process.env.NODE_ENV === "test" || process.env.VITEST)) {
-      const sbiHash = crypto.createHash("sha256").update(`${userId}:sbi_statement_nov2026`).digest("hex");
-      statements.push({
-        success: true,
-        bank_name: "SBI",
-        detected_bank: "SBI",
-        file_name: "SBI_EStatement_Nov2026.pdf",
-        file_hash: sbiHash,
-        metadata: {
-          account_number_masked: "XX..4821",
-          account_type: "SAVINGS",
-          statement_period_start: "2026-11-01",
-          statement_period_end: "2026-11-21",
-          opening_balance: 45000.0,
-          closing_balance: 72500.0,
-          total_credits: 35000.0,
-          total_debits: 7500.0,
-        },
-        validation: {
-          is_valid: true,
-          total_credits: 35000.0,
-          total_debits: 7500.0,
-          errors: [],
-        },
-        email_metadata: {
-          sender: "statements@sbi.co.in",
-          subject: "State Bank of India - Account E-Statement for Nov 2026",
-          date: new Date().toISOString(),
-          message_id: `msg_sbi_${userId.slice(0, 8)}_202611`,
-        },
-        transactions: [
-          {
-            transaction_date: "2026-11-05",
-            amount: 35000.0,
-            direction: "CREDIT",
-            original_narration: "NEFT CR-CITI0000002-TECH CORP-SALARY-NOV2026",
-            normalized_narration: "Salary Credit - Tech Corp",
-            counterparty_name: "Tech Corp",
-            category: "Salary",
-            transaction_type: "SALARY",
-            channel: "NEFT",
-            transaction_reference: "CITIN261105001",
-          },
-          {
-            transaction_date: "2026-11-12",
-            amount: 4500.0,
-            direction: "DEBIT",
-            original_narration: "UPI/DR/632190123456/NATURE BASKET/GROCERIES",
-            normalized_narration: "Nature Basket Groceries",
-            merchant_name: "Nature Basket",
-            category: "Groceries & Essentials",
-            transaction_type: "EXPENSE",
-            channel: "UPI",
-            transaction_reference: "UPI632190123456",
-          },
-          {
-            transaction_date: "2026-11-18",
-            amount: 3000.0,
-            direction: "DEBIT",
-            original_narration: "POS DEBIT - SHELL FUEL STATION BANGALORE",
-            normalized_narration: "Shell Fuel Station",
-            merchant_name: "Shell",
-            category: "Transport & Fuel",
-            transaction_type: "EXPENSE",
-            channel: "POS",
-            transaction_reference: "POS98765432",
-          },
-        ],
-      });
-    }
 
     const accountsCreated: string[] = [];
     let totalImported = 0;
@@ -909,12 +840,18 @@ export async function syncUserGmailStatements(
       }
 
       // Prepare canonical transactions with strict monetary validation
+      // Track occurrence index per key within the statement so legitimate repeated
+      // same-day purchases without an external RRN are never collapsed as false duplicates
+      const occurrenceCounter = new Map<string, number>();
       const canonicalRows = txs.map((t: any) => {
         const parsedAmount = validateMonetaryAmount(t.amount, {
           fieldName: "Gmail transaction amount",
           allowNegative: false,
         });
-        const dedupRaw = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+        const baseKey = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+        const occIndex = occurrenceCounter.get(baseKey) || 0;
+        occurrenceCounter.set(baseKey, occIndex + 1);
+        const dedupRaw = occIndex === 0 ? baseKey : `${baseKey}#${occIndex}`;
         const dedupHash = crypto.createHash("sha256").update(dedupRaw).digest("hex");
 
         return {
@@ -1242,7 +1179,8 @@ export async function syncUserGmailStatements(
             transfersMatched: transfersMatchedCount,
           },
         })
-        .eq("id", jobRecord.id);
+        .eq("id", jobRecord.id)
+        .eq("user_id", userId);
     }
 
     // Update integration last sync timestamp with durable checkpoint
@@ -1253,7 +1191,8 @@ export async function syncUserGmailStatements(
         sync_status: hasFailures && actionableFailedStatements.length === financialStatements.length ? "FAILED" : "ACTIVE",
         error_details: failureSummary,
       })
-      .eq("id", integration.id);
+      .eq("id", integration.id)
+      .eq("user_id", userId);
 
     const totalExtracted = statements.reduce((acc: number, s: any) => acc + (s.transactions?.length || 0), 0);
 
@@ -1286,7 +1225,8 @@ export async function syncUserGmailStatements(
           error_message: errorMsg,
           retry_count: 1,
         })
-        .eq("id", jobRecord.id);
+        .eq("id", jobRecord.id)
+        .eq("user_id", userId);
     }
 
     return {

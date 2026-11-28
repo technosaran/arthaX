@@ -18,16 +18,17 @@ export async function GET(req: NextRequest) {
   const challenge = searchParams.get("hub.challenge");
 
   const configuredToken = process.env.WHATSAPP_VERIFY_TOKEN;
-  const isProduction = process.env.NODE_ENV === "production";
+  const isProduction =
+    process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL_ENV);
+  const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
   if (isProduction && !configuredToken) {
     return NextResponse.json({ error: "Server configuration error: WHATSAPP_VERIFY_TOKEN missing." }, { status: 500 });
   }
 
-  const verifyToken = configuredToken || (process.env.NODE_ENV === "test" || process.env.VITEST ? "arthax_secure_whatsapp_token_2026" : "");
+  const verifyToken = configuredToken || (isTest ? "arthax_secure_whatsapp_token_2026" : "");
 
   if (mode === "subscribe" && token && constantTimeCompare(token, verifyToken)) {
-    console.log("[WhatsApp Webhook] Handshake verified successfully.");
     return new Response(challenge || "", { status: 200 });
   }
 
@@ -66,9 +67,9 @@ export async function POST(req: NextRequest) {
     const appSecret = process.env.WHATSAPP_APP_SECRET;
     const signature = req.headers.get("x-hub-signature-256");
 
-    // Enforce HMAC-SHA256 signature verification in production
-    const isProduction = process.env.NODE_ENV === "production";
-    if (isProduction && !appSecret) {
+    // Enforce HMAC-SHA256 signature verification in all non-test environments
+    const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+    if (!isTest && !appSecret) {
       return NextResponse.json({ error: "Server configuration error: WHATSAPP_APP_SECRET missing." }, { status: 500 });
     }
 
@@ -97,8 +98,8 @@ export async function POST(req: NextRequest) {
     if (typeof body.text === "string") {
       messageText = body.text;
       senderPhone = typeof body.phone === "string" ? body.phone : "test_user";
-      // Prevent cross-user privilege escalation: explicit user_id is only accepted in test/dev modes
-      if (process.env.NODE_ENV === "test" || process.env.VITEST || !isProduction) {
+      // Prevent cross-user privilege escalation: explicit user_id is strictly accepted in automated unit tests only
+      if (isTest) {
         explicitUserId = typeof body.user_id === "string" ? body.user_id : "";
       }
       messageId = typeof body.message_id === "string" ? body.message_id : `direct_${Date.now()}`;
@@ -148,7 +149,6 @@ export async function POST(req: NextRequest) {
 
     const authorizedPhone = process.env.WHATSAPP_AUTHORIZED_PHONE;
     const authorizedUserId = process.env.WHATSAPP_AUTHORIZED_USER_ID;
-    const isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
     if (authorizedUserId && ((authorizedPhone && senderPhone === authorizedPhone) || (isTest && senderPhone === "test_user"))) {
       userId = authorizedUserId;
     }

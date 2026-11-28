@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Plus,
   Minus,
@@ -59,7 +59,64 @@ const EXPENSE_CATEGORIES = [
   "General Expense",
 ];
 
-export default function AccountAdjustModal({
+function resolveInitialAdjustState(
+  account: AccountItem,
+  initialMode: "deposit" | "withdraw" | "adjust",
+  accounts: AccountItem[]
+) {
+  const isTargetCash =
+    account.type === "Liquid Cash" || account.name.toLowerCase().includes("cash");
+  const cashAcc = accounts.find(
+    (a) => a.type === "Liquid Cash" || a.name.toLowerCase().includes("cash")
+  );
+  const firstOther = accounts.find((a) => a.id !== account.id);
+
+  if (initialMode === "deposit") {
+    const fromAccountId =
+      !isTargetCash && cashAcc && cashAcc.id !== account.id
+        ? cashAcc.id
+        : firstOther?.id ?? "";
+    return {
+      fromAccountId,
+      toAccountId: account.id,
+      title: `Deposit to ${account.name}`,
+      category: "Cash Deposit",
+    };
+  }
+
+  if (initialMode === "withdraw") {
+    const toAccountId =
+      !isTargetCash && cashAcc && cashAcc.id !== account.id
+        ? cashAcc.id
+        : firstOther?.id ?? "";
+    return {
+      fromAccountId: account.id,
+      toAccountId,
+      title: `Withdrawal from ${account.name}`,
+      category: "General Expense",
+    };
+  }
+
+  return {
+    fromAccountId: "",
+    toAccountId: account.id,
+    title: "",
+    category: "Cash Deposit",
+  };
+}
+
+export default function AccountAdjustModal(props: AccountAdjustModalProps) {
+  if (!props.isOpen || !props.account) return null;
+  return (
+    <AccountAdjustModalContent
+      key={`${props.account.id}:${props.initialMode ?? "deposit"}`}
+      {...props}
+      account={props.account}
+    />
+  );
+}
+
+function AccountAdjustModalContent({
   isOpen,
   onClose,
   account,
@@ -67,9 +124,10 @@ export default function AccountAdjustModal({
   accounts,
   onSuccess,
   formatINR,
-}: AccountAdjustModalProps) {
+}: Omit<AccountAdjustModalProps, "account"> & { account: AccountItem }) {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const [defaults] = useState(() => resolveInitialAdjustState(account, initialMode, accounts));
 
   // Active top-level tab: deposit (+) | withdraw (-) | adjust (exact/calibrate)
   const [mode, setMode] = useState<"deposit" | "withdraw" | "adjust">(initialMode);
@@ -81,65 +139,16 @@ export default function AccountAdjustModal({
 
   // Form Fields
   const [amount, setAmount] = useState("");
-  const [fromAccountId, setFromAccountId] = useState("");
-  const [toAccountId, setToAccountId] = useState("");
-  const [category, setCategory] = useState("Cash Deposit");
-  const [title, setTitle] = useState("");
+  const [fromAccountId, setFromAccountId] = useState(defaults.fromAccountId);
+  const [toAccountId, setToAccountId] = useState(defaults.toAccountId);
+  const [category, setCategory] = useState(defaults.category);
+  const [title, setTitle] = useState(defaults.title);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
-  const [exactBalanceInput, setExactBalanceInput] = useState("");
+  const [exactBalanceInput, setExactBalanceInput] = useState(() => account.balance.toString());
   const [submitting, setSubmitting] = useState(false);
 
-  // Sync initial state when modal opens or target account changes
-  useEffect(() => {
-    if (!isOpen || !account) return;
-
-    setMode(initialMode);
-    setAmount("");
-    setNotes("");
-    setDate(new Date().toISOString().split("T")[0]);
-    setExactBalanceInput(account.balance.toString());
-
-    const isTargetCash =
-      account.type === "Liquid Cash" || account.name.toLowerCase().includes("cash");
-
-    // Smart default source/destination for transfers
-    const cashAcc = accounts.find(
-      (a) => a.type === "Liquid Cash" || a.name.toLowerCase().includes("cash")
-    );
-    const firstOther = accounts.find((a) => a.id !== account.id);
-
-    if (initialMode === "deposit") {
-      setDepositType("direct");
-      if (!isTargetCash && cashAcc && cashAcc.id !== account.id) {
-        setFromAccountId(cashAcc.id);
-      } else if (firstOther) {
-        setFromAccountId(firstOther.id);
-      } else {
-        setFromAccountId("");
-      }
-      setToAccountId(account.id);
-      setTitle(`Deposit to ${account.name}`);
-      setCategory("Cash Deposit");
-    } else if (initialMode === "withdraw") {
-      setWithdrawType("direct");
-      setFromAccountId(account.id);
-      if (!isTargetCash && cashAcc && cashAcc.id !== account.id) {
-        setToAccountId(cashAcc.id);
-      } else if (firstOther) {
-        setToAccountId(firstOther.id);
-      } else {
-        setToAccountId("");
-      }
-      setTitle(`Withdrawal from ${account.name}`);
-      setCategory("General Expense");
-    } else {
-      setExactBalanceInput(account.balance.toString());
-      setAdjustType("add");
-    }
-  }, [isOpen, account, initialMode, accounts]);
-
-  if (!isOpen || !account) return null;
+  if (!isOpen) return null;
 
   const parsedAmount = parseFloat(amount) || 0;
 

@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError } from "@/utils/apiResponse";
+import { apiError, apiNotFound } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { isValidUuid } from "@/lib/backend/queryParams";
+import { logger } from "@/utils/logger";
 import {
   roundMoney,
   addMoney,
@@ -173,7 +175,7 @@ export const POST = createApiRoute({
     }
 
     // Record BUY transaction in stock_transactions ledger
-    await supabaseAdmin.from("stock_transactions").insert({
+    const { error: txErr } = await supabaseAdmin.from("stock_transactions").insert({
       user_id: userId!,
       holding_id: holdingId,
       symbol: cleanSymbol,
@@ -184,6 +186,9 @@ export const POST = createApiRoute({
       transaction_date: transaction_date || new Date().toISOString().split("T")[0],
       notes: notes || `Manual purchase of ${quantity} shares at ₹${avg_buy_price}`,
     });
+    if (txErr) {
+      logger.warn("Failed to record stock BUY transaction", "StocksAPI", { userId, holdingId, error: txErr.message });
+    }
 
     // Invalidate caches across stocks, portfolio, and analytics
     await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
@@ -217,10 +222,13 @@ export const PUT = createApiRoute({
       .eq("id", id)
       .eq("user_id", userId!)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateErr) {
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!updated) {
+      return apiNotFound("Stock holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);
@@ -235,18 +243,23 @@ export const DELETE = createApiRoute({
   handler: async ({ userId, query, req }) => {
     const id = query.get("id");
 
-    if (!id) {
-      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    if (!isValidUuid(id)) {
+      return apiError("Valid holding ID is required", "BAD_REQUEST", 400, undefined, req);
     }
 
-    const { error: delErr } = await supabaseAdmin
+    const { data: deleted, error: delErr } = await supabaseAdmin
       .from("stock_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId!);
+      .eq("user_id", userId!)
+      .select("id")
+      .maybeSingle();
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!deleted) {
+      return apiNotFound("Stock holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["STOCKS", "PORTFOLIO", "ANALYTICS"]);

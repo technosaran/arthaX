@@ -39,9 +39,10 @@ export const siteConfig = {
     "arthaX",
   ],
   links: {
-    github: "https://github.com",
     terms: "/terms",
     privacy: "/privacy",
+    login: "/login",
+    supportEmail: "support@arthax.app",
   },
 };
 

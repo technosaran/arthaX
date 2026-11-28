@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError } from "@/utils/apiResponse";
+import { apiError, apiNotFound } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { isValidUuid } from "@/lib/backend/queryParams";
+import { logger } from "@/utils/logger";
 import {
   roundMoney,
   mulMoney,
@@ -205,7 +207,7 @@ export const POST = createApiRoute({
 
     // Automatically record investment transaction
     const txType = is_sip_active ? "SIP" : "BUY";
-    await supabaseAdmin.from("mutual_fund_transactions").insert({
+    const { error: txErr } = await supabaseAdmin.from("mutual_fund_transactions").insert({
       user_id: userId!,
       holding_id: holdingId,
       scheme_code,
@@ -217,6 +219,9 @@ export const POST = createApiRoute({
       transaction_date: transaction_date || new Date().toISOString().split("T")[0],
       notes: notes || (is_sip_active ? "Initial SIP investment" : "Lumpsum investment"),
     });
+    if (txErr) {
+      logger.warn("Failed to record MF BUY transaction", "MutualFundsAPI", { userId, holdingId, error: txErr.message });
+    }
 
     await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
 
@@ -246,10 +251,13 @@ export const PUT = createApiRoute({
       .eq("id", id)
       .eq("user_id", userId!)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateErr) {
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!updated) {
+      return apiNotFound("Mutual fund holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);
@@ -264,18 +272,23 @@ export const DELETE = createApiRoute({
   handler: async ({ userId, query, req }) => {
     const id = query.get("id");
 
-    if (!id) {
-      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    if (!isValidUuid(id)) {
+      return apiError("Valid holding ID is required", "BAD_REQUEST", 400, undefined, req);
     }
 
-    const { error: delErr } = await supabaseAdmin
+    const { data: deleted, error: delErr } = await supabaseAdmin
       .from("mutual_fund_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId!);
+      .eq("user_id", userId!)
+      .select("id")
+      .maybeSingle();
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!deleted) {
+      return apiNotFound("Mutual fund holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["MUTUAL_FUNDS", "PORTFOLIO", "ANALYTICS"]);

@@ -781,7 +781,7 @@ export default function TaxSection({ initialTab = "harvesting", onNavigate }: Ta
                   <span>Select All ({taxData.harvestingOpportunities.length})</span>
                 </button>
                 <div className="h-4 w-px bg-[var(--app-border)] hidden sm:block" />
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <span>
                     <span className="text-[var(--app-muted)]">Selected: </span>
                     <span className="font-bold">{simulationMetrics.count}</span>
@@ -1019,7 +1019,7 @@ export default function TaxSection({ initialTab = "harvesting", onNavigate }: Ta
               <div className="h-2.5 w-full rounded-full bg-[var(--app-track-bg)] overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${ltcgUsedPercent}%` }} />
               </div>
-              <div className="flex justify-between text-[11px] text-[var(--app-muted)] font-mono">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--app-muted)] font-mono">
                 <span>Realized LTCG: {formatINRWhole(realizedLtcg)} ({ltcgUsedPercent}%)</span>
                 <span>Exemption Cap: {formatINRWhole(ltcgExemptionLimit)}</span>
               </div>

@@ -164,6 +164,7 @@ export const POST = createApiRoute({
           targetAccountId = matchedAccount.id;
         } else {
           // Create an account for this bank
+          const extractedDigits = metadata.account_number_masked?.replace(/\D/g, "") || "";
           const { data: newAcc } = await supabaseAdmin
             .from("accounts")
             .insert({
@@ -171,7 +172,7 @@ export const POST = createApiRoute({
               name: `${parseResult.bank_name.toUpperCase()} Account`,
               type: "Savings Account",
               balance: Number(metadata.closing_balance),
-              last_four: metadata.account_number_masked?.slice(-4) || "0000",
+              last_four: extractedDigits.length >= 4 ? extractedDigits.slice(-4) : null,
             })
             .select("id")
             .single();
@@ -233,12 +234,16 @@ export const POST = createApiRoute({
         raw_metadata?: Record<string, unknown>;
       }
 
+      const occurrenceCounter = new Map<string, number>();
       const rowsToInsert = (transactions as StatementTxInput[]).map((t) => {
         const parsedAmount = validateMonetaryAmount(t.amount, {
           fieldName: "Statement transaction amount",
           allowNegative: false,
         });
-        const dedupRaw = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+        const baseKey = `${targetAccountId}:${t.transaction_date}:${parsedAmount}:${t.direction}:${t.transaction_reference || t.normalized_narration}`;
+        const occIndex = occurrenceCounter.get(baseKey) || 0;
+        occurrenceCounter.set(baseKey, occIndex + 1);
+        const dedupRaw = occIndex === 0 ? baseKey : `${baseKey}#${occIndex}`;
         const dedupHash = crypto.createHash("sha256").update(dedupRaw).digest("hex");
 
         return {

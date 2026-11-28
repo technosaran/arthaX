@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class TransactionClassificationInput(BaseModel):
     id: Optional[str] = None
     account_id: Optional[str] = None
+    bank_name: Optional[str] = None
     amount: Decimal = Field(..., decimal_places=2)
     direction: str = Field(..., pattern="^(DEBIT|CREDIT)$")
     original_narration: str

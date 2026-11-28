@@ -902,6 +902,8 @@ export default function ExpensesSection() {
             />
             {searchTerm && (
               <button
+                type="button"
+                aria-label="Clear expense search"
                 onClick={() => setSearchTerm("")}
                 className="absolute right-2.5 top-2.5 text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
               >
@@ -1070,7 +1072,7 @@ export default function ExpensesSection() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
                         <button
                           type="button"
                           onClick={() => openEditModal(item)}
@@ -1116,7 +1118,7 @@ export default function ExpensesSection() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[var(--app-border-subtle)] text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--app-border-subtle)] text-xs">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className="px-2 py-0.5 rounded-full text-[10px] font-semibold border"

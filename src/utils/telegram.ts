@@ -375,12 +375,13 @@ export function verifyTelegramSecret(
   configuredSecret?: string
 ): boolean {
   const secret = configuredSecret !== undefined ? configuredSecret : process.env.TELEGRAM_WEBHOOK_SECRET;
+  const isProdLike = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL_ENV);
   if (!secret) {
-    if (process.env.NODE_ENV === "production") {
+    if (isProdLike) {
       console.error("[Telegram Security] TELEGRAM_WEBHOOK_SECRET is not configured in production. Rejecting incoming webhook.");
       return false;
     }
-    // If no secret configured in environment during development/testing, allow webhook through
+    // If no secret configured in environment during local development/testing, allow webhook through
     return true;
   }
   if (!incomingSecret) {
@@ -432,14 +433,14 @@ export function extractTelegramLinkCandidate(text: string): string | null {
     return naturalMatch[1]?.trim() || null;
   }
 
-  // 3. Standalone AX token format: "AX-7K9P2X", "AX_7K9P2X", "AX7K9P2X"
-  const axMatch = trimmed.match(/^AX[-_]?([a-zA-Z0-9]{6})$/i);
+  // 3. Standalone AX token format: "AX-7K9P2X", "AX-A1B2C3D4E5F6", "AX_7K9P2X", "AX7K9P2X"
+  const axMatch = trimmed.match(/^AX[-_]?([a-zA-Z0-9]{6,16})$/i);
   if (axMatch) {
     return `AX-${axMatch[1].toUpperCase()}`;
   }
 
-  // 4. Standalone 6-character alphanumeric code: "365CA9" or "7K9P2X"
-  if (/^[a-zA-Z0-9]{6}$/.test(trimmed)) {
+  // 4. Standalone 6-char alphanumeric legacy code or 12-hex-char code
+  if (/^(?:[a-zA-Z0-9]{6}|[0-9a-fA-F]{12})$/.test(trimmed)) {
     return `AX-${trimmed.toUpperCase()}`;
   }
 
@@ -470,7 +471,7 @@ export function normalizeLinkTokenCandidates(candidate: string): string[] {
 
   if (normalized.startsWith("AX-")) {
     results.add(normalized.slice(3));
-  } else if (/^[A-Z0-9]{6}$/.test(normalized)) {
+  } else if (/^[A-Z0-9]{6,16}$/.test(normalized)) {
     results.add(`AX-${normalized}`);
   }
 

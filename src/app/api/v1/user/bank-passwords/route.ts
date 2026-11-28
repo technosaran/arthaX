@@ -90,7 +90,8 @@ export const POST = createApiRoute({
             encrypted_secret: encryptedSecret,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", userId!);
       } else {
         await supabaseAdmin
           .from("statement_password_hints")

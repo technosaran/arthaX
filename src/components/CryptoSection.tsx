@@ -69,6 +69,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   // Loading & syncing states
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -188,19 +189,26 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
   const fetchHoldings = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
+      setFetchError(null);
       const url = "/api/v1/crypto/holdings";
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       if (json.success && json.data) {
         setPortfolio(json.data);
+      } else {
+        throw new Error(json.error || "Unable to load crypto portfolio");
       }
     } catch (err) {
-      console.warn("Failed to fetch crypto holdings:", err);
+      const msg = err instanceof Error ? err.message : "Failed to load crypto holdings";
+      setFetchError(msg);
+      if (isInitial) {
+        showToast("Crypto Load Error", msg, "error");
+      }
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   // Fetch Market data
   const fetchMarket = useCallback(async () => {
@@ -376,7 +384,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
 
       {/* Sync error alert if present */}
       {portfolio.syncError && (
-        <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between gap-3">
+        <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertCircle size={16} className="text-rose-400 flex-shrink-0" />
             <span>Binance Sync Alert: {portfolio.syncError}</span>
@@ -387,11 +395,24 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </div>
       )}
 
+      {fetchError && (
+        <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-rose-400 flex-shrink-0" />
+            <span>{fetchError}</span>
+          </div>
+          <Button variant="ghost" size="xs" onClick={() => fetchHoldings(true)}>
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] overflow-x-auto">
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border)] overflow-x-auto max-w-full">
         <button
+          type="button"
           onClick={() => setActiveView("holdings")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             activeView === "holdings"
               ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
               : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
@@ -402,8 +423,9 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveView("trades")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             activeView === "trades"
               ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
               : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
@@ -414,8 +436,9 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveView("exited")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             activeView === "exited"
               ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
               : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
@@ -426,8 +449,9 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveView("swap")}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             activeView === "swap"
               ? "bg-[var(--app-card)] text-[var(--app-fg)] shadow-xs"
               : "text-[var(--app-muted)] hover:text-[var(--app-fg)]"
@@ -587,7 +611,7 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
                     <p className="text-xs text-[var(--app-muted)] max-w-sm mx-auto">
                       {portfolio.isBinanceConnected
                         ? "Your Binance spot wallet currently has no non-zero asset balances."
-                        : "Provide your read-only Binance API credentials to preview all features."}
+                        : "Connect your read-only Binance API credentials to view live spot balances and telemetry."}
                     </p>
                   </div>
                   {!portfolio.isBinanceConnected && (
@@ -750,61 +774,77 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
-                    <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
-                      Account Type
-                    </div>
-                    <div className="font-bold text-[var(--app-fg)]">
-                      {portfolio.accountType || "SPOT"}
-                    </div>
-                  </div>
+                {portfolio.isBinanceConnected ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
+                        <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
+                          Account Type
+                        </div>
+                        <div className="font-bold text-[var(--app-fg)]">
+                          {portfolio.accountType || "SPOT"}
+                        </div>
+                      </div>
 
-                  <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
-                    <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
-                      Trading Status
-                    </div>
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-400">
-                      <CheckCircle2 size={13} />
-                      <span>canTrade: Active</span>
-                    </div>
-                  </div>
+                      <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
+                        <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
+                          Trading Status
+                        </div>
+                        <div className={`flex items-center gap-1.5 font-bold ${portfolio.canTrade ? "text-emerald-400" : "text-amber-400"}`}>
+                          <CheckCircle2 size={13} />
+                          <span>{portfolio.canTrade ? "Active" : "Read-Only"}</span>
+                        </div>
+                      </div>
 
-                  <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
-                    <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
-                      Maker / Taker Fee
-                    </div>
-                    <div className="font-mono font-bold text-[var(--app-fg)]">
-                      0.1000% / 0.1000%
-                    </div>
-                  </div>
+                      <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
+                        <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
+                          Maker / Taker Fee
+                        </div>
+                        <div className="font-mono font-bold text-[var(--app-fg)]">
+                          {((portfolio.commissions?.maker ?? 0.1)).toFixed(4)}% / {((portfolio.commissions?.taker ?? 0.1)).toFixed(4)}%
+                        </div>
+                      </div>
 
-                  <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
-                    <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
-                      BNB Fee Discount
+                      <div className="p-3 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] space-y-1">
+                        <div className="text-[10px] uppercase font-mono text-[var(--app-muted)]">
+                          Deposits / Withdrawals
+                        </div>
+                        <div className="font-bold text-[var(--app-fg)] flex items-center gap-1">
+                          <Zap size={12} className="text-amber-400" />
+                          <span>
+                            {portfolio.canDeposit ? "Deposit On" : "Deposit Off"} · {portfolio.canWithdraw ? "Withdraw On" : "Withdraw Off"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="font-bold text-amber-400 flex items-center gap-1">
-                      <Zap size={12} />
-                      <span>25% Enabled</span>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="pt-2">
-                  <div className="text-[10px] uppercase font-mono text-[var(--app-muted)] mb-2">
-                    Enabled Permissions
+                    <div className="pt-2">
+                      <div className="text-[10px] uppercase font-mono text-[var(--app-muted)] mb-2">
+                        Enabled Permissions
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(portfolio.permissions && portfolio.permissions.length > 0 ? portfolio.permissions : ["SPOT"]).map((perm) => (
+                          <span
+                            key={perm}
+                            className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20"
+                          >
+                            {perm}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 rounded-xl bg-[var(--app-card-subtle)] border border-[var(--app-border-subtle)] text-center space-y-2.5">
+                    <p className="text-xs text-[var(--app-muted)]">
+                      Connect your Binance read-only API credentials in Settings to view live account permissions and fee tiers.
+                    </p>
+                    <Button variant="secondary" size="xs" onClick={navigateToBinanceSettings} className="gap-1.5">
+                      <Key size={12} />
+                      <span>Configure Binance API</span>
+                    </Button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {["SPOT", "LEVERAGED", "MARGIN_READ", "TRD_GRP_002"].map((perm) => (
-                      <span
-                        key={perm}
-                        className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                      >
-                        {perm}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -863,13 +903,14 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
                 </select>
               </div>
 
-              {/* Quick Amount Buttons */}
-              <div className="flex items-center gap-2 pt-2">
+      {/* Quick Amount Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-2">
                 {["0.05", "0.1", "0.5", "1.0", "5.0"].map((quick) => (
                   <button
                     key={quick}
+                    type="button"
                     onClick={() => setSwapAmount(quick)}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--app-card)] text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-[var(--app-border-subtle)]"
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--app-card)] text-[var(--app-muted)] hover:text-[var(--app-fg)] border border-[var(--app-border-subtle)] cursor-pointer"
                   >
                     {quick}
                   </button>
@@ -880,12 +921,14 @@ export default function CryptoSection({ onNavigate }: CryptoSectionProps = {}) {
             {/* Flip Button */}
             <div className="flex justify-center -my-2">
               <button
+                type="button"
+                aria-label="Swap source and target assets"
                 onClick={() => {
                   const prevFrom = swapFrom;
                   setSwapFrom(swapTo);
                   setSwapTo(prevFrom);
                 }}
-                className="w-9 h-9 rounded-full bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-[var(--app-muted)] hover:text-[var(--app-fg)] flex items-center justify-center transition-transform hover:scale-110 shadow-xs"
+                className="w-9 h-9 rounded-full bg-[var(--app-card-subtle)] border border-[var(--app-border)] text-[var(--app-muted)] hover:text-[var(--app-fg)] flex items-center justify-center transition-transform hover:scale-110 shadow-xs cursor-pointer"
               >
                 <ArrowRightLeft size={14} />
               </button>

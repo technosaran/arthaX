@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,7 @@ export const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const passwordInputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   const isSignUp = mode === 'signup';
 
@@ -100,6 +101,7 @@ export const LoginScreen = () => {
           justifyContent: 'center',
         }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         {/* Glow Header */}
@@ -319,6 +321,10 @@ export const LoginScreen = () => {
                   placeholderTextColor={colors.textMuted}
                   value={name}
                   onChangeText={setName}
+                  autoComplete="name"
+                  textContentType="name"
+                  autoCapitalize="words"
+                  returnKeyType="next"
                   onFocus={() => setFocusedField('name')}
                   onBlur={() => setFocusedField(null)}
                   style={{
@@ -357,7 +363,12 @@ export const LoginScreen = () => {
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
                 keyboardType="email-address"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
                 style={{
@@ -390,11 +401,16 @@ export const LoginScreen = () => {
             >
               <Lock size={18} color={focusedField === 'password' ? colors.primary : colors.textMuted} />
               <TextInput
+                ref={passwordInputRef}
                 placeholder="••••••••••••"
                 placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                textContentType={isSignUp ? 'newPassword' : 'password'}
+                returnKeyType="done"
+                onSubmitEditing={handleAuth}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
                 style={{
@@ -407,7 +423,9 @@ export const LoginScreen = () => {
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
                   <EyeOff size={18} color={colors.textMuted} />

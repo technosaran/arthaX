@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   LayoutDashboard,
   Landmark,
@@ -34,6 +34,7 @@ import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useTheme, ThemeMode } from "@/context/ThemeContext";
+import { usePrivacyMode } from "@/utils/privacyMode";
 
 interface SidebarProps {
   activeTab: string;
@@ -42,44 +43,45 @@ interface SidebarProps {
   setCollapsed: (collapsed: boolean) => void;
 }
 
-interface NavItemDef {
+export interface NavItemDef {
   id: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   group: "finance" | "tax" | "system";
+  section?: string;
 }
 
-const NAV_ITEMS: NavItemDef[] = [
+export const NAV_ITEMS: NavItemDef[] = [
   // Overview
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "finance" },
-  { id: "accounts", label: "Accounts", icon: Landmark, group: "finance" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "finance", section: "Overview" },
+  { id: "accounts", label: "Accounts", icon: Landmark, group: "finance", section: "Overview" },
 
   // Cash Flow
-  { id: "income", label: "Income", icon: TrendingUp, group: "finance" },
-  { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance" },
-  { id: "budgets", label: "Budgets", icon: Target, group: "finance" },
-  { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance" },
-  { id: "forecast", label: "Runway & Forecast", icon: Clock, group: "finance" },
-  { id: "reconciliation", label: "Reconciliation", icon: Scale, group: "finance" },
+  { id: "income", label: "Income", icon: TrendingUp, group: "finance", section: "Cash Flow" },
+  { id: "expenses", label: "Expenses", icon: TrendingDown, group: "finance", section: "Cash Flow" },
+  { id: "budgets", label: "Budgets", icon: Target, group: "finance", section: "Cash Flow" },
+  { id: "ledger", label: "Ledger", icon: BookOpen, group: "finance", section: "Cash Flow" },
+  { id: "forecast", label: "Runway & Forecast", icon: Clock, group: "finance", section: "Cash Flow" },
+  { id: "reconciliation", label: "Reconciliation", icon: Scale, group: "finance", section: "Cash Flow" },
 
   // Investments
-  { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance" },
-  { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance" },
-  { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance" },
-  { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance" },
-  { id: "crypto", label: "Crypto", icon: Bitcoin, group: "finance" },
-  { id: "fno", label: "Futures & Options", icon: Zap, group: "finance" },
+  { id: "stocks", label: "Stocks", icon: CandlestickChart, group: "finance", section: "Investments" },
+  { id: "mutual-funds", label: "Mutual Funds", icon: Coins, group: "finance", section: "Investments" },
+  { id: "bonds", label: "Bonds", icon: ShieldCheck, group: "finance", section: "Investments" },
+  { id: "gold-silver", label: "Gold & Silver", icon: Gem, group: "finance", section: "Investments" },
+  { id: "crypto", label: "Crypto", icon: Bitcoin, group: "finance", section: "Investments" },
+  { id: "fno", label: "Futures & Options", icon: Zap, group: "finance", section: "Investments" },
 
   // Planning
-  { id: "goals", label: "Goals", icon: Trophy, group: "finance" },
-  { id: "family", label: "Family", icon: Users, group: "finance" },
+  { id: "goals", label: "Goals", icon: Trophy, group: "finance", section: "Planning" },
+  { id: "family", label: "Family", icon: Users, group: "finance", section: "Planning" },
 
   // Tax & Harvesting
-  { id: "tax", label: "Tax Overview", icon: ReceiptIndianRupee, group: "tax" },
-  { id: "tax-harvesting", label: "Tax Harvesting", icon: Sparkles, group: "tax" },
+  { id: "tax", label: "Tax Overview", icon: ReceiptIndianRupee, group: "tax", section: "Tax & Harvesting" },
+  { id: "tax-harvesting", label: "Tax Harvesting", icon: Sparkles, group: "tax", section: "Tax & Harvesting" },
 
   // Workspace
-  { id: "settings", label: "Settings", icon: Settings, group: "system" },
+  { id: "settings", label: "Settings", icon: Settings, group: "system", section: "Workspace" },
 ];
 
 export default function Sidebar({
@@ -91,26 +93,12 @@ export default function Sidebar({
   const { signOut } = useAuth();
   const { showToast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { isPrivacyMasked, togglePrivacyMask: toggleGlobalPrivacy } = usePrivacyMode();
 
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-  const [isPrivacyMasked, setIsPrivacyMasked] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("arthax_privacy_mode") === "true";
-      if (saved) {
-        setIsPrivacyMasked(true);
-      }
-    }
-  }, []);
 
   const togglePrivacyMask = useCallback(() => {
-    const root = document.documentElement;
-    const isMasked = root.classList.toggle("privacy-masked");
-    setIsPrivacyMasked(isMasked);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("arthax_privacy_mode", isMasked ? "true" : "false");
-    }
+    const isMasked = toggleGlobalPrivacy();
     if (isMasked) {
       showToast(
         "Privacy Mode Enabled",
@@ -124,7 +112,7 @@ export default function Sidebar({
         "info"
       );
     }
-  }, [showToast]);
+  }, [toggleGlobalPrivacy, showToast]);
 
   const cycleTheme = useCallback(() => {
     const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
@@ -147,7 +135,7 @@ export default function Sidebar({
 
   const overviewItems = NAV_ITEMS.filter((item) => ["dashboard", "accounts"].includes(item.id));
   const cashFlowItems = NAV_ITEMS.filter((item) =>
-    ["income", "expenses", "budgets", "ledger"].includes(item.id)
+    ["income", "expenses", "budgets", "ledger", "forecast", "reconciliation"].includes(item.id)
   );
   const investmentItems = NAV_ITEMS.filter((item) =>
     ["stocks", "mutual-funds", "bonds", "gold-silver", "crypto", "fno"].includes(item.id)
@@ -253,8 +241,16 @@ export default function Sidebar({
               </button>
             </div>
           ) : (
-            <div className="w-full flex items-center justify-between">
-              <Logo size={32} showText={true} />
+            <div className="w-full flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => handleTabSelect("dashboard")}
+                className="flex items-center rounded-xl cursor-pointer transition-transform hover:scale-[1.02] active:scale-95 fintech-focus"
+                aria-label="Go to Dashboard"
+                title="Go to Dashboard"
+              >
+                <Logo size={32} showText={true} />
+              </button>
               <button
                 type="button"
                 onClick={() => setCollapsed(true)}
@@ -398,41 +394,47 @@ export default function Sidebar({
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1">
-              <button
-                type="button"
-                onClick={cycleTheme}
-                onMouseEnter={() => setHoveredItemId("theme-collapsed")}
-                onMouseLeave={() => setHoveredItemId(null)}
-                className="w-8 h-8 rounded-xl border border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] flex items-center justify-center cursor-pointer transition-all"
-                title="Toggle Theme"
-              >
-                {theme === "dark" ? <Moon size={14} className="text-sky-400" /> : <Sun size={14} className="text-amber-500" />}
-              </button>
-              {hoveredItemId === "theme-collapsed" && (
-                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl">
-                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                </div>
-              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={cycleTheme}
+                  onMouseEnter={() => setHoveredItemId("theme-collapsed")}
+                  onMouseLeave={() => setHoveredItemId(null)}
+                  className="w-8 h-8 rounded-xl border border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-fg)] flex items-center justify-center cursor-pointer transition-all"
+                  title="Toggle Theme"
+                  aria-label="Toggle visual theme"
+                >
+                  {theme === "dark" ? <Moon size={14} className="text-sky-400" /> : <Sun size={14} className="text-amber-500" />}
+                </button>
+                {hoveredItemId === "theme-collapsed" && (
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl pointer-events-none">
+                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                  </div>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={togglePrivacyMask}
-                onMouseEnter={() => setHoveredItemId("privacy-collapsed")}
-                onMouseLeave={() => setHoveredItemId(null)}
-                className={`w-8 h-8 rounded-xl border flex items-center justify-center cursor-pointer transition-all ${
-                  isPrivacyMasked
-                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
-                    : "border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)]"
-                }`}
-                title="Privacy Mode"
-              >
-                {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              {hoveredItemId === "privacy-collapsed" && (
-                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl">
-                  {isPrivacyMasked ? "Reveal Balances" : "Hide Balances"}
-                </div>
-              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={togglePrivacyMask}
+                  onMouseEnter={() => setHoveredItemId("privacy-collapsed")}
+                  onMouseLeave={() => setHoveredItemId(null)}
+                  className={`w-8 h-8 rounded-xl border flex items-center justify-center cursor-pointer transition-all ${
+                    isPrivacyMasked
+                      ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
+                      : "border-[var(--app-border-subtle)] hover:bg-[var(--app-card-hover)] text-[var(--app-muted)]"
+                  }`}
+                  title="Privacy Mode"
+                  aria-label="Toggle privacy mode"
+                >
+                  {isPrivacyMasked ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+                {hoveredItemId === "privacy-collapsed" && (
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 px-2 py-1 rounded-md border border-[var(--app-border)] bg-[var(--app-card-elevated)] text-[var(--app-fg)] text-[11px] font-semibold whitespace-nowrap shadow-xl pointer-events-none">
+                    {isPrivacyMasked ? "Reveal Balances" : "Hide Balances"}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -464,19 +466,6 @@ export default function Sidebar({
               </div>
             )}
           </div>
-
-          {/* Expand Sidebar Icon Button */}
-          {collapsed && (
-            <button
-              type="button"
-              onClick={() => setCollapsed(false)}
-              className="flex items-center justify-center w-8 h-8 rounded-xl border border-[var(--app-border-subtle)] hover:border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-fg)] transition-all cursor-pointer opacity-70 hover:opacity-100 hover:scale-105 active:scale-95 fintech-focus"
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
-            >
-              <ChevronRight size={14} />
-            </button>
-          )}
         </div>
       </aside>
     </>

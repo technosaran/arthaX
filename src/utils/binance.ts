@@ -432,7 +432,7 @@ export interface ExitedCryptoAsset {
   sellTradesCount: number;
 }
 
-export function extractBaseAndQuote(symbol: string): { baseAsset: string; quoteAsset: string } {
+function extractBaseAndQuote(symbol: string): { baseAsset: string; quoteAsset: string } {
   const commonQuotes = ["USDT", "USDC", "FDUSD", "BUSD", "TUSD", "BTC", "ETH", "BNB"];
   for (const q of commonQuotes) {
     if (symbol.endsWith(q) && symbol.length > q.length) {
@@ -902,26 +902,6 @@ export interface BinanceServerTime {
   clockDriftMs: number;
 }
 
-export interface BinanceSymbolFilter {
-  filterType: string;
-  minPrice?: string;
-  maxPrice?: string;
-  tickSize?: string;
-  minQty?: string;
-  maxQty?: string;
-  stepSize?: string;
-  minNotional?: string;
-}
-
-export interface BinanceSymbolInfo {
-  symbol: string;
-  status: string;
-  baseAsset: string;
-  quoteAsset: string;
-  filters: BinanceSymbolFilter[];
-  permissions: string[];
-}
-
 export async function fetchBinanceSystemStatus(
   baseUrl: string = "https://api.binance.com"
 ): Promise<{ success: boolean; data?: BinanceSystemStatus; error?: string }> {
@@ -1119,8 +1099,4 @@ export function getDemoSpotAccount(): BinanceAccountResponse {
     balances: [],
     permissions: ["SPOT"],
   };
-}
-
-export function getDemoTradeHistory(): CalculatedCryptoTrade[] {
-  return [];
 }

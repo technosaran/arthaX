@@ -651,6 +651,7 @@ export default function AppleWalletCard({
           {/* Zerodha Sync (Brokerage Demat only) */}
           {computedIsZerodha && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onSyncZerodha?.(account);
@@ -718,14 +719,14 @@ export default function AppleWalletCard({
                 CLIENT ID
               </span>
               <span className="font-mono font-bold tracking-widest text-white">
-                {account.last_four || "HXH648"}
+                {account.last_four || "UNLINKED"}
               </span>
               <span className="text-[10px] font-mono tracking-wider text-white/40">
-                • BO ID 12081600
+                • CDSL DEMAT
               </span>
             </div>
           ) : (
-            <span>••••  ••••  ••••  {account.last_four || "8821"}</span>
+            <span>••••  ••••  ••••  {account.last_four || "••••"}</span>
           )}
         </div>
       </div>

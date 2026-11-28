@@ -34,6 +34,8 @@ import {
   Plus,
   Eye,
   EyeOff,
+  Activity,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -265,7 +267,49 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
   });
   const [loadingGmail, setLoadingGmail] = useState(false);
   const [syncingGmail, setSyncingGmail] = useState(false);
-  const gmailLookbackDays = 30;
+  const [gmailLookbackDays, setGmailLookbackDays] = useState<number>(30);
+  const [automationStatus, setAutomationStatus] = useState<{
+    statements?: {
+      totalIngested: number;
+      reconciled: number;
+      discrepancies?: number;
+      reconciliationPassRate: string;
+      supportedBanks: string[];
+    };
+    transactions?: {
+      totalCanonical: number;
+      transfersMatched: number;
+      averageConfidence: number;
+    };
+    recurring?: {
+      activeCount: number;
+      dueCount: number;
+      nextRunDate: string | null;
+      todayIst: string;
+    };
+    pendingAttachments?: {
+      totalPending: number;
+      passwordRequiredCount: number;
+      banksRequiringPassword: string[];
+      items: Array<{
+        id?: string;
+        file_name?: string;
+        detected_bank?: string;
+        status?: string;
+        error_code?: string;
+        error_message?: string;
+        updated_at?: string;
+      }>;
+    };
+    recentJobs?: Array<{
+      id: string;
+      job_type: string;
+      status: string;
+      started_at?: string;
+      completed_at?: string;
+      error_message?: string;
+    }>;
+  } | null>(null);
   const [gmailEmail, setGmailEmail] = useState("");
   const [panInput, setPanInput] = useState("");
   const [dobInput, setDobInput] = useState("");
@@ -579,6 +623,35 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
   }, []);
 
+  const fetchAutomationStatus = useCallback(async (notify = false) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch("/api/v1/automation/status", { headers });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      const autoData = json.automation || json.data?.automation;
+      if (json.success && autoData) {
+        setAutomationStatus(autoData);
+        if (notify) {
+          showToast("Automation Health Refreshed", "Parser and ingestion metrics updated.", "success");
+        }
+      } else if (notify) {
+        throw new Error("Automation metrics unavailable");
+      }
+    } catch {
+      if (notify) {
+        showToast("Health Refresh Failed", "Could not retrieve automation engine telemetry.", "error");
+      }
+    }
+  }, [showToast]);
+
   useEffect(() => {
     refreshCounts();
 
@@ -647,6 +720,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       fetchBinanceStatus(false);
       fetchGmailStatus(false);
       fetchStoredBankPasswords();
+      fetchAutomationStatus();
 
       const onFocus = () => {
         fetchTelegramStatus(false);
@@ -654,6 +728,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         fetchBinanceStatus(false);
         fetchGmailStatus(false);
         fetchStoredBankPasswords();
+        fetchAutomationStatus();
       };
       window.addEventListener("focus", onFocus);
 
@@ -668,7 +743,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         clearInterval(interval);
       };
     }
-  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, fetchStoredBankPasswords]);
+  }, [activeTab, fetchTelegramStatus, fetchZerodhaStatus, fetchBinanceStatus, fetchGmailStatus, fetchStoredBankPasswords, fetchAutomationStatus]);
 
   // Handle Zerodha URL Redirects / Callbacks and section deep links
   useEffect(() => {
@@ -695,9 +770,9 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
     }
 
     if (section && ["profile", "statements", "integrations", "danger"].includes(section)) {
-      if (activeTab !== section) {
-        setActiveTab(section as SettingsTab);
-      }
+      setActiveTab(section as SettingsTab);
+      url.searchParams.delete("section");
+      window.history.replaceState({}, "", url.toString());
     }
 
     if (zerodhaConnected === "true") {
@@ -719,7 +794,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       url.searchParams.delete("section");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [showToast, fetchZerodhaStatus, activeTab]);
+  }, [showToast, fetchZerodhaStatus, fetchGmailStatus]);
 
   const handleSaveZerodha = async () => {
     if (!zerodhaApiKey.trim() || !zerodhaApiSecret.trim()) {
@@ -1082,6 +1157,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       refreshCounts();
       await fetchGmailStatus(false);
       await fetchStoredBankPasswords();
+      await fetchAutomationStatus();
     } catch (err: any) {
       showToast("Sync Error", err?.message || "Error syncing Gmail statements", "error");
     } finally {
@@ -1122,24 +1198,30 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
       });
 
       const json = await res.json();
-      if (json.success) {
-        showToast("Gmail Disconnected", "Statement discovery integration removed.", "info");
-        setGmailStatus({
-          connected: false,
-          email: null,
-          syncStatus: "DISCONNECTED",
-          lastSyncAt: null,
-          errorDetails: null,
-          passwordHintsCount: 0,
-          latestJob: null,
-        });
-        setLastSyncResult(null);
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
-        }
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || "Failed to disconnect Gmail.");
       }
-    } catch {
-      showToast("Disconnect Error", "Failed to disconnect Gmail.", "error");
+
+      showToast("Gmail Disconnected", "Statement discovery integration removed.", "info");
+      setGmailStatus({
+        connected: false,
+        email: null,
+        syncStatus: "DISCONNECTED",
+        lastSyncAt: null,
+        errorDetails: null,
+        passwordHintsCount: 0,
+        latestJob: null,
+      });
+      setLastSyncResult(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("arthax:financial_data_updated"));
+      }
+    } catch (err) {
+      showToast(
+        "Disconnect Error",
+        err instanceof Error ? err.message : "Failed to disconnect Gmail.",
+        "error"
+      );
     }
   };
 
@@ -1284,16 +1366,19 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         headers,
         body: JSON.stringify({ action: "generate_token" }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.link_token) {
-          setTelegramData((prev) => {
-            const updated = { ...prev, link_token: data.link_token };
-            saveToLocalCache(telegramCacheKey, updated, 86400);
-            return updated;
-          });
-          showToast("Telegram Link Code Generated", "Use this code with /link in Telegram bot.", "success");
-        }
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.link_token) {
+        setTelegramData((prev) => {
+          const updated = { ...prev, link_token: data.link_token };
+          saveToLocalCache(telegramCacheKey, updated, 86400);
+          return updated;
+        });
+        showToast("Telegram Link Code Generated", "Use this code with /link in Telegram bot.", "success");
+      } else {
+        throw new Error("Missing link token");
       }
     } catch {
       showToast("Code Generation Failed", "Failed to generate new Telegram link code.", "error");
@@ -1317,19 +1402,20 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
         headers,
         body: JSON.stringify({ action: "unlink" }),
       });
-      if (res.ok) {
-        const resetTg: TelegramData = {
-          is_linked: false,
-          telegram_username: null,
-          telegram_chat_id: null,
-          link_token: null,
-          bot_username: "Artha_X_bot",
-          loading: false,
-        };
-        setTelegramData(resetTg);
-        saveToLocalCache(telegramCacheKey, resetTg, 86400);
-        showToast("Telegram Disconnected", "Your Telegram chat is no longer linked to arthaX.", "info");
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
+      const resetTg: TelegramData = {
+        is_linked: false,
+        telegram_username: null,
+        telegram_chat_id: null,
+        link_token: null,
+        bot_username: "Artha_X_bot",
+        loading: false,
+      };
+      setTelegramData(resetTg);
+      saveToLocalCache(telegramCacheKey, resetTg, 86400);
+      showToast("Telegram Disconnected", "Your Telegram chat is no longer linked to arthaX.", "info");
     } catch {
       showToast("Disconnect Failed", "Failed to disconnect Telegram integration.", "error");
     } finally {
@@ -2197,7 +2283,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   )}
 
                   <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-sm tracking-tight truncate">
                         {greetingName.trim() || validProfileName || user?.user_metadata?.full_name || user?.user_metadata?.name || "arthaX User"}
                       </span>
@@ -2252,7 +2338,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       onChange={handleNameInputChange}
                       onKeyDown={handleNameKeyDown}
                       onBlur={handleNameBlur}
-                      placeholder="Enter display name (e.g. Alex)"
+                      placeholder="Enter your display name"
                     />
                   </div>
 
@@ -2293,7 +2379,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         <Landmark size={18} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h2 className="text-sm sm:text-base font-bold tracking-tight text-[var(--app-fg)]">
                             Personal &amp; Banking Identity Vault
                           </h2>
@@ -2304,7 +2390,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--app-bg)] border border-[var(--app-border-subtle)] text-[10px] font-mono text-[var(--app-muted)]">
                         <Lock size={10} className="text-emerald-400" />
                         <span>AES-256 GCM</span>
@@ -2336,7 +2422,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       {/* PAN Card Status */}
                       <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
                               <CreditCard size={13} />
                             </div>
@@ -2359,7 +2445,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       {/* DOB Status */}
                       <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center">
                               <Calendar size={13} />
                             </div>
@@ -2382,7 +2468,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       {/* Mobile Status */}
                       <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
                               <Smartphone size={13} />
                             </div>
@@ -2405,7 +2491,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       {/* Account Number Status */}
                       <div className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)]/80 flex flex-col justify-between gap-2.5 transition-all hover:border-[var(--app-border)]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
                               <Landmark size={13} />
                             </div>
@@ -2469,7 +2555,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     {/* Stored Bank Decryption Passwords */}
                     <div className="pt-3 border-t border-[var(--app-border-subtle)] space-y-2.5">
                       <div className="flex items-center justify-between text-xs font-semibold text-[var(--app-fg)]">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <KeyRound size={13} className="text-emerald-400" />
                           <span>Saved Bank Statement Passwords</span>
                         </div>
@@ -2707,7 +2793,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="primary"
                         size="md"
@@ -2753,9 +2839,18 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     </span>
                     <Badge variant="emerald" size="xs">Verified</Badge>
                   </div>
-                  <div className="text-xs font-semibold font-mono truncate text-[var(--app-fg)]">
-                    {user?.email || "Local Guest Mode"}
-                  </div>
+                  {user?.email ? (
+                    <a
+                      href={`mailto:${user.email}`}
+                      className="block text-xs font-semibold font-mono truncate text-[var(--app-fg)] hover:text-emerald-400 transition-colors"
+                    >
+                      {user.email}
+                    </a>
+                  ) : (
+                    <div className="text-xs font-semibold font-mono truncate text-[var(--app-fg)]">
+                      Local Guest Mode
+                    </div>
+                  )}
                 </div>
 
                 {/* Full Legal / Auth Name */}
@@ -2993,7 +3088,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <a
                         href={`tg://resolve?domain=${telegramData.bot_username}`}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#229ED9] hover:bg-[#1e8ec3] text-white text-xs font-medium transition-all shadow-sm"
@@ -3076,31 +3171,43 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     </div>
 
                     {/* Option 2: Copy Command */}
-                    <div className="p-3.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-bg)] space-y-2.5 flex flex-col justify-between">
+                    <div className="p-3.5 rounded-lg border border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)] space-y-2.5 flex flex-col justify-between">
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Link Token</span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)]">
-                        <code className="text-xs font-mono text-emerald-400 select-all font-semibold">
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)] min-w-0">
+                        <code className="text-xs font-mono text-emerald-400 select-all font-semibold break-all min-w-0 flex-1">
                           /link {telegramData.link_token || (user?.id ? user.id : "AX-CONNECT")}
                         </code>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <Button
                             variant="ghost"
                             size="xs"
                             icon={copiedLinkToken ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            onClick={() => {
+                            onClick={async () => {
                               const codeToCopy = telegramData.link_token
                                 ? `/link ${telegramData.link_token}`
                                 : user?.id
                                 ? `/link ${user.id}`
                                 : "/start";
-                              navigator.clipboard.writeText(codeToCopy);
-                              setCopiedLinkToken(true);
-                              setTimeout(() => setCopiedLinkToken(false), 2000);
-                              showToast("Copied to Clipboard", `Code "${codeToCopy}" copied. Send it to @${telegramData.bot_username || "arthaX_bot"}.`, "success");
+                              try {
+                                await navigator.clipboard.writeText(codeToCopy);
+                                setCopiedLinkToken(true);
+                                setTimeout(() => setCopiedLinkToken(false), 2000);
+                                showToast(
+                                  "Copied to Clipboard",
+                                  `Code "${codeToCopy}" copied. Send it to @${telegramData.bot_username || "Artha_X_bot"}.`,
+                                  "success"
+                                );
+                              } catch {
+                                showToast(
+                                  "Copy Failed",
+                                  "Could not write to clipboard. Copy the command manually.",
+                                  "error"
+                                );
+                              }
                             }}
                           >
                             {copiedLinkToken ? "Copied" : "Copy"}
@@ -3164,7 +3271,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                 <div className="space-y-4">
                   {gmailStatus.syncStatus === "EXPIRED" && (
                     <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2.5 shadow-sm">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <AlertTriangle size={15} className="flex-shrink-0 text-amber-400" />
                         <span>Google OAuth session expired. Re-authenticate to renew bank statement scanning authorization.</span>
                       </div>
@@ -3194,7 +3301,18 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <select
+                          aria-label="Gmail statement scan window"
+                          value={gmailLookbackDays}
+                          onChange={(e) => setGmailLookbackDays(Number(e.target.value))}
+                          disabled={syncingGmail}
+                          className="text-xs bg-[var(--app-card)] border border-[var(--app-border)] text-[var(--app-fg)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 cursor-pointer"
+                        >
+                          <option value={7}>Last 7 days</option>
+                          <option value={30}>Last 30 days</option>
+                          <option value={90}>Last 90 days</option>
+                        </select>
                         {gmailStatus.syncStatus === "EXPIRED" && (
                           <Button
                             variant="outline"
@@ -3237,20 +3355,23 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     )}
                   </div>
 
-                  {/* Sync results banner */}
+                  {/* Sync results banner (strictly live data — no synthetic fallback) */}
                   {(() => {
+                    const jobStats = gmailStatus?.latestJob?.stats;
                     const displayResult =
                       lastSyncResult ||
-                      (gmailStatus?.latestJob?.status === "COMPLETED" && gmailStatus.latestJob.stats
+                      (gmailStatus?.latestJob?.status === "COMPLETED" && jobStats
                         ? {
-                            statementsCount: gmailStatus.latestJob.stats.statementsCount || 1,
+                            statementsCount: jobStats.statementsCount ?? 0,
                             transactionsExtracted:
-                              gmailStatus.latestJob.stats.transactionsExtracted ||
-                              gmailStatus.latestJob.stats.transactionsImported ||
-                              57,
-                            transactionsImported: gmailStatus.latestJob.stats.transactionsImported,
-                            duplicatesSkipped: gmailStatus.latestJob.stats.duplicatesSkipped,
-                            accountsCreated: ["SBI Savings Account"],
+                              jobStats.transactionsExtracted ??
+                              jobStats.transactionsImported ??
+                              0,
+                            transactionsImported: jobStats.transactionsImported,
+                            duplicatesSkipped: jobStats.duplicatesSkipped,
+                            accountsCreated: Array.isArray(jobStats.accountsCreated)
+                              ? jobStats.accountsCreated
+                              : [],
                           }
                         : null);
 
@@ -3278,6 +3399,40 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                     );
                   })()}
 
+                  {automationStatus?.pendingAttachments && automationStatus.pendingAttachments.passwordRequiredCount > 0 && (
+                    <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-center justify-between flex-wrap gap-3">
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+                          <Lock size={13} />
+                          <span>
+                            {automationStatus.pendingAttachments.passwordRequiredCount} encrypted statement(s) waiting for password
+                          </span>
+                        </div>
+                        <p className="text-[11px] opacity-80">
+                          Detected bank(s): {(automationStatus.pendingAttachments.banksRequiringPassword || []).join(", ") || "BANK"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPasswordModalState({
+                            isOpen: true,
+                            banks:
+                              automationStatus.pendingAttachments?.banksRequiringPassword?.length
+                                ? automationStatus.pendingAttachments.banksRequiringPassword
+                                : ["BANK"],
+                            hints: {},
+                            noticeMessage: "Provide decryption password(s) to unlock pending Gmail statements.",
+                          })
+                        }
+                        className="border-amber-500/40 text-amber-300 hover:bg-amber-500/20 text-xs"
+                      >
+                        <KeyRound size={12} className="mr-1.5" />
+                        <span>Unlock Pending Statements</span>
+                      </Button>
+                    </div>
+                  )}
 
                 </div>
               ) : (
@@ -3302,7 +3457,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       <span>Supports SBI, HDFC, ICICI, Axis, Kotak, PNB, Canara &amp; more</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="primary"
                         size="md"
@@ -3394,14 +3549,24 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         {zerodhaStatus.apiKeyMasked && (
                           <span> • API Key: <span className="font-mono font-semibold text-emerald-400">{zerodhaStatus.apiKeyMasked}</span></span>
                         )}
-                        {zerodhaStatus.userProfile?.email && <span> • {zerodhaStatus.userProfile.email}</span>}
+                        {zerodhaStatus.userProfile?.email && (
+                          <span>
+                            {" • "}
+                            <a
+                              href={`mailto:${zerodhaStatus.userProfile.email}`}
+                              className="hover:text-emerald-400 hover:underline transition-colors break-all"
+                            >
+                              {zerodhaStatus.userProfile.email}
+                            </a>
+                          </span>
+                        )}
                         {zerodhaStatus.lastSyncAt && (
                           <span> • Last Synced: <span className="font-mono">{new Date(zerodhaStatus.lastSyncAt).toLocaleTimeString()}</span></span>
                         )}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="primary"
                         size="sm"
@@ -3436,7 +3601,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           Auto-login is configured for user {zerodhaStatus.autoLoginUserIdMasked || "Kite"}. Your session automatically renews daily at 8:30 AM IST and on page load without manual button clicks.
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -3459,7 +3624,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                           Your API keys ({zerodhaStatus.apiKeyMasked}) are saved. Zerodha access tokens expire daily at 6:00 AM IST. Log in to renew today&apos;s session, or enable auto-login below.
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {zerodhaStatus.loginUrl && (
                           <a
                             href={zerodhaStatus.loginUrl}
@@ -3533,16 +3698,16 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                   </div>
 
                   <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-[var(--app-border-subtle)]">
-                    <div className="text-[11px] opacity-60 flex items-center gap-1.5 flex-wrap">
+                    <div className="text-[11px] opacity-60 flex items-center gap-1.5 flex-wrap min-w-0">
                       <span>Redirect URL for Kite Developer Portal:</span>
-                      <code className="bg-[var(--app-bg)] px-1.5 py-0.5 rounded border font-mono text-[10px]">
+                      <code className="bg-[var(--app-bg)] px-1.5 py-0.5 rounded border font-mono text-[10px] break-all max-w-full">
                         {typeof window !== "undefined"
                           ? `${window.location.origin}/api/v1/integrations/zerodha/callback`
                           : "https://arthax.vercel.app/api/v1/integrations/zerodha/callback"}
                       </code>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="primary"
                         size="sm"
@@ -3565,7 +3730,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                       <li>Copy the 32-character secret key underneath the QR code.</li>
                       <li>Add your credentials to <code className="font-mono bg-[var(--app-bg)] px-1 rounded">.env.local</code>:</li>
                     </ol>
-                    <div className="p-2.5 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)] font-mono text-[11px] space-y-0.5 select-all text-emerald-400">
+                    <div className="p-2.5 rounded-lg bg-[var(--app-bg)] border border-[var(--app-border-subtle)] font-mono text-[11px] space-y-0.5 select-all text-emerald-400 overflow-x-auto break-all">
                       <div>ZERODHA_USER_ID=your_client_id</div>
                       <div>ZERODHA_PASSWORD=your_kite_password</div>
                       <div>ZERODHA_TOTP_SECRET=your_32_char_totp_secret</div>
@@ -3628,7 +3793,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="secondary"
                           size="sm"
@@ -3723,6 +3888,125 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
               )}
             </Card>
 
+            {/* AUTOMATION PIPELINE & STATEMENT ENGINE TELEMETRY CARD */}
+            {automationStatus && (
+              <Card className="p-6 sm:p-7 space-y-5">
+                <div className="flex items-center justify-between pb-4 border-b border-[var(--app-border-subtle)] flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <Activity size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold tracking-tight">Automation Engine &amp; Parser Health</h2>
+                      <p className="text-xs opacity-60">
+                        Live statement ingestion, UPI intelligence confidence, and IST recurring schedule status
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void fetchAutomationStatus(true)}
+                    className="gap-1.5 text-xs"
+                  >
+                    <RefreshCw size={12} />
+                    <span>Refresh Health</span>
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)]">
+                    <div className="text-[11px] opacity-60">Statements Ingested</div>
+                    <div className="text-base font-bold mt-0.5 tabular-nums">
+                      {automationStatus.statements?.totalIngested ?? 0}
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      Pass rate: {automationStatus.statements?.reconciliationPassRate ?? "N/A"}%
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)]">
+                    <div className="text-[11px] opacity-60">Classified Ledger Txns</div>
+                    <div className="text-base font-bold mt-0.5 tabular-nums">
+                      {automationStatus.transactions?.totalCanonical ?? 0}
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      Avg confidence:{" "}
+                      {automationStatus.transactions?.averageConfidence
+                        ? `${Math.round(automationStatus.transactions.averageConfidence * 100)}%`
+                        : "N/A"}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)]">
+                    <div className="text-[11px] opacity-60">Recurring Rules (IST)</div>
+                    <div className="text-base font-bold mt-0.5 tabular-nums">
+                      {automationStatus.recurring?.activeCount ?? 0} active
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5 flex items-center gap-1">
+                      <Clock size={10} />
+                      <span>
+                        {automationStatus.recurring?.nextRunDate
+                          ? `Next: ${automationStatus.recurring.nextRunDate}`
+                          : "None scheduled"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg-subtle)]">
+                    <div className="text-[11px] opacity-60">Pending Attachment Queue</div>
+                    <div className="text-base font-bold mt-0.5 tabular-nums">
+                      {automationStatus.pendingAttachments?.totalPending ?? 0}
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      {automationStatus.pendingAttachments?.passwordRequiredCount ?? 0} password locked
+                    </div>
+                  </div>
+                </div>
+
+                {automationStatus.statements?.supportedBanks && automationStatus.statements.supportedBanks.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold opacity-70">Active Statement Adapters</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {automationStatus.statements.supportedBanks.map((bank) => (
+                        <Badge key={bank} variant="neutral" className="text-[10px]">
+                          {bank}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {automationStatus.recentJobs && automationStatus.recentJobs.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[var(--app-border-subtle)]">
+                    <div className="text-[11px] font-semibold opacity-70">Recent Automation Runs</div>
+                    <div className="space-y-1.5">
+                      {automationStatus.recentJobs.slice(0, 4).map((job) => (
+                        <div
+                          key={job.id}
+                          className="flex items-center justify-between gap-2 text-[11px] px-3 py-1.5 rounded-lg bg-[var(--app-bg-subtle)] border border-[var(--app-border-subtle)]"
+                        >
+                          <span className="font-mono font-medium">{job.job_type}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {job.started_at && (
+                              <span className="opacity-50 hidden sm:inline">
+                                {new Date(job.started_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                              </span>
+                            )}
+                            <Badge
+                              variant={job.status === "COMPLETED" ? "emerald" : job.status === "FAILED" ? "rose" : "amber"}
+                              className="text-[10px]"
+                            >
+                              {job.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
 
           </div>
         )}
@@ -3798,7 +4082,7 @@ export default function SettingsSection({ initialTab }: SettingsSectionProps = {
 
           {/* Offline Snapshot Backup Suggestion */}
           <div
-            className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex items-center justify-between gap-3 text-xs"
+            className="p-3.5 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-bg)] flex flex-wrap items-center justify-between gap-3 text-xs"
           >
             <div className="min-w-0">
               <div className="font-semibold text-xs">Recommended: Download Backup</div>

@@ -114,10 +114,11 @@ export default function FnoSection() {
 
       const posRes = await fetch("/api/v1/fno/positions", { headers });
 
-      if (posRes.ok) {
-        const json = await posRes.json();
-        setPositions(json.positions || []);
+      if (!posRes.ok) {
+        throw new Error(`HTTP ${posRes.status}`);
       }
+      const json = await posRes.json();
+      setPositions(json.positions || []);
     } catch (err) {
       console.error("[F&O] Error loading data:", err);
       showToast("F&O Data Failed", "Could not load Futures & Options positions.", "error");
@@ -447,7 +448,7 @@ export default function FnoSection() {
               />
 
               {/* Instrument Type Pills */}
-              <div className="flex items-center gap-1 pl-2 border-l border-[var(--app-border)]">
+              <div className="flex flex-wrap items-center gap-1 pl-2 border-l border-[var(--app-border)]">
                 {["all", "CE", "PE", "FUT"].map((type) => (
                   <button
                     key={type}
@@ -663,7 +664,7 @@ export default function FnoSection() {
                   Showing <strong>{displayedPositions.length}</strong> of{" "}
                   <strong>{positions.length}</strong> F&O contracts
                 </div>
-                <div className="flex items-center gap-4 font-mono font-medium">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono font-medium">
                   <div>
                     <span className="text-[var(--app-muted)]">Unrealized MTM: </span>
                     <strong

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, Switch, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   User,
   Moon,
@@ -19,8 +20,10 @@ import { Header } from '../../components/Header';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
+import { getScrollBottomPadding } from '../../theme/platform';
 
 export const SettingsScreen = () => {
+  const insets = useSafeAreaInsets();
   const { colors, isDark, toggleTheme } = useTheme();
   const { user, isDemoUser, signOut } = useAuth();
 
@@ -35,7 +38,10 @@ export const SettingsScreen = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header title="Settings" subtitle="Preferences & Automations" />
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 50 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Profile Card */}
         <Card style={{ marginBottom: 20, padding: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -86,6 +92,8 @@ export const SettingsScreen = () => {
               onValueChange={toggleTheme}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="#ffffff"
+              ios_backgroundColor={colors.border}
+              accessibilityLabel="Toggle dark theme"
             />
           </View>
 

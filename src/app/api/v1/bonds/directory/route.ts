@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/utils/rateLimit";
 
 export interface PopularBondPreset {
   isin: string;
@@ -202,7 +203,21 @@ export const POPULAR_BONDS: PopularBondPreset[] = [
   },
 ];
 
-export async function GET() {
+export async function GET(req?: NextRequest) {
+  if (req) {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "anonymous";
+    const rl = await rateLimit(`bonds_dir:${clientIp}`, 120, 60);
+    if (!rl.success) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please slow down." },
+        { status: 429 }
+      );
+    }
+  }
+
   return NextResponse.json(
     {
       success: true,

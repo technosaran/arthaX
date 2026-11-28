@@ -33,6 +33,18 @@ export const GET = createApiRoute({
         supabaseAdmin.from("financial_audit_logs").select("*").eq("user_id", userId!).order("timestamp", { ascending: false }).limit(200),
       ]);
 
+      const queryError =
+        accountsRes.error ||
+        expensesRes.error ||
+        incomeRes.error ||
+        transfersRes.error ||
+        statementsRes.error ||
+        canonicalRes.error ||
+        auditRes.error;
+      if (queryError) {
+        return apiError(`Export query failed: ${queryError.message}`, "DATABASE_ERROR", 500, undefined, req);
+      }
+
       const exportBundle = {
         metadata: {
           user_id: userId,

@@ -470,7 +470,7 @@ export default function LoginClient() {
                   autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Alex Morgan"
+                  placeholder="Enter your full name"
                   leftIcon={<User size={13} className="text-emerald-400" />}
                   required
                 />
@@ -484,7 +484,7 @@ export default function LoginClient() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
+                placeholder="Enter your email address"
                 leftIcon={<Mail size={13} className="text-emerald-400" />}
                 required
               />
@@ -725,7 +725,11 @@ export default function LoginClient() {
                 <ShieldCheck size={14} className="text-emerald-400 flex-shrink-0" />
                 <span>Private & Secure • Protected Sessions</span>
               </div>
-              <div className="flex items-center gap-3 text-[10px] opacity-75">
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] opacity-80">
+                <Link href="/" className="hover:underline hover:text-emerald-400 transition-colors">
+                  Home
+                </Link>
+                <span>•</span>
                 <Link href="/privacy" className="hover:underline hover:text-emerald-400 transition-colors">
                   Privacy Policy
                 </Link>
@@ -733,6 +737,13 @@ export default function LoginClient() {
                 <Link href="/terms" className="hover:underline hover:text-emerald-400 transition-colors">
                   Terms of Service
                 </Link>
+                <span>•</span>
+                <a href="mailto:support@arthax.app" className="hover:underline hover:text-emerald-400 transition-colors">
+                  Support
+                </a>
+              </div>
+              <div className="text-[10px] opacity-60">
+                © {new Date().getFullYear()} arthaX. All rights reserved.
               </div>
             </div>
           </Card>

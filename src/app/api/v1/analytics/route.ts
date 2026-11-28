@@ -1,8 +1,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getCachedData, setCachedData, getUserCacheKey } from "@/utils/redis";
-import { getCurrentMonthYear, formatMonthDisplay } from "@/utils/monthUtils";
+import { getCurrentMonthYear, formatMonthDisplay, getLocalDateString } from "@/utils/monthUtils";
 import { apiSuccess, apiError } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
+import { getMonthBounds, parseMonthParam } from "@/lib/backend/queryParams";
 import { logger } from "@/utils/logger";
 import {
   addMoney,
@@ -20,6 +21,12 @@ export interface AnalyticsSummary {
     totalLiabilities: number;
     netWorth: number;
     accountsCount: number;
+    currency: "INR";
+  };
+  usdPortfolio: {
+    cryptoUsd: number;
+    assetsCount: number;
+    currency: "USD";
   };
   monthlyCashFlow: {
     month: string;
@@ -62,7 +69,12 @@ export interface AnalyticsSummary {
 export const GET = createApiRoute({
   rateLimit: { limit: 90, windowSeconds: 60, keyPrefix: "analytics" },
   handler: async ({ userId, query, req }) => {
-    const targetMonth = query.get("month") || getCurrentMonthYear(); // YYYY-MM
+    const rawMonth = query.get("month");
+    const monthCheck = parseMonthParam(rawMonth);
+    if (!monthCheck.valid) {
+      return apiError("Invalid month format. Expected YYYY-MM.", "VALIDATION_ERROR", 400, undefined, req);
+    }
+    const targetMonth = monthCheck.value || getCurrentMonthYear();
     const bypassCache = query.get("refresh") === "true";
 
     const cacheKey = getUserCacheKey(userId!, `analytics:${targetMonth}`);
@@ -78,11 +90,7 @@ export const GET = createApiRoute({
     }
 
     try {
-      const monthStart = `${targetMonth}-01`;
-      // Compute last day of target month
-      const [yearNum, monthNum] = targetMonth.split("-").map(Number);
-      const lastDayNum = new Date(yearNum, monthNum, 0).getDate();
-      const monthEnd = `${targetMonth}-${String(lastDayNum).padStart(2, "0")}`;
+      const { start: monthStart, end: monthEnd, lastDay: lastDayNum } = getMonthBounds(targetMonth);
 
       const now = new Date();
       const isCurrentMonth = targetMonth === getCurrentMonthYear();
@@ -212,53 +220,53 @@ export const GET = createApiRoute({
         );
       }
 
-      let cryptoValuation = 0;
-      if (cryptoRes?.data) {
-        const cryptoUsdTotal = sumMoney(cryptoRes.data.map((c) => c.total_value_usd || 0));
-        cryptoValuation = mulMoney(cryptoUsdTotal, 84.5);
-      }
+      // Strict Currency Separation: Crypto holdings remain strictly USD and are never converted/mixed into INR totals.
+      const cryptoUsdTotal = cryptoRes?.data
+        ? sumMoney(cryptoRes.data.map((c) => c.total_value_usd || 0))
+        : 0;
+      const cryptoAssetsCount = cryptoRes?.data?.length || 0;
 
       const investmentsTotal = sumMoney([
         stocksValuation,
         mfValuation,
         bondsValuation,
         bullionValuation,
-        cryptoValuation,
       ]);
 
       const totalAssets = addMoney(liquidAssets, investmentsTotal);
       const netWorth = subMoney(totalAssets, totalLiabilities);
 
-      // Persist daily net worth snapshot asynchronously in background
-      const todayStr = new Date().toISOString().split("T")[0];
-      try {
-        await supabaseAdmin
-          .from("net_worth_snapshots")
-          .upsert(
-            {
-              user_id: userId!,
-              snapshot_date: todayStr,
-              total_assets: totalAssets,
-              total_liabilities: totalLiabilities,
-              net_worth: netWorth,
-              currency: "INR",
-              breakdown: {
-                liquid_cash: liquidAssets,
-                stocks: stocksValuation,
-                mutual_funds: mfValuation,
-                bonds: bondsValuation,
-                bullion: bullionValuation,
-                crypto: cryptoValuation,
-                liabilities: totalLiabilities,
+      const todayStr = getLocalDateString(new Date(), "Asia/Kolkata");
+      const persistSnapshot = async () => {
+        try {
+          await supabaseAdmin
+            .from("net_worth_snapshots")
+            .upsert(
+              {
+                user_id: userId!,
+                snapshot_date: todayStr,
+                total_assets: totalAssets,
+                total_liabilities: totalLiabilities,
+                net_worth: netWorth,
+                currency: "INR",
+                breakdown: {
+                  liquid_cash: liquidAssets,
+                  stocks: stocksValuation,
+                  mutual_funds: mfValuation,
+                  bonds: bondsValuation,
+                  bullion: bullionValuation,
+                  liabilities: totalLiabilities,
+                  crypto_usd: cryptoUsdTotal,
+                },
+                updated_at: new Date().toISOString(),
               },
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,snapshot_date" }
-          );
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger.warn("Failed to persist net worth snapshot", "AnalyticsAPI", { error: errMsg });
-      }
+              { onConflict: "user_id,snapshot_date" }
+            );
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          logger.warn("Failed to persist net worth snapshot", "AnalyticsAPI", { error: errMsg });
+        }
+      };
 
       // 2. Cash flow calculations (excluding internal transfers / family transfers from spending)
       const isTransferOrFamily = (e: { category?: string | null; title?: string | null; notes?: string | null }): boolean => {
@@ -330,6 +338,12 @@ export const GET = createApiRoute({
           totalLiabilities,
           netWorth,
           accountsCount: mappedAccounts.length,
+          currency: "INR",
+        },
+        usdPortfolio: {
+          cryptoUsd: cryptoUsdTotal,
+          assetsCount: cryptoAssetsCount,
+          currency: "USD",
         },
         monthlyCashFlow: {
           month: targetMonth,
@@ -350,8 +364,11 @@ export const GET = createApiRoute({
         accounts: mappedAccounts,
       };
 
-      // Cache summary for 10 minutes (600 seconds)
-      await setCachedData(cacheKey, summary, 600);
+      // Persist snapshot and cache summary concurrently (10 min TTL)
+      await Promise.allSettled([
+        persistSnapshot(),
+        setCachedData(cacheKey, summary, 600),
+      ]);
 
       return apiSuccess(summary, { cached: false, month: targetMonth }, 200, req);
     } catch (err: unknown) {

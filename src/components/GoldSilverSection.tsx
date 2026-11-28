@@ -898,9 +898,9 @@ export default function GoldSilverSection() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             {/* Search Input */}
-            <div className="relative w-48 sm:w-64">
+            <div className="relative w-full sm:w-64">
               <Search
                 size={14}
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--app-muted)] pointer-events-none"

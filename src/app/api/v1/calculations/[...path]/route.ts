@@ -9,6 +9,20 @@ import {
   executeTaxRegimesTS,
 } from "@/lib/engine/embeddedEngine";
 
+function validateCalcSubPath(segments: string[] | undefined): string | null {
+  if (!segments || segments.length === 0) return "";
+  for (const seg of segments) {
+    if (!seg || seg === "." || seg === ".." || !/^[a-zA-Z0-9_-]+$/.test(seg)) {
+      return null;
+    }
+  }
+  return segments.join("/");
+}
+
+function getInternalServiceKey(): string {
+  return process.env.INTERNAL_SERVICE_KEY || process.env.CRON_SECRET || "";
+}
+
 function isDeveloperOrAdmin(req: NextRequest, userId: string): boolean {
   const adminKey = process.env.ADMIN_API_KEY || process.env.CRON_SECRET;
   const headerKey =
@@ -54,7 +68,10 @@ export async function GET(
   }
 
   const { path } = await context.params;
-  const subPath = path ? path.join("/") : "";
+  const subPath = validateCalcSubPath(path);
+  if (subPath === null) {
+    return apiError("Invalid calculation path.", "BAD_REQUEST", 400, undefined, req);
+  }
   const { search } = new URL(req.url);
 
   // 1. Restrict global calculation metrics to authorized developer/admin access
@@ -69,16 +86,13 @@ export async function GET(
   if (subPath === "history") {
     if (!isDeveloperOrAdmin(req, userId)) {
       const sp = new URLSearchParams(search);
+      sp.delete("user_id");
       sp.set("user_id", userId);
       effectiveSearch = `?${sp.toString()}`;
     }
   }
 
-  const internalKey =
-    process.env.INTERNAL_SERVICE_KEY ||
-    process.env.CRON_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "";
+  const internalKey = getInternalServiceKey();
 
   const baseUrl = getPythonServiceUrl(req.nextUrl.origin);
   const targetUrl = `${baseUrl}/api/py/calculations/${subPath}${effectiveSearch}`;
@@ -160,7 +174,10 @@ export async function POST(
   }
 
   const { path } = await context.params;
-  const subPath = path ? path.join("/") : "";
+  const subPath = validateCalcSubPath(path);
+  if (subPath === null) {
+    return apiError("Invalid calculation path.", "BAD_REQUEST", 400, undefined, req);
+  }
 
   const baseUrl = getPythonServiceUrl(req.nextUrl.origin);
   const targetUrl = `${baseUrl}/api/py/calculations/${subPath}`;
@@ -174,10 +191,7 @@ export async function POST(
     // Securely enforce authenticated user_id
     body.user_id = userId;
 
-    const internalKey =
-      process.env.INTERNAL_SERVICE_KEY ||
-      process.env.CRON_SECRET ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    const internalKey = getInternalServiceKey();
       "";
 
     // Fast 2500ms timeout for Python service so UI never hangs

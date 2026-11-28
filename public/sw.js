@@ -3,7 +3,7 @@
  * Handles offline caching, asset delivery, and connectivity fallbacks.
  */
 
-const CACHE_NAME = 'arthax-pwa-v1.0.1';
+const CACHE_NAME = 'arthax-pwa-v1.0.2';
 
 const PRECACHE_RESOURCES = [
   '/offline.html',
@@ -12,7 +12,7 @@ const PRECACHE_RESOURCES = [
   '/icon-512x512.png',
   '/icon-maskable-192x192.png',
   '/icon-maskable-512x512.png',
-  '/apple-touch-icon.png',
+  '/apple-icon.png',
   '/favicon.ico',
 ];
 

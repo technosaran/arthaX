@@ -128,14 +128,19 @@ async function handleWipe(req: NextRequest) {
 
       const toDelete = accounts?.filter((a) => a.id !== cashAccount?.id) || [];
       if (toDelete.length > 0) {
-        await supabaseAdmin.from("accounts").delete().in("id", toDelete.map((a) => a.id));
+        await supabaseAdmin
+          .from("accounts")
+          .delete()
+          .in("id", toDelete.map((a) => a.id))
+          .eq("user_id", userId);
       }
 
       if (cashAccount) {
         await supabaseAdmin
           .from("accounts")
           .update({ balance: 0.0, updated_at: new Date().toISOString() })
-          .eq("id", cashAccount.id);
+          .eq("id", cashAccount.id)
+          .eq("user_id", userId);
       } else {
         await supabaseAdmin.from("accounts").insert({
           user_id: userId,

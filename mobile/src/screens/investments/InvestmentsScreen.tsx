@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   TrendingUp,
   PieChart,
@@ -22,8 +23,10 @@ import { Card } from '../../components/Card';
 import { CurrencyText } from '../../components/CurrencyText';
 import { Badge } from '../../components/Badge';
 import { sumMoney, subMoney } from '../../engine/money';
+import { getScrollBottomPadding } from '../../theme/platform';
 
 export const InvestmentsScreen = () => {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { investments, stocks, mutualFunds, bullion, cryptoAssets, bonds, fnoPositions, isRefreshing, refreshData } = useFinancial();
 
@@ -44,7 +47,7 @@ export const InvestmentsScreen = () => {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshData} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
@@ -146,6 +149,9 @@ export const InvestmentsScreen = () => {
                 <TouchableOpacity
                   key={tab}
                   onPress={() => setActiveTab(tab)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                   style={{
                     paddingHorizontal: 12,
                     paddingVertical: 7,

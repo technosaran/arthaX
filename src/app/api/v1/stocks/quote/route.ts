@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis, isRedisConfigured } from "@/utils/redis";
-import { extractRequestId } from "@/utils/apiResponse";
+import { apiRateLimited, extractRequestId } from "@/utils/apiResponse";
+import { rateLimit } from "@/utils/rateLimit";
 
 export interface StockQuote {
   symbol: string;
@@ -27,8 +28,23 @@ export interface IndianMarketStatus {
   istTime: string;
 }
 
-// In-memory fallback cache when Redis is not reachable (TTL: 60s)
+// In-memory fallback cache when Redis is not reachable (TTL: 60s, bounded to 1000 entries)
+const MAX_QUOTE_CACHE_SIZE = 1000;
 const memoryCache = new Map<string, { data: StockQuote; expiry: number }>();
+
+function setQuoteMemoryCache(key: string, data: StockQuote, now: number) {
+  if (memoryCache.size >= MAX_QUOTE_CACHE_SIZE) {
+    for (const [k, v] of memoryCache.entries()) {
+      if (v.expiry <= now) memoryCache.delete(k);
+    }
+    while (memoryCache.size >= MAX_QUOTE_CACHE_SIZE) {
+      const oldest = memoryCache.keys().next().value;
+      if (!oldest) break;
+      memoryCache.delete(oldest);
+    }
+  }
+  memoryCache.set(key, { data, expiry: now + 60000 });
+}
 
 function getIndianMarketStatus(): IndianMarketStatus {
   // Current time converted to IST (UTC + 5:30)
@@ -168,6 +184,15 @@ export async function fetchStockQuote(
 
 export async function GET(req: NextRequest) {
   const requestId = extractRequestId(req);
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anonymous";
+  const rl = await rateLimit(`stocks_quote:${clientIp}`, 120, 60);
+  if (!rl.success) {
+    return apiRateLimited("Too many stock quote requests. Please wait a moment.", req);
+  }
+
   const { searchParams } = new URL(req.url);
   const symbolsParam = searchParams.get("symbols") || "";
   const forceRefresh = searchParams.get("refresh") === "true";
@@ -226,7 +251,7 @@ export async function GET(req: NextRequest) {
           const cached = redisResults?.[idx];
           if (cached) {
             quotesMap[item.key] = cached;
-            memoryCache.set(cacheKeys[idx], { data: cached, expiry: now + 60000 });
+            setQuoteMemoryCache(cacheKeys[idx], cached, now);
           } else {
             symbolsToFetch.push(item);
           }
@@ -248,7 +273,7 @@ export async function GET(req: NextRequest) {
 
         const cacheKey = `arthax:stock_quote:${item.key}`;
         // Store in memory cache with 60s TTL
-        memoryCache.set(cacheKey, { data: quote, expiry: Date.now() + 60000 });
+        setQuoteMemoryCache(cacheKey, quote, Date.now());
 
         // Store in Redis with 60s TTL
         if (isRedisConfigured && redis) {

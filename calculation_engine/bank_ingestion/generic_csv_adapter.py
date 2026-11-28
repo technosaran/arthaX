@@ -10,15 +10,30 @@ from decimal import Decimal
 from typing import Optional, List, Dict
 
 from .base_adapter import BaseBankAdapter
+from .generic_pdf_adapter import detect_bank_name_from_text
 from .models import StatementParseResult, StatementMetadata, ParsedTransactionItem
 from .pdf_decryptor import compute_file_hash
 from .statement_validator import validate_statement_math
 from .sbi_adapter import parse_date, parse_amount, InvalidAmountError
 
 
+def _detect_csv_delimiter(sample_lines: List[str]) -> str:
+    joined = "\n".join(line for line in sample_lines[:20] if line.strip())
+    if not joined:
+        return ","
+    try:
+        dialect = csv.Sniffer().sniff(joined, delimiters=",;\t|")
+        return dialect.delimiter
+    except Exception:
+        first_chunk = "\n".join(sample_lines[:10])
+        counts = {d: first_chunk.count(d) for d in (",", ";", "\t", "|")}
+        best = max(counts.items(), key=lambda x: x[1])
+        return best[0] if best[1] > 0 else ","
+
+
 class GenericCsvBankAdapter(BaseBankAdapter):
     BANK_NAME = "GENERIC_CSV"
-    PARSER_VERSION = "2.0.0"
+    PARSER_VERSION = "2.1.0"
 
     def can_parse(self, content: bytes, filename: str) -> bool:
         return filename.lower().endswith(".csv")
@@ -30,14 +45,18 @@ class GenericCsvBankAdapter(BaseBankAdapter):
         passwords: Optional[List[str]] = None,
     ) -> StatementParseResult:
         file_hash = compute_file_hash(content)
-        text = content.decode("utf-8", errors="replace")
+        text = content.decode("utf-8-sig", errors="replace")
         lines = text.splitlines()
+        delimiter = _detect_csv_delimiter(lines)
+
+        inferred_bank = detect_bank_name_from_text("\n".join(lines[:35]) + f"\n{filename}")
+        effective_bank = inferred_bank if inferred_bank != "BANK" else self.BANK_NAME
 
         header_idx = -1
         col_map: Dict[str, int] = {}
 
         for i, line in enumerate(lines[:35]):
-            row = [c.strip().upper() for c in next(csv.reader([line])) if c.strip()]
+            row = [c.strip().upper() for c in next(csv.reader([line], delimiter=delimiter)) if c.strip()]
             date_col = next((j for j, h in enumerate(row) if any(k in h for k in ("DATE", "TXN DATE", "VALUE DATE"))), None)
             narration_col = next((j for j, h in enumerate(row) if any(k in h for k in ("NARRATION", "DESCRIPTION", "PARTICULARS", "REMARKS", "DETAILS"))), None)
             amt_col = next((j for j, h in enumerate(row) if any(k in h for k in ("AMOUNT", "DEBIT", "WITHDRAWAL", "CREDIT", "DEPOSIT"))), None)
@@ -45,33 +64,33 @@ class GenericCsvBankAdapter(BaseBankAdapter):
             if date_col is not None and (narration_col is not None or amt_col is not None):
                 header_idx = i
                 # Build complete column map
-                raw_headers = next(csv.reader([line]))
+                raw_headers = next(csv.reader([line], delimiter=delimiter))
                 for idx, h in enumerate(raw_headers):
-                    u = h.strip().upper()
-                    if any(k == u or k in u for k in ("TXN DATE", "TRANSACTION DATE", "POSTING DATE", "DATE")):
-                        col_map.setdefault("date", idx)
-                    elif any(k == u or k in u for k in ("VALUE DATE", "VAL DATE")):
+                    u = " ".join(h.strip().upper().split())
+                    if any(k == u or k in u for k in ("VALUE DATE", "VAL DATE")):
                         col_map.setdefault("value_date", idx)
+                    elif any(k == u or k in u for k in ("TXN DATE", "TRANSACTION DATE", "POSTING DATE", "TRAN DATE")) or "DATE" in u:
+                        col_map.setdefault("date", idx)
                     elif any(k == u or k in u for k in ("NARRATION", "DESCRIPTION", "PARTICULARS", "DETAILS", "REMARKS")):
                         col_map.setdefault("narration", idx)
                     elif any(k == u or k in u for k in ("REF NO", "REFERENCE", "UTR", "CHQ NO", "CHEQUE NO")):
                         col_map.setdefault("reference", idx)
-                    elif any(k == u or k in u for k in ("DEBIT", "WITHDRAWAL", "DR", "DR AMOUNT")):
+                    elif u in ("TYPE", "CR/DR", "DR/CR", "CR / DR", "DR / CR") or "DR/CR" in u or "CR/DR" in u:
+                        col_map.setdefault("type", idx)
+                    elif any(k in u for k in ("DEBIT", "WITHDRAWAL", "DR AMOUNT", "DR AMT")) or u in ("DR", "DR."):
                         col_map.setdefault("debit", idx)
-                    elif any(k == u or k in u for k in ("CREDIT", "DEPOSIT", "CR", "CR AMOUNT")):
+                    elif any(k in u for k in ("CREDIT", "DEPOSIT", "CR AMOUNT", "CR AMT")) or u in ("CR", "CR."):
                         col_map.setdefault("credit", idx)
                     elif any(k == u or k in u for k in ("BALANCE", "RUNNING BALANCE", "CLOSING BALANCE")):
                         col_map.setdefault("balance", idx)
                     elif "AMOUNT" in u and "debit" not in col_map and "credit" not in col_map:
                         col_map.setdefault("amount", idx)
-                    elif any(k in u for k in ("TYPE", "CR/DR", "DR/CR")):
-                        col_map.setdefault("type", idx)
                 break
 
         if header_idx == -1 or "date" not in col_map:
             return self._build_empty_failure(filename, file_hash, "Could not identify tabular statement headers in CSV.")
 
-        reader = csv.reader(lines[header_idx + 1:])
+        reader = csv.reader(lines[header_idx + 1:], delimiter=delimiter)
         transactions: List[ParsedTransactionItem] = []
         raw_row_idx = 0
         parsing_errors: List[str] = []
@@ -112,19 +131,27 @@ class GenericCsvBankAdapter(BaseBankAdapter):
                 direction = "CREDIT"
                 amount = credit_amt
             elif "amount" in col_map and col_map["amount"] < len(row):
+                raw_amt_cell = row[col_map["amount"]].strip()
                 try:
-                    raw_amt = parse_amount(row[col_map["amount"]])
+                    raw_amt = parse_amount(raw_amt_cell)
                 except InvalidAmountError as ae:
                     parsing_errors.append(f"Row {raw_row_idx}: {str(ae)}")
                     continue
                 if raw_amt == Decimal("0.00"):
                     continue
                 type_indicator = row[col_map["type"]].strip().upper() if "type" in col_map and col_map["type"] < len(row) else ""
-                if "CR" in type_indicator or "CREDIT" in type_indicator or raw_amt > 0:
+                cell_upper = raw_amt_cell.upper()
+                if any(tok in type_indicator for tok in ("DR", "DEBIT", "WITHDRAWAL")) or "(DR)" in cell_upper or cell_upper.endswith("DR"):
+                    direction = "DEBIT"
+                    amount = abs(raw_amt)
+                elif any(tok in type_indicator for tok in ("CR", "CREDIT", "DEPOSIT")) or "(CR)" in cell_upper or cell_upper.endswith("CR"):
                     direction = "CREDIT"
                     amount = abs(raw_amt)
-                else:
+                elif raw_amt < 0 or (raw_amt_cell.startswith("(") and raw_amt_cell.endswith(")")):
                     direction = "DEBIT"
+                    amount = abs(raw_amt)
+                else:
+                    direction = "CREDIT"
                     amount = abs(raw_amt)
             else:
                 continue
@@ -168,7 +195,7 @@ class GenericCsvBankAdapter(BaseBankAdapter):
         closing_balance = last_bal if last_bal is not None else Decimal("0.00")
 
         metadata = StatementMetadata(
-            bank_name=self.BANK_NAME,
+            bank_name=effective_bank,
             statement_period_start=period_start,
             statement_period_end=period_end,
             opening_balance=opening_balance,
@@ -182,7 +209,7 @@ class GenericCsvBankAdapter(BaseBankAdapter):
 
         return StatementParseResult(
             success=validation.is_valid,
-            bank_name=self.BANK_NAME,
+            bank_name=effective_bank,
             metadata=metadata,
             transactions=transactions,
             validation=validation,

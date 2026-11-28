@@ -1,9 +1,9 @@
 import React from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import Logo from "@/components/Logo";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Mail } from "lucide-react";
+import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 import { Card } from "@/components/ui/Card";
+import { siteConfig } from "@/config/seo";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -11,41 +11,33 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/terms",
   },
+  openGraph: {
+    title: "Terms of Service | arthaX",
+    description: "Terms of service and acceptable usage guidelines for the arthaX platform.",
+    url: "/terms",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service | arthaX",
+    description: "Terms of service and acceptable usage guidelines for the arthaX platform.",
+  },
 };
 
 export default function TermsPage() {
   return (
     <div
-      className="min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 lg:p-12 select-text"
+      className="min-h-screen w-full flex flex-col justify-between select-text"
       style={{ backgroundColor: "var(--app-bg)", color: "var(--app-fg)" }}
     >
-      <div className="max-w-4xl mx-auto w-full space-y-8">
-        {/* Navigation & Header */}
-        <div className="flex items-center justify-between pb-6 border-b border-[var(--app-border-subtle)]">
-          <Link href="/" className="flex items-center gap-3 group focus:outline-none">
-            <Logo size={36} showText={true} />
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-xs font-semibold opacity-70 hover:opacity-100 hover:text-emerald-400 transition-colors"
-            >
-              Home
-            </Link>
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 text-xs font-semibold opacity-70 hover:opacity-100 transition-opacity"
-            >
-              <ArrowLeft size={14} />
-              <span>Back to Login</span>
-            </Link>
-          </div>
-        </div>
+      <PublicHeader currentPath="/terms" />
 
-        {/* Title */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-extrabold tracking-tight">Terms of Service</h1>
-          <p className="text-xs font-mono opacity-60">Last updated: November 13, 2026</p>
+      <main className="flex-1 w-full px-4 sm:px-8 py-8 lg:py-12">
+        <div className="max-w-4xl mx-auto w-full space-y-8">
+          {/* Title */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-extrabold tracking-tight">Terms of Service</h1>
+            <p className="text-xs font-mono opacity-60">Last updated: November 13, 2026</p>
         </div>
 
         {/* Detailed Content */}
@@ -86,17 +78,19 @@ export default function TermsPage() {
             <p className="opacity-80">
               For any questions regarding these Terms, please contact us at:
             </p>
-            <p className="font-mono text-xs text-emerald-400">
-              support@arthax.app
-            </p>
+            <a
+              href={`mailto:${siteConfig.links.supportEmail}`}
+              className="inline-flex items-center gap-1.5 font-mono text-xs text-emerald-400 hover:underline break-all"
+            >
+              <Mail size={13} />
+              <span>{siteConfig.links.supportEmail}</span>
+            </a>
           </section>
         </Card>
-
-        {/* Footer */}
-        <div className="text-center text-xs opacity-50 pb-6">
-          © 2026 arthaX. All rights reserved.
         </div>
-      </div>
+      </main>
+
+      <PublicFooter />
     </div>
   );
 }

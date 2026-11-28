@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TextStyle } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useFinancial } from '../context/FinancialContext';
+import { TABULAR_NUMS_STYLE } from '../theme/platform';
 
 interface CurrencyTextProps {
   amount: number;
@@ -51,7 +52,7 @@ export const CurrencyText: React.FC<CurrencyTextProps> = ({
 
   if (isPrivacyMasked) {
     return (
-      <Text style={[{ color: colors.text, fontWeight: '700', letterSpacing: 1 }, style]}>
+      <Text style={[{ color: colors.text, fontWeight: '700', letterSpacing: 1 }, TABULAR_NUMS_STYLE, style]}>
         {currency} ••••••
       </Text>
     );
@@ -70,7 +71,7 @@ export const CurrencyText: React.FC<CurrencyTextProps> = ({
   const formatted = formatIndianCurrency(amount, compact, currency);
 
   return (
-    <Text style={[{ color, fontWeight: '700' }, style]}>
+    <Text style={[{ color, fontWeight: '700' }, TABULAR_NUMS_STYLE, style]}>
       {sign}{formatted}
     </Text>
   );

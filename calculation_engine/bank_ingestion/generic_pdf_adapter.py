@@ -127,7 +127,7 @@ class GenericPdfBankAdapter(BaseBankAdapter):
             ifsc_code = m_ifsc.group(1)
 
         date_re = re.compile(
-            r"^\s*(\d{2}[/-]\d{2}[/-]\d{4}|\d{2}-[A-Za-z]{3}-\d{4}|\d{4}-\d{2}-\d{2})"
+            r"^\s*(\d{2}[/-]\d{2}[/-]\d{2,4}|\d{2}-[A-Za-z]{3}-\d{2,4}|\d{4}-\d{2}-\d{2})"
         )
 
         transactions: List[ParsedTransactionItem] = []
@@ -181,7 +181,7 @@ class GenericPdfBankAdapter(BaseBankAdapter):
 
         # Closing balance detection
         cl_bal = None
-        m_cl = re.search(r"(?i)closing\s*balance[\s:]*([0-9,]+\.[0-9]{2})", full_text)
+        m_cl = re.search(r"(?i)closing\s*balance[\s:]*(?:rs\.?|inr|₹)?\s*([0-9,]+\.[0-9]{2})", full_text)
         if m_cl:
             try:
                 cl_bal = parse_amount(m_cl.group(1))
@@ -193,7 +193,7 @@ class GenericPdfBankAdapter(BaseBankAdapter):
 
         # Opening balance detection
         op_bal = None
-        m_op = re.search(r"(?i)opening\s*balance[\s:]*([0-9,]+\.[0-9]{2})", full_text)
+        m_op = re.search(r"(?i)opening\s*balance[\s:]*(?:rs\.?|inr|₹)?\s*([0-9,]+\.[0-9]{2})", full_text)
         if m_op:
             try:
                 op_bal = parse_amount(m_op.group(1))
@@ -236,10 +236,22 @@ class GenericPdfBankAdapter(BaseBankAdapter):
             return None
 
         amt_candidates = []
+        inline_dir = None
         for t in reversed(tokens):
-            clean_t = t.replace(",", "")
-            if re.match(r"^\d+\.\d{2}$", clean_t):
-                amt_candidates.append(parse_amount(clean_t))
+            t_up = t.upper()
+            if t_up in ("CR", "(CR)", "DR", "(DR)"):
+                inline_dir = "CREDIT" if "CR" in t_up else "DEBIT"
+                continue
+            stripped = re.sub(r"(?i)(?:CR|DR|\(CR\)|\(DR\)|₹|RS\.?|INR)$", "", t.replace(",", "")).strip("()")
+            if re.match(r"^\d+(?:,\d{2,3})*\.\d{2}$|^\d+\.\d{2}$", stripped):
+                if t_up.endswith("CR") or t_up.endswith("(CR)"):
+                    inline_dir = inline_dir or "CREDIT"
+                elif t_up.endswith("DR") or t_up.endswith("(DR)"):
+                    inline_dir = inline_dir or "DEBIT"
+                try:
+                    amt_candidates.append(parse_amount(stripped))
+                except InvalidAmountError:
+                    break
             elif amt_candidates:
                 break
 
@@ -250,13 +262,15 @@ class GenericPdfBankAdapter(BaseBankAdapter):
         amt = amt_candidates[1] if len(amt_candidates) >= 2 else amt_candidates[0]
 
         upper_c = combined.upper()
-        if "CR" in upper_c and "DR" not in upper_c:
+        if inline_dir:
+            direction = inline_dir
+        elif re.search(r"\bCR\b", upper_c) and not re.search(r"\bDR\b", upper_c):
             direction = "CREDIT"
-        elif "DR" in upper_c:
+        elif re.search(r"\bDR\b", upper_c):
             direction = "DEBIT"
-        elif "DEPOSIT" in upper_c:
+        elif "DEPOSIT" in upper_c or "CREDITED" in upper_c:
             direction = "CREDIT"
-        elif "WITHDRAWAL" in upper_c:
+        elif "WITHDRAWAL" in upper_c or "DEBITED" in upper_c:
             direction = "DEBIT"
         else:
             direction = "DEBIT"

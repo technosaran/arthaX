@@ -175,6 +175,8 @@ export default function StocksSection() {
         if (force) {
           showToast("Quotes Updated", "Latest Indian stock market prices refreshed successfully.", "success");
         }
+      } else if (force) {
+        showToast("Quote Refresh Failed", `Could not fetch latest market prices (HTTP ${res.status}).`, "error");
       }
     } catch (err) {
       console.error("[Stocks] Error updating quotes:", err);
@@ -207,16 +209,17 @@ export default function StocksSection() {
         setAccounts(accountsRes.data);
       }
 
-      if (holdingsRes.ok) {
-        const json = await holdingsRes.json();
-        const holdingsData: StockHolding[] = json.holdings || [];
-        setHoldings(holdingsData);
-        setTransactions(json.transactions || []);
+      if (!holdingsRes.ok) {
+        throw new Error(`HTTP ${holdingsRes.status}`);
+      }
+      const json = await holdingsRes.json();
+      const holdingsData: StockHolding[] = json.holdings || [];
+      setHoldings(holdingsData);
+      setTransactions(json.transactions || []);
 
-        // Immediately fetch live quotes for all holdings
-        if (holdingsData.length > 0) {
-          fetchQuotesForHoldings(holdingsData, false);
-        }
+      // Immediately fetch live quotes for all holdings
+      if (holdingsData.length > 0) {
+        fetchQuotesForHoldings(holdingsData, false);
       }
     } catch (err) {
       console.error("[Stocks] Error loading holdings:", err);
@@ -682,8 +685,9 @@ export default function StocksSection() {
               {searchQuery && (
                 <button
                   type="button"
+                  aria-label="Clear stock search"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-muted)] hover:text-[var(--app-fg)]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-muted)] hover:text-[var(--app-fg)] cursor-pointer"
                 >
                   <X size={13} />
                 </button>
@@ -691,9 +695,9 @@ export default function StocksSection() {
             </div>
 
             {/* Filter Pills & Sector Dropdown */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 max-w-full">
               {/* Profit / Loss Filter Pills */}
-              <div className="flex items-center p-1 rounded-xl bg-[var(--app-card)] border border-[var(--app-border)] text-xs">
+              <div className="flex flex-wrap max-w-full items-center p-1 rounded-xl bg-[var(--app-card)] border border-[var(--app-border)] text-xs gap-0.5">
                 {(
                   [
                     { id: "all", label: "All" },
@@ -937,7 +941,7 @@ export default function StocksSection() {
                   Showing <strong>{displayedHoldings.length}</strong> of{" "}
                   <strong>{holdings.length}</strong> stock positions
                 </div>
-                <div className="flex items-center gap-4 font-mono font-medium">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono font-medium">
                   <div>
                     <span className="text-[var(--app-muted)]">Invested: </span>
                     <strong className="text-[var(--app-fg)]">

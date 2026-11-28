@@ -57,8 +57,8 @@ export const AppNavigator = () => {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} animated />
+      <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: true }}>
         {isAuthenticated ? (
           <Stack.Screen name="Main" component={BottomTabNavigator} />
         ) : (

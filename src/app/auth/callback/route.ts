@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getTrustedOrigin } from "@/utils/oauthSecurity";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const rawNext = searchParams.get("next") ?? "/";
   const authError = searchParams.get("error");
   const authErrorDescription = searchParams.get("error_description");
 
-  // Prevent CWE-601 Open Redirect vulnerabilities
-  const safeNext = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  // Prevent CWE-601 Open Redirect (disallow protocol-relative, backslash, or control chars)
+  const safeNext = /^\/(?![/\\])[^\r\n]*$/.test(rawNext) ? rawNext : "/";
 
-  // Determine correct public origin (handles Vercel / reverse proxy headers)
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
-  const baseOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : origin;
+  // Strictly resolve trusted public origin to prevent Host Header Poisoning
+  const baseOrigin = getTrustedOrigin(request);
 
   if (authError) {
     console.error("[Auth Callback] OAuth provider error received:", authError, authErrorDescription);

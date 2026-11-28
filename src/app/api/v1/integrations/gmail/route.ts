@@ -167,6 +167,7 @@ export const POST = createApiRoute({
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingInt.id)
+          .eq("user_id", userId!)
           .select()
           .single();
 

@@ -13,6 +13,13 @@ describe("Zerodha Multi-Owner Session Deduplication & Unified Automation Cron", 
 
   afterEach(() => {
     process.env = originalEnv;
+    vi.doUnmock("@/utils/rateLimit");
+    vi.doUnmock("@/utils/recurringJobs");
+    vi.doUnmock("@/utils/zerodhaCron");
+    vi.doUnmock("@/utils/zerodha");
+    vi.doUnmock("@/utils/zerodhaAutoLogin");
+    vi.doUnmock("@/utils/supabase/admin");
+    vi.doUnmock("@/utils/auth");
     vi.restoreAllMocks();
   });
 

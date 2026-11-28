@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError } from "@/utils/apiResponse";
+import { apiError, apiNotFound } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { isValidUuid } from "@/lib/backend/queryParams";
+import { logger } from "@/utils/logger";
 import {
   roundMoney,
   addMoney,
@@ -309,6 +311,7 @@ export const POST = createApiRoute({
           updated_at: new Date().toISOString(),
         })
         .eq("id", existing.id)
+        .eq("user_id", userId!)
         .select()
         .single();
 
@@ -356,7 +359,7 @@ export const POST = createApiRoute({
     }
 
     // Record BUY transaction
-    await supabaseAdmin.from("bond_transactions").insert({
+    const { error: txErr } = await supabaseAdmin.from("bond_transactions").insert({
       user_id: userId!,
       holding_id: holdingId,
       isin,
@@ -369,6 +372,9 @@ export const POST = createApiRoute({
       transaction_date: transaction_date || new Date().toISOString().split("T")[0],
       notes: `Purchased via ${platform}. Settled to ${demat_broker} Demat.`,
     });
+    if (txErr) {
+      logger.warn("Failed to record bond BUY transaction", "BondsAPI", { userId, holdingId, error: txErr.message });
+    }
 
     // Invalidate caches across bonds, portfolio, and analytics
     await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);
@@ -413,10 +419,13 @@ export const PUT = createApiRoute({
       .eq("id", id)
       .eq("user_id", userId!)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateErr) {
       return apiError(updateErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!updated) {
+      return apiNotFound("Bond holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);
@@ -431,18 +440,23 @@ export const DELETE = createApiRoute({
   handler: async ({ userId, query, req }) => {
     const id = query.get("id");
 
-    if (!id) {
-      return apiError("Bond ID is required", "BAD_REQUEST", 400, undefined, req);
+    if (!isValidUuid(id)) {
+      return apiError("Valid Bond ID is required", "BAD_REQUEST", 400, undefined, req);
     }
 
-    const { error: delErr } = await supabaseAdmin
+    const { data: deleted, error: delErr } = await supabaseAdmin
       .from("bond_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId!);
+      .eq("user_id", userId!)
+      .select("id")
+      .maybeSingle();
 
     if (delErr) {
       return apiError(delErr.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+    if (!deleted) {
+      return apiNotFound("Bond holding not found", req);
     }
 
     await invalidateUserCaches(userId, ["BONDS", "PORTFOLIO", "ANALYTICS"]);

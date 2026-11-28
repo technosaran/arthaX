@@ -597,6 +597,7 @@ export default function LedgerSection() {
               }}
             >
               <button
+                type="button"
                 onClick={handlePrevMonth}
                 disabled={!canGoPrev}
                 title={!canGoPrev ? "No earlier ledger records" : "Previous Month"}
@@ -612,6 +613,7 @@ export default function LedgerSection() {
                 {monthDisplayTitle}
               </span>
               <button
+                type="button"
                 onClick={handleNextMonth}
                 disabled={!canGoNext}
                 title={!canGoNext ? "Future months are not yet available" : "Next Month"}
@@ -625,6 +627,7 @@ export default function LedgerSection() {
               </button>
               {!isCurrentMonth && !isAllTime && (
                 <button
+                  type="button"
                   onClick={handleResetToCurrentMonth}
                   className="ml-1 px-2 py-1 text-[10px] uppercase font-bold rounded-md border cursor-pointer opacity-70 hover:opacity-100"
                   style={{ borderColor: "var(--app-border-subtle)" }}

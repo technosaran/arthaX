@@ -83,15 +83,27 @@ export async function POST(req: NextRequest) {
     const nowIso = new Date().toISOString();
     const currentAssetsList = portfolio.assets.map((a) => a.asset);
 
-    // Remove zeroed-out holdings that no longer exist in wallet
-    if (currentAssetsList.length > 0) {
-      await supabaseAdmin
-        .from("crypto_holdings")
-        .delete()
-        .eq("user_id", userId)
-        .not("asset", "in", `(${currentAssetsList.map((a) => `"${a}"`).join(",")})`);
-    } else {
+    // Remove zeroed-out holdings that no longer exist in wallet (avoid PostgREST filter interpolation)
+    const activeAssetSet = new Set(currentAssetsList);
+    if (activeAssetSet.size === 0) {
       await supabaseAdmin.from("crypto_holdings").delete().eq("user_id", userId);
+    } else {
+      const { data: existingRows } = await supabaseAdmin
+        .from("crypto_holdings")
+        .select("id, asset")
+        .eq("user_id", userId);
+
+      const staleIds = (existingRows || [])
+        .filter((row) => !activeAssetSet.has(row.asset))
+        .map((row) => row.id);
+
+      if (staleIds.length > 0) {
+        await supabaseAdmin
+          .from("crypto_holdings")
+          .delete()
+          .eq("user_id", userId)
+          .in("id", staleIds);
+      }
     }
 
     // Upsert active holdings

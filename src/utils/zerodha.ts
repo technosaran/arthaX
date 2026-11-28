@@ -622,7 +622,8 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           .update({
             balance: walletBalance,
           })
-          .eq("id", existingAccount.id);
+          .eq("id", existingAccount.id)
+          .eq("user_id", userId);
 
         if (updateErr) {
           logger.error("[Zerodha Sync] Failed to update account balance:", updateErr.message);
@@ -767,7 +768,11 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           .filter((o) => !activeSymbols.has(`${o.symbol.toUpperCase()}:${o.exchange.toUpperCase()}`))
           .map((d) => d.id);
         if (deleteIds.length > 0) {
-          await supabaseAdmin.from("stock_holdings").delete().in("id", deleteIds);
+          await supabaseAdmin
+            .from("stock_holdings")
+            .delete()
+            .eq("user_id", userId)
+            .in("id", deleteIds);
         }
       } catch (cleanupErr) {
         logger.warn("[Zerodha Sync] Old stock holdings cleanup notice:", String(cleanupErr));
@@ -874,7 +879,11 @@ export async function syncAllZerodhaSections(userId: string): Promise<{
           .filter((o) => !activeFunds.has(`${o.scheme_code}:${o.folio_number}`))
           .map((d) => d.id);
         if (deleteMfIds.length > 0) {
-          await supabaseAdmin.from("mutual_fund_holdings").delete().in("id", deleteMfIds);
+          await supabaseAdmin
+            .from("mutual_fund_holdings")
+            .delete()
+            .eq("user_id", userId)
+            .in("id", deleteMfIds);
         }
       } catch (cleanupErr) {
         logger.warn("[Zerodha Sync] Old mutual fund holdings cleanup notice:", String(cleanupErr));

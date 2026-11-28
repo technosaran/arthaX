@@ -319,6 +319,7 @@ def parse_bank_statement(payload: StatementParseRequest):
                 original_narration=tx.original_narration,
                 transaction_date=tx.transaction_date,
                 transaction_reference=tx.transaction_reference,
+                bank_name=parse_result.bank_name,
             )
         )
         tx_dict = tx.model_dump()

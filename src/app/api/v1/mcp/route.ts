@@ -2,30 +2,29 @@
  * arthaX Remote Model Context Protocol (MCP) HTTP Endpoint
  * Allows autonomous agents (Muse, Claude, Cursor, Antigravity) to securely query
  * and interact with arthaX over standard HTTP JSON-RPC without database credentials.
- * Authentication is enforced via Bearer tokens, x-api-key, or dedicated MCP API keys.
+ * Authentication is enforced via signed personal MCP tokens, verified Supabase JWTs,
+ * or explicitly configured server-side MCP_API_KEY secrets.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/utils/auth";
-import { supabaseAdmin } from "@/utils/supabase/admin";
 import { createMcpServer } from "@/mcp/server";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { constantTimeCompare } from "@/utils/crypto";
+import { verifyPersonalMcpToken } from "@/utils/mcpAuth";
+import { rateLimit } from "@/utils/rateLimit";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "Authorization, Content-Type, x-mcp-client, x-api-key, api-key, x-mcp-key, x-token, x-user-id, accept",
+  "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
 };
 
-export async function resolveMcpUser(
-  req?: NextRequest
-): Promise<{ userId: string | null; error: string | null }> {
-  if (!req) {
-    return { userId: null, error: "No request provided" };
-  }
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  // 1. Extract candidate token from Authorization, x-api-key, api-key, x-mcp-key, x-token, or URL query params
+function extractHeaderToken(req: NextRequest): string {
   const authHeader = req.headers.get("authorization") || "";
   const apiKeyHeader =
     req.headers.get("x-api-key") ||
@@ -34,100 +33,90 @@ export async function resolveMcpUser(
     req.headers.get("x-token") ||
     "";
 
-  let queryToken = "";
-  let queryUserId = "";
-  try {
-    const url = new URL(req.url);
-    queryToken =
-      url.searchParams.get("token") ||
-      url.searchParams.get("apiKey") ||
-      url.searchParams.get("api_key") ||
-      url.searchParams.get("key") ||
-      "";
-    queryUserId = url.searchParams.get("userId") || "";
-  } catch {
-    // ignore URL parsing errors in test environments
-  }
-
-  // Pick whichever candidate is non-empty
-  let raw = (apiKeyHeader || authHeader || queryToken).trim();
+  let raw = (apiKeyHeader || authHeader).trim();
   while (raw.toLowerCase().startsWith("bearer ")) {
     raw = raw.slice(7).trim();
   }
-  // Strip enclosing quotes if any
   if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     raw = raw.slice(1, -1).trim();
   }
+  return raw;
+}
+
+export async function resolveMcpUser(
+  req?: NextRequest
+): Promise<{ userId: string | null; error: string | null }> {
+  if (!req) {
+    return { userId: null, error: "No request provided" };
+  }
+
+  const raw = extractHeaderToken(req);
+
+  // 1. Signed Personal MCP Bearer Token (ax_mcp_...)
+  if (raw.startsWith("ax_mcp_")) {
+    const verified = verifyPersonalMcpToken(raw);
+    if (verified) {
+      return { userId: verified.sub, error: null };
+    }
+    return {
+      userId: null,
+      error: "Unauthorized: Personal MCP token is invalid or expired. Generate a fresh token in Settings > Integrations.",
+    };
+  }
+
+  // 2. Explicitly Configured Server-Side API Keys (never hardcoded in source)
+  const adminKey = process.env.ADMIN_API_KEY?.trim();
+  if (raw && adminKey && constantTimeCompare(raw, adminKey)) {
+    const requestedUserId = req.headers.get("x-user-id")?.trim();
+    if (requestedUserId) {
+      if (!UUID_REGEX.test(requestedUserId)) {
+        return { userId: null, error: "Unauthorized: Invalid x-user-id format." };
+      }
+      return { userId: requestedUserId, error: null };
+    }
+  }
+
+  const serviceKeys = [
+    process.env.MCP_API_KEY,
+    process.env.ARTHAX_MCP_KEY,
+    process.env.INTERNAL_SERVICE_KEY,
+    process.env.SHORTCUTS_API_KEY,
+    adminKey,
+  ]
+    .map((k) => k?.trim())
+    .filter((k): k is string => Boolean(k && k.length > 0));
 
   const ownerUserId =
     process.env.SHORTCUTS_AUTHORIZED_USER_ID ||
     process.env.WHATSAPP_AUTHORIZED_USER_ID ||
     process.env.TELEGRAM_AUTHORIZED_USER_ID ||
-    process.env.ZERODHA_AUTHORIZED_USER_ID?.split(",")[0] ||
-    "640cb47d-abe8-4182-85d5-347f5ccd4aa2";
-
-  const requestedUserId =
-    req.headers.get("x-user-id") ||
-    queryUserId ||
+    process.env.ZERODHA_AUTHORIZED_USER_ID?.split(",")[0]?.trim() ||
     null;
 
-  // 2. Check Static MCP API Keys / Secrets
-  const staticKeys = [
-    process.env.MCP_API_KEY,
-    process.env.ARTHAX_MCP_KEY,
-    process.env.INTERNAL_SERVICE_KEY,
-    process.env.SHORTCUTS_API_KEY,
-    process.env.ADMIN_API_KEY,
-    "arthax_mcp_live_token",
-    "arthax_mcp_secret_2026",
-  ].filter(Boolean) as string[];
-
-  if (raw && staticKeys.includes(raw)) {
-    return { userId: requestedUserId || ownerUserId, error: null };
-  }
-
-  // 3. Check if candidate is directly a user ID / UUID
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (raw && (uuidRegex.test(raw) || raw === ownerUserId)) {
-    return { userId: raw, error: null };
-  }
-
-  // 4. Check Supabase Auth JWT
-  if (raw && raw.includes(".")) {
-    try {
-      const { data: { user }, error: jwtErr } = await supabaseAdmin.auth.getUser(raw);
-      if (user?.id && !jwtErr) {
-        return { userId: user.id, error: null };
-      }
-
-      // If JWT expired, check if payload sub is a known user
-      const parts = raw.split(".");
-      if (parts.length === 3) {
-        const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
-        const payload = JSON.parse(payloadJson);
-        if (payload?.sub && typeof payload.sub === "string" && (uuidRegex.test(payload.sub) || payload.sub === ownerUserId)) {
-          return { userId: payload.sub, error: null };
-        }
-      }
-    } catch {
-      // ignore
+  if (raw && serviceKeys.some((key) => constantTimeCompare(raw, key))) {
+    if (!ownerUserId) {
+      return {
+        userId: null,
+        error: "Server configuration error: Authorized owner user ID is not configured for service key access.",
+      };
     }
+    return { userId: ownerUserId, error: null };
   }
 
-  // 5. Fallback to getAuthenticatedUser (cookies or standard JWT mock)
+  // 3. Verified Supabase Auth JWT or HTTP-only Session Cookies
   try {
     const auth = await getAuthenticatedUser(req);
     if (auth.userId && !auth.error) {
       return { userId: auth.userId, error: null };
     }
   } catch {
-    // ignore
+    // Fall through to unified unauthorized error
   }
 
   return {
     userId: null,
     error:
-      "Unauthorized: Missing or invalid API key / token. Please provide your arthaX API Key ('arthax_mcp_live_token' or your personal Bearer token) from Settings > Integrations.",
+      "Unauthorized: Missing or invalid API token. Copy your personal MCP configuration from Settings > Integrations.",
   };
 }
 
@@ -157,9 +146,9 @@ export async function GET(req?: NextRequest) {
       version: "1.0.0",
       protocol: "model-context-protocol",
       endpoint: "/api/v1/mcp",
-      authentication: "Bearer <token> or x-api-key: arthax_mcp_live_token",
+      authentication: "Authorization: Bearer <personal-mcp-token-or-jwt>",
       authenticated: authStatus,
-      userId: authenticatedUserId,
+      ...(authenticatedUserId ? { userId: authenticatedUserId } : {}),
       description: "Remote HTTP MCP server for arthaX sovereign wealth and portfolio intelligence",
     },
     {
@@ -169,7 +158,23 @@ export async function GET(req?: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // 1. Authenticate user from Bearer header, x-api-key, or static MCP key
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "anonymous";
+  const ipRl = await rateLimit(`mcp_ip:${clientIp}`, 120, 60);
+  if (!ipRl.success) {
+    return NextResponse.json(
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32005, message: "Rate limit exceeded. Please wait before retrying." },
+      },
+      { status: 429, headers: CORS_HEADERS }
+    );
+  }
+
+  // 1. Authenticate user strictly from signed personal MCP token, configured key, or verified JWT
   const auth = await resolveMcpUser(req);
   if (!auth.userId || auth.error) {
     return NextResponse.json(
@@ -180,7 +185,7 @@ export async function POST(req: NextRequest) {
           code: -32000,
           message:
             auth.error ||
-            "Unauthorized: Missing or invalid API key / Bearer token. Please provide 'Authorization: Bearer <token>' or 'x-api-key: arthax_mcp_live_token' from arthaX Settings > Integrations.",
+            "Unauthorized: Missing or invalid API token. Copy your personal MCP configuration from arthaX Settings > Integrations.",
         },
       },
       {
@@ -211,6 +216,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const isBatch = Array.isArray(body);
+  if (
+    (!isBatch && (typeof body !== "object" || body === null)) ||
+    (isBatch && (body as unknown[]).length === 0)
+  ) {
+    return NextResponse.json(
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Invalid Request: Expected JSON-RPC object or non-empty array",
+        },
+      },
+      { status: 400, headers: CORS_HEADERS }
+    );
+  }
+
   const supabaseKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_KEY ||
@@ -231,20 +254,57 @@ export async function POST(req: NextRequest) {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
-  // Helper to execute a single JSON-RPC call
-  const executeCall = (rpcMsg: Record<string, unknown>): Promise<unknown> => {
-    return new Promise((resolve) => {
-      // If it's a notification (no id), resolve immediately after sending
-      if (rpcMsg.id === undefined || rpcMsg.id === null) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        clientTransport.send(rpcMsg as any).then(() => resolve(null));
-        return;
-      }
+  // Single multiplexed dispatcher so concurrent JSON-RPC batch calls match their exact IDs
+  const pendingResponses = new Map<
+    string | number,
+    { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }
+  >();
 
-      const timeout = setTimeout(() => {
+  clientTransport.onmessage = (responseMsg: unknown) => {
+    if (responseMsg && typeof responseMsg === "object" && "id" in responseMsg) {
+      const msgId = (responseMsg as { id?: string | number | null }).id;
+      if (msgId !== undefined && msgId !== null) {
+        const entry = pendingResponses.get(msgId);
+        if (entry) {
+          clearTimeout(entry.timer);
+          pendingResponses.delete(msgId);
+          entry.resolve(responseMsg);
+        }
+      }
+    }
+  };
+
+  const executeCall = (rpcMsg: unknown): Promise<unknown> => {
+    if (!rpcMsg || typeof rpcMsg !== "object" || Array.isArray(rpcMsg)) {
+      return Promise.resolve({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid Request" },
+      });
+    }
+
+    const msgObj = rpcMsg as Record<string, unknown>;
+    const msgId = msgObj.id;
+
+    if (msgId === undefined || msgId === null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return clientTransport.send(msgObj as any).then(() => null);
+    }
+
+    if (typeof msgId !== "string" && typeof msgId !== "number") {
+      return Promise.resolve({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid JSON-RPC id" },
+      });
+    }
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingResponses.delete(msgId);
         resolve({
           jsonrpc: "2.0",
-          id: rpcMsg.id,
+          id: msgId,
           error: {
             code: -32603,
             message: "Internal error: MCP request timed out after 15 seconds",
@@ -252,18 +312,16 @@ export async function POST(req: NextRequest) {
         });
       }, 15000);
 
-      clientTransport.onmessage = (responseMsg: unknown) => {
-        clearTimeout(timeout);
-        resolve(responseMsg);
-      };
+      pendingResponses.set(msgId, { resolve, timer });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      clientTransport.send(rpcMsg as any).catch((err: unknown) => {
-        clearTimeout(timeout);
+      clientTransport.send(msgObj as any).catch((err: unknown) => {
+        clearTimeout(timer);
+        pendingResponses.delete(msgId);
         const errMsg = err instanceof Error ? err.message : "Failed to process MCP request";
         resolve({
           jsonrpc: "2.0",
-          id: rpcMsg.id,
+          id: msgId,
           error: {
             code: -32603,
             message: errMsg,
@@ -274,18 +332,22 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    if (Array.isArray(body)) {
-      const responses = await Promise.all((body as Record<string, unknown>[]).map(executeCall));
+    if (isBatch) {
+      const responses = await Promise.all((body as unknown[]).map(executeCall));
       return NextResponse.json(responses.filter(Boolean), { headers: CORS_HEADERS });
     }
 
-    const response = await executeCall(body as Record<string, unknown>);
+    const response = await executeCall(body);
     if (!response) {
       return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
     }
 
     return NextResponse.json(response, { headers: CORS_HEADERS });
   } finally {
+    for (const entry of pendingResponses.values()) {
+      clearTimeout(entry.timer);
+    }
+    pendingResponses.clear();
     await clientTransport.close().catch(() => {});
     await server.close().catch(() => {});
   }

@@ -6,11 +6,96 @@ import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import DashboardSection from "@/components/DashboardSection";
+import CommandPalette from "@/components/CommandPalette";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
 import PublicLandingView from "@/components/PublicLandingView";
 import { Skeleton, StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { siteConfig } from "@/config/seo";
 import { Loader2 } from "lucide-react";
+
+const TAB_PAGE_META: Record<string, { title: string; description: string }> = {
+  dashboard: {
+    title: "Dashboard",
+    description: "Unified net worth, portfolio allocation, asset breakdown, and recent cashflow overview.",
+  },
+  accounts: {
+    title: "Accounts & Cards",
+    description: "Manage bank accounts, wallets, savings balances, and credit cards in one place.",
+  },
+  stocks: {
+    title: "Indian Equities & Stocks",
+    description: "Live stock holdings, Zerodha Kite sync, P&L tracking, and capital allocation.",
+  },
+  "mutual-funds": {
+    title: "Mutual Funds",
+    description: "Track AMFI mutual fund holdings, XIRR, SIP allocations, and CAS imports.",
+  },
+  bonds: {
+    title: "Bonds & Fixed Deposits",
+    description: "Monitor fixed income securities, maturity schedules, coupon yields, and FDs.",
+  },
+  "gold-silver": {
+    title: "Gold & Silver Bullion",
+    description: "Track sovereign gold bonds, digital bullion, and physical precious metal holdings.",
+  },
+  fno: {
+    title: "F&O Derivatives",
+    description: "Review futures and options positions, margin telemetry, and realized derivative P&L.",
+  },
+  crypto: {
+    title: "Crypto Portfolio",
+    description: "Monitor digital asset holdings, market prices, and spot balances.",
+  },
+  income: {
+    title: "Income Ledger",
+    description: "Record salary, dividends, interest receipts, and recurring income streams.",
+  },
+  expenses: {
+    title: "Expenses",
+    description: "Track categorized household spending, payment methods, and monthly trends.",
+  },
+  budgets: {
+    title: "Budgets",
+    description: "Set category spending limits and monitor budget utilization in real time.",
+  },
+  ledger: {
+    title: "Ledger",
+    description: "Inspect double-entry transaction records across every linked account.",
+  },
+  forecast: {
+    title: "Cashflow Forecast",
+    description: "Project forward liquidity, recurring obligations, and upcoming cash balances.",
+  },
+  reconciliation: {
+    title: "Statement Reconciliation",
+    description: "Verify imported statements and resolve unmatched banking or brokerage entries.",
+  },
+  goals: {
+    title: "Financial Goals",
+    description: "Plan target corpora, SIP milestones, and timelines for life financial goals.",
+  },
+  family: {
+    title: "Family Vault",
+    description: "Coordinate shared family wealth, member portfolios, and emergency contacts.",
+  },
+  tax: {
+    title: "Tax Overview",
+    description: "Estimate capital gains, tax slabs, deductions, and advance tax obligations.",
+  },
+  "tax-harvesting": {
+    title: "Tax Loss Harvesting",
+    description: "Identify tax-harvesting opportunities across equity and mutual fund holdings.",
+  },
+  settings: {
+    title: "Settings",
+    description: "Manage workspace preferences, brokerage connections, statements, and security settings.",
+  },
+  profile: {
+    title: "Account Profile",
+    description: "Manage your arthaX account identity, profile details, and privacy controls.",
+  },
+};
 
 const TabLoadingFallback = () => (
   <main
@@ -100,13 +185,40 @@ const CashflowForecastSection = dynamic(() => import("@/components/CashflowForec
   loading: TabLoadingFallback,
 });
 
+const VALID_TABS = new Set([
+  "dashboard",
+  "accounts",
+  "stocks",
+  "bonds",
+  "mutual-funds",
+  "gold-silver",
+  "fno",
+  "crypto",
+  "income",
+  "expenses",
+  "budgets",
+  "goals",
+  "family",
+  "ledger",
+  "tax",
+  "tax-harvesting",
+  "settings",
+  "profile",
+  "reconciliation",
+  "forecast",
+]);
+
+function normalizeTab(raw: string | null): string {
+  return raw && VALID_TABS.has(raw) ? raw : "dashboard";
+}
+
 export default function HomeClient() {
   const { user, loading } = useAuth();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const urlTab = params.get("tab");
-      if (urlTab) return urlTab;
+      return normalizeTab(params.get("tab"));
     }
     return "dashboard";
   });
@@ -121,20 +233,22 @@ export default function HomeClient() {
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const urlTab = params.get("tab");
-      if (urlTab) {
-        const initialVisited: Record<string, boolean> = { dashboard: true, [urlTab]: true };
-        if (urlTab === "tax" || urlTab === "tax-harvesting") {
-          initialVisited.tax = true;
-          initialVisited["tax-harvesting"] = true;
-        }
-        return initialVisited;
+      const urlTab = normalizeTab(params.get("tab"));
+      const initialVisited: Record<string, boolean> = { dashboard: true, [urlTab]: true };
+      if (urlTab === "tax" || urlTab === "tax-harvesting") {
+        initialVisited.tax = true;
+        initialVisited["tax-harvesting"] = true;
       }
+      if (urlTab === "profile") {
+        initialVisited.settings = true;
+      }
+      return initialVisited;
     }
     return { dashboard: true };
   });
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (rawTab: string) => {
+    const tab = normalizeTab(rawTab);
     setActiveTab(tab);
     setVisitedTabs((prev) => {
       const next = { ...prev, [tab]: true };
@@ -147,9 +261,27 @@ export default function HomeClient() {
       }
       return next;
     });
-    // Auto-collapse sidebar on mobile screens when switching tabs
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      setCollapsed(true);
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const currentUrlTab = normalizeTab(url.searchParams.get("tab"));
+      if (currentUrlTab !== tab) {
+        if (tab === "dashboard") {
+          url.searchParams.delete("tab");
+        } else {
+          url.searchParams.set("tab", tab);
+        }
+        if (tab !== "settings" && tab !== "profile") {
+          url.searchParams.delete("section");
+        }
+        window.history.pushState({ tab }, "", url.toString());
+      } else if (tab !== "settings" && tab !== "profile" && url.searchParams.has("section")) {
+        url.searchParams.delete("section");
+        window.history.replaceState({ tab }, "", url.toString());
+      }
+      if (window.innerWidth < 768) {
+        setCollapsed(true);
+      }
     }
   };
 
@@ -157,15 +289,45 @@ export default function HomeClient() {
     if (typeof window === "undefined") return;
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
-      const urlTab = params.get("tab");
-      if (urlTab) {
-        setActiveTab(urlTab);
-        setVisitedTabs((prev) => (prev[urlTab] ? prev : { ...prev, [urlTab]: true }));
+      const urlTab = normalizeTab(params.get("tab"));
+      setActiveTab(urlTab);
+      setVisitedTabs((prev) => {
+        const next = prev[urlTab] ? prev : { ...prev, [urlTab]: true };
+        if (urlTab === "profile" && !next.settings) return { ...next, settings: true };
+        return next;
+      });
+    };
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
       }
     };
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("keydown", handleGlobalShortcut);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleGlobalShortcut);
+    };
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (loading) return;
+
+    const meta = !user
+      ? { title: siteConfig.title, description: siteConfig.description }
+      : {
+          title: `${TAB_PAGE_META[activeTab]?.title || "Dashboard"} | ${siteConfig.name}`,
+          description: TAB_PAGE_META[activeTab]?.description || siteConfig.description,
+        };
+
+    document.title = meta.title;
+    const descTag = document.querySelector('meta[name="description"]');
+    if (descTag) {
+      descTag.setAttribute("content", meta.description);
+    }
+  }, [user, loading, activeTab]);
 
   // Loading Screen while authenticating session
   if (loading) {
@@ -208,12 +370,13 @@ export default function HomeClient() {
 
       {/* Main Viewport Container with 0ms Instant Tab Switching */}
       <div className="flex-1 h-screen flex flex-col overflow-hidden relative w-full min-w-0">
-        {/* Universal Top Header Bar with Theme Switcher & Profile Avatar (Always Visible Across ALL Tabs) */}
+        {/* Universal Top Header Bar with Search, Theme Switcher & Profile Avatar */}
         <TopNav
           activeTab={activeTab}
           setActiveTab={handleTabChange}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
+          onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         />
 
         {/* Content Viewport Landmark */}
@@ -317,6 +480,13 @@ export default function HomeClient() {
 
         {/* Ergonomic Mobile Bottom Navigation Dock */}
         <MobileBottomNav activeTab={activeTab} onSelectTab={handleTabChange} />
+
+        {/* Universal Quick-Jump Command Palette (Cmd+K / Ctrl+K) */}
+        <CommandPalette
+          isOpen={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          onSelectTab={handleTabChange}
+        />
       </div>
     </div>
   );

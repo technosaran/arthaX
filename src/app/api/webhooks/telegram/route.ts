@@ -31,7 +31,6 @@ import {
   getExpenseActionKeyboard,
   getIncomeActionKeyboard,
   getUnlinkedInlineKeyboard,
-  getTelegramWebhookInfo,
   extractTelegramLinkCandidate,
   normalizeLinkTokenCandidates,
   formatCurrencyINR,
@@ -123,13 +122,10 @@ export async function GET() {
     });
   }
 
-  const webhookInfo = await getTelegramWebhookInfo();
-
   return NextResponse.json({
     status: "ok",
     configured: true,
     bot_username: botUsername,
-    webhook: webhookInfo.success ? webhookInfo.info : { error: webhookInfo.error },
   });
 }
 
@@ -243,6 +239,16 @@ export async function POST(req: NextRequest) {
     const linkCandidate = extractTelegramLinkCandidate(rawText);
 
     if (linkCandidate) {
+      const linkRl = await rateLimit(`tg_link_attempt:${chatIdStr}`, 8, 300);
+      if (!linkRl.success) {
+        await sendTelegramMessage({
+          chatId,
+          text: "⚠️ <b>Too Many Link Attempts</b>\n\nPlease wait 5 minutes before trying another pairing code.",
+          replyMarkup: getUnlinkedInlineKeyboard(webAppUrl),
+        });
+        return NextResponse.json({ success: false, error: "Link rate limit exceeded" }, { status: 429 });
+      }
+
       let matchedUserId: string | null = null;
       let matchedUserName: string = "User";
 
@@ -863,7 +869,8 @@ export async function POST(req: NextRequest) {
             avg_buy_price: +newAvg.toFixed(2),
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("user_id", userId);
       } else {
         const { data: newHolding } = await supabaseAdmin
           .from("stock_holdings")
@@ -1075,7 +1082,11 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (existing?.id) {
-        await supabaseAdmin.from("budgets").update({ amount: amt }).eq("id", existing.id);
+        await supabaseAdmin
+          .from("budgets")
+          .update({ amount: amt })
+          .eq("id", existing.id)
+          .eq("user_id", userId);
       } else {
         await supabaseAdmin.from("budgets").insert({
           user_id: userId,
@@ -1186,7 +1197,8 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin
         .from("family_members")
         .update({ telegram_chat_id: null, telegram_username: null })
-        .eq("telegram_chat_id", chatIdStr);
+        .eq("telegram_chat_id", chatIdStr)
+        .eq("user_id", userId);
 
       await sendTelegramMessage({
         chatId,

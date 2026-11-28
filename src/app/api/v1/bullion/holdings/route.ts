@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { apiError } from "@/utils/apiResponse";
+import { apiError, apiNotFound } from "@/utils/apiResponse";
 import { createApiRoute } from "@/lib/backend/routeHandler";
 import { invalidateUserCaches } from "@/lib/backend/cacheInvalidation";
+import { isValidUuid } from "@/lib/backend/queryParams";
+import { logger } from "@/utils/logger";
 import {
   roundMoney,
   addMoney,
@@ -130,22 +132,28 @@ export const POST = createApiRoute({
       return apiError(holdingError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
     }
 
-    // 2. Automatically record in bullion_transactions ledger
-    await supabaseAdmin.from("bullion_transactions").insert({
+    // 2. Automatically record in bullion_transactions ledger (matches schema columns)
+    const { error: txErr } = await supabaseAdmin.from("bullion_transactions").insert({
       user_id: userId!,
       holding_id: holdingData.id,
-      transaction_type: "BUY",
+      type: "BUY",
       metal,
       weight_grams: item.weight_grams * item.quantity,
       price_per_gram: item.buy_price_per_gram,
       total_amount: calculatedTotalBuy,
       making_charges: item.making_charges,
       tax_gst: item.tax_gst,
-      payment_account_id: item.account_id || null,
-      storage_location: item.storage_location.trim(),
       transaction_date: purchaseDate,
       notes: item.notes ? `Initial asset purchase: ${item.notes}` : "Initial asset purchase",
     });
+
+    if (txErr) {
+      logger.warn("Failed to record initial bullion BUY transaction", "BullionAPI", {
+        userId,
+        holdingId: holdingData.id,
+        error: txErr.message,
+      });
+    }
 
     await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);
 
@@ -228,18 +236,24 @@ export const DELETE = createApiRoute({
   handler: async ({ userId, query, req }) => {
     const id = query.get("id");
 
-    if (!id) {
-      return apiError("Holding ID is required", "BAD_REQUEST", 400, undefined, req);
+    if (!isValidUuid(id)) {
+      return apiError("Valid holding ID is required", "BAD_REQUEST", 400, undefined, req);
     }
 
-    const { error: deleteError } = await supabaseAdmin
+    const { data: deleted, error: deleteError } = await supabaseAdmin
       .from("bullion_holdings")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId!);
+      .eq("user_id", userId!)
+      .select("id")
+      .maybeSingle();
 
     if (deleteError) {
       return apiError(deleteError.message, "INTERNAL_SERVER_ERROR", 500, undefined, req);
+    }
+
+    if (!deleted) {
+      return apiNotFound("Holding not found or access denied", req);
     }
 
     await invalidateUserCaches(userId, ["BULLION", "PORTFOLIO", "ANALYTICS"]);

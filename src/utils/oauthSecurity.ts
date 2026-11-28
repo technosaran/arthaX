@@ -122,7 +122,7 @@ export function verifySignedOAuthState(rawState: string): OAuthStatePayload {
  * Derives trusted public origin from request and environment.
  * Prevents host header poisoning and open-redirect vulnerabilities.
  */
-export function getTrustedOrigin(req: NextRequest): string {
+export function getTrustedOrigin(req: Request | NextRequest): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
     try {
       return new URL(process.env.NEXT_PUBLIC_APP_URL).origin;
@@ -130,7 +130,8 @@ export function getTrustedOrigin(req: NextRequest): string {
   }
   const { origin } = new URL(req.url);
   const forwardedHost = req.headers.get("x-forwarded-host");
-  const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+  const rawProto = (req.headers.get("x-forwarded-proto") || "https").toLowerCase();
+  const forwardedProto = rawProto === "http" ? "http" : "https";
 
   if (forwardedHost) {
     const hostOnly = forwardedHost.split(":")[0].toLowerCase();

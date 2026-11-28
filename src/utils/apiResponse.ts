@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { logger } from "@/utils/logger";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -41,7 +40,8 @@ export function extractRequestId(req?: Request | NextRequest): string {
     req.headers.get("x-request-id") ||
     req.headers.get("x-correlation-id") ||
     req.headers.get("cf-ray");
-  if (incomingId) return incomingId;
+  const trimmed = incomingId?.trim();
+  if (trimmed && /^[a-zA-Z0-9_.:-]{1,64}$/.test(trimmed)) return trimmed;
   return `req_${crypto.randomBytes(8).toString("hex")}`;
 }
 
@@ -70,9 +70,9 @@ export function apiSuccess<T>(
       ? (data as Record<string, unknown>)
       : {};
 
-  const payload: any = {
-    success: true,
+  const payload: ApiResponse<T> & Record<string, unknown> = {
     ...objectPayload,
+    success: true,
     data,
     ...(meta ? { meta } : {}),
     requestId,
@@ -84,6 +84,8 @@ export function apiSuccess<T>(
     headers: {
       "X-Request-Id": requestId,
       "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
     },
   });
 }
@@ -115,6 +117,8 @@ export function apiError(
     headers: {
       "X-Request-Id": requestId,
       "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
     },
   });
 }
@@ -136,35 +140,3 @@ export const apiValidationError = (details: unknown, msg: string = "Validation f
 
 export const apiRateLimited = (msg: string = "Rate limit exceeded. Please try again shortly.", req?: Request) =>
   apiError(msg, "RATE_LIMITED", 429, undefined, req);
-
-/**
- * Higher-order wrapper for route handlers that guarantees correlation IDs and safe exception catching.
- */
-export function withApiHandler<T = unknown>(
-  handler: (req: NextRequest, ctx?: unknown) => Promise<NextResponse<ApiResponse<T>> | NextResponse>
-) {
-  return async (req: NextRequest, ctx?: unknown): Promise<NextResponse> => {
-    const requestId = extractRequestId(req);
-    const start = Date.now();
-    try {
-      const response = await handler(req, ctx);
-      const duration = Date.now() - start;
-      logger.info(`${req.method} ${req.nextUrl.pathname} -> ${response.status} (${duration}ms)`, "API", {
-        requestId,
-        path: req.nextUrl.pathname,
-        status: response.status,
-      });
-      response.headers.set("X-Request-Id", requestId);
-      return response;
-    } catch (err: unknown) {
-      const duration = Date.now() - start;
-      const errorMsg = err instanceof Error ? err.message : "Internal Server Error";
-      logger.error(`${req.method} ${req.nextUrl.pathname} failed after ${duration}ms: ${errorMsg}`, "API", err, {
-        requestId,
-        path: req.nextUrl.pathname,
-      });
-
-      return apiError(errorMsg, "INTERNAL_SERVER_ERROR", 500, undefined, req);
-    }
-  };
-}

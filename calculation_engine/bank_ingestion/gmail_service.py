@@ -318,13 +318,17 @@ DEFAULT_GMAIL_STATEMENT_QUERY = (
     "OR subject:\"account statement\" OR subject:\"statement of account\" OR subject:\"bank statement\" "
     "OR subject:eCAS OR subject:\"consolidated account statement\" "
     "OR from:sbi.co.in OR from:sbi.bank.in OR from:alerts.sbi.bank.in OR from:onlinesbi.sbi OR from:sbicard.com "
-    "OR from:hdfcbank.net OR from:hdfcbank.com OR from:hdfcbankcard.com "
-    "OR from:icicibank.com OR from:icicibankltd.com "
-    "OR from:axisbank.com OR from:axisbank.net OR from:kotak.com OR from:pnb.co.in OR from:pnbindia.in "
-    "OR from:bankofbaroda.com OR from:bankofbaroda.co.in OR from:canarabank.com OR from:unionbankofindia.co.in "
+    "OR from:hdfcbank.net OR from:hdfcbank.com OR from:hdfcbank.bank.in OR from:hdfcbankcard.com "
+    "OR from:icicibank.com OR from:icicibank.bank.in OR from:icicibankltd.com "
+    "OR from:axisbank.com OR from:axis.bank.in OR from:axisbank.net "
+    "OR from:kotak.com OR from:kotakbank.com OR from:kotak.bank.in "
+    "OR from:pnb.co.in OR from:pnbindia.in "
+    "OR from:bankofbaroda.com OR from:bankofbaroda.co.in OR from:bobfinancial.com "
+    "OR from:canarabank.com OR from:unionbankofindia.co.in OR from:idbibank.co.in "
     "OR from:indianbank.co.in OR from:indianbank.in OR from:indbankonline.com "
-    "OR from:indusind.com OR from:idfcfirstbank.com OR from:federalbank.co.in "
-    "OR from:yesbank.in OR from:rblbank.com OR from:aubank.in OR from:sc.com "
+    "OR from:indusind.com OR from:indusindbank.com OR from:idfcfirstbank.com OR from:federalbank.co.in "
+    "OR from:yesbank.in OR from:yes.bank.in OR from:rblbank.com OR from:aubank.in "
+    "OR from:sc.com OR from:hsbc.co.in OR from:citibank.co.in OR from:americanexpress.com "
     "OR from:camsonline.com OR from:kfintech.com) "
     "-from:reportsmailer.zerodha.net -from:zerodha.com -from:cdslstatement.com -from:nsdl.co.in "
     "has:attachment (filename:pdf OR filename:csv)"
@@ -454,6 +458,14 @@ class GmailStatementIngestor:
     def extract_attachment_parts(self, message_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Recursively traverses MIME message structure to find PDF and CSV attachments (including inline data)."""
         attachments: List[Dict[str, Any]] = []
+        seen_keys = set()
+
+        def _append_unique(att_dict: Dict[str, Any]):
+            key = (att_dict.get("attachmentId") or "", att_dict.get("filename", "").lower(), att_dict.get("size", 0))
+            if key in seen_keys:
+                return
+            seen_keys.add(key)
+            attachments.append(att_dict)
 
         def _decode_data(data_str: str) -> bytes:
             if not data_str:
@@ -494,7 +506,7 @@ class GmailStatementIngestor:
                                 att_dict["size"] = len(decoded)
                         except Exception as e:
                             logger.warning(f"Failed to decode inline attachment data: {e}")
-                    attachments.append(att_dict)
+                    _append_unique(att_dict)
 
                 sub_parts = part.get("parts", [])
                 if sub_parts:
@@ -533,7 +545,7 @@ class GmailStatementIngestor:
                             att_dict["size"] = len(decoded)
                     except Exception as e:
                         logger.warning(f"Failed to decode inline attachment data: {e}")
-                attachments.append(att_dict)
+                _append_unique(att_dict)
 
         return attachments
 
@@ -643,21 +655,40 @@ class GmailStatementIngestor:
         failed_statements: List[Dict[str, Any]] = []
         total_transactions = 0
         all_transactions_for_matching: List[Dict[str, Any]] = []
+        tx_by_id: Dict[str, Dict[str, Any]] = {}
+
+        # Fetch full MIME details concurrently (bounded at 4 workers) for fast sync turnaround
+        msg_ids = [m["id"] for m in messages if m.get("id")]
+        fetched_details: Dict[str, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {}
+
+        def _fetch_one(mid: str) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+            try:
+                return mid, self.fetch_message_detail(mid), None
+            except Exception as exc:
+                return mid, None, str(exc)
+
+        if len(msg_ids) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(4, len(msg_ids))) as pool:
+                for mid, detail, err_str in pool.map(_fetch_one, msg_ids):
+                    fetched_details[mid] = (detail, err_str)
+        elif len(msg_ids) == 1:
+            mid, detail, err_str = _fetch_one(msg_ids[0])
+            fetched_details[mid] = (detail, err_str)
 
         for msg_summary in messages:
             msg_id = msg_summary.get("id")
             if not msg_id:
                 continue
 
-            try:
-                msg_detail = self.fetch_message_detail(msg_id)
-            except Exception as err:
-                logger.warning(f"Failed to fetch message detail for {msg_id}: {err}")
+            msg_detail, fetch_err = fetched_details.get(msg_id, (None, "Missing detail"))
+            if fetch_err or msg_detail is None:
+                logger.warning(f"Failed to fetch message detail for {msg_id}: {fetch_err}")
                 failed_statements.append({
                     "success": False,
                     "message_id": msg_id,
                     "error_code": "MESSAGE_FETCH_FAILED",
-                    "errors": [f"Failed to fetch message details: {str(err)}"],
+                    "errors": [f"Failed to fetch message details: {fetch_err}"],
                 })
                 continue
 
@@ -738,7 +769,8 @@ class GmailStatementIngestor:
 
                     # Enrich transactions with Transaction Intelligence
                     enriched_txs = []
-                    for tx in parse_res.transactions:
+                    acct_key = f"{parse_res.bank_name or detected_bank}:{parse_res.metadata.account_number_masked or msg_id}"
+                    for idx, tx in enumerate(parse_res.transactions):
                         classification = classifier.classify(
                             TransactionClassificationInput(
                                 amount=tx.amount,
@@ -746,9 +778,13 @@ class GmailStatementIngestor:
                                 original_narration=tx.original_narration,
                                 transaction_date=tx.transaction_date,
                                 transaction_reference=tx.transaction_reference,
+                                bank_name=parse_res.bank_name or detected_bank,
                             )
                         )
                         tx_dict = tx.model_dump()
+                        tx_uid = f"{msg_id}:{att_id or 'inline'}:{idx}"
+                        tx_dict["id"] = tx_uid
+                        tx_dict["account_id"] = acct_key
                         tx_dict["category"] = classification.category
                         tx_dict["transaction_type"] = classification.transaction_type
                         tx_dict["classification_confidence"] = float(classification.confidence)
@@ -759,7 +795,9 @@ class GmailStatementIngestor:
                         tx_dict["counterparty_identifier"] = classification.counterparty_identifier
                         tx_dict["channel"] = classification.channel
                         tx_dict["is_refund"] = classification.is_refund
+                        tx_dict["is_transfer"] = classification.is_transfer
                         enriched_txs.append(tx_dict)
+                        tx_by_id[tx_uid] = tx_dict
                         all_transactions_for_matching.append(tx_dict)
 
                     stmt_dict = parse_res.model_dump()
@@ -800,8 +838,14 @@ class GmailStatementIngestor:
                     parsed_statements.append(fail_info)
                     failed_statements.append(fail_info)
 
-        # Match internal transfers across all extracted transactions
+        # Match internal transfers across all extracted transactions and propagate flag
         transfer_matches = match_internal_transfers(all_transactions_for_matching)
+        for tm in transfer_matches:
+            for tid in (tm.debit_tx_id, tm.credit_tx_id):
+                if tid in tx_by_id:
+                    tx_by_id[tid]["is_transfer"] = True
+                    tx_by_id[tid]["transaction_type"] = "INTERNAL_TRANSFER"
+                    tx_by_id[tid]["category"] = "Transfer"
 
         has_failures = len(failed_statements) > 0
         overall_status = "FAILED" if (has_failures and len(failed_statements) == len(parsed_statements)) else ("PARTIAL_FAILURE" if has_failures else "COMPLETED")

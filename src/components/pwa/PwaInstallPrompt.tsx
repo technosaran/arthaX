@@ -24,45 +24,66 @@ export default function PwaInstallPrompt() {
       return;
     }
 
-    // 2. Check dismissal cooldown (7 days)
-    const dismissedTime = localStorage.getItem("arthax_pwa_dismissed_at");
-    if (dismissedTime) {
-      const elapsed = Date.now() - parseInt(dismissedTime, 10);
-      if (elapsed < 7 * 24 * 60 * 60 * 1000) {
-        return;
-      }
-    }
-
-    // 3. Detect iOS Safari
     const ua = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(ua);
     const isSafari = ua.includes("safari") && !ua.includes("crios") && !ua.includes("fxios");
-
     if (isIosDevice && isSafari) {
       setIsIos(true);
-      // Give the user 4 seconds to view the page before surfacing install suggestion
-      const timer = setTimeout(() => setShowBanner(true), 4000);
-      return () => clearTimeout(timer);
     }
 
-    // 4. Android / Chromium beforeinstallprompt listener
+    // Explicit user-triggered install prompt from navigation menu (bypasses dismiss cooldown)
+    const handleExplicitOpen = async () => {
+      const promptEvent = (window as any).deferredPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        try {
+          const choiceResult = await promptEvent.userChoice;
+          if (choiceResult?.outcome === "accepted") {
+            setShowBanner(false);
+            setIsInstalled(true);
+          }
+          (window as any).deferredPrompt = null;
+        } catch {
+          setShowIosModal(true);
+        }
+      } else {
+        setShowIosModal(true);
+      }
+    };
+
     const handleInstallable = () => {
       setShowBanner(true);
     };
 
     const handleInstalled = () => {
       setShowBanner(false);
+      setShowIosModal(false);
       setIsInstalled(true);
     };
 
+    window.addEventListener("arthax:open-pwa-install", handleExplicitOpen);
     window.addEventListener("arthax:pwa-installable", handleInstallable);
     window.addEventListener("arthax:pwa-installed", handleInstalled);
 
-    if ((window as any).deferredPrompt) {
-      setShowBanner(true);
+    let iosTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Check dismissal cooldown (7 days) only for passive auto-banner
+    const dismissedTime = localStorage.getItem("arthax_pwa_dismissed_at");
+    const inCooldown =
+      !!dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 7 * 24 * 60 * 60 * 1000;
+
+    if (!inCooldown) {
+      if (isIosDevice && isSafari) {
+        // Give the user 4 seconds to view the page before surfacing install suggestion
+        iosTimer = setTimeout(() => setShowBanner(true), 4000);
+      } else if ((window as any).deferredPrompt) {
+        setShowBanner(true);
+      }
     }
 
     return () => {
+      if (iosTimer) clearTimeout(iosTimer);
+      window.removeEventListener("arthax:open-pwa-install", handleExplicitOpen);
       window.removeEventListener("arthax:pwa-installable", handleInstallable);
       window.removeEventListener("arthax:pwa-installed", handleInstalled);
     };

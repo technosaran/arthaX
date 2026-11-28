@@ -8,7 +8,22 @@ export interface RateLimitResult {
 }
 
 // In-memory fallback map for environments without Redis or during Redis network blips
+const MAX_MEMORY_ENTRIES = 10_000;
 const inMemoryStore = new Map<string, { count: number; resetAt: number }>();
+
+function pruneMemoryStoreIfNeeded(now: number): void {
+  if (inMemoryStore.size < MAX_MEMORY_ENTRIES) return;
+  for (const [k, v] of inMemoryStore.entries()) {
+    if (v.resetAt <= now) {
+      inMemoryStore.delete(k);
+    }
+  }
+  while (inMemoryStore.size >= MAX_MEMORY_ENTRIES) {
+    const oldestKey = inMemoryStore.keys().next().value;
+    if (!oldestKey) break;
+    inMemoryStore.delete(oldestKey);
+  }
+}
 
 // Periodic in-memory store cleanup to avoid memory leaks
 if (typeof setInterval !== "undefined") {
@@ -19,7 +34,7 @@ if (typeof setInterval !== "undefined") {
         inMemoryStore.delete(k);
       }
     }
-  }, 60000) as any).unref?.();
+  }, 60000) as { unref?: () => void }).unref?.();
 }
 
 /**
@@ -38,22 +53,28 @@ export async function rateLimit(
   const now = Date.now();
   const resetUnix = Math.ceil((now + windowSeconds * 1000) / 1000);
 
-  // 1. Upstash Redis distributed path
+  // 1. Upstash Redis distributed path (pipelined INCR + TTL to prevent orphan keys without expiry)
   if (isRedisConfigured && redis) {
     try {
       const key = `arthax:ratelimit:${identifier}`;
-      const current = await redis.incr(key);
+      const pipeline = redis.pipeline();
+      pipeline.incr(key);
+      pipeline.ttl(key);
+      const [rawCount, rawTtl] = (await pipeline.exec()) as [number, number];
+      const current = Number(rawCount) || 1;
+      const ttl = Number(rawTtl);
 
-      if (current === 1) {
+      if (current === 1 || ttl < 0) {
         await redis.expire(key, windowSeconds);
       }
 
+      const effectiveReset = ttl > 0 ? Math.ceil(now / 1000) + ttl : resetUnix;
       const remaining = Math.max(0, limit - current);
       return {
         success: current <= limit,
         limit,
         remaining,
-        reset: resetUnix,
+        reset: effectiveReset,
       };
     } catch (err) {
       console.warn(`[RateLimit] Redis error for ${identifier}, falling back to memory:`, err);
@@ -63,6 +84,7 @@ export async function rateLimit(
   // 2. In-memory fallback path
   const record = inMemoryStore.get(identifier);
   if (!record || record.resetAt <= now) {
+    pruneMemoryStoreIfNeeded(now);
     inMemoryStore.set(identifier, { count: 1, resetAt: now + windowSeconds * 1000 });
     return {
       success: true,
@@ -112,6 +134,23 @@ export async function checkAndSetIdempotency(
     return false; // Already processed
   }
 
+  pruneMemoryStoreIfNeeded(now);
   inMemoryStore.set(memoryKey, { count: 1, resetAt: now + ttlSeconds * 1000 });
   return true;
+}
+
+/**
+ * Releases an idempotency lock when an operation fails with a transient 5xx error
+ * so the caller can safely retry without being blocked for the full TTL.
+ */
+export async function releaseIdempotency(key: string): Promise<void> {
+  if (!key) return;
+  inMemoryStore.delete(`idemp:${key}`);
+  if (isRedisConfigured && redis) {
+    try {
+      await redis.del(`arthax:idempotency:${key}`);
+    } catch {
+      // Non-blocking cleanup
+    }
+  }
 }

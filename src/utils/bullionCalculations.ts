@@ -9,9 +9,6 @@ import { formatINRWhole } from "@/utils/money";
 
 export type MetalType = "GOLD" | "SILVER";
 
-export type GoldPurity = "24K" | "22K" | "18K" | "14K";
-export type SilverPurity = "999" | "925" | "9999";
-
 export type BullionItemType =
   | "COIN"
   | "BAR"
@@ -20,12 +17,6 @@ export type BullionItemType =
   | "BULLION"
   | "UTENSIL"
   | "OTHER";
-
-export type StorageLocation =
-  | "Home Safe"
-  | "Bank Locker"
-  | "Digital Vault"
-  | "Custom";
 
 export interface BullionHolding {
   id: string;
@@ -48,22 +39,6 @@ export interface BullionHolding {
   notes?: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface BullionTransaction {
-  id: string;
-  user_id: string;
-  holding_id: string;
-  metal: MetalType;
-  type: "BUY" | "SELL";
-  weight_grams: number;
-  price_per_gram: number;
-  making_charges: number;
-  tax_gst: number;
-  total_amount: number;
-  transaction_date: string;
-  notes?: string | null;
-  created_at: string;
 }
 
 export interface BullionRates {

@@ -12,6 +12,7 @@ import { Wifi, Building2, CreditCard as CardIcon, ShieldCheck } from 'lucide-rea
 import Svg, { Rect, Path } from 'react-native-svg';
 import { Account } from '../types';
 import { formatIndianCurrency } from './CurrencyText';
+import { MONO_FONT, TABULAR_NUMS_STYLE } from '../theme/platform';
 
 interface AppleWalletAccountCardProps {
   account: Account;
@@ -133,6 +134,8 @@ export const AppleWalletAccountCard: React.FC<AppleWalletAccountCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${account.name}, ${isCredit ? 'current due' : 'available balance'} ${formatIndianCurrency(balanceAmount)}`}
       style={[
         {
           borderRadius: 22,
@@ -188,13 +191,16 @@ export const AppleWalletAccountCard: React.FC<AppleWalletAccountCardProps> = ({
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 14 }}>
           <EmvChip />
           <Text
-            style={{
-              fontSize: 16,
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontFamily: 'monospace',
-              letterSpacing: 2,
-              fontWeight: '700',
-            }}
+            style={[
+              {
+                fontSize: 16,
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontFamily: MONO_FONT,
+                letterSpacing: 2,
+                fontWeight: '700',
+              },
+              TABULAR_NUMS_STYLE,
+            ]}
           >
             {account.account_number_mask || '•••• •••• •••• 8821'}
           </Text>
@@ -207,12 +213,15 @@ export const AppleWalletAccountCard: React.FC<AppleWalletAccountCardProps> = ({
               {isCredit ? 'Current Due' : 'Available Balance'}
             </Text>
             <Text
-              style={{
-                fontSize: 24,
-                fontWeight: '900',
-                color: isCredit ? '#fca5a5' : '#ffffff',
-                marginTop: 2,
-              }}
+              style={[
+                {
+                  fontSize: 24,
+                  fontWeight: '900',
+                  color: isCredit ? '#fca5a5' : '#ffffff',
+                  marginTop: 2,
+                },
+                TABULAR_NUMS_STYLE,
+              ]}
             >
               {formatIndianCurrency(balanceAmount)}
             </Text>

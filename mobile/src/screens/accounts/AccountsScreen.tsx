@@ -5,29 +5,26 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Modal,
   TextInput,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Building2,
-  CreditCard,
   Plus,
-  SlidersHorizontal,
-  ChevronDown,
   Layers,
-  ArrowUpRight,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useFinancial } from '../../context/FinancialContext';
 import { Header } from '../../components/Header';
-import { Card } from '../../components/Card';
 import { CurrencyText } from '../../components/CurrencyText';
 import { Button } from '../../components/Button';
+import { BottomSheetModal } from '../../components/BottomSheetModal';
 import { AppleWalletAccountCard } from '../../components/AppleWalletAccountCard';
 import { sumMoney } from '../../engine/money';
+import { COMPACT_HIT_SLOP, getScrollBottomPadding, NUMERIC_KEYBOARD } from '../../theme/platform';
 
 export const AccountsScreen = () => {
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { accounts, isRefreshing, refreshData } = useFinancial();
 
@@ -83,7 +80,7 @@ export const AccountsScreen = () => {
       />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 50 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: getScrollBottomPadding(insets.bottom) }}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshData} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
@@ -123,43 +120,48 @@ export const AccountsScreen = () => {
         </View>
 
         {/* Filter Chips */}
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
-          {(['ALL', 'SAVINGS', 'CREDIT_CARD', 'INVESTMENT'] as const).map((type) => {
-            const isSelected = filterType === type;
-            const label =
-              type === 'ALL'
-                ? 'All Cards'
-                : type === 'SAVINGS'
-                ? 'Savings / Bank'
-                : type === 'CREDIT_CARD'
-                ? 'Credit Cards'
-                : 'Demat / Brokers';
-            return (
-              <TouchableOpacity
-                key={type}
-                onPress={() => setFilterType(type)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 7,
-                  borderRadius: 12,
-                  backgroundColor: isSelected ? colors.primary : colors.card,
-                  borderWidth: 1,
-                  borderColor: isSelected ? colors.primary : colors.border,
-                }}
-              >
-                <Text
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {(['ALL', 'SAVINGS', 'CREDIT_CARD', 'INVESTMENT'] as const).map((type) => {
+              const isSelected = filterType === type;
+              const label =
+                type === 'ALL'
+                  ? 'All Cards'
+                  : type === 'SAVINGS'
+                  ? 'Savings / Bank'
+                  : type === 'CREDIT_CARD'
+                  ? 'Credit Cards'
+                  : 'Demat / Brokers';
+              return (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => setFilterType(type)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                   style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: isSelected ? '#ffffff' : colors.textSecondary,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 12,
+                    backgroundColor: isSelected ? colors.primary : colors.card,
+                    borderWidth: 1,
+                    borderColor: isSelected ? colors.primary : colors.border,
                   }}
                 >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: isSelected ? '#ffffff' : colors.textSecondary,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
 
         {/* Section Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -171,6 +173,9 @@ export const AccountsScreen = () => {
           </View>
           <TouchableOpacity
             onPress={() => setModalVisible(true)}
+            hitSlop={COMPACT_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Link financial card"
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -232,6 +237,9 @@ export const AccountsScreen = () => {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity
                       onPress={() => Alert.alert('Balance Updated', `${account.name} balance verified via API sync.`)}
+                      hitSlop={COMPACT_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sync balance for ${account.name}`}
                       style={{
                         paddingHorizontal: 12,
                         paddingVertical: 6,
@@ -252,54 +260,52 @@ export const AccountsScreen = () => {
       </ScrollView>
 
       {/* Link Account Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 }}>
-              Link New Financial Account
-            </Text>
+      <BottomSheetModal visible={modalVisible} onClose={() => setModalVisible(false)}>
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 }}>
+            Link New Financial Account
+          </Text>
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Account Name
-            </Text>
-            <TextInput
-              placeholder="e.g. ICICI Coral Credit Card"
-              placeholderTextColor={colors.textMuted}
-              value={accName}
-              onChangeText={setAccName}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Account Name
+          </Text>
+          <TextInput
+            placeholder="e.g. ICICI Coral Credit Card"
+            placeholderTextColor={colors.textMuted}
+            value={accName}
+            onChangeText={setAccName}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
+          />
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Institution
-            </Text>
-            <TextInput
-              placeholder="e.g. ICICI Bank, Zerodha, SBI"
-              placeholderTextColor={colors.textMuted}
-              value={institution}
-              onChangeText={setInstitution}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Institution
+          </Text>
+          <TextInput
+            placeholder="e.g. ICICI Bank, Zerodha, SBI"
+            placeholderTextColor={colors.textMuted}
+            value={institution}
+            onChangeText={setInstitution}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, marginBottom: 14 }}
+          />
 
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
-              Current Balance (₹)
-            </Text>
-            <TextInput
-              placeholder="0.00"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              value={balance}
-              onChangeText={setBalance}
-              style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 20 }}
-            />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+            Current Balance (₹)
+          </Text>
+          <TextInput
+            placeholder="0.00"
+            placeholderTextColor={colors.textMuted}
+            keyboardType={NUMERIC_KEYBOARD}
+            value={balance}
+            onChangeText={setBalance}
+            style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 20 }}
+          />
 
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Button title="Cancel" variant="secondary" onPress={() => setModalVisible(false)} style={{ flex: 1 }} />
-              <Button title="Save Account" variant="primary" onPress={handleCreateAccount} style={{ flex: 1 }} />
-            </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Button title="Cancel" variant="secondary" onPress={() => setModalVisible(false)} style={{ flex: 1 }} />
+            <Button title="Save Account" variant="primary" onPress={handleCreateAccount} style={{ flex: 1 }} />
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
+      </BottomSheetModal>
     </View>
   );
 };

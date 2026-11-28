@@ -13,9 +13,12 @@ import {
   ArrowRight,
   PiggyBank,
   Clock,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import { getUserCacheKey, CACHE_KEYS } from "@/utils/cacheKeys";
 import { getFromLocalCache, saveToCache } from "@/utils/cacheClient";
 import InteractiveDonutChart, { DonutSegment } from "@/components/charts/InteractiveDonutChart";
@@ -28,6 +31,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton, StatCardSkeleton } from "@/components/ui/Skeleton";
+
+const CHART_PALETTE = [
+  "#10B981", // Emerald (Cash / Savings)
+  "#3B82F6", // Royal Blue (HDFC / Banking)
+  "#8B5CF6", // Purple / Violet (Fixed Deposits)
+  "#06B6D4", // Neon Cyan (Investments / Demat)
+  "#F59E0B", // Bright Amber / Gold
+  "#EC4899", // Vivid Pink
+  "#F43F5E", // Vibrant Rose / Red
+  "#14B8A6", // Teal
+];
 
 interface AccountItem {
   id: string;
@@ -140,6 +154,8 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   const [incomes, setIncomes] = useState<IncomeItem[]>(initialCache?.incomes || []);
   const [transfers, setTransfers] = useState<TransferItem[]>(initialCache?.transfers || []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const inFlightRef = useRef<boolean>(false);
   const pendingRefetchRef = useRef<boolean>(false);
 
@@ -148,13 +164,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   const formattedName = useMemo(() => {
     return formatDisplayName(displayName);
   }, [displayName]);
-
-  // Synchronize greeting name whenever profile arrives or updates
-  useEffect(() => {
-    if (profile?.name) {
-      setName((prev) => (prev === profile.name ? prev : profile.name));
-    }
-  }, [profile?.name]);
 
   // Currency Formatter (INR)
   const formatCurrency = useCallback((val: number) => {
@@ -181,6 +190,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       return;
     }
     inFlightRef.current = true;
+    setLoadError(null);
 
     try {
       const supabase = createClient();
@@ -240,6 +250,11 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           .select("metal, weight_grams, total_buy_price")
           .eq("user_id", user.id),
       ]);
+
+      const queryErrors = [accountsRes.error, expensesRes.error, incomeRes.error, transfersRes.error].filter(Boolean);
+      if (queryErrors.length > 0) {
+        throw new Error(queryErrors[0]?.message || "Unable to sync latest ledger telemetry.");
+      }
 
       // 1. Resolve user display name
       const rawProfileName = profile?.name?.trim();
@@ -355,7 +370,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         120
       );
     } catch (err) {
-      console.warn("Error fetching dashboard telemetry:", err);
+      const msg = err instanceof Error ? err.message : "Failed to load dashboard telemetry.";
+      setLoadError(msg);
+      showToast("Dashboard Sync Issue", msg, "error");
     } finally {
       setLoading(false);
       inFlightRef.current = false;
@@ -373,7 +390,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       setGreetingEmoji(info.emoji);
     };
 
-    updateTimeGreeting();
     const greetingInterval = setInterval(updateTimeGreeting, 60000);
 
     if (!user) {
@@ -579,18 +595,6 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     return Math.min(100, Math.round((liquid / totalAssets) * 100));
   }, [accounts, totalAssets]);
 
-  // Modern Fintech Color Palette for Chart
-  const chartPalette = [
-    "#10B981", // Emerald (Cash / Savings)
-    "#3B82F6", // Royal Blue (HDFC / Banking)
-    "#8B5CF6", // Purple / Violet (Fixed Deposits)
-    "#06B6D4", // Neon Cyan (Investments / Demat)
-    "#F59E0B", // Bright Amber / Gold
-    "#EC4899", // Vivid Pink
-    "#F43F5E", // Vibrant Rose / Red
-    "#14B8A6", // Teal
-  ];
-
   // Group portfolio assets by type for Donut Chart
   const typeMap = useMemo(() => {
     const map = accounts
@@ -623,9 +627,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       .map(([catType, catBalance], index) => ({
         label: catType,
         value: catBalance,
-        color: chartPalette[index % chartPalette.length],
+        color: CHART_PALETTE[index % CHART_PALETTE.length],
       }));
-  }, [typeMap, chartPalette]);
+  }, [typeMap]);
 
   const cryptoDonutSegments: DonutSegment[] = useMemo(() => {
     const sorted = [...cryptoHoldings].sort((a, b) => b.total_value_usd - a.total_value_usd);
@@ -635,7 +639,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     const segments: DonutSegment[] = top5.map((c, i) => ({
       label: c.asset,
       value: c.total_value_usd,
-      color: chartPalette[i % chartPalette.length],
+      color: CHART_PALETTE[i % CHART_PALETTE.length],
       subtitle: formatUSD(c.total_value_usd),
     }));
 
@@ -650,7 +654,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
     }
 
     return segments;
-  }, [cryptoHoldings, chartPalette, formatUSD]);
+  }, [cryptoHoldings, formatUSD]);
 
   // Top Expense Categories this Month
   const topExpenseCategories = useMemo(() => {
@@ -667,9 +671,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         category: cat,
         amount,
         percentage: totalMonthExpense > 0 ? Math.round((amount / totalMonthExpense) * 100) : 0,
-        color: chartPalette[index % chartPalette.length],
+        color: CHART_PALETTE[index % CHART_PALETTE.length],
       }));
-  }, [currentMonthExpenses, totalMonthExpense, chartPalette]);
+  }, [currentMonthExpenses, totalMonthExpense]);
 
   // Combined Recent Activity (Latest 5 items)
   const recentActivities: ActivityItem[] = useMemo(() => {
@@ -754,6 +758,24 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       </div>
 
       <div className="max-w-7xl space-y-6 sm:space-y-8">
+        {loadError && (
+          <div className="p-3.5 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertCircle size={16} className="text-rose-400 shrink-0" />
+              <span className="truncate">{loadError}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => void fetchDashboardData()}
+              className="gap-1.5 shrink-0"
+            >
+              <RefreshCw size={12} />
+              <span>Retry</span>
+            </Button>
+          </div>
+        )}
+
         {/* HERO CARD: Total Net Worth Card + Integrated Portfolio Asset Allocation */}
         <div
           className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 border relative overflow-hidden transition-all shadow-md group hover:border-[var(--app-border-hover)]"
@@ -773,7 +795,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             {/* Left Column: Total Net Worth Summary */}
             <div className="xl:col-span-6 space-y-5 min-w-0">
               {/* Top Label & Segmented Currency View Toggle */}
-              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-medium text-[var(--app-muted)]">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-[var(--app-fg)]">
                     Total Net Worth
@@ -1322,7 +1344,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                         <div className="font-semibold text-xs text-[var(--app-fg)] truncate">
                           {act.title}
                         </div>
-                        <div className="text-[11px] text-[var(--app-muted)] flex items-center gap-2 mt-0.5">
+                        <div className="text-[11px] text-[var(--app-muted)] flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
                           {act.category && (
                             <span className="px-2 py-0.5 rounded-md border text-[10px] font-mono border-[var(--app-border-subtle)] bg-[var(--app-card-subtle)]">
                               {act.category}
