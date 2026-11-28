@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import {
   TaxRuleOverride,
@@ -128,51 +127,6 @@ export interface TaxRegimeComparisonData {
 /**
  * Modern TanStack Query hooks replacing manual useEffect / useState boilerplate.
  */
-export function useAccountsQuery() {
-  const { user } = useAuth();
-  const supabase = createClient();
-
-  return useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-    staleTime: 60 * 1000,
-  });
-}
-
-export function useStockHoldingsQuery() {
-  const { user } = useAuth();
-  const supabase = createClient();
-
-  return useQuery({
-    queryKey: ["stock_holdings", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("stock_holdings")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-    staleTime: 30 * 1000,
-  });
-}
-
 export function useTaxAnalysisQuery(
   assessmentYear: string = getCurrentIndianAssessmentYear(),
   taxSlabRate: number = 0.30,
